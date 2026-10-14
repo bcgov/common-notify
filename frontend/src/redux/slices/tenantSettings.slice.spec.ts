@@ -5,12 +5,14 @@ import type { TenantSettings } from '@/interfaces/tenant-settings.interface'
 
 describe('tenantSettingsSlice', () => {
   const initialState = {
+    rateLimitPerMinute: undefined,
     alertEmail: null,
     defaultSenderEmail: null,
     saving: false,
   }
 
   const loadedState = {
+    rateLimitPerMinute: { EMAIL: 750, SMS: 1000 },
     alertEmail: 'alerts@example.com',
     defaultSenderEmail: 'noreply',
     emailLogoId: null,
@@ -51,17 +53,23 @@ describe('tenantSettingsSlice', () => {
 
       expect(state.alertEmail).toBeNull()
       expect(state.defaultSenderEmail).toBeNull()
+      expect(state.rateLimitPerMinute).toBeUndefined()
       expect(state.error).toBeUndefined()
     })
 
     it('should take its own fields from the shared payload', () => {
       const state = tenantSettingsReducer(
         initialState,
-        fetchSettings.fulfilled(tenantSettings, '', undefined),
+        fetchSettings.fulfilled(
+          { ...tenantSettings, rateLimitPerMinute: { EMAIL: 750, SMS: 1000 } },
+          '',
+          undefined,
+        ),
       )
 
       expect(state.alertEmail).toBe('alerts@example.com')
       expect(state.defaultSenderEmail).toBe('noreply')
+      expect(state.rateLimitPerMinute).toEqual({ EMAIL: 750, SMS: 1000 })
     })
 
     it('should fall back to defaults when no settings row exists yet', () => {
