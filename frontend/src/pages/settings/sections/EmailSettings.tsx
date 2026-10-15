@@ -13,6 +13,7 @@ import {
 } from '@bcgov/design-system-react-components'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import EmailLogoMenu from '@/components/EmailLogoMenu'
+import StickyBar from '@/components/StickyBar'
 import TooltipTrigger from '@/components/TooltipTrigger'
 import { NotificationChannel } from '@/api/templates.api'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
@@ -334,9 +335,11 @@ const EmailSettings: FC = () => {
         </p>
       </div>
 
-      <Button type="submit" variant="primary" isDisabled={isSaveDisabled}>
-        {saving ? 'Saving…' : 'Save email settings'}
-      </Button>
+      <StickyBar>
+        <Button type="submit" variant="primary" isDisabled={isSaveDisabled}>
+          {saving ? 'Saving…' : 'Save email settings'}
+        </Button>
+      </StickyBar>
     </form>
   )
 }

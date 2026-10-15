@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { ProgressCircle } from '@bcgov/design-system-react-components'
 import BulkNotifications from '@/pages/bulk-notifications/BulkNotifications'
-import LoadingSpinner from '@/components/LoadingSpinner'
 import NotFound from '@/components/NotFound'
 import { useBulkNotificationsAccess } from '@/hooks/useBulkNotificationsAccess'
 
@@ -15,7 +15,11 @@ function BulkNotificationsPage() {
   // before they do is the empty shell this replaced; rendering the 404 before they do
   // flashes it at users who turn out to have access.
   if (!isResolved) {
-    return <LoadingSpinner isVisible />
+    return (
+      <div className="page-loading">
+        <ProgressCircle isIndeterminate valueLabel="Loading..." />
+      </div>
+    )
   }
 
   // Same answer the sidebar gives by omitting the link: as far as this user is

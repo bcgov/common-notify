@@ -23,6 +23,7 @@ import { useCstarRoles } from '@/hooks/useCstarRoles'
 import useAutoGrowingTextArea from '@/hooks/useAutoGrowingTextArea'
 import { CstarRole } from '@/enum/cstar-role.enum'
 import TemplatePreviewModal from './TemplatePreviewModal'
+import TemplateFormActions from './TemplateFormActions'
 import SmsSegmentEstimate from './SmsSegmentEstimate'
 import '@/scss/components/templates.scss'
 
@@ -234,8 +235,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
       <PageHeading
         title={isReadOnly ? 'View reusable template' : 'Edit reusable template'}
         breadcrumbs={[
-          { label: 'Home', to: '/dashboard' },
-          { label: 'Templates', to: '/templates' },
+          { label: 'Template', to: '/templates' },
           {
             label: isReadOnly ? 'View reusable template' : 'Edit reusable template',
           },
@@ -385,25 +385,17 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
           </div>
         </div>
 
-        <div className="template-form__actions">
-          <Button type="button" variant="secondary" onClick={handleCancel}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onPress={() => setPreviewOpen(true)}
-            isDisabled={!formData.body.trim() || !formData.channelCode || !formData.engineCode}
-          >
-            Preview
-          </Button>
-
+        <TemplateFormActions
+          onCancel={handleCancel}
+          onPreview={() => setPreviewOpen(true)}
+          isPreviewDisabled={!formData.body.trim() || !formData.channelCode || !formData.engineCode}
+        >
           {!isReadOnly && (
             <Button type="submit" isDisabled={saving}>
               {saving ? 'Saving...' : 'Save'}
             </Button>
           )}
-        </div>
+        </TemplateFormActions>
       </form>
 
       <TemplatePreviewModal

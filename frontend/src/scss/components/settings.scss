@@ -29,15 +29,20 @@
   }
 }
 
+// The measure sits on the section's blocks rather than the section itself, so the
+// StickyBar at the end of each form can span the full width of the page.
 .settings__section {
   display: flex;
   flex-direction: column;
   gap: 24px;
-  width: 418px;
-  max-width: 100%;
 
-  &:has(.settings__form--email) {
-    width: 500px;
+  > :not(.settings__form),
+  > .settings__form > :not(.sticky-bar) {
+    max-width: 418px;
+  }
+
+  > .settings__form--email > :not(.sticky-bar) {
+    max-width: 500px;
   }
 }
 
