@@ -192,6 +192,11 @@ groups:
           summary: "Redis connection errors in {{ $labels.namespace }}"
           description: "{{ $value }} Redis connection error log lines in {{ $labels.namespace }} over the last 10 minutes"
 
+      # Counts failed notifications, not matching log lines. A bare line match on
+      # email/fail also matches the success line "... sent=20, failed=0", and one
+      # bad recipient emits ~10 lines across its retries. Anchored instead on the
+      # terminal line the worker writes once per notification that has exhausted
+      # its retries, so the value is the number of failed notifications.
       - uid: cn-log-email-failures
         title: EmailSendingFailures
         condition: C
@@ -205,7 +210,11 @@ groups:
             model:
               editorMode: code
               expr: |
-                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(email|smtp).*(?i)(fail|error)" [10m])) by (namespace)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"}
+                  | json | level="error"
+                  | context="EmailDeliveryWorker"
+                  |~ "Notification delivery failed"
+                [10m])) by (namespace)
               queryType: instant
               refId: A
           - refId: C
@@ -223,13 +232,17 @@ groups:
         annotations:
           short: "{{ $labels.namespace }} email send failures elevated"
           summary: "Email sending failures in {{ $labels.namespace }}"
-          description: "{{ $value }} email send failure log lines in {{ $labels.namespace }} over the last 10 minutes"
+          description: "{{ $value }} email notifications failed delivery in {{ $labels.namespace }} over the last 10 minutes (retries exhausted)"
 
   - orgId: 1
     name: common-notify-performance
     folder: Common Notify Logs
     interval: 1m
     rules:
+      # Compares the parsed duration field. A regex for a number >=5000 following
+      # the text "duration" matched contentLength instead, so fast requests were
+      # counted as slow. Threshold matches the real latency profile, where
+      # requests even over a second are rare.
       - uid: cn-log-slow-api
         title: SlowAPIResponses
         condition: C
@@ -243,7 +256,9 @@ groups:
             model:
               editorMode: code
               expr: |
-                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)duration.*([5-9][0-9]{3}|[1-9][0-9]{4,})" [10m])) by (namespace)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"}
+                  | json | context="HTTP" | duration > 3000
+                [10m])) by (namespace)
               queryType: instant
               refId: A
           - refId: C
@@ -252,7 +267,7 @@ groups:
               type: threshold
               expression: A
               conditions:
-                - evaluator: { type: gt, params: [20] }
+                - evaluator: { type: gt, params: [5] }
               refId: C
         labels:
           severity: "warning"
@@ -372,6 +387,8 @@ groups:
     folder: Common Notify Logs
     interval: 1m
     rules:
+      # level=error so success lines containing "failed=0" cannot match.
+      # Threshold is uncalibrated - no CHES traffic observed yet.
       - uid: cn-log-ches-failures
         title: ChesDeliveryFailures
         condition: C
@@ -385,7 +402,10 @@ groups:
             model:
               editorMode: code
               expr: |
-                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)ches.*(?i)(fail|error|timeout|unavailable|5[0-9][0-9])" [10m])) by (namespace)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"}
+                  | json | level="error"
+                  |~ "(?i)ches" |~ "(?i)(fail|error|timeout|unavailable|5[0-9][0-9])"
+                [10m])) by (namespace)
               queryType: instant
               refId: A
           - refId: C
@@ -438,6 +458,8 @@ groups:
           summary: "ACS delivery failures in {{ $labels.namespace }}"
           description: "Repeated ACS (SMS provider) failures in {{ $labels.namespace }} ({{ $value }} matching log lines over 10m). SMS delivery may be degraded."
 
+      # level=error so success lines containing "failed=0" cannot match.
+      # Threshold is uncalibrated - no SMS traffic observed yet.
       - uid: cn-log-sms-failures
         title: SmsSendingFailures
         condition: C
@@ -451,7 +473,10 @@ groups:
             model:
               editorMode: code
               expr: |
-                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)sms.*(?i)(fail|error)" [10m])) by (namespace)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"}
+                  | json | level="error"
+                  |~ "(?i)sms" |~ "(?i)(fail|error)"
+                [10m])) by (namespace)
               queryType: instant
               refId: A
           - refId: C
@@ -471,6 +496,7 @@ groups:
           summary: "SMS sending failures in {{ $labels.namespace }}"
           description: "{{ $value }} SMS send failure log lines in {{ $labels.namespace }} over the last 10 minutes."
 
+      # level=error so success lines containing "failed=0" cannot match.
       - uid: cn-log-webhook-failures
         title: WebhookDeliveryFailures
         condition: C
@@ -484,7 +510,10 @@ groups:
             model:
               editorMode: code
               expr: |
-                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(webhook|callback).*(?i)(fail|error|timeout)" [10m])) by (namespace)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"}
+                  | json | level="error"
+                  |~ "(?i)(webhook|callback)" |~ "(?i)(fail|error|timeout)"
+                [10m])) by (namespace)
               queryType: instant
               refId: A
           - refId: C
@@ -504,6 +533,10 @@ groups:
           summary: "Webhook delivery failures in {{ $labels.namespace }}"
           description: "Webhook/callback delivery failures in {{ $labels.namespace }} ({{ $value }} matching log lines over 10m)."
 
+      # level=error so the "sent=20, failed=0" success line cannot match; those
+      # successes were most of the matches. Threshold lowered to suit, since
+      # excluding them put the old value out of reach. Still line-based: queue
+      # jobs have no single terminal failure line the way email does.
       - uid: cn-log-queue-failures
         title: QueueJobFailures
         condition: C
@@ -517,7 +550,10 @@ groups:
             model:
               editorMode: code
               expr: |
-                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"} |~ "(?i)(job|worker|bullmq).*(?i)(failed|error)" [10m])) by (namespace)
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"}
+                  | json | level="error"
+                  |~ "(?i)(job|worker|bullmq)" |~ "(?i)(failed|error)"
+                [10m])) by (namespace)
               queryType: instant
               refId: A
           - refId: C
@@ -526,7 +562,7 @@ groups:
               type: threshold
               expression: A
               conditions:
-                - evaluator: { type: gt, params: [25] }
+                - evaluator: { type: gt, params: [15] }
               refId: C
         labels:
           severity: "warning"
