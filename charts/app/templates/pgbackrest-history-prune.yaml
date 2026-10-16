@@ -1,0 +1,119 @@
+{{- if .Values.pgbackrestHistoryPrune.enabled }}
+# Prunes pgBackRest's backup.history.
+#
+# pgBackRest writes one manifest per backup into
+# /pgbackrest/repo1/backup/db/backup.history and keeps it FOREVER. There is no
+# retention option for it - `pgbackrest help expire` offers only
+# --repo-retention-{full,diff,archive,archive-type}, none of which touch history.
+# repo1-retention-full was correctly set to 1 the whole time and made no
+# difference.
+#
+# In f6bc3f-dev that reached 1.8G across 4,422 files over ~196 days of hourly
+# backups, filling the 5Gi repo. That stopped WAL archiving, which filled
+# /pgwal, which stopped Postgres writing WAL at all - Patroni crash-looped it
+# while the pod still reported 4/4 Running, and every deploy failed for four
+# days on the Flyway init container.
+#
+# The manifests are informational: restore does not read them. Pruning is safe.
+# Follows the pattern of the chart's own pgbackrestLogCleanup CronJob - a
+# ServiceAccount that execs into the pod holding the volume, because repo1 is
+# RWO and cannot be mounted by a second pod.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-pgbackrest-history-prune
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-pgbackrest-history-prune
+rules:
+  # Find the repo host by label, then exec the prune inside it. Namespaced only;
+  # BC Gov tenants cannot create cluster-scoped RBAC.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-pgbackrest-history-prune
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-pgbackrest-history-prune
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-pgbackrest-history-prune
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-pgbackrest-history-prune
+spec:
+  # Offset off the hour: the full backup runs at 0 8 * * * and incrementals
+  # at 0 0-7,9-23 * * *, so every hour is otherwise occupied.
+  schedule: {{ .Values.pgbackrestHistoryPrune.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          serviceAccountName: {{ .Release.Name }}-pgbackrest-history-prune
+          restartPolicy: Never
+          containers:
+            - name: prune
+              # In-cluster imagestream, so this adds no Docker Hub pull and
+              # cannot be rate limited.
+              image: {{ .Values.pgbackrestHistoryPrune.image | quote }}
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  cpu: 100m
+                  memory: 64Mi
+              env:
+                - name: RETENTION_DAYS
+                  value: {{ .Values.pgbackrestHistoryPrune.retentionDays | quote }}
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -euo pipefail
+                  POD=$(oc get pods \
+                    -l postgres-operator.crunchydata.com/data=pgbackrest \
+                    -o name | head -1)
+                  if [ -z "${POD}" ]; then
+                    echo "No pgbackrest repo host found; nothing to do."
+                    exit 0
+                  fi
+                  echo "Repo host: ${POD}  retention: ${RETENTION_DAYS}d"
+                  # No `find` or `xargs` in the pgbackrest image (verified: both
+                  # MISSING; rm/ls/du/df/date/awk/sed are present), so the prune
+                  # walks a glob and compares the DATE IN THE FILENAME. That is
+                  # pgBackRest's own backup label (20260401-061623F.manifest.gz),
+                  # which is more trustworthy than mtime.
+                  oc exec "${POD}" -c pgbackrest -- sh -c '
+                    H=/pgbackrest/repo1/backup/db/backup.history
+                    [ -d "$H" ] || { echo "No backup.history; nothing to do."; exit 0; }
+                    CUTOFF=$(date -d "-'"${RETENTION_DAYS}"' days" +%Y%m%d)
+                    echo "before: $(du -sh $H | cut -f1), cutoff $CUTOFF"
+                    n=0
+                    for f in "$H"/*/*.manifest.gz; do
+                      [ -e "$f" ] || continue
+                      b=${f##*/}; d=${b%%-*}
+                      case "$d" in ""|*[!0-9]*) continue;; esac
+                      if [ "$d" -lt "$CUTOFF" ]; then rm -f "$f" && n=$((n+1)); fi
+                    done
+                    echo "pruned $n manifests older than $CUTOFF"
+                    echo "after:  $(du -sh $H | cut -f1)"
+                    df -h /pgbackrest/repo1 | tail -1
+                  '
+{{- end }}

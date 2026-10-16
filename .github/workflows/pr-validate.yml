@@ -22,10 +22,44 @@ jobs:
         - [Frontend](https://${{ github.event.repository.name }}-${{ github.event.number }}.apps.silver.devops.gov.bc.ca)
         - [Backend](https://${{ github.event.repository.name }}-${{ github.event.number }}.apps.silver.devops.gov.bc.ca/api)
 
+  crunchy-values-drift:
+    name: Crunchy Values Drift
+    if: (! github.event.pull_request.draft)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v6
+      # values-prod.yml and values-dev.yml are FULL COPIES of values.yml, because
+      # action-crunchy takes a single values file and there is no overlay to layer
+      # a short override onto. Duplicating a database config is only safe if the
+      # copies cannot silently diverge - a storage class, backup target or
+      # Postgres version drifting between environments is the fault that stays
+      # hidden until a restore. Only the replica count and the volume sizes may
+      # differ, and only those because prod runs a standby and dev needs a larger
+      # backup repo.
+      - name: Fail if the per-env files differ outside replicas and volume sizes
+        run: |
+          STATUS=0
+          for f in values-prod.yml values-dev.yml; do
+            DIFF=$(diff <(grep -vE '^\s*#' charts/crunchy/values.yml) \
+                        <(grep -vE '^\s*#' "charts/crunchy/${f}") || true)
+            UNEXPECTED=$(echo "${DIFF}" | grep -E '^[<>]' \
+              | grep -vE 'replicas:|storage:|walStorage:' || true)
+            if [ -n "${UNEXPECTED}" ]; then
+              echo "::error title=Crunchy values drift::values.yml and ${f} differ outside replicas/storage/walStorage."
+              echo "${UNEXPECTED}"
+              STATUS=1
+            else
+              echo "${f}: only replicas/storage differ:"
+              echo "${DIFF}" | grep -E '^[<>]' | sed 's/^/    /' || echo "    (identical)"
+            fi
+          done
+          exit ${STATUS}
+
   results:
     name: Validate Results
     if: always()
-    needs: [validate]
+    needs: [validate, crunchy-values-drift]
     runs-on: ubuntu-slim
     steps:
       - run: echo "Success!"
