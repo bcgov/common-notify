@@ -60,7 +60,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.2.3",
     "eslint-plugin-react": "^7.37.4",
-    "eslint-plugin-react-hooks": "~7.0.1",
+    "eslint-plugin-react-hooks": "~7.1.0",
     "jsdom": "^30.0.0",
     "msw": "^3.0.0",
     "prettier": "^3.5.3",
