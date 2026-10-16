@@ -158,6 +158,6 @@
   position: relative;
   // No side gutters here: the 64px inset on each side belongs to `.page`
   // ($page-gutter), so it applies once and pages cannot double it up.
-  // 56px separates the header from the page content below it.
-  padding: 56px 0 $spacing-xl;
+  // 32px separates the header from the page content below it.
+  padding: 32px 0 $spacing-xl;
 }

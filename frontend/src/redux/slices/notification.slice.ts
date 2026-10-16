@@ -121,4 +121,14 @@ export const { setSort, setFilter, setPage, setLimit, upsertNotification } =
 
 export const selectNotifications = (state: RootState) => state.notification.items
 
+// True once the tenant is known to have sent nothing. Checks items as well as count because an
+// SSE upsert adds rows without updating count. Active filters mean "nothing matched", not this.
+// Not while loading: just after filters are cleared, the empty rows are still the filtered result.
+export const selectHasNoNotifications = (state: RootState) =>
+  state.notification.hasLoaded &&
+  !state.notification.isLoading &&
+  state.notification.count === 0 &&
+  state.notification.items.length === 0 &&
+  Object.keys(state.notification.filters).length === 0
+
 export default notificationSlice.reducer

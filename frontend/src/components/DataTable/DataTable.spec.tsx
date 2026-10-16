@@ -94,6 +94,70 @@ describe('DataTable', () => {
 
       expect(screen.getByRole('cell', { name: 'No data available.' })).toBeInTheDocument()
     })
+
+    it('offers to clear a search that matched nothing', async () => {
+      const onClearSearch = vi.fn()
+      render(
+        <DataTable
+          columns={columns}
+          data={[]}
+          keyExtractor={keyExtractor}
+          search="nothing"
+          onClearSearch={onClearSearch}
+        />,
+      )
+
+      expect(
+        screen.getByRole('cell', { name: /^No results found. Try a different search./ }),
+      ).toBeInTheDocument()
+      await userEvent.click(screen.getByRole('button', { name: 'Clear search' }))
+
+      expect(onClearSearch).toHaveBeenCalledTimes(1)
+    })
+
+    it('offers to clear every filter when filters matched nothing', async () => {
+      const onFilter = vi.fn()
+      render(
+        <DataTable
+          columns={columns}
+          data={[]}
+          keyExtractor={keyExtractor}
+          activeFilters={{ status: ['active'], name: ['Alice'] }}
+          onFilter={onFilter}
+        />,
+      )
+
+      expect(
+        screen.getByRole('cell', { name: /^No data match the filters applied./ }),
+      ).toBeInTheDocument()
+      await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
+
+      expect(onFilter).toHaveBeenCalledWith('status', [])
+      expect(onFilter).toHaveBeenCalledWith('name', [])
+    })
+
+    it('puts a search ahead of filters when both are applied', () => {
+      render(
+        <DataTable
+          columns={columns}
+          data={[]}
+          keyExtractor={keyExtractor}
+          search="nothing"
+          onClearSearch={vi.fn()}
+          activeFilters={{ status: ['active'] }}
+          onFilter={vi.fn()}
+        />,
+      )
+
+      expect(screen.getByRole('button', { name: 'Clear search' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Clear filters' })).not.toBeInTheDocument()
+    })
+
+    it('shows no action when nothing narrowed the table', () => {
+      render(<DataTable columns={columns} data={[]} keyExtractor={keyExtractor} />)
+
+      expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    })
   })
 
   describe('loading state', () => {
@@ -361,6 +425,41 @@ describe('DataTable', () => {
       )
 
       expect(screen.queryByTestId('pagination')).not.toBeInTheDocument()
+    })
+
+    it('hides pagination and marks the row when a search emptied the table', () => {
+      render(
+        <DataTable
+          columns={columns}
+          data={[]}
+          keyExtractor={keyExtractor}
+          currentPage={1}
+          totalCount={0}
+          onPageChange={vi.fn()}
+          search="nothing"
+          onClearSearch={vi.fn()}
+        />,
+      )
+
+      expect(screen.queryByTestId('pagination')).not.toBeInTheDocument()
+      expect(screen.getByRole('cell', { name: /^No results found/ }).closest('tr')).toHaveClass(
+        'data-table__empty-row--action',
+      )
+    })
+
+    it('keeps pagination on a plain empty table', () => {
+      render(
+        <DataTable
+          columns={columns}
+          data={[]}
+          keyExtractor={keyExtractor}
+          currentPage={1}
+          totalCount={0}
+          onPageChange={vi.fn()}
+        />,
+      )
+
+      expect(screen.getByTestId('pagination')).toBeInTheDocument()
     })
 
     it('calls onPageChange when pagination next button is clicked', async () => {

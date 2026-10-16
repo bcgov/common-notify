@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import TablePaginationFooter from './pagination/TablePaginationFooter'
+import TableEmptyState, { getEmptyMessage, getNarrowing } from './TableEmptyState'
 import { Table } from './Table'
 import { TableBody } from './TableBody'
 import { TableCell } from './TableCell'
@@ -49,6 +50,9 @@ export interface TableProps<T> {
   isLoading?: boolean
   isEmpty?: boolean
   emptyMessage?: string
+  // Search: when set, an empty table offers to clear it (filters use activeFilters/onFilter)
+  search?: string
+  onClearSearch?: () => void
   // Accessibility
   label?: string
   // Styling
@@ -82,6 +86,8 @@ export function DataTable<T extends object>({
   isLoading = false,
   isEmpty,
   emptyMessage = 'No data available.',
+  search,
+  onClearSearch,
   currentPage,
   pageSize = 15,
   totalCount,
@@ -101,6 +107,11 @@ export function DataTable<T extends object>({
   data = data ?? []
 
   const showEmpty = !isLoading && (isEmpty || data.length === 0)
+  const narrowing = getNarrowing(search, onClearSearch, activeFilters, onFilter)
+  // A search or filter that emptied the table: there are no pages to move between.
+  const showNarrowedEmpty = showEmpty && narrowing != null
+  const showPagination =
+    onPageChange != null && totalCount != null && currentPage != null && !showNarrowedEmpty
 
   function renderBodyContent() {
     if (isLoading) {
@@ -113,9 +124,7 @@ export function DataTable<T extends object>({
 
     if (showEmpty) {
       return (
-        <TableRow className="data-table__empty-row">
-          <TableCell colSpan={columns.length}>{emptyMessage}</TableCell>
-        </TableRow>
+        <TableEmptyState narrowing={narrowing} message={emptyMessage} colSpan={columns.length} />
       )
     }
 
@@ -156,7 +165,7 @@ export function DataTable<T extends object>({
   const statusMessage = isLoading
     ? 'Loading'
     : showEmpty
-      ? emptyMessage
+      ? getEmptyMessage(narrowing, emptyMessage)
       : currentPage != null && totalCount != null
         ? (() => {
             const totalPages = Math.ceil(totalCount / pageSize)
@@ -201,15 +210,14 @@ export function DataTable<T extends object>({
           </TableRow>
         </TableHeader>
         <TableBody>{renderBodyContent()}</TableBody>
-        {(footerContent != null ||
-          (onPageChange != null && totalCount != null && currentPage != null)) && (
+        {(footerContent != null || showPagination) && (
           <TableFooter>
             {footerContent != null && (
               <TableRow>
                 <TableCell colSpan={columns.length}>{footerContent}</TableCell>
               </TableRow>
             )}
-            {onPageChange != null && totalCount != null && currentPage != null && (
+            {showPagination && (
               <TableRow>
                 <TableCell colSpan={columns.length} style={{ padding: 0 }}>
                   <TablePaginationFooter
