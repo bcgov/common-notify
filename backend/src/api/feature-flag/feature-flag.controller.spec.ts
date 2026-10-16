@@ -12,6 +12,10 @@ import { UpdateFeatureFlagDto } from './schemas/update-feature-flag.dto'
 describe('FeatureFlagController', () => {
   let controller: FeatureFlagController
 
+  const username = 'a1b2c3@azureidir'
+  const token = `header.${Buffer.from(JSON.stringify({ preferred_username: username })).toString('base64')}.signature`
+  const mockReq = { headers: { authorization: `Bearer ${token}` } } as any
+
   const mockFeatureFlagService = {
     create: vi.fn(),
     getAll: vi.fn(),
@@ -57,18 +61,18 @@ describe('FeatureFlagController', () => {
         enabled: true,
         tenantId: null,
         createdAt: new Date(),
-        createdBy: 'admin-user',
+        createdBy: username,
         updatedAt: new Date(),
-        updatedBy: 'admin-user',
+        updatedBy: username,
       }
 
       mockFeatureFlagService.getByCodeAndTenant.mockResolvedValue(null)
       mockFeatureFlagService.create.mockResolvedValue(created)
 
-      const result = await controller.create(dto)
+      const result = await controller.create(dto, mockReq)
 
       expect(result).toEqual(created)
-      expect(mockFeatureFlagService.create).toHaveBeenCalledWith(dto, 'admin-user')
+      expect(mockFeatureFlagService.create).toHaveBeenCalledWith(dto, username)
     })
 
     it('should throw BadRequestException for empty code', async () => {
@@ -77,7 +81,7 @@ describe('FeatureFlagController', () => {
         enabled: true,
       }
 
-      await expect(controller.create(dto)).rejects.toThrow(BadRequestException)
+      await expect(controller.create(dto, mockReq)).rejects.toThrow(BadRequestException)
     })
 
     it('should throw BadRequestException when flag already exists', async () => {
@@ -98,7 +102,7 @@ describe('FeatureFlagController', () => {
 
       mockFeatureFlagService.getByCodeAndTenant.mockResolvedValue(existing)
 
-      await expect(controller.create(dto)).rejects.toThrow(BadRequestException)
+      await expect(controller.create(dto, mockReq)).rejects.toThrow(BadRequestException)
     })
 
     it('should throw BadRequestException when tenant override already exists', async () => {
@@ -120,7 +124,7 @@ describe('FeatureFlagController', () => {
 
       mockFeatureFlagService.getByCodeAndTenant.mockResolvedValue(existing)
 
-      await expect(controller.create(dto)).rejects.toThrow(BadRequestException)
+      await expect(controller.create(dto, mockReq)).rejects.toThrow(BadRequestException)
     })
   })
 
@@ -173,31 +177,31 @@ describe('FeatureFlagController', () => {
         enabled: true,
         tenantId: null,
         createdAt: new Date(),
-        createdBy: 'admin-user',
+        createdBy: username,
         updatedAt: new Date(),
-        updatedBy: 'admin-user',
+        updatedBy: username,
       }
 
       const updated: FeatureFlag = {
         ...existing,
         enabled: false,
-        updatedBy: 'admin-user',
+        updatedBy: username,
         updatedAt: new Date(),
       }
 
       mockFeatureFlagService.getById.mockResolvedValue(existing)
       mockFeatureFlagService.update.mockResolvedValue(updated)
 
-      const result = await controller.update(id, dto)
+      const result = await controller.update(id, dto, mockReq)
 
       expect(result).toEqual(updated)
-      expect(mockFeatureFlagService.update).toHaveBeenCalledWith(id, dto, 'admin-user')
+      expect(mockFeatureFlagService.update).toHaveBeenCalledWith(id, dto, username)
     })
 
     it('should throw BadRequestException for empty ID', async () => {
       const dto: UpdateFeatureFlagDto = { enabled: false }
 
-      await expect(controller.update('', dto)).rejects.toThrow(BadRequestException)
+      await expect(controller.update('', dto, mockReq)).rejects.toThrow(BadRequestException)
     })
 
     it('should throw NotFoundException when flag does not exist', async () => {
@@ -206,7 +210,7 @@ describe('FeatureFlagController', () => {
 
       mockFeatureFlagService.getById.mockResolvedValue(null)
 
-      await expect(controller.update(id, dto)).rejects.toThrow(NotFoundException)
+      await expect(controller.update(id, dto, mockReq)).rejects.toThrow(NotFoundException)
     })
   })
 
