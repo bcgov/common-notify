@@ -74,7 +74,7 @@ export class TemplatesRepository {
   async findById(tenantId: string, templateId: string): Promise<Template | null> {
     return this.templateRepository.findOne({
       where: { id: templateId, tenantId, active: true },
-      relations: ['channel', 'engine'],
+      relations: { channel: true, engine: true },
     })
   }
 
@@ -182,7 +182,7 @@ export class TemplatesRepository {
   async findByName(tenantId: string, name: string): Promise<Template | null> {
     return this.templateRepository.findOne({
       where: { tenantId, name },
-      relations: ['channel', 'engine'],
+      relations: { channel: true, engine: true },
     })
   }
 
@@ -268,7 +268,7 @@ export class TemplatesRepository {
   ): Promise<[TemplateVersion[], number]> {
     return this.templateVersionRepository.findAndCount({
       where: { templateId },
-      relations: ['channel', 'engine'],
+      relations: { channel: true, engine: true },
       take: limit,
       skip: offset,
       order: { version: 'DESC' },
@@ -300,7 +300,7 @@ export class TemplatesRepository {
   async findVersion(templateId: string, version: number): Promise<TemplateVersion | null> {
     return this.templateVersionRepository.findOne({
       where: { templateId, version },
-      relations: ['channel', 'engine'],
+      relations: { channel: true, engine: true },
     })
   }
 }

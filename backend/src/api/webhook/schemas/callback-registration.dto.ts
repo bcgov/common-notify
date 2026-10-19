@@ -9,10 +9,9 @@ import {
   IsIn,
   IsNotEmpty,
 } from 'class-validator'
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 // PartialType from @nestjs/swagger, not @nestjs/mapped-types: only this one carries the
 // @ApiProperty metadata across, without which the update DTO publishes as an empty schema.
-import { PartialType } from '@nestjs/swagger'
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger'
 import { WebhookType } from '../../../enum/webhook-type.enum'
 
 export const CHANNEL_TYPE_VALUES = ['email', 'sms', 'msgApp'] as const

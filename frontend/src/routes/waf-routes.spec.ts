@@ -8,7 +8,7 @@ import { join, resolve } from 'path'
  * path matches one is reachable by clicking but 403s on refresh - which is how /admin/* broke.
  */
 const frontendRoot = resolve(__dirname, '../..')
-const coraza = readFileSync(join(frontendRoot, 'coraza.conf'), 'utf8')
+const coraza = readFileSync(join(frontendRoot, 'coraza.conf'), 'utf8').replace(/\r\n/g, '\n')
 
 /** The `@rx` pattern of a REQUEST_URI rule, by id. */
 function uriRule(id: number): RegExp {

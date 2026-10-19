@@ -1,5 +1,8 @@
 {
   "extends": "./tsconfig.json",
+  // TypeScript 6 requires rootDir to be explicit. './src' is what it inferred before, so dist
+  // keeps its current layout (dist/main.js, not dist/src/main.js).
+  "compilerOptions": { "rootDir": "./src" },
   "exclude": ["node_modules", "dist", "test", "**/*spec.ts"],
   "include": ["src/**/*.ts", "generated/**/*.ts"]
 }

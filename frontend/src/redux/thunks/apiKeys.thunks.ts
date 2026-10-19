@@ -1,3 +1,4 @@
+import { fetchApiKeyUsage } from './apiKeyUsage.thunks'
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import {
   getApiKeys,
@@ -27,10 +28,16 @@ export const fetchApiKeys = createAsyncThunk<
 export const issueApiKey = createAsyncThunk<
   IssuedApiKey,
   string | undefined,
-  { rejectValue: string }
->('apiKeys/issue', async (notes, { rejectWithValue }) => {
+  { state: RootState; rejectValue: string }
+>('apiKeys/issue', async (notes, { dispatch, getState, rejectWithValue }) => {
   try {
-    return await issueApiKeyApi(notes)
+    const tenantId = getState().tenant.selectedTenant?.id
+    const issuedKey = await issueApiKeyApi(notes)
+    // Refresh usage without delaying the one-time key reveal or resetting form values.
+    if (tenantId && getState().tenant.selectedTenant?.id === tenantId) {
+      void dispatch(fetchApiKeyUsage())
+    }
+    return issuedKey
   } catch (error) {
     return rejectWithValue(error instanceof Error ? error.message : 'Failed to generate an API key')
   }

@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-24.04
     environment: TOOLS
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Deploy Loki to Tools Namespace
         uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
@@ -111,7 +111,7 @@ jobs:
     runs-on: ubuntu-24.04
     environment: DEV
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Deploy kube-state-metrics to Dev
         uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
@@ -137,7 +137,7 @@ jobs:
     runs-on: ubuntu-24.04
     environment: TEST
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Deploy kube-state-metrics to Test
         uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
@@ -163,7 +163,7 @@ jobs:
     runs-on: ubuntu-24.04
     environment: PROD
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Deploy kube-state-metrics to Prod
         uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
@@ -192,7 +192,7 @@ jobs:
     runs-on: ubuntu-24.04
     environment: TOOLS
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Deploy Prometheus to Tools Namespace
         uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
@@ -230,7 +230,7 @@ jobs:
     runs-on: ubuntu-24.04
     environment: TOOLS
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Deploy Grafana to Tools Namespace
         uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
@@ -360,7 +360,7 @@ jobs:
     runs-on: ubuntu-24.04
     environment: DEV
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Deploy Grafana Agent to Dev
         uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
@@ -396,7 +396,7 @@ jobs:
     runs-on: ubuntu-24.04
     environment: TEST
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Deploy Grafana Agent to Test
         uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
@@ -432,7 +432,7 @@ jobs:
     runs-on: ubuntu-24.04
     environment: PROD
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Deploy Grafana Agent to Prod
         uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
@@ -468,7 +468,7 @@ jobs:
     runs-on: ubuntu-24.04
     environment: ${{ inputs.environment || 'DEV' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Deploy Loki
         uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
@@ -509,7 +509,7 @@ jobs:
     runs-on: ubuntu-24.04
     environment: ${{ inputs.environment || 'DEV' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Deploy Grafana
         uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0

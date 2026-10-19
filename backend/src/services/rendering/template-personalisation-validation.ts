@@ -14,42 +14,56 @@ export function extractTemplatePersonalisationKeys(
   template: Template,
   personalisation?: Record<string, unknown>,
 ): string[] {
+  return analyseTemplatePersonalisation(template, personalisation).required
+}
+
+/**
+ * The keys a template needs (`required`), and which of them it prints (`printed`). A key in
+ * `required` but not `printed` is only tested - `{{#if notes}}`, `((notes??text))` - so a blank
+ * value is a meaningful "no" rather than a gap in the message.
+ */
+export function analyseTemplatePersonalisation(
+  template: Template,
+  personalisation?: Record<string, unknown>,
+): { required: string[]; printed: Set<string> } {
   const placeholders = new Set<string>()
+  const printed = new Set<string>()
 
   addPlaceholders(
     placeholders,
-    extractPlaceholdersForEngine(template.engineCode, template.body, personalisation),
+    extractPlaceholdersForEngine(template.engineCode, template.body, personalisation, printed),
   )
 
   if (template.channelCode === NotificationChannel.EMAIL) {
     addPlaceholders(
       placeholders,
-      extractPlaceholdersForEngine(template.engineCode, template.subject, personalisation),
+      extractPlaceholdersForEngine(template.engineCode, template.subject, personalisation, printed),
     )
   }
 
-  return [...placeholders]
+  return { required: [...placeholders], printed }
 }
 
 function extractPlaceholdersForEngine(
   engineCode: TemplateEngine | string,
   text?: string,
   personalisation?: Record<string, unknown>,
+  printed?: Set<string>,
 ): string[] {
   switch (engineCode) {
     case TemplateEngine.LEGACY_GC_NOTIFY:
-      return extractLegacyGcNotifyPlaceholders(text)
+      return extractLegacyGcNotifyPlaceholders(text, printed)
     case TemplateEngine.HANDLEBARS:
     case TemplateEngine.MJML:
-      return extractHandlebarsStylePlaceholders(text, personalisation)
+      return extractHandlebarsStylePlaceholders(text, personalisation, printed)
     case TemplateEngine.MUSTACHE:
-      return extractMustachePlaceholders(text)
+      return extractMustachePlaceholders(text, printed)
     default:
       return []
   }
 }
 
-function extractLegacyGcNotifyPlaceholders(text?: string): string[] {
+function extractLegacyGcNotifyPlaceholders(text?: string, printed?: Set<string>): string[] {
   if (!text) {
     return []
   }
@@ -58,6 +72,8 @@ function extractLegacyGcNotifyPlaceholders(text?: string): string[] {
 
   for (const match of text.matchAll(LEGACY_GC_NOTIFY_PLACEHOLDER_REGEX)) {
     addPlaceholder(placeholders, match[1])
+    // `((name??text))` prints the text, not the value, so `name` is only tested.
+    if (!match[0].includes('??')) addPlaceholder(printed, match[1])
   }
 
   return [...placeholders]
@@ -66,6 +82,7 @@ function extractLegacyGcNotifyPlaceholders(text?: string): string[] {
 function extractHandlebarsStylePlaceholders(
   text?: string,
   personalisation?: Record<string, unknown>,
+  printed?: Set<string>,
 ): string[] {
   if (!text) {
     return []
@@ -74,7 +91,7 @@ function extractHandlebarsStylePlaceholders(
   const placeholders = new Set<string>()
   const ast = Handlebars.parse(text) as any
 
-  visitHandlebarsNode(ast, placeholders, 0, personalisation)
+  visitHandlebarsNode(ast, placeholders, 0, personalisation, printed)
 
   return [...placeholders]
 }
@@ -84,6 +101,7 @@ function visitHandlebarsNode(
   placeholders: Set<string>,
   scopedDepth: number,
   personalisation?: Record<string, unknown>,
+  printed?: Set<string>,
 ): void {
   if (!node || typeof node !== 'object') {
     return
@@ -92,11 +110,14 @@ function visitHandlebarsNode(
   switch (node.type) {
     case 'Program':
       for (const child of node.body || []) {
-        visitHandlebarsNode(child, placeholders, scopedDepth, personalisation)
+        visitHandlebarsNode(child, placeholders, scopedDepth, personalisation, printed)
       }
       return
     case 'MustacheStatement':
+      // Everything a `{{...}}` references reaches the output, including a helper's arguments.
+      // Block parameters (`{{#if x}}`, `{{#each x}}`) only decide what renders.
       collectHandlebarsReference(node, placeholders, scopedDepth)
+      if (printed) collectHandlebarsReference(node, printed, scopedDepth)
       return
     case 'BlockStatement': {
       const helperName = getHandlebarsPathName(node.path)
@@ -112,12 +133,12 @@ function visitHandlebarsNode(
       )
 
       if (selectedConditionalBranch === 'program') {
-        visitHandlebarsNode(node.program, placeholders, nextScopedDepth, personalisation)
+        visitHandlebarsNode(node.program, placeholders, nextScopedDepth, personalisation, printed)
       } else if (selectedConditionalBranch === 'inverse') {
-        visitHandlebarsNode(node.inverse, placeholders, scopedDepth, personalisation)
+        visitHandlebarsNode(node.inverse, placeholders, scopedDepth, personalisation, printed)
       } else {
-        visitHandlebarsNode(node.program, placeholders, nextScopedDepth, personalisation)
-        visitHandlebarsNode(node.inverse, placeholders, scopedDepth, personalisation)
+        visitHandlebarsNode(node.program, placeholders, nextScopedDepth, personalisation, printed)
+        visitHandlebarsNode(node.inverse, placeholders, scopedDepth, personalisation, printed)
       }
       return
     }
@@ -127,7 +148,7 @@ function visitHandlebarsNode(
         collectHandlebarsExpression(param, placeholders, scopedDepth)
       }
       collectHandlebarsHash(node.hash, placeholders, scopedDepth)
-      visitHandlebarsNode(node.program, placeholders, scopedDepth, personalisation)
+      visitHandlebarsNode(node.program, placeholders, scopedDepth, personalisation, printed)
       return
     case 'SubExpression':
       collectHandlebarsReference(node, placeholders, scopedDepth)
@@ -263,7 +284,7 @@ function getHandlebarsPathName(path: any): string | undefined {
   return IDENTIFIER_REGEX.test(root) ? root : undefined
 }
 
-function extractMustachePlaceholders(text?: string): string[] {
+function extractMustachePlaceholders(text?: string, printed?: Set<string>): string[] {
   if (!text) {
     return []
   }
@@ -271,7 +292,7 @@ function extractMustachePlaceholders(text?: string): string[] {
   const placeholders = new Set<string>()
   const tokens = Mustache.parse(text) as MustacheToken[]
 
-  collectMustacheTokens(tokens, placeholders, 0)
+  collectMustacheTokens(tokens, placeholders, 0, printed)
 
   return [...placeholders]
 }
@@ -280,26 +301,25 @@ function collectMustacheTokens(
   tokens: MustacheToken[],
   placeholders: Set<string>,
   scopedDepth: number,
+  printed?: Set<string>,
 ): void {
   for (const token of tokens) {
     const [type, value, , , children] = token
-    const rootName = getScopedIdentifier(value)
+    // Names inside a section resolve against the section's own context, not the caller's.
+    const rootName = scopedDepth === 0 ? getScopedIdentifier(value) : undefined
 
     switch (type) {
       case 'name':
       case '&':
       case '{':
-        if (rootName && scopedDepth === 0) {
-          addPlaceholder(placeholders, rootName)
-        }
+        addPlaceholder(placeholders, rootName)
+        addPlaceholder(printed, rootName)
         break
       case '#':
       case '^':
-        if (rootName && scopedDepth === 0) {
-          addPlaceholder(placeholders, rootName)
-        }
+        addPlaceholder(placeholders, rootName)
         if (Array.isArray(children)) {
-          collectMustacheTokens(children, placeholders, scopedDepth + 1)
+          collectMustacheTokens(children, placeholders, scopedDepth + 1, printed)
         }
         break
       default:
@@ -330,9 +350,9 @@ function addPlaceholders(target: Set<string>, values: string[]): void {
   }
 }
 
-function addPlaceholder(placeholders: Set<string>, value?: string): void {
+function addPlaceholder(placeholders: Set<string> | undefined, value?: string): void {
   if (value && IDENTIFIER_REGEX.test(value)) {
-    placeholders.add(value)
+    placeholders?.add(value)
   }
 }
 

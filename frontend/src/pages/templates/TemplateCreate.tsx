@@ -14,6 +14,7 @@ import { createTemplate, NotificationChannel, TemplateEngine } from '@/api/templ
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
 import TemplatePreviewModal from './TemplatePreviewModal'
+import TemplateFormActions from './TemplateFormActions'
 import SmsSegmentEstimate from './SmsSegmentEstimate'
 import useAutoGrowingTextArea from '@/hooks/useAutoGrowingTextArea'
 import '@/scss/components/templates.scss'
@@ -201,8 +202,7 @@ const TemplateCreate: FC = () => {
       <PageHeading
         title="Create reusable template"
         breadcrumbs={[
-          { label: 'Home', to: '/dashboard' },
-          { label: 'Templates', to: '/templates' },
+          { label: 'Template', to: '/templates' },
           { label: 'Create reusable template' },
         ]}
       />
@@ -328,22 +328,15 @@ const TemplateCreate: FC = () => {
           </div>
         </div>
 
-        <div className="template-form__actions">
-          <Button type="button" variant="secondary" onClick={handleCancel}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onPress={() => setPreviewOpen(true)}
-            isDisabled={!formData.body.trim() || !formData.channelCode || !formData.engineCode}
-          >
-            Preview
-          </Button>
+        <TemplateFormActions
+          onCancel={handleCancel}
+          onPreview={() => setPreviewOpen(true)}
+          isPreviewDisabled={!formData.body.trim() || !formData.channelCode || !formData.engineCode}
+        >
           <Button type="submit" isDisabled={isSaveDisabled}>
             {saving ? 'Saving...' : 'Save'}
           </Button>
-        </div>
+        </TemplateFormActions>
       </form>
 
       <TemplatePreviewModal

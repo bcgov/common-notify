@@ -23,13 +23,13 @@ $page-narrow-width: 572px; // Single-column form pages (template create/edit)
   padding: 0 $page-gutter;
 }
 
-// Centred single-column variant. Each block still stretches to the column, so
-// fields keep their own max-widths inside it.
-.page--narrow > * {
+// Left-aligned single-column variant. Each block still stretches to the column, so
+// fields keep their own max-widths inside it. A form's blocks take the measure rather
+// than the form itself, so a StickyBar at the end of the form can span the page.
+.page--narrow > :not(form),
+.page--narrow > form > :not(.sticky-bar) {
   width: 100%;
   max-width: $page-narrow-width;
-  margin-left: auto;
-  margin-right: auto;
 }
 
 /* Heading block: optional breadcrumb, the page title, and an optional meta line */

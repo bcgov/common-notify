@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FC, SubmitEvent } from 'react'
 import { Button, SvgInfoIcon, Switch, Tooltip } from '@bcgov/design-system-react-components'
+import StickyBar from '@/components/StickyBar'
 import TooltipTrigger from '@/components/TooltipTrigger'
 import { NotificationChannel } from '@/api/templates.api'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
@@ -200,9 +201,11 @@ const SmsSettings: FC = () => {
         </p>
       </div>
 
-      <Button type="submit" variant="primary" isDisabled={isSaveDisabled}>
-        {saving ? 'Saving…' : 'Save SMS settings'}
-      </Button>
+      <StickyBar>
+        <Button type="submit" variant="primary" isDisabled={isSaveDisabled}>
+          {saving ? 'Saving…' : 'Save SMS settings'}
+        </Button>
+      </StickyBar>
     </form>
   )
 }

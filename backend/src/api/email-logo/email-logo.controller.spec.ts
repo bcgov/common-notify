@@ -81,6 +81,49 @@ describe('EmailLogoController', () => {
     expect(response.type).toHaveBeenCalledWith('image/svg+xml')
   })
 
+  it('serves the email rendition when format=email is requested', async () => {
+    vi.mocked(emailLogoService.findByIdIfApproved).mockResolvedValue({
+      id: 'logo-id',
+      fileKey: 'logos/BC_AG_H_RGB_pos.svg',
+      emailFileKey: 'logos/BC_AG_H_RGB_pos.png',
+    } as EmailLogo)
+    vi.mocked(emailLogoStorage.head).mockResolvedValue({})
+    vi.mocked(emailLogoStorage.download).mockResolvedValue(Buffer.from('png'))
+
+    await controller.getImage('logo-id', response, 'email')
+
+    expect(emailLogoStorage.download).toHaveBeenCalledWith('logos/BC_AG_H_RGB_pos.png')
+    expect(response.type).toHaveBeenCalledWith('image/png')
+  })
+
+  it('falls back to the file key for format=email when there is no email rendition', async () => {
+    vi.mocked(emailLogoService.findByIdIfApproved).mockResolvedValue({
+      id: 'logo-id',
+      fileKey: 'logos/BC_AG_H_RGB_pos.svg',
+      emailFileKey: null,
+    } as EmailLogo)
+    vi.mocked(emailLogoStorage.head).mockResolvedValue({})
+    vi.mocked(emailLogoStorage.download).mockResolvedValue(Buffer.from('svg'))
+
+    await controller.getImage('logo-id', response, 'email')
+
+    expect(emailLogoStorage.download).toHaveBeenCalledWith('logos/BC_AG_H_RGB_pos.svg')
+  })
+
+  it('serves the SVG when no format is requested, even if an email rendition exists', async () => {
+    vi.mocked(emailLogoService.findByIdIfApproved).mockResolvedValue({
+      id: 'logo-id',
+      fileKey: 'logos/BC_AG_H_RGB_pos.svg',
+      emailFileKey: 'logos/BC_AG_H_RGB_pos.png',
+    } as EmailLogo)
+    vi.mocked(emailLogoStorage.head).mockResolvedValue({})
+    vi.mocked(emailLogoStorage.download).mockResolvedValue(Buffer.from('svg'))
+
+    await controller.getImage('logo-id', response)
+
+    expect(emailLogoStorage.download).toHaveBeenCalledWith('logos/BC_AG_H_RGB_pos.svg')
+  })
+
   it('returns not found without reading storage when the logo is unavailable', async () => {
     vi.mocked(emailLogoService.findByIdIfApproved).mockResolvedValue(null)
 

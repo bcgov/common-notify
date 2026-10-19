@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common'
-import { randomUUID } from 'crypto'
+import { randomInt, randomUUID } from 'node:crypto'
 import type Redis from 'ioredis'
 
 /**
@@ -82,7 +82,10 @@ export class RedisConcurrencyLimiter {
         return null
       }
       if (acquired === 1) return token
-      await new Promise((resolve) => setTimeout(resolve, pollMs + Math.random() * pollMs))
+      // randomInt rather than Math.random: the jitter does not need to be unguessable, but
+      // a CSPRNG costs nothing once per poll and keeps the rule honest about which
+      // random source is which.
+      await new Promise((resolve) => setTimeout(resolve, pollMs + randomInt(pollMs)))
     }
   }
 

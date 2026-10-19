@@ -67,7 +67,7 @@
 
 .queue-monitoring__reason-text {
   max-width: 420px;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .queue-monitoring__progress {

@@ -93,7 +93,7 @@ jobs:
     steps:
       # The action reads rules_file_name out of the workspace, so the repo has
       # to be on disk before it runs.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: ZAP Scan
         uses: zaproxy/action-full-scan@3c58388149901b9a03b7718852c5ba889646c27c # v0.13.0
         with:

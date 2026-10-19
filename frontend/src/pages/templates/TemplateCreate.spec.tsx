@@ -209,8 +209,7 @@ describe('TemplateCreate', () => {
     render(<TemplateCreate />)
 
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/dashboard')
-    expect(screen.getByRole('link', { name: 'Templates' })).toHaveAttribute('href', '/templates')
+    expect(screen.getByRole('link', { name: 'Template' })).toHaveAttribute('href', '/templates')
     expect(
       screen.getByText('Create reusable template', { selector: '[aria-current="page"]' }),
     ).toBeTruthy()

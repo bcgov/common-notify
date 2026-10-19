@@ -15,7 +15,9 @@ const loadMaxResultsPerPage = async (value?: string) => {
 describe('notification config', () => {
   afterEach(() => {
     vi.resetModules()
-    vi.unmock('@/config')
+    // doUnmock, not unmock: the mock above is a runtime doMock, and unmock would be hoisted
+    // above it.
+    vi.doUnmock('@/config')
   })
 
   it('uses the configured positive integer value', async () => {

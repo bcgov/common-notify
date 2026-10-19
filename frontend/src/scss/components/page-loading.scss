@@ -1,0 +1,22 @@
+// Full-viewport centring for the indeterminate ProgressCircle shown while a page waits on data
+
+.page-loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// Shown over the rendered page while a slow API request is in flight (see globalLoading.ts)
+.page-loading--overlay {
+  background-color: rgba(0, 0, 0, 0.3);
+  z-index: 9999;
+}
+
+.page-loading__card {
+  background-color: white;
+  padding: 2rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}

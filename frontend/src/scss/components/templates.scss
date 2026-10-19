@@ -10,7 +10,7 @@
   }
 }
 
-// The page frame (heading, gutters, centred column) comes from `.page .page--narrow`
+// The page frame (heading, gutters, single column) comes from `.page .page--narrow`
 // in page.scss; everything below is specific to the template form.
 
 .template-form {
@@ -91,14 +91,6 @@
 .template-form__sms-estimate-note {
   margin-top: 4px;
   color: #474543;
-}
-
-.template-form__actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 16px;
-  margin-top: 0;
 }
 
 .template-form__body-label {

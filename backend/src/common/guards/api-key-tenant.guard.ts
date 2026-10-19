@@ -45,7 +45,9 @@ export abstract class ApiKeyTenantGuard implements CanActivate {
    * Checked before any tenant lookup, for a route whose clients authenticate in a shape
    * of their own. Throw to reject. The default accepts everything.
    */
-  protected beforeResolve(_request: { headers: Record<string, unknown> }): void {}
+  protected beforeResolve(_request: { headers: Record<string, unknown> }): void {
+    // Accepts by default. Subclasses override this to reject.
+  }
 
   /** Names this guard in its success log, e.g. "GC Notify request authorized". */
   protected abstract get routeDescription(): string
@@ -66,7 +68,7 @@ export abstract class ApiKeyTenantGuard implements CanActivate {
 
     const credentialIdentifier = credentialHeaders.credentialIdentifier
 
-    let mapping: ApiKeyConsumer | null = null
+    let mapping: ApiKeyConsumer | null
     try {
       mapping = await resolveApiKeyConsumer(
         this.apiKeyConsumerRepository,

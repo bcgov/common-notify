@@ -106,7 +106,7 @@ jobs:
           values_file: charts/crunchy/values.yml
           triggers: ${{ inputs.db_triggers }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: inputs.redis_triggers != ''
         name: Checkout for Redis
 
@@ -204,7 +204,7 @@ jobs:
                 helm uninstall ${{ steps.vars.outputs.release }}
             fi
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Debug Values File
         if: inputs.debug == 'true'
         run: ls -l charts/crunchy/values.yml

@@ -108,10 +108,11 @@ const EventsAdditionalRecipients: FC<EventsAdditionalRecipientsProps> = ({
         <span className="events__field-label">Additional recipient(s) (required)</span>
 
         <TagListField
+          isCompact
           values={fields.to.addresses}
           onChange={(addresses) => updateField('to', { enabled: true, addresses })}
           aria-label="Phone numbers"
-          placeholder="Enter phone number(s)"
+          placeholder="Enter phone number details..."
           isDisabled={isDisabled}
           isInvalid={invalid.length > 0}
           errorMessage={

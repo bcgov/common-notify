@@ -41,7 +41,7 @@ jobs:
       DEPLOYMENT: ${{ github.event.repository.name }}-dev-backend
       GATEWAY_URL: https://${{ vars.LOAD_TEST_GATEWAY_HOST || 'gw-fe8c5-notify.dev.api.gov.bc.ca' }}/api
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # ── Setup: sink + auto-bind (once) ────────────────────────────────────
       - name: Enable email sink + auto-bind
