@@ -113,7 +113,17 @@ const EventsEmailSaved: FC<EventsEmailSavedProps> = ({ eventId }) => {
             {template && <EventEmailPreview emailSettings={emailSettings} template={template} />}
 
             <StickyBar>
-              <Button variant="secondary" type="button" onPress={() => openTab('email')}>
+              <Button
+                variant="secondary"
+                type="button"
+                onPress={() =>
+                  navigate({
+                    to: '/events/$eventId',
+                    params: { eventId },
+                    search: { tab: 'email', edit: true },
+                  })
+                }
+              >
                 Edit settings
               </Button>
               <Button
