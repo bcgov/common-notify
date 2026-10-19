@@ -60,9 +60,7 @@ describe('configuration redis.sentinels', () => {
   })
 
   it('defaults the port to 26379 when the port is not a number', () => {
-    expect(sentinelsOf('redis-node-0:not-a-port')).toEqual([
-      { host: 'redis-node-0', port: 26379 },
-    ])
+    expect(sentinelsOf('redis-node-0:not-a-port')).toEqual([{ host: 'redis-node-0', port: 26379 }])
   })
 
   it('splits on the last colon, so an IPv6 host keeps its colons', () => {
