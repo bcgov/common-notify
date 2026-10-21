@@ -1,11 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { FC, SubmitEvent } from 'react'
 import { Button, SvgInfoIcon, Switch, Tooltip } from '@bcgov/design-system-react-components'
 import StickyBar from '@/components/StickyBar'
 import TooltipTrigger from '@/components/TooltipTrigger'
 import { NotificationChannel } from '@/api/templates.api'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import { fetchApiKeyUsage } from '@/redux/thunks/apiKeyUsage.thunks'
 import { updateSmsSettings } from '@/redux/thunks/settings.thunks'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
@@ -36,11 +35,6 @@ const SmsSettings: FC = () => {
     includeTenantNameInSms,
     internationalSmsEnabled,
   })
-
-  // Read-only daily/annual limits. Remounted per tenant by Settings.tsx.
-  useEffect(() => {
-    dispatch(fetchApiKeyUsage())
-  }, [dispatch])
 
   // Simple check for whether not a value has changed from the existing value
   const settingsChanged =

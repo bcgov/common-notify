@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { FC } from 'react'
-import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import { fetchTemplates } from '@/redux/thunks/templates.thunks'
+import { useAppSelector } from '@/redux/hooks'
+import { getTemplates } from '@/api/templates.api'
+import type { TemplateResponse } from '@/api/templates.api'
 import { Button } from '@bcgov/design-system-react-components'
 import PageSubHeading from '../../../components/PageSubHeading'
 import { Link, useNavigate } from '@tanstack/react-router'
@@ -11,15 +12,27 @@ import { useCstarRoles } from '@/hooks/useCstarRoles'
  * Used on the Dashboard page
  */
 export const NotificationTemplatesSection: FC = () => {
-  const dispatch = useAppDispatch()
   const navigate = useNavigate()
-  const templates = useAppSelector((state) => state.templates.items)
+  const [templates, setTemplates] = useState<TemplateResponse[]>([])
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const { canEdit } = useCstarRoles()
 
+  // Fetch first two templates directly
   useEffect(() => {
-    dispatch(fetchTemplates())
-  }, [dispatch, selectedTenant])
+    if (!selectedTenant) return
+
+    let active = true
+
+    getTemplates(1, 2)
+      .then((response) => {
+        if (active) setTemplates(response.data)
+      })
+      .catch(() => {})
+
+    return () => {
+      active = false
+    }
+  }, [selectedTenant])
 
   return (
     <section className="page__section">
@@ -33,7 +46,7 @@ export const NotificationTemplatesSection: FC = () => {
           Create New Template
         </Button>
         <ul className="list-unstyled m-0 d-flex flex-column gap-2">
-          {templates.slice(0, 2).map((template) => (
+          {templates.map((template) => (
             <li key={template.id}>
               <Link
                 to="/template-edit/$templateId"
