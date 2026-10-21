@@ -50,6 +50,13 @@ function isValidPhone(value: string): boolean {
   return normalizePhone(value) !== null
 }
 
+// Mirrors PhoneNumberService.isInternational: anything outside Canada, the US included. False for
+// a number that won't normalize, which isValidPhone already flags.
+function isInternationalPhone(value: string): boolean {
+  const normalized = normalizePhone(value)
+  return normalized !== null && parsePhoneNumberFromString(normalized)?.country !== 'CA'
+}
+
 // Differently formatted entries can normalize to the same E.164 number (e.g. "2505551234" and
 // "250-555-1234"); TagListField only catches exact-string repeats, so flag later entries whose
 // normalized form repeats an earlier one, the same way a malformed number is flagged, instead of
@@ -80,6 +87,8 @@ type EventsSmsTabProps = Readonly<{
   onUnsavedChangesChange?: (value: boolean) => void
   smsNotificationsEnabled?: boolean
   senderPhoneNumber?: string | null
+  /** Whether the international_sms flag and the tenant's International SMS setting are both on. */
+  internationalSmsAllowed?: boolean
 }>
 
 type EventsSmsSavedSettingsProps = Readonly<{
@@ -136,6 +145,7 @@ export default function EventsSmsTab({
   onUnsavedChangesChange,
   smsNotificationsEnabled,
   senderPhoneNumber,
+  internationalSmsAllowed = false,
 }: EventsSmsTabProps) {
   const senderError = senderPhoneNumber
     ? ''
@@ -176,6 +186,9 @@ export default function EventsSmsTab({
   const invalid = submittedTo.filter(
     (number) => !isValidPhone(number) || duplicates.includes(number),
   )
+  const international = internationalSmsAllowed
+    ? []
+    : submittedTo.filter((number) => isInternationalPhone(number) && !invalid.includes(number))
   const recipientError = submittedTo.length ? '' : 'Select at least one recipient'
   const templateError = selectedTemplate ? '' : 'Select a template'
   const busy = saving || isDeactivating
@@ -199,7 +212,7 @@ export default function EventsSmsTab({
   function validate(action: 'Save' | 'Preview') {
     if (!channelActive) return false
     setValidationAttempted(true)
-    if (senderError || recipientError || templateError || invalid.length) {
+    if (senderError || recipientError || templateError || invalid.length || international.length) {
       showErrorToast(
         'Required fields missing',
         action === 'Save'
@@ -314,6 +327,7 @@ export default function EventsSmsTab({
                   values={{ to, cc: [], bcc: [] }}
                   onChange={(recipients) => setTo(recipients.to)}
                   invalidAddresses={{ to: invalid, cc: [], bcc: [] }}
+                  internationalAddresses={international}
                   isDisabled={fieldsDisabled}
                   variant="sms"
                 />
