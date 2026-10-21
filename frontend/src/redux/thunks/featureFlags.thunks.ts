@@ -1,6 +1,6 @@
 import { createAsyncThunk } from '@reduxjs/toolkit'
-import type { AxiosError } from 'axios'
 import { get, post, patch, deleteMethod } from '@/common/api'
+import { getApiErrorMessage } from '@/utils/apiErrorMessage'
 import type { FeatureFlag } from '@/interfaces/feature-flag.interface'
 
 /**
@@ -72,12 +72,7 @@ export const createFeatureFlag = createAsyncThunk(
       })
       return newFlag
     } catch (error) {
-      const axiosError = error as AxiosError
-      const responseData = (axiosError.response?.data as any) || {}
-      const errorMessage =
-        responseData.message ||
-        (error instanceof Error ? error.message : 'Failed to create feature flag')
-      return rejectWithValue(errorMessage)
+      return rejectWithValue(getApiErrorMessage(error, 'Failed to create feature flag'))
     }
   },
 )
