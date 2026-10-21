@@ -32,6 +32,29 @@ describe('PhoneNumberService', () => {
     })
   })
 
+  describe('isInternational', () => {
+    it.each([
+      ['+16045551234', 'a Canadian number'],
+      ['604-555-1234', 'a national Canadian number'],
+    ])('treats %s (%s) as domestic', (input) => {
+      expect(service.isInternational(input)).toBe(false)
+    })
+
+    it.each([
+      ['+12065550123', 'a US number'],
+      ['+18005551234', 'a toll-free number, which libphonenumber assigns to the US'],
+      ['+17875551234', 'Puerto Rico, which shares +1'],
+      ['+18765551234', 'Jamaica, which shares +1'],
+      ['+442071838750', 'the UK'],
+    ])('treats %s (%s) as international', (input) => {
+      expect(service.isInternational(input)).toBe(true)
+    })
+
+    it('leaves a number that will not parse to format validation', () => {
+      expect(service.isInternational('not-a-number')).toBe(false)
+    })
+  })
+
   describe('isValid', () => {
     it.each(['+12505551234', '+491512345678901'])('accepts canonical E.164 number %s', (input) => {
       expect(service.isValid(input)).toBe(true)
