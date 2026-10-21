@@ -14,6 +14,7 @@ import { NotificationPubSubService } from './notification-pubsub.service'
 import { TenantsModule } from '../admin/tenants/tenants.module'
 import { TemplatesModule } from '../templates/templates.module'
 import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
+import { TenantSettingsModule } from '../tenant-settings/tenant-settings.module'
 import { CstarModule } from '../../services/cstar/cstar.module'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { ApiKeysModule } from '../api-keys/api-keys.module'
@@ -31,6 +32,7 @@ import { ApiKeysModule } from '../api-keys/api-keys.module'
     TenantsModule,
     TemplatesModule,
     FeatureFlagModule,
+    TenantSettingsModule,
     CstarModule,
     // ApiKeyConsumer repository for NotifyServiceGuard on NotificationController.
     ApiKeysModule,
