@@ -6,11 +6,19 @@ import { QueueName } from '../enum/queue-name.enum'
 import { countAddedJobs } from './queue-metrics'
 
 /** Shape of the `redis` block in configuration.ts. */
+export interface RedisSentinelNode {
+  host: string
+  port: number
+}
+
 export interface RedisConfig {
   host: string
   port: number
   password?: string
   db: number
+  sentinels?: RedisSentinelNode[]
+  masterName?: string
+  sentinelPassword?: string
 }
 
 /**
@@ -21,16 +29,21 @@ export function buildRedisOptions(
   redisConfig: RedisConfig,
   overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
-  const options: Record<string, unknown> = {
-    host: redisConfig.host,
-    port: redisConfig.port,
-    db: redisConfig.db,
-    ...overrides,
+  const options: Record<string, unknown> = { db: redisConfig.db }
+  if (redisConfig.sentinels?.length) {
+    options.sentinels = redisConfig.sentinels
+    options.name = redisConfig.masterName ?? 'mymaster'
+    if (redisConfig.sentinelPassword) {
+      options.sentinelPassword = redisConfig.sentinelPassword
+    }
+  } else {
+    options.host = redisConfig.host
+    options.port = redisConfig.port
   }
   if (redisConfig.password) {
     options.password = redisConfig.password
   }
-  return options
+  return { ...options, ...overrides }
 }
 
 /**
