@@ -61,7 +61,7 @@ export abstract class DeliveryWorker implements QueueProcessor<DeliveryJobPayloa
   }
 
   /** How this channel renders and sends each recipient of a merge batch. */
-  protected abstract mergeSender(job: Job<DeliveryJobPayload>): Promise<MergeSender>
+  protected abstract mergeSender(job: Job<DeliveryJobPayload>): MergeSender | Promise<MergeSender>
 
   /** Send a plain (non-merge) delivery job. */
   protected abstract deliver(job: Job<DeliveryJobPayload>, startedAt: number): Promise<unknown>

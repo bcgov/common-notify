@@ -1,4 +1,5 @@
 import { HttpException, Injectable, Logger, Optional } from '@nestjs/common'
+import { describeError } from '../../common/utils/describe-error'
 import { Job, UnrecoverableError } from 'bullmq'
 import { DeliveryJobPayload } from '../queue.types'
 import { DeliveryChannel } from './delivery-channel'
@@ -17,9 +18,7 @@ export function isPermanentValidationError(error: unknown): error is HttpExcepti
 
 /** The same failure, marked so BullMQ fails the job now instead of spending its retries. */
 export function notRetried(error: unknown): UnrecoverableError {
-  const unrecoverable = new UnrecoverableError(
-    error instanceof Error ? error.message : String(error),
-  )
+  const unrecoverable = new UnrecoverableError(describeError(error))
   unrecoverable.cause = error
   return unrecoverable
 }
@@ -49,7 +48,7 @@ export class DeliveryFailureHandler {
   ): Promise<never> {
     const logger = new Logger(channel.context)
     const { notifyId, tenantId } = job.data
-    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorMessage = describeError(error)
     const attempt = (job.attemptsMade ?? 0) + 1
     const attempts = maxAttempts(job)
     const finalAttempt = attempt >= attempts
@@ -119,9 +118,9 @@ export class DeliveryFailureHandler {
       )
     } catch (markError) {
       logger.error(
-        `[${notifyId}] Failed to mark notification FAILED after job exhaustion: ${
-          markError instanceof Error ? markError.message : String(markError)
-        }`,
+        `[${notifyId}] Failed to mark notification FAILED after job exhaustion: ${describeError(
+          markError,
+        )}`,
       )
     }
   }

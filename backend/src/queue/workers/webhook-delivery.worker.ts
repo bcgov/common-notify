@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
+import { describeError } from '../../common/utils/describe-error'
 import { createHmac } from 'crypto'
 import type { Job } from 'bullmq'
 import axios from 'axios'
@@ -133,7 +134,7 @@ export class WebhookDeliveryWorker implements QueueProcessor<WebhookJobPayload> 
       return { success: false, statusCode: httpStatusCode }
     }
 
-    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorMessage = describeError(error)
     await this.logAttempt(job, {
       httpStatusCode,
       responseBody: responseBody ?? errorMessage,

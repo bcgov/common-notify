@@ -394,12 +394,13 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
     const scheduleInfo =
       delay > 0 ? ` (scheduled for ${new Date(scheduledFor!).toISOString()})` : ''
 
-    for (const { queue, channel, payload } of deliveries) {
+    // Email and SMS are independent, so they are queued together.
+    const queueChannel = async ({ queue, channel, payload }: (typeof deliveries)[number]) => {
       // On a re-run, a channel whose recipients are all sent or failed is done; queueing it
       // again would re-send it while recovering the other channel.
       if (resumed && (await this.requestDetailService.countInFlight(notifyId, channel)) === 0) {
         this.logger.log(`[${notifyId}] Skipping ${channel}: delivered on an earlier run`)
-        continue
+        return
       }
 
       // notifyId_channel: a retried ingestion job cannot queue the same delivery twice.
@@ -422,6 +423,7 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
         `[${notifyId}] Queued delivery job (channel=${channel}, key=${jobKey})${scheduleInfo}`,
       )
     }
+    await Promise.all(deliveries.map(queueChannel))
 
     this.logger.log(
       `[${notifyId}] Successfully processed ingestion job, channels=${deliveries.map((d) => d.channel).join(',')}`,

@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { describeError } from '../../common/utils/describe-error'
 import type { Job } from 'bullmq'
 import { DeliveryJobPayload, MailMergeJobData } from '../queue.types'
 import { batchProgressReporter } from '../batch-progress'
@@ -207,7 +208,7 @@ export class MergeBatchRunner {
         )
         throw error
       }
-      const errorMessage = error instanceof Error ? error.message : String(error)
+      const errorMessage = describeError(error)
       this.logger.error(
         `[${notifyId}] ${capitalize(sender.channel.mergeLabel)} recipient send failed (batch=${batchId}): ${errorMessage}`,
       )

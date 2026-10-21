@@ -71,7 +71,7 @@ export class SmsDeliveryWorker extends DeliveryWorker {
   }
 
   /** Render each merge recipient's body from their own params and send it. */
-  protected async mergeSender(job: Job<DeliveryJobPayload>): Promise<MergeSender> {
+  protected mergeSender(job: Job<DeliveryJobPayload>): MergeSender {
     const { notifyId } = job.data
     return {
       channel: SMS_CHANNEL,
