@@ -119,6 +119,30 @@ describe('CstarCacheStore', () => {
     )
   })
 
+  it('follows Sentinel like every other Redis client, rather than pinning to redisHost', () => {
+    const sentinels = [{ host: 'common-notify-redis', port: 26379 }]
+    new CstarCacheStore({
+      get: vi.fn((key: string) =>
+        key === 'cstar.userTenantsCacheTtlMs'
+          ? 15000
+          : {
+              host: 'localhost',
+              port: 6379,
+              db: 0,
+              sentinels,
+              masterName: 'mymaster',
+              sentinelPassword: 'secret',
+            },
+      ),
+    } as unknown as ConfigService)
+
+    expect(createRedisClient).toHaveBeenCalledWith(
+      expect.objectContaining({ sentinels, masterName: 'mymaster', sentinelPassword: 'secret' }),
+      'CstarCacheStore',
+      expect.anything(),
+    )
+  })
+
   it('namespaces keys per deployment, so environments sharing one Redis cannot collide', async () => {
     // RELEASE_NAME is unset under test, so the prefix falls back to "notify".
     clientMock.get.mockResolvedValue(null)
