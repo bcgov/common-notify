@@ -31,6 +31,8 @@ function setup(
     empty?: boolean
     disabled?: boolean
     onDirty?: (value: boolean) => void
+    to?: string[]
+    internationalSmsAllowed?: boolean
   } = {},
 ) {
   return render(
@@ -38,8 +40,9 @@ function setup(
       values={
         options.empty
           ? { active: options.active ?? true, templateId: null, to: [] }
-          : { ...configured, active: options.active ?? true }
+          : { ...configured, to: options.to ?? configured.to, active: options.active ?? true }
       }
+      internationalSmsAllowed={options.internationalSmsAllowed}
       senderPhoneNumber={options.unassigned ? null : (options.sender ?? '+15551234567')}
       onSave={onSave}
       onDeactivate={onDeactivate}
@@ -172,6 +175,25 @@ describe('SMS event MVP', () => {
     )
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
     expect(screen.queryByText('Ready to send?')).not.toBeInTheDocument()
+  })
+
+  it('blocks US and other international numbers unless International SMS is allowed', async () => {
+    setup({ to: ['+12505551234', '+12065550123', '+442071838750'] })
+    expect(
+      screen.getAllByText(
+        /Only Canadian numbers can be sent to.*International: \+12065550123, \+442071838750/,
+      )[0],
+    ).toBeVisible()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
+  it('saves international numbers when International SMS is allowed', async () => {
+    const to = ['+12505551234', '+442071838750']
+    setup({ to, internationalSmsAllowed: true })
+    expect(screen.queryByText(/Only Canadian numbers/)).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith({ ...configured, to }))
   })
 
   it('prevents read-only users from saving or previewing', () => {

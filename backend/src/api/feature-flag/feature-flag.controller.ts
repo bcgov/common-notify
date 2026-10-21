@@ -26,6 +26,7 @@ import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { SsoRole } from '../../enum/sso-role.enum'
 import { ApiExcludeController } from '@nestjs/swagger'
+import { JwtUserExtractor } from '../../common/utils/jwt-user-extractor'
 
 /**
  * Feature Flag Controller
@@ -65,7 +66,7 @@ export class FeatureFlagController {
   @Version('1')
   @Roles(SsoRole.NOTIFY_ADMIN)
   @Post()
-  async create(@Body() dto: CreateFeatureFlagDto): Promise<FeatureFlag> {
+  async create(@Body() dto: CreateFeatureFlagDto, @Req() req: Request): Promise<FeatureFlag> {
     try {
       // Validate code format
       if (!dto.code || dto.code.trim().length === 0) {
@@ -80,8 +81,7 @@ export class FeatureFlagController {
         )
       }
 
-      // TODO: In production, extract userId from request context (JWT token)
-      const userId = 'admin-user' // placeholder
+      const userId = JwtUserExtractor.extractUser(req)
 
       const flag = await this.featureFlagService.create(dto, userId)
       this.logger.log(`Created feature flag: ${flag.code} (enabled: ${flag.enabled})`)
@@ -116,7 +116,11 @@ export class FeatureFlagController {
   @Version('1')
   @Roles(SsoRole.NOTIFY_ADMIN)
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateFeatureFlagDto): Promise<FeatureFlag> {
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateFeatureFlagDto,
+    @Req() req: Request,
+  ): Promise<FeatureFlag> {
     try {
       // Validate ID format
       if (!id || id.trim().length === 0) {
@@ -129,8 +133,7 @@ export class FeatureFlagController {
         throw new NotFoundException(`Feature flag with ID "${id}" not found`)
       }
 
-      // TODO: In production, extract userId from request context (JWT token)
-      const userId = 'admin-user' // placeholder
+      const userId = JwtUserExtractor.extractUser(req)
 
       const updated = await this.featureFlagService.update(id, dto, userId)
       this.logger.log(`Updated feature flag: ${updated.code} (enabled: ${updated.enabled})`)
