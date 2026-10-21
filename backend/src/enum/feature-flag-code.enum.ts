@@ -14,4 +14,7 @@ export enum FeatureFlagCode {
   // Non-production guardrail: when enabled, every tenant in the environment can only send to
   // recipients on its own safelist. Enabled in PR/DEV/TEST, off in PROD.
   RECIPIENT_SAFELIST = 'recipient_safelist',
+  // SMS to numbers outside Canada. When enabled, each tenant's own International SMS
+  // setting decides; when disabled, those numbers are rejected for every tenant.
+  INTERNATIONAL_SMS = 'international_sms',
 }

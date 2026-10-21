@@ -9,6 +9,7 @@ import { fetchApiKeyUsage } from '@/redux/thunks/apiKeyUsage.thunks'
 import { updateSmsSettings } from '@/redux/thunks/settings.thunks'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
+import { useFeatureFlag } from '@/config/featureFlags/useFeatureFlag'
 import { CstarRole } from '@/enum/cstar-role.enum'
 import type { SmsSettingsValues } from '@/interfaces/tenant-settings.interface'
 
@@ -29,6 +30,8 @@ const SmsSettings: FC = () => {
   const smsLimits = usage?.channels.find((channel) => channel.channel === NotificationChannel.SMS)
   const { hasRole } = useCstarRoles()
   const canEdit = hasRole(CstarRole.NOTIFY_OPERATIONS_ADMIN)
+  // The tenant can only choose International SMS once it is allowed for them at all.
+  const internationalSmsAvailable = useFeatureFlag('international_sms', selectedTenant?.id)
   // Seeded once at mount. Settings.tsx remounts this section whenever new data lands,
   // so there is no effect keeping these in sync.
   const [values, setValues] = useState<SmsSettingsValues>({
@@ -143,17 +146,19 @@ const SmsSettings: FC = () => {
         </p>
       </div>
 
-      <div className="settings__field">
-        <div className="settings__switch-row">
-          <span className="settings__label">International SMS</span>
-          <Switch
-            aria-label="International SMS"
-            isDisabled={isFieldDisabled}
-            isSelected={values.internationalSmsEnabled}
-            onChange={(isSelected) => setValue('internationalSmsEnabled', isSelected)}
-          />
+      {internationalSmsAvailable && (
+        <div className="settings__field">
+          <div className="settings__switch-row">
+            <span className="settings__label">International SMS</span>
+            <Switch
+              aria-label="International SMS"
+              isDisabled={isFieldDisabled}
+              isSelected={values.internationalSmsEnabled}
+              onChange={(isSelected) => setValue('internationalSmsEnabled', isSelected)}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="settings__field">
         <span className="settings__label">

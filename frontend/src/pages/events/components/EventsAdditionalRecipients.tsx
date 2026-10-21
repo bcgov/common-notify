@@ -44,6 +44,8 @@ type EventsAdditionalRecipientsProps = {
   onChange: (values: RecipientAddresses) => void
   /** Malformed addresses per field, as determined by the parent; empty/absent means valid. */
   invalidAddresses?: RecipientAddresses
+  /** 'sms' only: valid numbers outside Canada that this tenant may not send to. */
+  internationalAddresses?: string[]
   isDisabled?: boolean
   /** 'email' shows To/CC/BCC behind checkboxes; 'sms' shows only a single always-visible To field. */
   variant?: RecipientVariant
@@ -57,6 +59,7 @@ const EventsAdditionalRecipients: FC<EventsAdditionalRecipientsProps> = ({
   values,
   onChange,
   invalidAddresses,
+  internationalAddresses = [],
   isDisabled = false,
   variant = 'email',
 }) => {
@@ -98,6 +101,12 @@ const EventsAdditionalRecipients: FC<EventsAdditionalRecipientsProps> = ({
 
   if (variant === 'sms') {
     const invalid = invalidAddresses?.to ?? []
+    const errors = [
+      invalid.length > 0 &&
+        `Enter valid, unique phone numbers. Invalid or duplicate: ${invalid.join(', ')}`,
+      internationalAddresses.length > 0 &&
+        `Only Canadian numbers can be sent to unless International SMS is enabled for this tenant. International: ${internationalAddresses.join(', ')}`,
+    ].filter(Boolean)
 
     return (
       <div
@@ -114,12 +123,8 @@ const EventsAdditionalRecipients: FC<EventsAdditionalRecipientsProps> = ({
           aria-label="Phone numbers"
           placeholder="Enter phone number details..."
           isDisabled={isDisabled}
-          isInvalid={invalid.length > 0}
-          errorMessage={
-            invalid.length > 0
-              ? `Enter valid, unique phone numbers. Invalid or duplicate: ${invalid.join(', ')}`
-              : undefined
-          }
+          isInvalid={errors.length > 0}
+          errorMessage={errors.length > 0 ? errors.join(' ') : undefined}
         />
       </div>
     )
