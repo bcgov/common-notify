@@ -35,6 +35,8 @@ import { CstarApiClient } from '../../services/cstar/cstar-api.client'
 import { CstarGroupListResponseDto } from './schemas/cstar-group-response.dto'
 import { FeatureFlagService } from '../feature-flag/feature-flag.service'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
+import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
+import { INTERNATIONAL_SMS_HINT } from '../notification/notification.service'
 
 /**
  * Filters on values derived from an event's channel settings rather than stored on the event.
@@ -125,6 +127,7 @@ export class EventsService {
     @InjectRepository(ProvisionedPhoneNumber)
     private readonly provisionedPhoneNumberRepository: Repository<ProvisionedPhoneNumber>,
     private readonly featureFlagService: FeatureFlagService,
+    private readonly tenantSettingsService: TenantSettingsService,
   ) {}
 
   /**
@@ -214,6 +217,28 @@ export class EventsService {
   private async assertSmsEnabled(tenantId: string): Promise<void> {
     if (!(await this.isSmsEnabled(tenantId))) {
       throw new ForbiddenException('SMS notifications are not enabled for this tenant')
+    }
+  }
+
+  /**
+   * Rejects international recipients unless the international_sms flag and the tenant's own
+   * International SMS setting are both on, matching NotificationService's send-time check.
+   */
+  private async assertInternationalSmsAllowed(tenantId: string, numbers: string[]): Promise<void> {
+    const international = numbers.filter((number) =>
+      this.phoneNumberService.isInternational(number),
+    )
+    if (international.length === 0) return
+
+    const flags = await this.featureFlagService.getFlagsForTenant(tenantId)
+    const allowed =
+      (flags[FeatureFlagCode.INTERNATIONAL_SMS] ?? false) &&
+      ((await this.tenantSettingsService.findByTenantId(tenantId))?.internationalSmsEnabled ??
+        false)
+    if (!allowed) {
+      throw new BadRequestException(
+        `SMS cannot be sent to international number(s): ${international.join(', ')}. ${INTERNATIONAL_SMS_HINT}`,
+      )
     }
   }
 
@@ -456,6 +481,10 @@ export class EventsService {
 
     await this.assertTemplateUsable(tenantId, templateId, NotificationChannel.SMS)
     await this.assertWithinRecipientCap('SMS', recipients.length)
+    await this.assertInternationalSmsAllowed(
+      tenantId,
+      recipients.map((recipient) => recipient.address),
+    )
 
     const setting = this.findOrCreateSmsSetting(event, userId)
     const number = await this.findTenantPhoneNumber(tenantId)

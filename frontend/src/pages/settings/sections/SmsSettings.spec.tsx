@@ -7,12 +7,17 @@ import { fetchApiKeyUsage } from '@/redux/thunks/apiKeyUsage.thunks'
 import { CstarRole } from '@/enum/cstar-role.enum'
 
 const dispatchMock = vi.fn()
+const useFeatureFlagMock = vi.fn()
 
 let state: any
 
 vi.mock('@/redux/hooks', () => ({
   useAppDispatch: () => dispatchMock,
   useAppSelector: (selector: (value: unknown) => unknown) => selector(state),
+}))
+
+vi.mock('@/config/featureFlags/useFeatureFlag', () => ({
+  useFeatureFlag: (...args: unknown[]) => useFeatureFlagMock(...args),
 }))
 
 vi.mock('@/redux/thunks/settings.thunks', () => ({
@@ -72,6 +77,7 @@ const saveButton = () => screen.getByRole('button', { name: 'Save SMS settings' 
 describe('SmsSettings section', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    useFeatureFlagMock.mockReturnValue(true)
     dispatchMock.mockImplementation((action) => ({
       unwrap: () => Promise.resolve(action.payload),
     }))
@@ -83,6 +89,16 @@ describe('SmsSettings section', () => {
     expect(screen.getByLabelText('SMS notifications')).toBeChecked()
     expect(screen.getByLabelText('Include tenant name in SMS')).toBeChecked()
     expect(screen.getByLabelText('International SMS')).not.toBeChecked()
+  })
+
+  it('hides the International SMS switch when the international_sms flag is off', () => {
+    useFeatureFlagMock.mockReturnValue(false)
+
+    renderWithRoles()
+
+    expect(useFeatureFlagMock).toHaveBeenCalledWith('international_sms', 'tenant-1')
+    expect(screen.queryByLabelText('International SMS')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('SMS notifications')).toBeInTheDocument()
   })
 
   it('fetches the usage limits and renders them', () => {
