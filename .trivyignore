@@ -19,4 +19,4 @@ KSV104
 # second pod cannot mount it - the prune has to exec into the pod already holding
 # the volume. Same approach as the chart's own pgbackrest log cleanup. The Role is
 # namespaced, read-only on pods, and exec-only on pods/exec.
-KSV0053
+KSV-0053
