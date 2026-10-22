@@ -13,3 +13,10 @@ KSV021
 # OpenShift restricted SCC forbids seccomp: "seccomp may not be set".
 KSV030
 KSV104
+
+# KSV0053: Role grants pods/exec
+# charts/app/templates/pgbackrest-history-prune.yaml needs it. repo1 is RWO, so a
+# second pod cannot mount it - the prune has to exec into the pod already holding
+# the volume. Same approach as the chart's own pgbackrest log cleanup. The Role is
+# namespaced, read-only on pods, and exec-only on pods/exec.
+KSV0053
