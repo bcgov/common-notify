@@ -29,6 +29,8 @@
 		rewrite {$GATEWAY_PATH_PREFIX:}{uri}
 		header_up Host {http.reverse_proxy.upstream.hostport}
 		header_up X-Real-IP {remote_host}
+		header_down -Via
+		header_down -X-Kong-*
 	}
 
 	# Serve dynamic runtime configuration - MUST come before file_server
@@ -51,11 +53,27 @@ window.VITE_CSTAR_TENANT_SETUP_URL="{$VITE_CSTAR_TENANT_SETUP_URL}";`
 
 	root * /srv
 	encode zstd gzip
+	# Only existing Vite content-hashed assets are immutable. Missing assets must
+	# return 404 rather than an immutable copy of the SPA shell.
+	handle /assets/* {
+		@immutable {
+			path_regexp hashed_asset ^/assets/.+-[A-Za-z0-9_-]{8,}\.[^/]+$
+			file {path}
+		}
+		route {
+			header Cache-Control "no-store"
+			header @immutable Cache-Control "public, max-age=31536000, immutable"
+			file_server
+		}
+	}
+	@uncached not path /assets/*
+	header @uncached >Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate"
 	file_server
 	@spa_router {
 		not path /api*
 		not path /gcnotify/*
 		not path /static/config.js
+		not path /assets/*
 		file {
 			try_files {path} /index.html
 		}
@@ -64,22 +82,22 @@ window.VITE_CSTAR_TENANT_SETUP_URL="{$VITE_CSTAR_TENANT_SETUP_URL}";`
 	header {
 		-Server
 		X-Frame-Options "SAMEORIGIN"
-		X-XSS-Protection "1;mode=block"
-		Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate"
 		X-Content-Type-Options "nosniff"
-		Strict-Transport-Security "max-age=31536000"
-		Content-Security-Policy "default-src 'self' https://*.gov.bc.ca;;
-			script-src 'self' 'unsafe-inline' https://*.gov.bc.ca ;
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		# Runtime component styling and email previews still need inline styles;
+		# scripts are external files only. Keep ZAP's CSP rule active.
+		Content-Security-Policy "default-src 'self' https://*.gov.bc.ca;
+			script-src 'self' https://*.gov.bc.ca;
 			style-src 'self' https://fonts.googleapis.com https://use.fontawesome.com 'unsafe-inline';
 			font-src 'self' https://fonts.gstatic.com;
 			img-src 'self' data: https://fonts.googleapis.com https://www.w3.org https://*.gov.bc.ca https://*.tile.openstreetmap.org;
 			frame-ancestors 'self';
 			form-action 'self';
-			block-all-mixed-content;
 			connect-src 'self' https://*.gov.bc.ca wss://*.gov.bc.ca;"
 		Referrer-Policy "same-origin"
 		Permissions-Policy "fullscreen=(self), camera=(), microphone=()"
-		Cross-Origin-Resource-Policy "cross-origin"
+		Cross-Origin-Resource-Policy "same-origin"
+		Cross-Origin-Embedder-Policy "require-corp"
 		Cross-Origin-Opener-Policy "same-origin"
 	}
 }

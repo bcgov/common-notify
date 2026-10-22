@@ -6,9 +6,10 @@
 # acted on belong here.
 #
 # Two alerts from the last scan are deliberately NOT ignored:
-#   10055  CSP. script-src is fixed, style-src still carries 'unsafe-inline'
-#          because emotion, react-toastify and react-aria all require it (see
-#          frontend/Caddyfile). One rule id covers both, so ignoring it would
+#   10055  CSP. script-src permits external scripts only; style-src still carries
+#          'unsafe-inline' for runtime styling (Emotion/MUI, React Toastify,
+#          and React Aria) and email preview styles. See frontend/Caddyfile.
+#          One rule id covers both, so ignoring it would
 #          also hide a script-src regression.
 #   10027  Suspicious Comments. Fixed in frontend/index.html; kept active to
 #          catch the next comment that trips it.
