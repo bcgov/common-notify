@@ -40,6 +40,9 @@ export class CstarCacheStore implements OnModuleDestroy {
         port: redisConfig?.port ?? 6379,
         password: redisConfig?.password,
         db: redisConfig?.db ?? 0,
+        sentinels: redisConfig?.sentinels,
+        masterName: redisConfig?.masterName,
+        sentinelPassword: redisConfig?.sentinelPassword,
       },
       CstarCacheStore.name,
       {

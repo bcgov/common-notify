@@ -8,6 +8,7 @@ import {
   TextField,
   Tooltip,
 } from '@bcgov/design-system-react-components'
+import StickyBar from '@/components/StickyBar'
 import TooltipTrigger from '@/components/TooltipTrigger'
 import ApiKeyField from './ApiKeyField'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
@@ -212,9 +213,11 @@ const TenantSettings: FC = () => {
         </p>
       </div>
 
-      <Button type="submit" variant="primary" isDisabled={isSaveDisabled}>
-        {saving ? 'Saving…' : 'Save tenant settings'}
-      </Button>
+      <StickyBar>
+        <Button type="submit" variant="primary" isDisabled={isSaveDisabled}>
+          {saving ? 'Saving…' : 'Save tenant settings'}
+        </Button>
+      </StickyBar>
     </form>
   )
 }

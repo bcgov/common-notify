@@ -27,8 +27,6 @@ import {
 } from '@nestjs/swagger'
 import * as express from 'express'
 import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
-import { Roles } from '../../common/decorators/roles.decorator'
-import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { JwtUserExtractor } from '../../common/utils/jwt-user-extractor'
 import { TemplatesService } from './templates.service'
@@ -230,8 +228,6 @@ export class TemplatesController {
   })
   @ApiCreatedResponse({ description: 'The created template.', type: TemplateResponseDto })
   @ApiResponse({ status: 400, description: 'Malformed request, or an unknown channel or engine.' })
-  @ApiResponse({ status: 403, description: 'Requires the NOTIFY_TEMPLATE_EDITOR role.' })
-  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
   async createTemplate(
     @Req() req: express.Request,
     @Body() createTemplateDto: CreateTemplateDto,
@@ -275,9 +271,7 @@ export class TemplatesController {
     },
   })
   @ApiOkResponse({ description: 'The updated template.', type: TemplateResponseDto })
-  @ApiResponse({ status: 403, description: 'Requires the NOTIFY_TEMPLATE_EDITOR role.' })
   @ApiResponse({ status: 404, description: 'No such template for this tenant.' })
-  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
   async updateTemplate(
     @Req() req: express.Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,
@@ -311,9 +305,7 @@ export class TemplatesController {
     description: 'Template ID.',
   })
   @ApiResponse({ status: 204, description: 'Deleted.' })
-  @ApiResponse({ status: 403, description: 'Requires the NOTIFY_TEMPLATE_EDITOR role.' })
   @ApiResponse({ status: 404, description: 'No such template for this tenant.' })
-  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
   async deleteTemplate(
     @Req() req: express.Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,

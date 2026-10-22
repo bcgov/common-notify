@@ -71,6 +71,9 @@ interface NotificationPreviewModalProps {
   footer?: ReactNode
   /** Banner across the top of the panes, such as where the values come from. */
   notice?: ReactNode
+  outputFooter?: ReactNode
+  closeButton?: ReactNode
+  className?: string
 }
 
 /**
@@ -196,6 +199,9 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
   error = null,
   footer,
   notice,
+  outputFooter,
+  closeButton,
+  className,
 }) => {
   return (
     <Modal
@@ -206,11 +212,12 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
       }}
     >
       <Dialog aria-labelledby="notification-preview-title">
-        <div className="notification-preview">
+        <div className={['notification-preview', className].filter(Boolean).join(' ')}>
           <div className="notification-preview__header">
             <h5 className="notification-preview__title" id="notification-preview-title">
               {title}
             </h5>
+            {closeButton}
           </div>
 
           {notice && <div className="notification-preview__notice">{notice}</div>}
@@ -312,6 +319,7 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
                 bodyHtml={bodyHtml}
                 bodyText={bodyText}
               />
+              {!error && !isLoading && outputFooter}
             </div>
           </div>
 

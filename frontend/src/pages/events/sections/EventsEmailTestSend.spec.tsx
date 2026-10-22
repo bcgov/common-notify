@@ -288,7 +288,7 @@ describe('EventsEmailTestSend', () => {
 
       expect(await screen.findByRole('radio', { name: 'Myself' })).toBeInTheDocument()
       expect(getEventByIdMock).toHaveBeenCalledWith('event-1')
-      expect(getTemplateByIdMock).toHaveBeenCalledWith('template-1')
+      await waitFor(() => expect(getTemplateByIdMock).toHaveBeenCalledWith('template-1'))
     })
 
     it('reports an event that could not be loaded', async () => {

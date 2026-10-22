@@ -10,6 +10,9 @@ import { TenantsService } from '../admin/tenants/tenants.service'
 import { TemplatesRepository } from '../templates/templates.repository'
 import { TemplatesService } from '../templates/templates.service'
 import { NotificationPubSubService } from './notification-pubsub.service'
+import { FeatureFlagService } from '../feature-flag/feature-flag.service'
+import { NotificationChannel } from '../../enum/notification-channel.enum'
+import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 
 const mockRepository = {
   create: vi.fn(),
@@ -41,6 +44,14 @@ const mockTemplatesService = {
 
 const mockNotificationPubSubService = {
   publish: vi.fn(),
+}
+
+const mockFeatureFlagService = {
+  isEnabled: vi.fn().mockResolvedValue(false),
+}
+
+const mockTenantSettingsService = {
+  findByTenantId: vi.fn().mockResolvedValue(null),
 }
 
 const createMockQueryBuilder = () => ({
@@ -86,6 +97,14 @@ describe('NotificationService', () => {
         {
           provide: NotificationPubSubService,
           useValue: mockNotificationPubSubService,
+        },
+        {
+          provide: FeatureFlagService,
+          useValue: mockFeatureFlagService,
+        },
+        {
+          provide: TenantSettingsService,
+          useValue: mockTenantSettingsService,
         },
       ],
     }).compile()
@@ -672,6 +691,84 @@ describe('NotificationService', () => {
 
         // Should not have content validation errors
         expect(errors.some((e) => e.includes('SMS body'))).toBe(false)
+      })
+    })
+
+    describe('international SMS', () => {
+      const smsTo = (...to: string[]): any => ({
+        sms: { recipients: { to }, content: { body: 'Test' } },
+      })
+      const allow = (flag: boolean, tenantSetting: boolean) => {
+        mockFeatureFlagService.isEnabled.mockResolvedValue(flag)
+        mockTenantSettingsService.findByTenantId.mockResolvedValue({
+          internationalSmsEnabled: tenantSetting,
+        })
+      }
+      const isInternationalError = (e: string) => e.includes('international number')
+
+      it('allows Canadian numbers without reading the flag or settings', async () => {
+        allow(false, false)
+
+        const errors = await service.validateBusinessRules(
+          'tenant-123',
+          smsTo('+16045551234', '+12505551234'),
+        )
+
+        expect(errors.some(isInternationalError)).toBe(false)
+        expect(mockFeatureFlagService.isEnabled).not.toHaveBeenCalled()
+        expect(mockTenantSettingsService.findByTenantId).not.toHaveBeenCalled()
+      })
+
+      it('rejects an international number when the flag is off, whatever the tenant setting', async () => {
+        allow(false, true)
+
+        const errors = await service.validateBusinessRules(
+          'tenant-123',
+          smsTo('+16045551234', '+442071838750'),
+        )
+
+        expect(errors.filter(isInternationalError)).toEqual([
+          expect.stringContaining('+442071838750'),
+        ])
+        expect(mockFeatureFlagService.isEnabled).toHaveBeenCalledWith(
+          'international_sms',
+          'tenant-123',
+        )
+      })
+
+      it('rejects an international number when the flag is on but the tenant has not enabled it', async () => {
+        allow(true, false)
+
+        const errors = await service.validateBusinessRules('tenant-123', smsTo('+17875551234'))
+
+        expect(errors.some(isInternationalError)).toBe(true)
+      })
+
+      it('rejects a US number when the flag is on but the tenant has not enabled it', async () => {
+        allow(true, false)
+
+        const errors = await service.validateBusinessRules('tenant-123', smsTo('+12065550123'))
+
+        expect(errors.filter(isInternationalError)).toEqual([
+          expect.stringContaining('+12065550123'),
+        ])
+      })
+
+      it('rejects when the tenant has no settings row', async () => {
+        mockFeatureFlagService.isEnabled.mockResolvedValue(true)
+        mockTenantSettingsService.findByTenantId.mockResolvedValue(null)
+
+        const errors = await service.validateBusinessRules('tenant-123', smsTo('+442071838750'))
+
+        expect(errors.some(isInternationalError)).toBe(true)
+      })
+
+      it('allows an international number when the flag and the tenant setting are both on', async () => {
+        allow(true, true)
+
+        const errors = await service.validateBusinessRules('tenant-123', smsTo('+442071838750'))
+
+        expect(errors.some(isInternationalError)).toBe(false)
       })
     })
 
@@ -1412,6 +1509,61 @@ describe('NotificationService', () => {
       expect(dto.updatedAt).toEqual(updatedDate)
       expect(dto.createdAt).toBeInstanceOf(Date)
       expect(dto.updatedAt).toBeInstanceOf(Date)
+    })
+  })
+
+  describe('validateMailMergeRules international SMS', () => {
+    const smsMerge = (...numbers: string[]): any => ({
+      sms: {
+        recipients: { mergeArray: [['to', 'name'], ...numbers.map((n) => [n, 'Pat'])] },
+        content: { body: 'Hi {{name}}' },
+      },
+    })
+    const isInternationalError = (e: string) => e.includes('international number')
+
+    beforeEach(() => {
+      mockTenantsService.findOne.mockResolvedValue({ id: 'tenant-123', status: 'active' })
+    })
+
+    it('reports each international row once, reading the flag once', async () => {
+      mockFeatureFlagService.isEnabled.mockResolvedValue(false)
+
+      const errors = await service.validateMailMergeRules(
+        'tenant-123',
+        smsMerge('+16045551234', '+442071838750', '+18765551234'),
+        NotificationChannel.SMS,
+      )
+
+      expect(errors.filter(isInternationalError)).toEqual([
+        expect.stringMatching(/^Row 2: "\+442071838750"/),
+        expect.stringMatching(/^Row 3: "\+18765551234"/),
+      ])
+      expect(mockFeatureFlagService.isEnabled).toHaveBeenCalledTimes(1)
+    })
+
+    it('allows international rows when the flag and the tenant setting are both on', async () => {
+      mockFeatureFlagService.isEnabled.mockResolvedValue(true)
+      mockTenantSettingsService.findByTenantId.mockResolvedValue({ internationalSmsEnabled: true })
+
+      const errors = await service.validateMailMergeRules(
+        'tenant-123',
+        smsMerge('+442071838750'),
+        NotificationChannel.SMS,
+      )
+
+      expect(errors).toEqual([])
+    })
+
+    it('does not check email merges', async () => {
+      const errors = await service.validateMailMergeRules('tenant-123', {
+        email: {
+          recipients: { mergeArray: [['to'], ['a@example.com']] },
+          content: { subject: 'S', body: 'B' },
+        },
+      } as any)
+
+      expect(errors).toEqual([])
+      expect(mockFeatureFlagService.isEnabled).not.toHaveBeenCalled()
     })
   })
 })
