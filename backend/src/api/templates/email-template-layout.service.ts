@@ -25,7 +25,7 @@ export interface EmailHeaderOverride {
  * Height a sender's own logo is rendered at. The width follows it, so a wide logo stays wide.
  * The preview on the test send screen uses the same figure.
  */
-const LOGO_HEIGHT_PX = 80
+const LOGO_HEIGHT_PX = 110
 
 /**
  * Gap between the logo/title row and the rule under it.
@@ -120,10 +120,8 @@ export class EmailTemplateLayoutService {
    * agree on - Outlook in particular ignores flex and much of the box model.
    *
    * The measurements match .events__header-preview-row and its children, so that the preview on
-   * the test send screen shows what actually arrives. The one thing not reproduced is the
-   * preview's `object-fit: contain` cap on width: mail clients do not support it, and enforcing
-   * both a height and a max-width there would distort a wide logo rather than letterbox it. The
-   * height is what is held to, and the width follows it.
+   * the test send screen shows what actually arrives. In both, the height is what is held to, and
+   * the width follows it.
    */
   private headerHtml(logoId: string, title: string | null, alt: string): string {
     const divider = '1px solid #d8d8d8'
