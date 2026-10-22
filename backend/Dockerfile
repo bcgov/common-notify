@@ -15,7 +15,7 @@ COPY . ./
 RUN npm ci --ignore-scripts --no-update-notifier --omit=dev
 
 # Deploy using minimal Distroless image
-FROM gcr.io/distroless/nodejs22-debian12:nonroot
+FROM gcr.io/distroless/nodejs22-debian13:nonroot
 ENV NODE_ENV=production
 
 # Copy app and dependencies
