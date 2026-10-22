@@ -34,6 +34,7 @@ import { NotificationPubSubService } from '../api/notification/notification-pubs
 import { TenantsModule } from '../api/admin/tenants/tenants.module'
 import { TemplatesModule } from '../api/templates/templates.module'
 import { TenantSettingsModule } from '../api/tenant-settings/tenant-settings.module'
+import { FeatureFlagModule } from '../api/feature-flag/feature-flag.module'
 import { EventsModule } from '../api/events/events.module'
 import { NotifyModule } from '../api/notify/notify.module'
 import { WebhookModule } from '../api/webhook/webhook.module'
@@ -73,6 +74,7 @@ function queueProvider(name: QueueName): Provider {
     TenantsModule,
     TemplatesModule,
     TenantSettingsModule,
+    FeatureFlagModule,
     WebhookModule,
     AttachmentModule,
     ClamavModule,

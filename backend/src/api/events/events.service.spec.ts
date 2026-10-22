@@ -5,6 +5,7 @@ import { BadRequestException, ConflictException, NotFoundException } from '@nest
 import { vi } from 'vitest'
 import { EventsService } from './events.service'
 import { FeatureFlagService } from '../feature-flag/feature-flag.service'
+import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import { ProvisionedPhoneNumber } from './entities/provisioned-phone-number.entity'
 import { NotifyEvent } from './entities/event.entity'
 import { EventChannelSetting } from './entities/event-channel-setting.entity'
@@ -115,6 +116,7 @@ describe('EventsService', () => {
   /** Unset by default, so getMaxRecipients falls back to its built-in 100. */
   const mockProvisionedPhoneNumberRepository = { findOne: vi.fn() }
   const mockFeatureFlagService = { getFlagsForTenant: vi.fn() }
+  const mockTenantSettingsService = { findByTenantId: vi.fn() }
 
   const mockConfigurationRepository = {
     findOne: vi.fn(),
@@ -171,6 +173,7 @@ describe('EventsService', () => {
       providers: [
         EventsService,
         { provide: FeatureFlagService, useValue: mockFeatureFlagService },
+        { provide: TenantSettingsService, useValue: mockTenantSettingsService },
         {
           provide: getRepositoryToken(ProvisionedPhoneNumber),
           useValue: mockProvisionedPhoneNumberRepository,
@@ -1484,6 +1487,64 @@ describe('EventsService', () => {
         }),
         expect.objectContaining({ kind: EventRecipientKind.TO, address: '+16045551234' }),
       ])
+    })
+
+    describe('international recipients', () => {
+      const allow = (flag: boolean, tenantSetting: boolean) => {
+        mockFeatureFlagService.getFlagsForTenant.mockResolvedValue({
+          sms_notifications: true,
+          international_sms: flag,
+        })
+        mockTenantSettingsService.findByTenantId.mockResolvedValue({
+          internationalSmsEnabled: tenantSetting,
+        })
+      }
+
+      it('saves Canadian numbers without reading the tenant setting', async () => {
+        mockEventRepository.findOne.mockResolvedValue(buildEvent([smsSetting()]))
+
+        await service.updateSmsChannelSetting(tenantId, eventId, {
+          active: false,
+          templateId: null,
+          to: ['250 555 1234'],
+        })
+
+        expect(mockTenantSettingsService.findByTenantId).not.toHaveBeenCalled()
+        expect(mockManager.transaction).toHaveBeenCalled()
+      })
+
+      it.each([
+        [false, true, 'the flag is off'],
+        [true, false, 'the tenant has not enabled it'],
+      ])(
+        'rejects a US number when %s/%s (%s), even on an inactive save',
+        async (flag, tenantSetting) => {
+          allow(flag, tenantSetting)
+          mockEventRepository.findOne.mockResolvedValue(buildEvent([smsSetting()]))
+
+          await expect(
+            service.updateSmsChannelSetting(tenantId, eventId, {
+              active: false,
+              templateId: null,
+              to: ['250 555 1234', '+1 206 555 0123'],
+            }),
+          ).rejects.toThrow(/international number\(s\): \+12065550123\. Only Canadian/)
+          expect(mockManager.transaction).not.toHaveBeenCalled()
+        },
+      )
+
+      it('saves international numbers when the flag and the tenant setting are both on', async () => {
+        allow(true, true)
+        mockEventRepository.findOne.mockResolvedValue(buildEvent([smsSetting()]))
+
+        await service.updateSmsChannelSetting(tenantId, eventId, {
+          active: false,
+          templateId: null,
+          to: ['+442071838750'],
+        })
+
+        expect(savedRecipients()).toEqual([expect.objectContaining({ address: '+442071838750' })])
+      })
     })
 
     it('rejects activating the channel while no sender number is claimed', async () => {
