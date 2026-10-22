@@ -33,6 +33,20 @@ backend:
     #-- minReplicas (5) so drains still complete
     minAvailable: 2
 
+  #-- CCP-5831: ClamAV sits in the send path for notifications with
+  #-- attachments, and failClosed below holds those sends when it is
+  #-- unavailable, so it has to be able to survive a node drain and a deploy.
+  clamav:
+    replicas: 2
+    #-- never leave zero scanners mid-deploy, which failClosed depends on
+    deploymentStrategy: RollingUpdate
+    pdb:
+      enabled: true
+      #-- strictly below replicas (2) so drains still complete
+      minAvailable: 1
+    #-- hold notifications with attachments rather than deliver them unscanned
+    failClosed: true
+
 frontend:
   deploymentStrategy: RollingUpdate
   autoscaling:
