@@ -56,6 +56,10 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings', editE
   )
   const selectedTenantId = useAppSelector((state) => state.tenant.selectedTenant?.id)
   const smsFeatureEnabled = useFeatureFlag('sms_notifications', selectedTenantId)
+  const internationalSmsFlag = useFeatureFlag('international_sms', selectedTenantId)
+  const internationalSmsEnabled = useAppSelector(
+    (state) => state.smsSettings?.internationalSmsEnabled,
+  )
   const [requestedTab, setRequestedTab] = useState<EventTab>(initialTab)
   // Also guard direct tab entry and a flag being disabled while the page is open.
   const selectedTab = requestedTab === 'sms' && !smsFeatureEnabled ? 'settings' : requestedTab
@@ -252,6 +256,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings', editE
           onUnsavedChangesChange={setSmsHasUnsavedChanges}
           smsNotificationsEnabled={smsNotificationsEnabled}
           senderPhoneNumber={event.senderPhoneNumber ?? null}
+          internationalSmsAllowed={internationalSmsFlag && internationalSmsEnabled === true}
           values={{
             active: event.smsSettings?.active ?? false,
             templateId: event.smsSettings?.templateId ?? null,
