@@ -12,20 +12,23 @@ import cstarApi from '@/api/cstar.api'
 import type { Tenant } from '@/interfaces/CstarTenant'
 import tenant, { selectTenant } from '../slices/tenant.slice'
 import cstar from '../slices/cstar.slice'
+import user from '../slices/user.slice'
 import apiKeys from '../slices/apiKeys.slice'
 import apiKeyUsage from '../slices/apiKeyUsage.slice'
 import tenantSettings from '../slices/tenantSettings.slice'
 import { fetchAllTenantsUsage, fetchApiKeyUsage } from '../thunks/apiKeyUsage.thunks'
 import { issueApiKey } from '../thunks/apiKeys.thunks'
 import { updateTenantSettings } from '../thunks/settings.thunks'
-import { fetchCstarTenants } from '../thunks/cstar.thunks'
+import { fetchCstarRoles, fetchCstarTenants } from '../thunks/cstar.thunks'
 import type { AppDispatch } from '../store'
 import { tenantGuardMiddleware } from './tenantGuard'
 
 vi.mock('@/api/apiKeyUsage.api', () => ({ getApiKeyUsage: vi.fn(), getAllTenantsUsage: vi.fn() }))
 vi.mock('@/api/apiKeys.api', () => ({ issueApiKey: vi.fn() }))
 vi.mock('@/api/settings.api', () => ({ updateTenantSettings: vi.fn() }))
-vi.mock('@/api/cstar.api', () => ({ default: { fetchUserTenants: vi.fn() } }))
+vi.mock('@/api/cstar.api', () => ({
+  default: { fetchUserTenants: vi.fn(), fetchUserRoles: vi.fn() },
+}))
 
 function makeTenant(id: string): Tenant {
   return {
@@ -75,7 +78,7 @@ function deferred<T>() {
 
 function setupStore() {
   const store = configureStore({
-    reducer: { tenant, cstar, apiKeys, apiKeyUsage, tenantSettings },
+    reducer: { tenant, cstar, user, apiKeys, apiKeyUsage, tenantSettings },
     middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(tenantGuardMiddleware),
   })
   store.dispatch(selectTenant(tenantA))
@@ -184,5 +187,29 @@ describe('tenantGuardMiddleware', () => {
     expect(store.getState().tenantSettings.saving).toBe(false)
     expect(store.getState().apiKeys.saving).toBe(false)
     expect(store.getState().apiKeys.keys).toEqual([])
+  })
+
+  it("keeps the selected tenant's roles when the previous tenant's roles arrive last", async () => {
+    const store = setupStore()
+    const rolesA = deferred<{ data: { roles: string[] } }>()
+    const rolesB = deferred<{ data: { roles: string[] } }>()
+    vi.mocked(cstarApi.fetchUserRoles).mockImplementation(
+      (tenantId: string) =>
+        (tenantId === tenantA.id ? rolesA.promise : rolesB.promise) as ReturnType<
+          typeof cstarApi.fetchUserRoles
+        >,
+    )
+
+    const requestA = store.dispatch(fetchCstarRoles({ tenantId: tenantA.id }))
+    store.dispatch(selectTenant(tenantB))
+    const requestB = store.dispatch(fetchCstarRoles({ tenantId: tenantB.id }))
+    rolesB.resolve({ data: { roles: ['viewer'] } })
+    await requestB
+    rolesA.resolve({ data: { roles: [] } })
+    await requestA
+
+    expect(store.getState().user.rolesTenantId).toBe(tenantB.id)
+    expect(store.getState().user.rolesLoading).toBe(false)
+    expect(store.getState().user.rolesError).toBeNull()
   })
 })

@@ -14,7 +14,8 @@ interface TenantGuardState {
 export const TENANT_AGNOSTIC_THUNKS: readonly string[] = [
   'auth/*',
   'user/*',
-  'cstar/*',
+  // Not `cstar/*`: roles are per tenant, and are always dispatched after `selectTenant`.
+  'cstar/fetchTenants',
   'codeTables/*',
   'adminTenants/*',
   'apiKeyUsage/fetchAllTenants',
