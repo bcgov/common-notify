@@ -33,9 +33,11 @@ interface EditEventProps {
   eventId: string
   /** Tab to open on, e.g. when the email saved page hands back to its own settings. */
   initialTab?: EventTab
+  /** Opens an active email channel on its form instead of handing off to the saved page. */
+  editEmail?: boolean
 }
 
-const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => {
+const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings', editEmail = false }) => {
   const { canEdit } = useCstarRoles()
   // Fetched here rather than in the email tab, the same way the tenant's logos and default sender
   // are: the tab takes everything outside its own form as a prop.
@@ -54,6 +56,10 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
   )
   const selectedTenantId = useAppSelector((state) => state.tenant.selectedTenant?.id)
   const smsFeatureEnabled = useFeatureFlag('sms_notifications', selectedTenantId)
+  const internationalSmsFlag = useFeatureFlag('international_sms', selectedTenantId)
+  const internationalSmsEnabled = useAppSelector(
+    (state) => state.smsSettings?.internationalSmsEnabled,
+  )
   const [requestedTab, setRequestedTab] = useState<EventTab>(initialTab)
   // Also guard direct tab entry and a flag being disabled while the page is open.
   const selectedTab = requestedTab === 'sms' && !smsFeatureEnabled ? 'settings' : requestedTab
@@ -65,6 +71,18 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
   const [emailHasUnsavedChanges, setEmailHasUnsavedChanges] = useState(false)
   const [smsHasUnsavedChanges, setSmsHasUnsavedChanges] = useState(false)
   const [pendingTab, setPendingTab] = useState<EventTab | null>(null)
+  // Only the saved page's "Edit settings" opens an active email channel on its form; any other
+  // way onto the email tab shows the saved settings, so leaving the tab drops this again.
+  const [emailEditing, setEmailEditing] = useState(editEmail)
+  const showEmailSaved =
+    selectedTab === 'email' && !emailEditing && event?.emailSettings?.active === true
+
+  // Replaced rather than pushed, so Back from the saved page does not land here and bounce.
+  useEffect(() => {
+    if (showEmailSaved) {
+      navigate({ to: '/events/$eventId/saved', params: { eventId }, replace: true })
+    }
+  }, [showEmailSaved, eventId, navigate])
 
   // Placeholder only, for the email tab's sender field and custom header. Failures are not
   // surfaced here since the page's own load state doesn't depend on either. Both thunks return
@@ -119,10 +137,12 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
       return
     }
     setRequestedTab(tab)
+    setEmailEditing(false)
   }
 
   function leavePendingTab() {
     if (pendingTab) setRequestedTab(pendingTab)
+    setEmailEditing(false)
     setEmailHasUnsavedChanges(false)
     setSmsHasUnsavedChanges(false)
     setPendingTab(null)
@@ -185,7 +205,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
   function renderTabContent() {
     if (loadError) return <div className="alert alert-danger">{loadError}</div>
 
-    if (!event) return <p className="events__help">Loading event...</p>
+    if (!event || showEmailSaved) return <p className="events__help">Loading event...</p>
 
     if (selectedTab === 'settings')
       return (
@@ -236,6 +256,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings' }) => 
           onUnsavedChangesChange={setSmsHasUnsavedChanges}
           smsNotificationsEnabled={smsNotificationsEnabled}
           senderPhoneNumber={event.senderPhoneNumber ?? null}
+          internationalSmsAllowed={internationalSmsFlag && internationalSmsEnabled === true}
           values={{
             active: event.smsSettings?.active ?? false,
             templateId: event.smsSettings?.templateId ?? null,
