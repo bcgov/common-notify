@@ -316,30 +316,32 @@ export class NotifySubmissionService {
     entries: UsageEntry[],
   ): Promise<AcceptedUsageResult[]> {
     if (!apiKeyConsumerId) return []
-    const results: AcceptedUsageResult[] = []
-    for (const { channel, count } of entries) {
-      if (count <= 0) continue
-      try {
-        const usageRows = await this.apiKeyUsageService.recordUsage(
-          apiKeyConsumerId,
-          channel,
-          count,
-        )
-        results.push(
-          ...usageRows.map(({ periodTypeCode, periodStart, sentCount }) => ({
-            channelCode: channel,
-            periodTypeCode,
-            periodStart,
-            sentCount,
-          })),
-        )
-      } catch (error) {
-        this.logger.warn(
-          `Failed to record ${channel} usage for API key ${apiKeyConsumerId}: ${errorMessage(error)}`,
-        )
-      }
-    }
-    return results
+    // One entry per channel, and each channel upserts its own rows, so the writes can overlap.
+    const perChannel = await Promise.all(
+      entries
+        .filter(({ count }) => count > 0)
+        .map(async ({ channel, count }): Promise<AcceptedUsageResult[]> => {
+          try {
+            const usageRows = await this.apiKeyUsageService.recordUsage(
+              apiKeyConsumerId,
+              channel,
+              count,
+            )
+            return usageRows.map(({ periodTypeCode, periodStart, sentCount }) => ({
+              channelCode: channel,
+              periodTypeCode,
+              periodStart,
+              sentCount,
+            }))
+          } catch (error) {
+            this.logger.warn(
+              `Failed to record ${channel} usage for API key ${apiKeyConsumerId}: ${errorMessage(error)}`,
+            )
+            return []
+          }
+        }),
+    )
+    return perChannel.flat()
   }
 
   private callerFromRequest(req: any): Caller {
@@ -640,7 +642,9 @@ export class NotifySubmissionService {
           params: { ...globalParams, ...recipient.params },
         },
       } as NotifySimpleRequest
-      total += await this.resolveSmsSegments(tenantId, perRecipient)
+      // Sequential on purpose: a template merge looks the template up once per row, and a merge can
+      // have 50,000 rows - in parallel that would be 50,000 concurrent queries on the pool.
+      total += await this.resolveSmsSegments(tenantId, perRecipient) // NOSONAR
     }
     return total
   }
@@ -751,7 +755,14 @@ export class NotifySubmissionService {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string') return error
+  try {
+    return JSON.stringify(error) ?? 'Unknown error'
+  } catch {
+    // Circular, or holds a BigInt.
+    return 'Unknown error'
+  }
 }
 
 /**
