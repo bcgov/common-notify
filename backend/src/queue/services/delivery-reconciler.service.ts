@@ -21,6 +21,8 @@ import { ProviderToken } from '../../enum/provider-token.enum'
 import { QueueName } from '../../enum/queue-name.enum'
 import { redisKey } from '../../common/redis/redis-namespace'
 import { DELIVERY_JOB_OPTIONS, INGESTION_JOB_OPTIONS } from '../job-options'
+import { StructuredLoggerService } from '../../common/logger'
+import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../job-retention'
 import {
   delayUntilScheduled,
   ingestionJobFromRequest,
@@ -124,6 +126,7 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
     @Optional() @Inject(QueueName.EMAIL_DELIVERY) private readonly emailQueue?: Queue | null,
     @Optional() @Inject(QueueName.SMS_DELIVERY) private readonly smsQueue?: Queue | null,
     @Optional() @Inject(QueueName.INGESTION) private readonly ingestionQueue?: Queue | null,
+    @Optional() private readonly structuredLogger?: StructuredLoggerService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -453,5 +456,17 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
       status: sent > 0 ? NotificationStatus.PARTIALLY_COMPLETED : NotificationStatus.FAILED,
       updatedBy: 'delivery-reconciler',
     })
+    // The send failure line the delivery alerts count. Only batch and delivery work carry a
+    // channel; a request that never fanned out is not attributed to one.
+    if (item.channel === NotificationChannel.EMAIL || item.channel === NotificationChannel.SMS) {
+      this.structuredLogger?.logNotificationFailure(
+        item.notifyId,
+        item.tenantId,
+        item.channel === NotificationChannel.EMAIL ? 'email' : 'sms',
+        `Not delivered: the ${item.kind} failed ${attempts} recovery attempt(s)`,
+        undefined,
+        DeliveryReconcilerService.name,
+      )
+    }
   }
 }

@@ -8,6 +8,7 @@ import { NotificationStatus } from '../../enum/notification-status.enum'
 import type { NotificationRequestDetail } from '../../api/notification/entities/notification-request-detail.entity'
 import type { NotificationRequest } from '../../api/notification/entities/notification-request.entity'
 import type { NotificationService } from '../../api/notification/notification.service'
+import type { StructuredLoggerService } from '../../common/logger'
 
 const BATCH = {
   batchId: 'req-1-EMAIL-0',
@@ -125,6 +126,7 @@ function setup({
     getJob: vi.fn().mockResolvedValue(job ?? null),
     add: vi.fn().mockResolvedValue({}),
   }
+  const structuredLogger = { logNotificationFailure: vi.fn() }
   const service = new DeliveryReconcilerService(
     detailRepository as unknown as Repository<NotificationRequestDetail>,
     requestRepository as unknown as Repository<NotificationRequest>,
@@ -133,9 +135,11 @@ function setup({
     queue as unknown as Queue,
     null,
     ingestionQueue as unknown as Queue,
+    structuredLogger as unknown as StructuredLoggerService,
   )
   return {
     service,
+    structuredLogger,
     detailRepository,
     requestRepository,
     notificationService,
@@ -230,6 +234,38 @@ describe('DeliveryReconcilerService', () => {
       updatedBy: 'delivery-reconciler',
     })
     expect(queue.add).not.toHaveBeenCalled()
+  })
+
+  it('logs the settled email send as one delivery failure for the alert to count', async () => {
+    const { service, detailRepository, structuredLogger } = setup({
+      job: jobIn('failed'),
+      attempt: 6,
+    })
+    detailRepository.count.mockResolvedValueOnce(0).mockResolvedValueOnce(0)
+
+    await service.reconcile()
+
+    expect(structuredLogger.logNotificationFailure).toHaveBeenCalledTimes(1)
+    expect(structuredLogger.logNotificationFailure).toHaveBeenCalledWith(
+      'req-1',
+      'tenant-1',
+      'email',
+      expect.stringMatching(/5 recovery/),
+      undefined,
+      'DeliveryReconcilerService',
+    )
+  })
+
+  it('logs no delivery failure while other work on the request is still owed', async () => {
+    const { service, detailRepository, structuredLogger } = setup({
+      job: jobIn('failed'),
+      attempt: 6,
+    })
+    detailRepository.count.mockResolvedValueOnce(3)
+
+    await service.reconcile()
+
+    expect(structuredLogger.logNotificationFailure).not.toHaveBeenCalled()
   })
 
   it('records the pass and what it acted on for the monitoring page', async () => {
@@ -487,7 +523,7 @@ describe('DeliveryReconcilerService', () => {
     })
 
     it('settles the request as failed after the recovery limit', async () => {
-      const { service, ingestionQueue, notificationService } = setup({
+      const { service, ingestionQueue, notificationService, structuredLogger } = setup({
         stale: [],
         scheduled: SCHEDULED,
         attempt: 6,
@@ -495,6 +531,8 @@ describe('DeliveryReconcilerService', () => {
 
       expect(await service.reconcile()).toEqual({ 'gave-up': 1 })
       expect(ingestionQueue.add).not.toHaveBeenCalled()
+      // Never fanned out, so there is no channel to attribute the failure to.
+      expect(structuredLogger.logNotificationFailure).not.toHaveBeenCalled()
       expect(notificationService.update).toHaveBeenCalledWith('req-1', 'tenant-1', {
         status: NotificationStatus.FAILED,
         updatedBy: 'delivery-reconciler',

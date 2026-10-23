@@ -377,6 +377,16 @@ export class EmailDeliveryWorker extends DeliveryWorker {
       throw new Error(
         'AttachmentResolverService is not available to resolve stored email attachments',
       )
+      if (finalStatus !== NotificationStatus.COMPLETED) {
+        structuredLogger?.logNotificationFailure(
+          notifyId,
+          tenantId,
+          'email',
+          `${failedRemaining} of ${failedRemaining + sentRemaining} merge recipients failed`,
+          undefined,
+          EmailDeliveryWorker.name,
+        )
+      }
     }
 
     this.logger.debug(
