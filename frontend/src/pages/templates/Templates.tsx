@@ -104,6 +104,7 @@ const Templates: FC = () => {
     filters,
     isLoading,
     hasLoaded,
+    hasNoData,
   } = useAppSelector((state) => state.templates)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const { canEdit } = useCstarRoles()
@@ -111,8 +112,7 @@ const Templates: FC = () => {
   const [dialog, setDialog] = useState<DeleteDialog | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   // A search or filter that matches nothing still shows the table and its empty message.
-  const hasNoTemplates =
-    hasLoaded && !isLoading && count === 0 && !search && Object.keys(filters).length === 0
+  const hasNoTemplates = hasNoData && !search && Object.keys(filters).length === 0
 
   const columns: TableColumn<TemplateResponse>[] = [
     ...baseColumns,

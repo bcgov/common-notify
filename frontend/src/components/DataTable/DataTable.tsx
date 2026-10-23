@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import TablePaginationFooter from './pagination/TablePaginationFooter'
 import TableEmptyState, { getEmptyMessage, getNarrowing } from './TableEmptyState'
 import { Table } from './Table'
@@ -105,6 +105,7 @@ export function DataTable<T extends object>({
   onRowClick,
 }: TableProps<T>) {
   const rows = data ?? []
+  const tableRef = useRef<HTMLTableElement>(null)
 
   const showEmpty = !isLoading && (isEmpty || rows.length === 0)
   const narrowing = getNarrowing(search, onClearSearch, activeFilters, onFilter)
@@ -124,7 +125,14 @@ export function DataTable<T extends object>({
 
     if (showEmpty) {
       return (
-        <TableEmptyState narrowing={narrowing} message={emptyMessage} colSpan={columns.length} />
+        <TableEmptyState
+          narrowing={narrowing}
+          message={emptyMessage}
+          colSpan={columns.length}
+          // Clearing removes the button that was pressed, so focus moves to the table rather
+          // than dropping back to the top of the page.
+          onCleared={() => tableRef.current?.focus()}
+        />
       )
     }
 
@@ -186,6 +194,8 @@ export function DataTable<T extends object>({
         multiline={multiline}
         className={className}
         aria-label={label}
+        ref={tableRef}
+        tabIndex={-1}
       >
         <TableHeader>
           <TableRow>

@@ -136,6 +136,24 @@ describe('DataTable', () => {
       expect(onFilter).toHaveBeenCalledWith('name', [])
     })
 
+    it('moves focus to the table once the clear button is gone', async () => {
+      const { rerender } = render(
+        <DataTable
+          columns={columns}
+          data={[]}
+          keyExtractor={keyExtractor}
+          label="Users"
+          search="nothing"
+          onClearSearch={() => {}}
+        />,
+      )
+
+      await userEvent.click(screen.getByRole('button', { name: 'Clear search' }))
+      rerender(<DataTable columns={columns} data={[]} keyExtractor={keyExtractor} label="Users" />)
+
+      expect(screen.getByRole('table', { name: 'Users' })).toHaveFocus()
+    })
+
     it('puts a search ahead of filters when both are applied', () => {
       render(
         <DataTable

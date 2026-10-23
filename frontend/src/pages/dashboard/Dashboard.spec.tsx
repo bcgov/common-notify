@@ -207,7 +207,7 @@ describe('Dashboard with CodeTables', () => {
   it('shows the no-data card instead of the search and table when nothing has been sent', async () => {
     const store = createStore({
       ...preloadedState,
-      notification: { ...baseNotificationState, hasLoaded: true },
+      notification: { ...baseNotificationState, hasLoaded: true, hasNoData: true },
       user: { current: { cstarRoles: ['NOTIFY_TEMPLATE_EDITOR'] } },
     })
 
@@ -224,6 +224,22 @@ describe('Dashboard with CodeTables', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Create notification event' }))
 
     expect(navigateMock).toHaveBeenCalledWith({ to: '/events/create' })
+  })
+
+  it('keeps the no-data card up while a revisit refetches', () => {
+    const store = createStore({
+      ...preloadedState,
+      notification: { ...baseNotificationState, hasLoaded: true, hasNoData: true, isLoading: true },
+    })
+
+    render(
+      <Provider store={store}>
+        <Dashboard />
+      </Provider>,
+    )
+
+    expect(screen.getByText('No notifications yet.')).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
 
   it('holds off on the no-data card while notifications are refetching', () => {

@@ -106,12 +106,20 @@ describe('Templates', () => {
   })
 
   it('shows the no-data card instead of the table when the tenant has no templates', () => {
-    setState([])
+    setState([], { hasNoData: true })
     render(<Templates />)
 
     expect(screen.getByText('No templates yet.')).toBeInTheDocument()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Create New Template' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the no-data card up while a revisit refetches', () => {
+    setState([], { hasNoData: true, isLoading: true })
+    render(<Templates />)
+
+    expect(screen.getByText('No templates yet.')).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
 
   it('shows loading rather than the no-data card while a refetch is in flight', () => {

@@ -41,9 +41,10 @@ interface TableEmptyStateProps {
   narrowing: Narrowing | null
   message: string
   colSpan: number
+  onCleared?: () => void
 }
 
-const TableEmptyState: FC<TableEmptyStateProps> = ({ narrowing, message, colSpan }) => (
+const TableEmptyState: FC<TableEmptyStateProps> = ({ narrowing, message, colSpan, onCleared }) => (
   <TableRow
     className={
       narrowing ? 'data-table__empty-row data-table__empty-row--action' : 'data-table__empty-row'
@@ -52,7 +53,14 @@ const TableEmptyState: FC<TableEmptyStateProps> = ({ narrowing, message, colSpan
     <TableCell colSpan={colSpan}>
       {getEmptyMessage(narrowing, message)}
       {narrowing && (
-        <Button variant="link" size="small" onPress={narrowing.clear}>
+        <Button
+          variant="link"
+          size="small"
+          onPress={() => {
+            narrowing.clear()
+            onCleared?.()
+          }}
+        >
           {NARROWED[narrowing.by].actionLabel}
         </Button>
       )}

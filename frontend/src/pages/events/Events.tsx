@@ -91,14 +91,14 @@ const Events: FC = () => {
     filters,
     isLoading,
     hasLoaded,
+    hasNoData,
     error,
   } = useAppSelector((state) => state.events)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const { canEdit } = useCstarRoles()
   const [searchInput, setSearchInput] = useState(search)
   // A search or filter that matches nothing still shows the table and its empty message.
-  const hasNoEvents =
-    hasLoaded && !isLoading && count === 0 && !search && Object.keys(filters).length === 0
+  const hasNoEvents = hasNoData && !search && Object.keys(filters).length === 0
 
   useEffect(() => {
     if (selectedTenant) {

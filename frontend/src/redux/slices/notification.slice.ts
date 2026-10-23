@@ -18,6 +18,8 @@ interface NotificationState {
   totalPages: number
   isLoading: boolean
   hasLoaded: boolean
+  /** The last fetch was unsearched and unfiltered and found nothing: the tenant has none yet. */
+  hasNoData: boolean
   error: string | null
   /** Request id of the fetch currently being awaited; see utils/latestRequest. */
   currentRequestId: string | null
@@ -34,6 +36,7 @@ const initialState: NotificationState = {
   totalPages: 0,
   isLoading: false,
   hasLoaded: false,
+  hasNoData: false,
   error: null,
   currentRequestId: null,
 }
@@ -100,6 +103,7 @@ export const notificationSlice = createSlice({
         if (isStaleResponse(state.currentRequestId, action)) return
         state.isLoading = false
         state.hasLoaded = true
+        state.hasNoData = action.payload.count === 0 && Object.keys(state.filters).length === 0
         state.currentRequestId = null
         state.items = action.payload.data
         state.count = action.payload.count
@@ -121,13 +125,12 @@ export const { setSort, setFilter, setPage, setLimit, upsertNotification } =
 
 export const selectNotifications = (state: RootState) => state.notification.items
 
-// True once the tenant is known to have sent nothing. Checks items as well as count because an
-// SSE upsert adds rows without updating count. Active filters mean "nothing matched", not this.
-// Not while loading: just after filters are cleared, the empty rows are still the filtered result.
+// True once the tenant is known to have sent nothing. hasNoData comes from the last fetch, so a
+// refetch on revisit keeps the card up, and clearing filters that matched nothing doesn't flash
+// it. Checks items too because an SSE upsert adds rows without a fetch. Active filters mean
+// "nothing matched", not this.
 export const selectHasNoNotifications = (state: RootState) =>
-  state.notification.hasLoaded &&
-  !state.notification.isLoading &&
-  state.notification.count === 0 &&
+  state.notification.hasNoData &&
   state.notification.items.length === 0 &&
   Object.keys(state.notification.filters).length === 0
 
