@@ -112,6 +112,11 @@ const RequestStatus: FC<RequestStatusProps> = ({ notificationRequestId }) => {
     dispatch(setSearch(searchInput))
   }
 
+  function clearSearch() {
+    setSearchInput('')
+    dispatch(setSearch(''))
+  }
+
   function handleLimitChange(newLimit: number) {
     dispatch(setLimit(newLimit))
   }
@@ -165,8 +170,10 @@ const RequestStatus: FC<RequestStatusProps> = ({ notificationRequestId }) => {
           columns={columns}
           data={details}
           keyExtractor={(row) => row.id}
-          isLoading={isLoading && !hasLoaded}
+          isLoading={isLoading && (!hasLoaded || details.length === 0)}
           emptyMessage="No delivery records found"
+          search={search}
+          onClearSearch={clearSearch}
           label="Notification Delivery Records"
           currentPage={page}
           pageSize={limit}
