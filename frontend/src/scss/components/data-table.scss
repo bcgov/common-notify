@@ -176,6 +176,23 @@ $table-header-bg: #f1f8fe; // Table header / footer color
     }
   }
 
+  // Puts an empty-state action (e.g. "Clear search") on its own line under the message.
+  &__empty-row td .bcds-react-aria-Button {
+    display: flex;
+    margin: $spacing-sm auto 0;
+  }
+
+  // Search/filter empty state sits on white. Scoped under tbody tr to tie with the striped
+  // odd-row and row hover backgrounds, and placed after them so it wins.
+  tbody tr.data-table__empty-row--action,
+  tbody tr.data-table__empty-row--action:hover {
+    background-color: $white;
+  }
+
+  tbody tr.data-table__empty-row--action td {
+    padding-top: $spacing-md;
+  }
+
   /* Pagination footer row */
 
   &__footer {

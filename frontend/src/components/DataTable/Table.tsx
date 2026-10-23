@@ -1,7 +1,7 @@
-import type { ComponentPropsWithoutRef } from 'react'
+import type { ComponentPropsWithRef } from 'react'
 import '@/scss/components/data-table.scss'
 
-export interface TableProps extends ComponentPropsWithoutRef<'table'> {
+export interface TableProps extends ComponentPropsWithRef<'table'> {
   variant?: 'striped' | 'bordered' | 'plain'
   size?: 'sm' | 'md' | 'lg'
   scrollable?: boolean
