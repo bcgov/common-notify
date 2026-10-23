@@ -22,7 +22,7 @@ export const NotificationTemplatesSection: FC = () => {
     if (!selectedTenant) return
 
     let active = true
-
+    // 1 page with 2 enties since we only display the latest 2 templates
     getTemplates(1, 2)
       .then((response) => {
         if (active) setTemplates(response.data)
