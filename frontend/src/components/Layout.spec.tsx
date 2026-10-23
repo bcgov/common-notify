@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import userReducer from '@/redux/slices/user.slice'
-import tenantReducer from '@/redux/slices/tenant.slice'
+import tenantReducer, { selectTenant } from '@/redux/slices/tenant.slice'
 import cstarReducer from '@/redux/slices/cstar.slice'
 import loadingReducer from '@/redux/slices/loading.slice'
 import { CstarRole } from '@/enum/cstar-role.enum'
@@ -61,13 +61,16 @@ function renderLayout({
     },
   })
 
-  return render(
-    <Provider store={store}>
-      <Layout>
-        <div>Page content</div>
-      </Layout>
-    </Provider>,
-  )
+  return {
+    store,
+    ...render(
+      <Provider store={store}>
+        <Layout>
+          <div>Page content</div>
+        </Layout>
+      </Provider>,
+    ),
+  }
 }
 
 const queryLoading = () => screen.queryByRole('progressbar', { name: 'Loading...' })
@@ -103,5 +106,20 @@ describe('Layout loading indicators', () => {
     expect(container.querySelector('.page-loading--overlay .page-loading__card')).toContainElement(
       queryLoading(),
     )
+  })
+})
+
+describe('Layout tenant switching', () => {
+  // Pages keep tenant data in local state (e.g. one-shot api/ calls) and rely on this to drop it.
+  it('unmounts the page while the new tenant loads its roles', () => {
+    const { store } = renderLayout()
+    expect(screen.getByText('Page content')).toBeInTheDocument()
+
+    act(() => {
+      store.dispatch(selectTenant({ id: 'tenant-2', name: 'Other Tenant' } as never))
+    })
+
+    expect(screen.queryByText('Page content')).not.toBeInTheDocument()
+    expect(queryLoading()).toBeInTheDocument()
   })
 })

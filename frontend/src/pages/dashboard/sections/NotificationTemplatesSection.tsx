@@ -1,25 +1,44 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { FC } from 'react'
-import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import { fetchTemplates } from '@/redux/thunks/templates.thunks'
+import { useAppSelector } from '@/redux/hooks'
+import { getTemplates } from '@/api/templates.api'
+import type { TemplateResponse } from '@/api/templates.api'
 import { Button } from '@bcgov/design-system-react-components'
 import PageSubHeading from '../../../components/PageSubHeading'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
+import { showErrorToast } from '@/redux/utils/toastUtils'
 
 /**
  * Used on the Dashboard page
  */
 export const NotificationTemplatesSection: FC = () => {
-  const dispatch = useAppDispatch()
   const navigate = useNavigate()
-  const templates = useAppSelector((state) => state.templates.items)
+  const [templates, setTemplates] = useState<TemplateResponse[]>([])
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const { canEdit } = useCstarRoles()
 
+  // Fetch first two templates directly. Local state needs no reset on a tenant switch: Layout
+  // swaps the page for a spinner while the new tenant's roles load, which unmounts this.
   useEffect(() => {
-    dispatch(fetchTemplates())
-  }, [dispatch, selectedTenant])
+    if (!selectedTenant) return
+
+    let active = true
+    // 1 page with 2 entries since we only display the latest 2 templates
+    getTemplates(1, 2)
+      .then((response) => {
+        if (active) setTemplates(response.data)
+      })
+      .catch((error) => {
+        if (active) {
+          showErrorToast(error instanceof Error ? error.message : 'Failed to load templates')
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [selectedTenant])
 
   return (
     <section className="page__section">
@@ -33,7 +52,7 @@ export const NotificationTemplatesSection: FC = () => {
           Create New Template
         </Button>
         <ul className="list-unstyled m-0 d-flex flex-column gap-2">
-          {templates.slice(0, 2).map((template) => (
+          {templates.map((template) => (
             <li key={template.id}>
               <Link
                 to="/template-edit/$templateId"
