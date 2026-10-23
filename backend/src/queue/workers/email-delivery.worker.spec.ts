@@ -8,6 +8,7 @@ import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { IEmailTransport } from '../../adapters'
 import { AttachmentResolverService } from '../../api/notify/services/attachment-resolver.service'
+import { StructuredLoggerService } from '../../common/logger'
 
 describe('EmailDeliveryWorker', () => {
   let mockEmailQueue: Partial<Bull.Queue<DeliveryJobPayload>>
@@ -18,6 +19,13 @@ describe('EmailDeliveryWorker', () => {
   let mockAttachmentResolverService: any
   let mockEmailAdapter: IEmailTransport
   let mockRequestDetailService: any
+  let mockStructuredLogger: Record<
+    | 'logNotificationStart'
+    | 'logNotificationSuccess'
+    | 'logNotificationFailure'
+    | 'logQueueOperation',
+    ReturnType<typeof vi.fn>
+  >
   let processHandler: (job: Bull.Job<DeliveryJobPayload>) => Promise<any>
   let completedCallback: (job: Bull.Job<DeliveryJobPayload>) => void
   let failedCallback: (job: Bull.Job<DeliveryJobPayload>, err: Error) => void
@@ -43,6 +51,13 @@ describe('EmailDeliveryWorker', () => {
       countByStatus: vi.fn().mockResolvedValue(0),
       findSentAddresses: vi.fn().mockResolvedValue(new Set()),
       findBatchRecipients: vi.fn().mockResolvedValue([]),
+    }
+
+    mockStructuredLogger = {
+      logNotificationStart: vi.fn(),
+      logNotificationSuccess: vi.fn(),
+      logNotificationFailure: vi.fn(),
+      logQueueOperation: vi.fn(),
     }
 
     // Mock the notification service
@@ -764,6 +779,7 @@ describe('EmailDeliveryWorker', () => {
         attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
         emailAdapter: mockEmailAdapter,
         requestDetailService: mockRequestDetailService,
+        structuredLogger: mockStructuredLogger as unknown as StructuredLoggerService,
       })
 
       const job: Partial<Bull.Job<DeliveryJobPayload>> = {
@@ -802,6 +818,15 @@ describe('EmailDeliveryWorker', () => {
       expect(mockRequestDetailService.markFailed).toHaveBeenCalledWith(
         'notify-template-missing',
         'Missing personalisation for template ID template-uuid: firstName',
+      )
+      expect(mockStructuredLogger.logNotificationFailure).toHaveBeenCalledTimes(1)
+      expect(mockStructuredLogger.logNotificationFailure).toHaveBeenCalledWith(
+        'notify-template-missing',
+        'tenant-123',
+        'email',
+        expect.any(BadRequestException),
+        expect.any(Number),
+        'EmailDeliveryWorker',
       )
     })
     it('should throw error when notifyId is missing', async () => {
@@ -1519,6 +1544,7 @@ describe('EmailDeliveryWorker', () => {
           attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
           emailAdapter: mockEmailAdapter,
           requestDetailService: mockRequestDetailService,
+          structuredLogger: mockStructuredLogger as unknown as StructuredLoggerService,
         })
       })
 
@@ -1752,6 +1778,7 @@ describe('EmailDeliveryWorker', () => {
           status: NotificationStatus.COMPLETED,
           updatedBy: 'email-delivery-worker',
         })
+        expect(mockStructuredLogger.logNotificationFailure).not.toHaveBeenCalled()
       })
 
       it('should mark parent PARTIALLY_COMPLETED when some sent and some failed with no pending', async () => {
@@ -1785,6 +1812,14 @@ describe('EmailDeliveryWorker', () => {
           status: NotificationStatus.PARTIALLY_COMPLETED,
           updatedBy: 'email-delivery-worker',
         })
+        expect(mockStructuredLogger.logNotificationFailure).toHaveBeenCalledWith(
+          'notify-bulk',
+          'tenant-bulk',
+          'email',
+          '1 of 2 merge recipients failed',
+          undefined,
+          'EmailDeliveryWorker',
+        )
       })
 
       it('should mark parent FAILED when all recipients fail and no pending remain', async () => {
@@ -1810,6 +1845,16 @@ describe('EmailDeliveryWorker', () => {
           status: NotificationStatus.FAILED,
           updatedBy: 'email-delivery-worker',
         })
+        // One line for the whole merge, not one per failed recipient.
+        expect(mockStructuredLogger.logNotificationFailure).toHaveBeenCalledTimes(1)
+        expect(mockStructuredLogger.logNotificationFailure).toHaveBeenCalledWith(
+          'notify-bulk',
+          'tenant-bulk',
+          'email',
+          '2 of 2 merge recipients failed',
+          undefined,
+          'EmailDeliveryWorker',
+        )
       })
 
       it('should not update parent status when other batches are still pending', async () => {
@@ -1821,6 +1866,7 @@ describe('EmailDeliveryWorker', () => {
         await processHandler(job as Bull.Job<DeliveryJobPayload>)
 
         expect(mockNotificationService.update).not.toHaveBeenCalled()
+        expect(mockStructuredLogger.logNotificationFailure).not.toHaveBeenCalled()
       })
 
       it('should throw NotFoundException when template is not found (triggers retry)', async () => {
@@ -1896,6 +1942,14 @@ describe('EmailDeliveryWorker', () => {
           status: NotificationStatus.PARTIALLY_COMPLETED,
           updatedBy: 'email-delivery-worker',
         })
+        expect(mockStructuredLogger.logNotificationFailure).toHaveBeenCalledWith(
+          'notify-bulk',
+          'tenant-bulk',
+          'email',
+          '1 of 25 merge recipients failed',
+          undefined,
+          'EmailDeliveryWorker',
+        )
       })
 
       it('leaves a systemic error to be retried before the final attempt', async () => {
