@@ -195,8 +195,10 @@ groups:
       # Counts failed notifications, not matching log lines. A bare line match on
       # email/fail also matches the success line "... sent=20, failed=0", and one
       # bad recipient emits ~10 lines across its retries. Anchored instead on the
-      # terminal line the worker writes once per notification that has exhausted
-      # its retries, so the value is the number of failed notifications.
+      # "Notification delivery failed" line, written once per notification when it
+      # ends failed: retries exhausted, a permanent 400, a merge settling with
+      # failed recipients, or the delivery reconciler giving up. The value is the
+      # number of failed notifications.
       - uid: cn-log-email-failures
         title: EmailSendingFailures
         condition: C
@@ -212,7 +214,7 @@ groups:
               expr: |
                 sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"}
                   | json | level="error"
-                  | context="EmailDeliveryWorker"
+                  | channel="email"
                   |~ "Notification delivery failed"
                 [10m])) by (namespace)
               queryType: instant
@@ -232,7 +234,7 @@ groups:
         annotations:
           short: "{{ $labels.namespace }} email send failures elevated"
           summary: "Email sending failures in {{ $labels.namespace }}"
-          description: "{{ $value }} email notifications failed delivery in {{ $labels.namespace }} over the last 10 minutes (retries exhausted)"
+          description: "{{ $value }} email notifications failed delivery in {{ $labels.namespace }} over the last 10 minutes"
 
   - orgId: 1
     name: common-notify-performance
