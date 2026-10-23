@@ -40,7 +40,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.0",
     "express-prom-bundle": "^8.0.0",
-    "handlebars": "^4.7.9",
+    "handlebars": "^4.7.10",
     "helmet": "^8.0.0",
     "ioredis": "^5.3.7",
     "jwks-rsa": "^4.0.1",
