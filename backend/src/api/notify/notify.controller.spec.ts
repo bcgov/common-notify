@@ -82,6 +82,8 @@ const mockNotificationService = {
     { address: 'bob@example.com', params: {} },
   ]),
   validateMailMergeRules: vi.fn().mockResolvedValue([]),
+  cancelOrRescheduleNotification: vi.fn(),
+  mapToDto: vi.fn((notification) => notification),
 }
 
 const mockAttachmentValidationService = {
@@ -93,8 +95,9 @@ const mockAttachmentProcessingService = {
 }
 
 const mockIngestionQueue = {
+  name: 'notification-ingestion',
   add: vi.fn(),
-  process: vi.fn(),
+  getJob: vi.fn(),
 }
 
 const mockFeatureFlagService = {
@@ -310,6 +313,88 @@ describe('Notify Controllers', () => {
       } finally {
         delegate.mockRestore()
       }
+    })
+
+    describe('cancel and reschedule', () => {
+      const cancelOrReschedule = (body: object, tenantId = 'tenant-1') =>
+        (app.get(NotifySimpleController) as any).doCancelOrReschedule(
+          tenantId,
+          'user-1',
+          'notification-1',
+          body,
+        )
+
+      function queuedJob(state: string, tenantId = 'tenant-1') {
+        return {
+          id: 'notification-1',
+          data: { notifyId: 'notification-1', tenantId, scheduledFor: '2026-11-01T12:00:00.000Z' },
+          getState: vi.fn().mockResolvedValue(state),
+          remove: vi.fn().mockResolvedValue(undefined),
+        }
+      }
+
+      beforeEach(() => {
+        mockNotificationService.cancelOrRescheduleNotification.mockResolvedValue({
+          id: 'notification-1',
+        })
+      })
+
+      it('removes a cancelled send’s ingestion job, found by its id', async () => {
+        const job = queuedJob('delayed')
+        mockIngestionQueue.getJob.mockResolvedValue(job)
+
+        await cancelOrReschedule({ action: 'cancel' })
+
+        expect(mockIngestionQueue.getJob).toHaveBeenCalledWith('notification-1')
+        expect(job.remove).toHaveBeenCalled()
+      })
+
+      it('re-queues a rescheduled send under the same id, due at the new time', async () => {
+        const job = queuedJob('delayed')
+        mockIngestionQueue.getJob.mockResolvedValue(job)
+        const sendAt = new Date(Date.now() + 2 * 60 * 60_000)
+
+        await cancelOrReschedule({ scheduledTime: sendAt.toISOString() })
+
+        expect(job.remove).toHaveBeenCalled()
+        const [name, data, options] = mockIngestionQueue.add.mock.calls[0]
+        expect(name).toBe('notification-ingestion')
+        // Ingestion delays the delivery jobs until scheduledFor, so it moves with the job.
+        expect(data).toMatchObject({
+          notifyId: 'notification-1',
+          scheduledFor: sendAt.toISOString(),
+        })
+        expect(options).toMatchObject({ jobId: 'notification-1', attempts: 3 })
+        expect(options.delay).toBeGreaterThan(119 * 60_000)
+        expect(options.delay).toBeLessThanOrEqual(120 * 60_000)
+      })
+
+      it.each(['active', 'completed'])('leaves a job that is already %s alone', async (state) => {
+        const job = queuedJob(state)
+        mockIngestionQueue.getJob.mockResolvedValue(job)
+
+        await cancelOrReschedule({ action: 'cancel' })
+
+        expect(job.remove).not.toHaveBeenCalled()
+      })
+
+      it('never touches another tenant’s job', async () => {
+        const job = queuedJob('delayed', 'tenant-2')
+        mockIngestionQueue.getJob.mockResolvedValue(job)
+
+        await cancelOrReschedule({ scheduledTime: new Date(Date.now() + 60_000).toISOString() })
+
+        expect(job.remove).not.toHaveBeenCalled()
+        expect(mockIngestionQueue.add).not.toHaveBeenCalled()
+      })
+
+      it('still returns the updated request when there is no job to change', async () => {
+        mockIngestionQueue.getJob.mockResolvedValue(undefined)
+
+        await expect(cancelOrReschedule({ action: 'cancel' })).resolves.toEqual({
+          id: 'notification-1',
+        })
+      })
     })
 
     describe('accepted usage limit-alert wiring', () => {
@@ -820,6 +905,7 @@ describe('Notify Controllers', () => {
 
         await vi.waitFor(() => {
           expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+            'notification-ingestion',
             expect.objectContaining({
               request: expect.objectContaining({
                 sms: expect.objectContaining({
@@ -1545,6 +1631,7 @@ describe('Notify Controllers', () => {
 
         await vi.waitFor(() => {
           expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+            'notification-ingestion',
             expect.objectContaining({
               request: processedPayload,
             }),
@@ -1553,6 +1640,7 @@ describe('Notify Controllers', () => {
         })
 
         expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+          'notification-ingestion',
           expect.objectContaining({
             request: expect.not.objectContaining({
               email: expect.objectContaining({

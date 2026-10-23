@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
-import Bull from 'bull'
+import type { Queue } from 'bullmq'
 import { TemplatesRepository } from '../templates/templates.repository'
 import { TemplatesService } from '../templates/templates.service'
 import { Template } from '../templates/entities/template.entity'
@@ -55,7 +55,7 @@ import type { NotifySimpleRequest } from '../notify/schemas/notify-simple-reques
 import type { NotifyEmailChannel } from '../notify/schemas/notify-email-channel'
 import type { NotifyAttachment } from '../notify/schemas/notify-attachment'
 import type { StoredNotifyAttachment } from '../notify/schemas/stored-notify-attachment'
-import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../../queue/job-retention'
+import { INGESTION_JOB_OPTIONS } from '../../queue/job-options'
 
 const TEMPLATE_LIST_QUERY_CONFIG: QueryableFieldsConfig = {
   sortableFields: { name: 'template.name', updatedAt: 'template.updatedAt' },
@@ -181,7 +181,7 @@ export class GcNotifyInternalExecutionService {
     private readonly tenantSettingsService: TenantSettingsService,
     @InjectRepository(NotifyConfiguration)
     private readonly configurationRepository: Repository<NotifyConfiguration>,
-    @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue<IngestionJobPayload>,
+    @Inject(QueueName.INGESTION) private readonly ingestionQueue: Queue<IngestionJobPayload>,
     private readonly attachmentValidationService: AttachmentValidationService,
     private readonly attachmentProcessingService: AttachmentProcessingService,
     private readonly bulkValidationService: GcNotifyBulkValidationService,
@@ -387,7 +387,7 @@ export class GcNotifyInternalExecutionService {
 
     const accepted = (await handleMerge(
       this.queueableContext(),
-      this.ingestionQueue as unknown as Bull.Queue,
+      this.ingestionQueue as unknown as Queue,
       QueueName.INGESTION,
       tenantId,
       notifyRequest,
@@ -496,7 +496,7 @@ export class GcNotifyInternalExecutionService {
       apiKeyUsageService: this.apiKeyUsageService,
       smsSegmentService: this.smsSegmentService,
       notificationDedupService: this.notificationDedupService,
-      queueMap: new Map([[QueueName.INGESTION, this.ingestionQueue as unknown as Bull.Queue]]),
+      queueMap: new Map([[QueueName.INGESTION, this.ingestionQueue as unknown as Queue]]),
     }
   }
 
@@ -794,12 +794,9 @@ export class GcNotifyInternalExecutionService {
           ...(scheduledFor && { scheduledFor }),
         }
 
-        await this.ingestionQueue.add(jobPayload, {
+        await this.ingestionQueue.add(this.ingestionQueue.name, jobPayload, {
           jobId: notificationRecord.id,
-          attempts: 3,
-          backoff: { type: 'exponential', delay: 2000 },
-          removeOnComplete: COMPLETED_JOB_RETENTION,
-          removeOnFail: FAILED_JOB_RETENTION,
+          ...INGESTION_JOB_OPTIONS,
           ...(delayMs > 0 && { delay: delayMs }),
         })
 

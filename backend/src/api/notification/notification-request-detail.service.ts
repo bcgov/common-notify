@@ -267,10 +267,18 @@ export class NotificationRequestDetailService {
   }
 
   /**
-   * Count detail records for a request in a given status (used to reconcile the parent request).
+   * A request's detail rows counted per status, in one query, for settling the parent request.
+   * A status with no rows is absent.
    */
-  async countByStatus(notificationRequestId: string, status: string): Promise<number> {
-    return this.detailRepository.count({ where: { notificationRequestId, status } })
+  async countByStatuses(notificationRequestId: string): Promise<Record<string, number>> {
+    const rows = await this.detailRepository
+      .createQueryBuilder('detail')
+      .select('detail.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .where('detail.notificationRequestId = :notificationRequestId', { notificationRequestId })
+      .groupBy('detail.status')
+      .getRawMany<{ status: string; count: string }>()
+    return Object.fromEntries(rows.map(({ status, count }) => [status, Number(count)]))
   }
 
   /**
@@ -292,11 +300,12 @@ export class NotificationRequestDetailService {
   // need more info on what the smtp gateway returns on individual failure
 
   /**
-   * Mark all request detail records for a request as failed. Only called on the final attempt.
+   * Mark a request's undelivered detail records failed. Only called once retrying has ended.
    */
   async markFailed(notificationRequestId: string, errorMessage: string): Promise<void> {
+    // A recipient already reached, or deliberately refused, keeps that record.
     await this.detailRepository.update(
-      { notificationRequestId },
+      { notificationRequestId, status: Not(In(RETRY_PRESERVED_STATUSES)) },
       { status: 'failed', errorMessage, lastAttemptAt: new Date(), updatedBy: 'system' },
     )
   }

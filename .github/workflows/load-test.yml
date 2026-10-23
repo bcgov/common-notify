@@ -82,7 +82,7 @@ jobs:
         with:
           path: ./tests/load/drain-test.js
 
-      # Sample Bull queue depth in Redis until empty → drain rate + peak depth.
+      # Sample BullMQ queue depth in Redis until empty → drain rate + peak depth.
       - name: Measure queue drain
         if: always()
         continue-on-error: true # measurement must never block the ramps that follow
@@ -125,15 +125,15 @@ jobs:
               exit 0
             fi
             llen() { n=$(rc LLEN "$1" | tr -dc '0-9'); echo "${n:-0}"; }
-            # Bull keys are namespaced per deployment (REDIS_KEY_PREFIX, defaulting to
+            # Queue keys are namespaced per deployment (REDIS_KEY_PREFIX, defaulting to
             # RELEASE_NAME) because every deployment in the namespace shares one Redis.
             PREFIX=$(oc get deploy "$DEP" -o jsonpath='{.spec.template.spec.containers[*].env[?(@.name=="RELEASE_NAME")].value}' 2>/dev/null)
             PREFIX=${PREFIX:-notify}
-            echo "bull key prefix: $PREFIX"
+            echo "queue key prefix: $PREFIX:mq"
             depth() {
               t=0
               for q in notification-ingestion email-delivery; do
-                for s in wait active; do t=$((t + $(llen "$PREFIX:$q:$s"))); done
+                for s in wait active; do t=$((t + $(llen "$PREFIX:mq:$q:$s"))); done
               done
               echo "$t"
             }

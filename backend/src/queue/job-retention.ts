@@ -1,12 +1,12 @@
 /**
- * Retention for Bull jobs.
+ * Retention for queue jobs.
  *
  * Redis is capped at 768mb with `maxmemory-policy noeviction` (charts/redis/values.yml), so a
  * queue that keeps every job it has ever run eventually makes Redis reject writes - which
  * stops enqueue altogether, not just this queue. Both sets are bounded by age and count.
  *
  * The completed window is not an audit log; notification_request and its history table are.
- * It exists so that re-adding the same jobId within the window is deduplicated by Bull - a
+ * It exists so that re-adding the same jobId within the window is deduplicated by BullMQ - a
  * request queued twice in quick succession (the original path, then a retry of the same add) runs
  * once. An hour is far longer than that race while still bounding what Redis holds.
  */

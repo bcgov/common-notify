@@ -1,23 +1,25 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import type Bull from 'bull'
 import { QueueModule } from './queue.module'
+import { QueueName } from '../enum/queue-name.enum'
 import type { WorkerHeartbeat } from './worker-heartbeat'
 
 type Heartbeat = Pick<WorkerHeartbeat, 'markDraining' | 'remove'>
 
 function moduleWith(close: () => Promise<void>) {
-  const queue = {
-    pause: vi.fn().mockResolvedValue(undefined),
-    close: vi.fn(close),
-  } as unknown as Bull.Queue
+  const worker = { pause: vi.fn().mockResolvedValue(undefined), close: vi.fn(close) }
   const heartbeat: Heartbeat = {
     markDraining: vi.fn(),
     remove: vi.fn().mockResolvedValue(undefined),
   }
-  const module = new QueueModule(queue, queue, queue, null as unknown as Bull.Queue)
+  const module = new QueueModule()
   // Set by onModuleInit when workers start; that path needs the whole worker graph.
-  ;(module as unknown as { heartbeat: Heartbeat }).heartbeat = heartbeat
-  return { module, queue, heartbeat }
+  const internals = module as unknown as { heartbeat: Heartbeat; workers: Map<QueueName, unknown> }
+  internals.heartbeat = heartbeat
+  // Three workers running (webhook absent).
+  for (const name of [QueueName.INGESTION, QueueName.EMAIL_DELIVERY, QueueName.SMS_DELIVERY]) {
+    internals.workers.set(name, worker)
+  }
+  return { module, worker, heartbeat }
 }
 
 describe('QueueModule shutdown', () => {
@@ -33,14 +35,13 @@ describe('QueueModule shutdown', () => {
   })
 
   it('waits for in-flight jobs, then drops the pod off the live list', async () => {
-    const { module, queue, heartbeat } = moduleWith(() => Promise.resolve())
+    const { module, worker, heartbeat } = moduleWith(() => Promise.resolve())
 
     await module.beforeApplicationShutdown()
 
-    // Three queues present (webhook absent): each stops taking work, then closes once its
-    // active jobs finish.
-    expect(queue.pause).toHaveBeenCalledTimes(3)
-    expect(queue.close).toHaveBeenCalledTimes(3)
+    // Each worker stops taking work, then closes once its active jobs finish.
+    expect(worker.pause).toHaveBeenCalledTimes(3)
+    expect(worker.close).toHaveBeenCalledTimes(3)
     expect(heartbeat.remove).toHaveBeenCalled()
   })
 
@@ -56,7 +57,7 @@ describe('QueueModule shutdown', () => {
     expect(heartbeat.remove).not.toHaveBeenCalled()
   })
 
-  it('does not throw out of shutdown when closing a queue fails', async () => {
+  it('does not throw out of shutdown when closing a worker fails', async () => {
     const { module, heartbeat } = moduleWith(() => Promise.reject(new Error('connection lost')))
 
     await expect(module.beforeApplicationShutdown()).resolves.toBeUndefined()
