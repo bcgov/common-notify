@@ -41,6 +41,7 @@ import { LimitAlertNotificationService } from './services/limit-alert-notificati
 import { SafelistService } from '../safelist/safelist.service'
 import { SmsSegmentService } from './services/sms-segment.service'
 import { NotificationDedupService } from './services/notification-dedup.service'
+import { NotifySubmissionService } from './services/notify-submission.service'
 import { EventNotificationResolver } from '../events/event-notification.resolver'
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 
@@ -224,6 +225,7 @@ describe('Notify Controllers', () => {
         },
         { provide: NotificationDedupService, useValue: mockNotificationDedupService },
         { provide: EventNotificationResolver, useValue: mockEventNotificationResolver },
+        NotifySubmissionService,
       ],
     })
       .overrideGuard(NotifyServiceGuard)
@@ -290,8 +292,10 @@ describe('Notify Controllers', () => {
     })
 
     it('receives the limit-alert provider through Nest injection', () => {
-      const controller = app.get(NotifySimpleController)
-      expect(controller.limitAlertNotificationService).toBe(mockLimitAlertNotificationService)
+      const submission = app.get(NotifySubmissionService)
+      expect((submission as any).limitAlertNotificationService).toBe(
+        mockLimitAlertNotificationService,
+      )
     })
 
     it('passes the same provider to the manually constructed frontend delegate', async () => {
@@ -307,9 +311,9 @@ describe('Notify Controllers', () => {
           { action: 'cancel' },
         )
 
-        expect(
-          (delegate.mock.instances[0] as NotifySimpleController).limitAlertNotificationService,
-        ).toBe(mockLimitAlertNotificationService)
+        expect((delegate.mock.instances[0] as any).submissionService).toBe(
+          app.get(NotifySubmissionService),
+        )
       } finally {
         delegate.mockRestore()
       }
@@ -591,9 +595,9 @@ describe('Notify Controllers', () => {
             sentCount: 85,
           },
         ])
-        const controller = app.get(NotifySimpleController)
-        const provider = controller.limitAlertNotificationService
-        ;(controller as any).limitAlertNotificationService = undefined
+        const submission = app.get(NotifySubmissionService) as any
+        const provider = submission.limitAlertNotificationService
+        submission.limitAlertNotificationService = undefined
 
         try {
           const response = await request(app.getHttpServer())
@@ -602,7 +606,7 @@ describe('Notify Controllers', () => {
             .expect(202)
           expect(response.body.status).toBe('accepted')
         } finally {
-          ;(controller as any).limitAlertNotificationService = provider
+          submission.limitAlertNotificationService = provider
         }
       })
 
@@ -1070,7 +1074,7 @@ describe('Notify Controllers', () => {
       })
 
       it('hands the email shorthand params to validation under the channel, not top level', async () => {
-        // /notifysimple/email posts a bare channel, which @Queueable wraps as { email: body }.
+        // /notifysimple/email posts a bare channel, which the submission service wraps as { email: body }.
         // Everything the caller sent lands under email — so validateBusinessRules sees no
         // top-level params and must read the channel's own params to resolve placeholders.
         const templateId = '12345678-1234-4234-8234-123456789012'
