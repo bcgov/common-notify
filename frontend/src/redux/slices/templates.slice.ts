@@ -18,6 +18,8 @@ interface TemplatesState {
   previewValues: Record<string, string>
   isLoading: boolean
   hasLoaded: boolean
+  /** The last fetch was unsearched and unfiltered and found nothing: the tenant has none yet. */
+  hasNoData: boolean
   error: string | null
   /** Request id of the fetch currently being awaited; see utils/latestRequest. */
   currentRequestId: string | null
@@ -36,6 +38,7 @@ const initialState: TemplatesState = {
   previewValues: {},
   isLoading: false,
   hasLoaded: false,
+  hasNoData: false,
   error: null,
   currentRequestId: null,
 }
@@ -99,6 +102,8 @@ export const templatesSlice = createSlice({
         state.totalPages = action.payload.totalPages
         state.isLoading = false
         state.hasLoaded = true
+        state.hasNoData =
+          action.payload.count === 0 && !state.search && Object.keys(state.filters).length === 0
         state.currentRequestId = null
       })
       .addCase(fetchTemplates.rejected, (state, action) => {
