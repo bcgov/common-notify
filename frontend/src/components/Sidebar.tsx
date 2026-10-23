@@ -10,19 +10,7 @@ import { useBulkNotificationsAccess } from '@/hooks/useBulkNotificationsAccess'
 import { useFeatureFlag } from '@/config/featureFlags/useFeatureFlag'
 import { SsoRole } from '@/enum/sso-role.enum'
 
-// Icons
-import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
-import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
-import SendOutlinedIcon from '@mui/icons-material/SendOutlined'
-import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
-// import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
-import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
-import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined'
-import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
-import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
-import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
-import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
-import WorkspacesOutlinedIcon from '@mui/icons-material/WorkspacesOutlined'
+import { BootstrapIcon } from '@/components/BootstrapIcon'
 import { CSTAR_ROLE_DISPLAY } from '@/enum/cstar-role.enum'
 import { Button, Tooltip, SvgInfoIcon } from '@bcgov/design-system-react-components'
 import TooltipTrigger from '@/components/TooltipTrigger'
@@ -31,43 +19,43 @@ const navItems = [
   {
     label: 'Home',
     to: '/',
-    icon: <HomeOutlinedIcon />,
+    icon: <BootstrapIcon name="house" />,
   },
   {
     label: 'Dashboard',
     to: '/dashboard',
-    icon: <WorkspacesOutlinedIcon />,
+    icon: <BootstrapIcon name="boxes" />,
   },
   {
     label: 'Notification Events',
     to: '/events',
-    icon: <WorkspacesOutlinedIcon />,
+    icon: <BootstrapIcon name="boxes" />,
   },
   {
     label: 'Send Batch Notification',
     to: '/bulk-notifications',
-    icon: <SendOutlinedIcon />,
+    icon: <BootstrapIcon name="send" />,
   },
   {
     label: 'Templates',
     to: '/templates',
-    icon: <FolderOutlinedIcon />,
+    icon: <BootstrapIcon name="folder" />,
   },
   {
     label: 'Usage & Limits',
     to: '/usage',
-    icon: <SpeedOutlinedIcon />,
+    icon: <BootstrapIcon name="speedometer2" />,
   },
   {
     label: 'Settings',
     to: '/settings',
-    icon: <SettingsOutlinedIcon />,
+    icon: <BootstrapIcon name="gear" />,
   },
 ]
 
 const adminItems = {
   label: 'Admin',
-  icon: <AdminPanelSettingsOutlinedIcon />,
+  icon: <BootstrapIcon name="shield-lock" />,
   subItems: [
     {
       label: 'Feature Flags',
@@ -190,7 +178,7 @@ const Sidebar: FC = () => {
                   className={`sidebar__menu-arrow ${adminExpanded ? 'expanded' : ''}`}
                   aria-hidden="true"
                 >
-                  <ExpandMoreOutlinedIcon style={{ fontSize: 18 }} />
+                  <BootstrapIcon name="chevron-down" style={{ fontSize: 18 }} />
                 </span>
               )}
             </Button>
@@ -236,7 +224,7 @@ const Sidebar: FC = () => {
         {/*
           <Button className="sidebar__item">
             <span className="sidebar__icon" aria-hidden="true">
-              <HelpOutlineOutlinedIcon />
+              <BootstrapIcon name="question-circle" />
             </span>
             <span className="sidebar__label">Help</span>
           </Button>
@@ -253,7 +241,7 @@ const Sidebar: FC = () => {
                 aria-label={`Signed in as ${user.displayName}`}
               >
                 <span className="sidebar__icon" aria-hidden="true">
-                  <PersonOutlinedIcon />
+                  <BootstrapIcon name="person" />
                 </span>
                 <span className="sidebar__label">{user.displayName}</span>
               </div>
@@ -293,14 +281,14 @@ const Sidebar: FC = () => {
               aria-label={collapsed ? 'Logout' : undefined}
             >
               <span className="sidebar__icon" aria-hidden="true">
-                <LogoutOutlinedIcon />
+                <BootstrapIcon name="box-arrow-right" />
               </span>
               <span className="sidebar__label">Logout</span>
             </Button>
           ) : (
             <Button className="sidebar__item" onPress={handleLogin}>
               <span className="sidebar__icon" aria-hidden="true">
-                <LoginOutlinedIcon />
+                <BootstrapIcon name="box-arrow-in-right" />
               </span>
               <span className="sidebar__label">Login</span>
             </Button>

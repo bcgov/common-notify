@@ -1,4 +1,4 @@
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'
+import { BootstrapIcon } from '@/components/BootstrapIcon'
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 import type { FilterOption } from './DataTable'
 import { ColumnHeaderDropdown } from './ColumnHeaderDropdown'
@@ -62,7 +62,11 @@ export function TableHeaderCell({
             {isFiltered ? (
               <span className="data-table__filter-badge">{activeFilterValues!.length}</span>
             ) : (
-              <KeyboardArrowDownIcon className="data-table__dropdown-icon" aria-hidden="true" />
+              <BootstrapIcon
+                name="chevron-down"
+                className="data-table__dropdown-icon"
+                aria-hidden="true"
+              />
             )}
           </ColumnHeaderDropdown>
         </div>

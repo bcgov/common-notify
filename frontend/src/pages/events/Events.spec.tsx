@@ -48,10 +48,6 @@ vi.mock('@/redux/utils/toastUtils', () => ({
   showSuccessToast: vi.fn(),
 }))
 
-vi.mock('@mui/icons-material/KeyboardArrowDown', () => ({ default: () => <span>▼</span> }))
-vi.mock('@mui/icons-material/KeyboardArrowUp', () => ({ default: () => <span>▲</span> }))
-vi.mock('@mui/icons-material/UnfoldMore', () => ({ default: () => <span>⇅</span> }))
-
 const event = (overrides: Partial<EventResponse> = {}): EventResponse => ({
   id: 'event-1',
   name: 'Permit renewal',

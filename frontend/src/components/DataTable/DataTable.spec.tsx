@@ -3,10 +3,6 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { DataTable } from './DataTable'
 
-vi.mock('@mui/icons-material/KeyboardArrowDown', () => ({ default: () => <span>▼</span> }))
-vi.mock('@mui/icons-material/KeyboardArrowUp', () => ({ default: () => <span>▲</span> }))
-vi.mock('@mui/icons-material/UnfoldMore', () => ({ default: () => <span>⇅</span> }))
-
 interface Row {
   id: number
   name: string

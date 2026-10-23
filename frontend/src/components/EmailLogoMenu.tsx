@@ -1,3 +1,4 @@
+import { BootstrapIcon } from '@/components/BootstrapIcon'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { FC, KeyboardEvent } from 'react'
 import {
@@ -5,7 +6,6 @@ import {
   SvgChevronUpIcon,
   TextField,
 } from '@bcgov/design-system-react-components'
-import SearchIcon from '@mui/icons-material/Search'
 import type { ApprovedEmailLogo } from '@/interfaces/tenant-settings.interface'
 import EmailLogoMenuItem from './EmailLogoMenuItem'
 import type { EmailLogoMenuOption } from './EmailLogoMenuItem'
@@ -203,7 +203,7 @@ const EmailLogoMenu: FC<EmailLogoMenuProps> = ({
               aria-expanded="true"
               aria-activedescendant={activeOptionId}
               autoFocus
-              iconLeft={<SearchIcon fontSize="small" aria-hidden="true" />}
+              iconLeft={<BootstrapIcon name="search" fontSize="small" aria-hidden="true" />}
               size="medium"
               type="text"
               {...({

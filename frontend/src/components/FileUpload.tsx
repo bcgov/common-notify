@@ -1,7 +1,7 @@
+import { BootstrapIcon } from '@/components/BootstrapIcon'
 import { useId, useRef, useState } from 'react'
 import type { DragEvent, FC } from 'react'
 import { Button, SvgCheckCircleIcon } from '@bcgov/design-system-react-components'
-import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined'
 import '@/scss/components/file-upload.scss'
 
 interface FileUploadProps {
@@ -134,7 +134,11 @@ const FileUpload: FC<FileUploadProps> = ({
         {file ? (
           <div className="file-upload__selected">
             <div className="file-upload__chip">
-              <UploadFileOutlinedIcon className="file-upload__file-icon" aria-hidden="true" />
+              <BootstrapIcon
+                name="file-earmark-arrow-up"
+                className="file-upload__file-icon"
+                aria-hidden="true"
+              />
               <span className="file-upload__file-meta">
                 <span className="file-upload__file-name">{file.name}</span>
                 <span className="file-upload__file-size">{formatSize(file.size)}</span>
@@ -176,7 +180,11 @@ const FileUpload: FC<FileUploadProps> = ({
           </div>
         ) : (
           <div className="file-upload__prompt">
-            <UploadFileOutlinedIcon className="file-upload__prompt-icon" aria-hidden="true" />
+            <BootstrapIcon
+              name="file-earmark-arrow-up"
+              className="file-upload__prompt-icon"
+              aria-hidden="true"
+            />
             <p className="file-upload__prompt-text">Choose a file or drag and drop here</p>
             <p className="file-upload__prompt-types">({allowedExtensions.join(', ')})</p>
             <label htmlFor={inputId} className="file-upload__browse">
