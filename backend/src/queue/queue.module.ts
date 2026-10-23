@@ -36,6 +36,7 @@ import { EMAIL_ADAPTER, IEmailTransport, SMS_ADAPTER, ISmsTransport } from '../a
 import { TenantsModule } from '../api/admin/tenants/tenants.module'
 import { TemplatesModule } from '../api/templates/templates.module'
 import { TenantSettingsModule } from '../api/tenant-settings/tenant-settings.module'
+import { FeatureFlagModule } from '../api/feature-flag/feature-flag.module'
 import { EventsModule } from '../api/events/events.module'
 import { EventNotificationResolver } from '../api/events/event-notification.resolver'
 import { NotifyModule } from '../api/notify/notify.module'
@@ -70,6 +71,7 @@ import { PhoneNumberService } from '../api/notify/services/phone-number.service'
     TenantsModule,
     TemplatesModule,
     TenantSettingsModule,
+    FeatureFlagModule,
     WebhookModule,
     AttachmentModule,
     ClamavModule,
