@@ -1,9 +1,9 @@
-import eslint from '@eslint/js';
-import tseslint from 'typescript-eslint';
-import react from 'eslint-plugin-react';
-import reactHooks from 'eslint-plugin-react-hooks';
-import prettier from 'eslint-plugin-prettier';
-import prettierConfig from 'eslint-config-prettier';
+import eslint from '@eslint/js'
+import tseslint from 'typescript-eslint'
+import react from 'eslint-plugin-react'
+import reactHooks from 'eslint-plugin-react-hooks'
+import prettier from 'eslint-plugin-prettier'
+import prettierConfig from 'eslint-config-prettier'
 
 /**
  * Shared ignore patterns (inlined from eslint-base.config.mjs)
@@ -18,7 +18,7 @@ const baseIgnores = [
   '**/dist/**',
   '**/node_modules/**',
   '**/coverage/**',
-];
+]
 
 /**
  * Shared ESLint rules (inlined from eslint-base.config.mjs)
@@ -36,12 +36,12 @@ const baseRules = {
   // TypeScript rules (shared across frontend and backend)
   '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
   '@typescript-eslint/explicit-module-boundary-types': 'off',
-  '@typescript-eslint/no-explicit-any': 'off',
+  '@typescript-eslint/no-explicit-any': 'warn',
   '@typescript-eslint/no-non-null-assertion': 'off',
   '@typescript-eslint/no-empty-interface': 'off',
   '@typescript-eslint/ban-types': 'off',
   '@typescript-eslint/explicit-function-return-type': 'off',
-};
+}
 
 export default tseslint.config(
   eslint.configs.recommended,
@@ -70,7 +70,7 @@ export default tseslint.config(
       'no-use-before-define': 'off',
       '@typescript-eslint/no-use-before-define': ['error', { functions: false }],
       '@typescript-eslint/no-var-requires': 'off',
-      
+
       // Type-only imports are safe in frontend (no runtime DI like NestJS)
       '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports' }],
 
@@ -85,5 +85,10 @@ export default tseslint.config(
       'react/display-name': 'off',
     },
   },
-);
-
+  {
+    files: ['**/*.spec.ts', '**/*.spec.tsx'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+)

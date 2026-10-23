@@ -1,4 +1,5 @@
 import type { AxiosError } from 'axios'
+import { getApiErrorMessage } from '@/utils/apiErrorMessage'
 import { get, patch, generateApiParameters, STATUS_CODES } from '@/common/api'
 
 /**
@@ -146,7 +147,6 @@ export async function updateTenantLimits(
 
 function toReadableError(error: unknown, resource: string): Error {
   const axiosError = error as AxiosError
-  const responseData = (axiosError.response?.data as any) || {}
 
   if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
     return new Error(`You are not authorized to view ${resource}`)
@@ -155,9 +155,5 @@ function toReadableError(error: unknown, resource: string): Error {
     return new Error(`You do not have permission to modify the ${resource}`)
   }
 
-  return new Error(
-    `Failed to load ${resource}: ${
-      responseData.message || (error instanceof Error ? error.message : 'Unknown error')
-    }`,
-  )
+  return new Error(`Failed to load ${resource}: ${getApiErrorMessage(error)}`)
 }
