@@ -8,6 +8,7 @@ import {
   updateFeatureFlag,
   deleteFeatureFlag,
 } from '../thunks/featureFlags.thunks'
+import { selectTenant } from './tenant.slice'
 
 /**
  * Redux state for feature flags
@@ -80,6 +81,16 @@ const featureFlagsSlice = createSlice({
     clearFeatureFlags: () => initialState,
   },
   extraReducers: (builder) => {
+    // Reset on tenant switch; tenantGuard drops the old tenant's in-flight results.
+    // The admin `flagsList` is cross-tenant, so it is kept.
+    builder.addCase(selectTenant, (state) => {
+      state.byCode = initialState.byCode
+      state.tenantId = undefined
+      state.loading = false
+      state.synced = false
+      state.error = undefined
+    })
+
     // Fetch feature flags for user
     builder
       .addCase(fetchFeatureFlags.pending, (state) => {
