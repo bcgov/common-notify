@@ -103,7 +103,12 @@ jobs:
           oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
           oc_server: ${{ inputs.oc_server }}
           environment: ${{ inputs.environment }}
-          values_file: charts/crunchy/values.yml
+          # action-crunchy takes a single values file, so the environment selects
+          # the file rather than layering an override.
+          #   PROD - runs a standby (CCP-5826); DEV and TEST cannot fit one
+          #   DEV  - larger repo1/pgwal, because PR churn fills the backup repo
+          #   TEST and PRs - the base file
+          values_file: ${{ inputs.environment == 'PROD' && 'charts/crunchy/values-prod.yml' || inputs.environment == 'DEV' && 'charts/crunchy/values-dev.yml' || 'charts/crunchy/values.yml' }}
           triggers: ${{ inputs.db_triggers }}
 
       - uses: actions/checkout@v7
