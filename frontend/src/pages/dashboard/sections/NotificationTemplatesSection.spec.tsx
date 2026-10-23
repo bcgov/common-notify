@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NotificationTemplatesSection } from './NotificationTemplatesSection'
 import { getTemplates } from '@/api/templates.api'
+import { showErrorToast } from '@/redux/utils/toastUtils'
 
 let state: any
 
@@ -11,6 +12,10 @@ vi.mock('@/redux/hooks', () => ({
 
 vi.mock('@/api/templates.api', () => ({
   getTemplates: vi.fn(),
+}))
+
+vi.mock('@/redux/utils/toastUtils', () => ({
+  showErrorToast: vi.fn(),
 }))
 
 vi.mock('@/hooks/useCstarRoles', () => ({
@@ -49,6 +54,14 @@ describe('NotificationTemplatesSection', () => {
     expect(await screen.findByText('Welcome email')).toBeInTheDocument()
     expect(getTemplates).toHaveBeenCalledTimes(1)
     expect(getTemplates).toHaveBeenCalledWith(1, 2)
+  })
+
+  it('reports a failed fetch', async () => {
+    vi.mocked(getTemplates).mockRejectedValue(new Error('Network down'))
+    state = { tenant: { selectedTenant: tenant('tenant-1') } }
+    render(<NotificationTemplatesSection />)
+
+    await vi.waitFor(() => expect(showErrorToast).toHaveBeenCalledWith('Network down'))
   })
 
   it('does not fetch when no tenant is selected', () => {

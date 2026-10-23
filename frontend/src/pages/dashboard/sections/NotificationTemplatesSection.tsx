@@ -7,6 +7,7 @@ import { Button } from '@bcgov/design-system-react-components'
 import PageSubHeading from '../../../components/PageSubHeading'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
+import { showErrorToast } from '@/redux/utils/toastUtils'
 
 /**
  * Used on the Dashboard page
@@ -17,7 +18,8 @@ export const NotificationTemplatesSection: FC = () => {
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const { canEdit } = useCstarRoles()
 
-  // Fetch first two templates directly
+  // Fetch first two templates directly. Local state needs no reset on a tenant switch: Layout
+  // swaps the page for a spinner while the new tenant's roles load, which unmounts this.
   useEffect(() => {
     if (!selectedTenant) return
 
@@ -27,7 +29,11 @@ export const NotificationTemplatesSection: FC = () => {
       .then((response) => {
         if (active) setTemplates(response.data)
       })
-      .catch(() => {})
+      .catch((error) => {
+        if (active) {
+          showErrorToast(error instanceof Error ? error.message : 'Failed to load templates')
+        }
+      })
 
     return () => {
       active = false
