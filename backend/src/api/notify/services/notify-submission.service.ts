@@ -179,13 +179,7 @@ export class NotifySubmissionService {
 
     // Billable count, before accepting the request. For SMS this renders every row, because each
     // recipient's body - and therefore its segment count - differs.
-    const messageCount = await this.countMergeMessages(
-      tenantId,
-      channel,
-      dto,
-      recipients,
-      globalParams,
-    )
+    const messageCount = await this.countMergeMessages(tenantId, channel, dto, recipients)
     if (isSms && messageCount > recipients.length) {
       this.logger.debug(
         `SMS merge: ${recipients.length} recipient(s) bill as ${messageCount} segment(s) (tenant=${tenantId})`,
@@ -627,26 +621,20 @@ export class NotifySubmissionService {
     channel: NotificationChannel,
     dto: NotifySimpleRequest,
     recipients: MergeRecipient[],
-    globalParams: Record<string, unknown>,
   ): Promise<number> {
     if (channel !== NotificationChannel.SMS) return recipients.length
-
-    let total = 0
-    for (const recipient of recipients) {
-      // Per-recipient params win over global ones, matching how the delivery worker renders it.
-      const perRecipient = {
-        ...dto,
-        sms: {
-          ...dto.sms!,
-          recipients: { to: [recipient.address] },
-          params: { ...globalParams, ...recipient.params },
-        },
-      } as NotifySimpleRequest
-      // Sequential on purpose: a template merge looks the template up once per row, and a merge can
-      // have 50,000 rows - in parallel that would be 50,000 concurrent queries on the pool.
-      total += await this.resolveSmsSegments(tenantId, perRecipient) // NOSONAR
+    try {
+      return await this.smsSegmentService.countMergeSegments(
+        tenantId,
+        dto,
+        recipients.map(({ params }) => params),
+      )
+    } catch (error) {
+      this.logger.warn(
+        `Failed to count SMS merge segments, billing one segment per recipient: ${errorMessage(error)}`,
+      )
+      return recipients.length
     }
-    return total
   }
 
   private async processLimitAlerts(

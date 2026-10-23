@@ -144,6 +144,10 @@ const mockLimitAlertNotificationService = {
 
 const mockSmsSegmentService = {
   countSegmentsPerRecipient: vi.fn().mockResolvedValue(1),
+  // One segment per row unless a test says otherwise.
+  countMergeSegments: vi.fn((_tenantId: string, _request: unknown, rows: unknown[]) =>
+    Promise.resolve(rows.length),
+  ),
 }
 
 // Disabled unless a test opts in, so every other send test runs the undeduplicated path.
@@ -178,6 +182,9 @@ describe('Notify Controllers', () => {
     mockSafelistService.isEnforced.mockResolvedValue(false)
     mockSafelistService.findBlocked.mockResolvedValue([])
     mockSmsSegmentService.countSegmentsPerRecipient.mockResolvedValue(1)
+    mockSmsSegmentService.countMergeSegments.mockImplementation((_tenantId, _request, rows) =>
+      Promise.resolve(rows.length),
+    )
     mockNotificationDedupService.enabled = false
     mockNotificationDedupService.fingerprint.mockReturnValue('fingerprint-1')
     mockNotificationDedupService.findDuplicate.mockResolvedValue(null)
@@ -1359,13 +1366,10 @@ describe('Notify Controllers', () => {
         })
 
         it('should bill each recipient on its own body rather than assuming a uniform one', async () => {
-          // Two recipients whose rendered bodies span 3 and 1 segments: the old email-only code
-          // multiplied one count by the recipient total, which would have billed 2 or 6 here.
-          mockSmsSegmentService.countSegmentsPerRecipient
-            .mockResolvedValueOnce(3)
-            .mockResolvedValueOnce(1)
+          // Rows spanning 3 and 1 segments; the per-row sum is covered in sms-segment.service.spec.
+          mockSmsSegmentService.countMergeSegments.mockResolvedValue(4)
 
-          return request(app.getHttpServer())
+          await request(app.getHttpServer())
             .post('/api/v1/notifysimple/sms')
             .send(validSmsMerge)
             .expect(202)
@@ -1373,10 +1377,16 @@ describe('Notify Controllers', () => {
               expect(res.body.recipientCount).toBe(2)
               expect(res.body.billableMessageCount).toBe(4)
             })
+          // Each row's own params, so each recipient's body is rendered separately.
+          expect(mockSmsSegmentService.countMergeSegments).toHaveBeenCalledWith(
+            'test-tenant-id',
+            expect.anything(),
+            [{}, {}],
+          )
         })
 
         it('should enforce limits on segments, not on recipients', async () => {
-          mockSmsSegmentService.countSegmentsPerRecipient.mockResolvedValue(4)
+          mockSmsSegmentService.countMergeSegments.mockResolvedValue(8)
           mockApiKeyConsumerId = 'consumer-1'
 
           await request(app.getHttpServer())
