@@ -6,6 +6,7 @@ import {
   regenerateApiKey,
   updateApiKeyNotes,
 } from '../thunks/apiKeys.thunks'
+import { selectTenant } from './tenant.slice'
 
 interface ApiKeysState {
   /** Keys bound to the selected tenant. At most one today. */
@@ -57,6 +58,8 @@ export const apiKeysSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
+      // Reset on tenant switch; tenantGuard drops the old tenant's in-flight results.
+      .addCase(selectTenant, () => initialState)
       .addCase(fetchApiKeys.pending, (state) => {
         // Drop the previous tenant's key immediately, so the section can never render
         // one tenant's key under another tenant's heading.

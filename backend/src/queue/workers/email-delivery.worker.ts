@@ -210,6 +210,7 @@ export class EmailDeliveryWorker {
             fromAddress,
             headerOverride,
             batchProgressReporter(job),
+            structuredLogger,
           )
         }
 
@@ -472,6 +473,7 @@ export class EmailDeliveryWorker {
               requestDetailService,
               notificationService,
               logger,
+              structuredLogger,
             )
             job.discard()
             logger.error(`[${notifyId}] Batch ${batchId} failed; its unsent recipients are FAILED`)
@@ -489,6 +491,14 @@ export class EmailDeliveryWorker {
           job.discard()
           logger.error(
             `[${notifyId}] Notification marked as FAILED after permanent validation error. Error: ${errorMessage}`,
+          )
+          structuredLogger?.logNotificationFailure(
+            notifyId,
+            tenantId,
+            'email',
+            error,
+            Date.now() - startedAt,
+            workerContext,
           )
           throw error
         }
@@ -607,6 +617,7 @@ export class EmailDeliveryWorker {
     fromAddress: string | null,
     headerOverride: EmailHeaderOverride | undefined,
     reportProgress?: BatchProgressReporter,
+    structuredLogger?: StructuredLoggerService,
   ): Promise<{ success: boolean; batchId: string; sent: number; failed: number }> {
     const { content, params } = mailMergeData
     const { recipients, alreadySent } = await loadBatchRecipients(
@@ -749,6 +760,7 @@ export class EmailDeliveryWorker {
       requestDetailService,
       notificationService,
       logger,
+      structuredLogger,
     )
 
     return { success: true, batchId, sent, failed }
@@ -757,6 +769,8 @@ export class EmailDeliveryWorker {
   /**
    * Settle the parent request once no recipients remain pending across all batches.
    * all sent → COMPLETED; some sent + some failed → PARTIALLY_COMPLETED; all failed → FAILED.
+   * Anything short of COMPLETED is logged as one delivery failure for the whole merge, which is
+   * what the EmailSendingFailures alert counts.
    */
   private static async settleMergeRequest(
     notifyId: string,
@@ -764,6 +778,7 @@ export class EmailDeliveryWorker {
     requestDetailService: NotificationRequestDetailService,
     notificationService: NotificationService,
     logger: Logger,
+    structuredLogger?: StructuredLoggerService,
   ): Promise<void> {
     const pendingRemaining = await requestDetailService.countByStatus(notifyId, 'pending')
     if (pendingRemaining === 0) {
@@ -784,6 +799,16 @@ export class EmailDeliveryWorker {
       logger.log(
         `[${notifyId}] All mail merge batches complete; parent marked ${finalStatus.toUpperCase()}`,
       )
+      if (finalStatus !== NotificationStatus.COMPLETED) {
+        structuredLogger?.logNotificationFailure(
+          notifyId,
+          tenantId,
+          'email',
+          `${failedRemaining} of ${failedRemaining + sentRemaining} merge recipients failed`,
+          undefined,
+          EmailDeliveryWorker.name,
+        )
+      }
     }
   }
 
