@@ -72,6 +72,14 @@ export class DeliveryFailureHandler {
       logger.error(
         `[${notifyId}] Notification marked as FAILED after permanent validation error. Error: ${errorMessage}`,
       )
+      this.structuredLogger?.logNotificationFailure(
+        notifyId,
+        tenantId,
+        channel.channel,
+        error,
+        Date.now() - startedAt,
+        channel.context,
+      )
       throw notRetried(error)
     }
 

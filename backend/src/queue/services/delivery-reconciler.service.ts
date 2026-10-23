@@ -22,7 +22,6 @@ import { QueueName } from '../../enum/queue-name.enum'
 import { redisKey } from '../../common/redis/redis-namespace'
 import { DELIVERY_JOB_OPTIONS, INGESTION_JOB_OPTIONS } from '../job-options'
 import { StructuredLoggerService } from '../../common/logger'
-import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../job-retention'
 import {
   delayUntilScheduled,
   ingestionJobFromRequest,

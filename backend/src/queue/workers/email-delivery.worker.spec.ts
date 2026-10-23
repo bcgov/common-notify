@@ -28,6 +28,13 @@ describe('EmailDeliveryWorker', () => {
   let mockAttachmentResolverService: any
   let mockEmailAdapter: IEmailTransport
   let mockRequestDetailService: any
+  let mockStructuredLogger: Record<
+    | 'logNotificationStart'
+    | 'logNotificationSuccess'
+    | 'logNotificationFailure'
+    | 'logQueueOperation',
+    ReturnType<typeof vi.fn>
+  >
   let processHandler: (job: Job<DeliveryJobPayload>) => Promise<any>
   let completedCallback: (job: Job<DeliveryJobPayload>) => void
   let failedCallback: (job: Job<DeliveryJobPayload>, err: Error) => void
@@ -50,6 +57,7 @@ describe('EmailDeliveryWorker', () => {
       deps.notificationService,
       deps.requestDetailService,
       deps.templatesRepository,
+      deps.structuredLogger,
     )
     const worker = new EmailDeliveryWorker(
       deps.notificationService,

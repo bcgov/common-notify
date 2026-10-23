@@ -43,6 +43,7 @@ describe('SmsDeliveryWorker', () => {
       deps.notificationService,
       deps.requestDetailService,
       deps.templatesRepository,
+      deps.structuredLogger,
     )
     const worker = new SmsDeliveryWorker(
       deps.notificationService,

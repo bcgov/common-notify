@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
 import { describeError } from '../../common/utils/describe-error'
 import type { Job } from 'bullmq'
 import { DeliveryJobPayload, MailMergeJobData } from '../queue.types'
@@ -11,6 +11,7 @@ import { NotificationRequestDetailService } from '../../api/notification/notific
 import { TemplatesRepository } from '../../api/templates/templates.repository'
 import type { Template } from '../../api/templates/entities/template.entity'
 import { NotificationStatus } from '../../enum/notification-status.enum'
+import { StructuredLoggerService } from '../../common/logger'
 
 export type MergeRecipient = NonNullable<MailMergeJobData['recipients']>[number]
 
@@ -66,6 +67,7 @@ export class MergeBatchRunner {
     private readonly notificationService: NotificationService,
     private readonly requestDetailService: NotificationRequestDetailService,
     private readonly templatesRepository: TemplatesRepository,
+    @Optional() private readonly structuredLogger?: StructuredLoggerService,
   ) {}
 
   async run(job: Job<DeliveryJobPayload>, sender: MergeSender): Promise<MergeBatchResult> {
@@ -135,6 +137,8 @@ export class MergeBatchRunner {
   /**
    * Settle the parent request once no recipient is pending across all of its batches:
    * all sent → COMPLETED; some sent and some failed → PARTIALLY_COMPLETED; all failed → FAILED.
+   * Anything short of COMPLETED is logged as one delivery failure for the whole merge, which is
+   * what the channel's sending-failures alert counts.
    */
   async settle(notifyId: string, tenantId: string, channel: DeliveryChannel): Promise<void> {
     const counts = await this.requestDetailService.countByStatuses(notifyId)
@@ -148,6 +152,17 @@ export class MergeBatchRunner {
     this.logger.log(
       `[${notifyId}] All ${channel.mergeLabel} batches complete; parent marked ${status.toUpperCase()}`,
     )
+    if (status !== NotificationStatus.COMPLETED) {
+      const failed = counts.failed ?? 0
+      this.structuredLogger?.logNotificationFailure(
+        notifyId,
+        tenantId,
+        channel.channel,
+        `${failed} of ${failed + (counts.sent ?? 0)} merge recipients failed`,
+        undefined,
+        channel.context,
+      )
+    }
   }
 
   private async resolveSource(
