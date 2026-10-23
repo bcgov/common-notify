@@ -351,6 +351,42 @@ groups:
           summary: "High authentication failure rate in {{ $labels.namespace }}"
           description: "{{ $value }} authentication failure log lines in {{ $labels.namespace }} over the last 10 minutes - possible brute force attack"
 
+      - uid: cn-log-clamav-unavailable
+        title: ClamAVUnavailable
+        condition: C
+        noDataState: OK
+        execErrState: OK
+        for: 1m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              editorMode: code
+              expr: |
+                sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"}
+                  | json
+                  |~ "ClamAV is unavailable while fail-closed mode is enabled|ClamAV scanning is disabled while fail-closed mode is enabled|ClamAV is not healthy, skipping scan"
+                [10m])) by (namespace)
+              queryType: instant
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+              refId: C
+        labels:
+          severity: "critical"
+          service: "common-notify"
+          component: "security"
+        annotations:
+          short: "{{ $labels.namespace }} ClamAV unavailable"
+          summary: "ClamAV unavailable in {{ $labels.namespace }}"
+          description: "ClamAV could not scan an attachment in {{ $labels.namespace }}. With failClosed on (TEST and PROD) those notifications are held and retried, so a sustained outage is a delivery outage. With failClosed off they are delivered UNSCANNED. Check the clamav pods."
+
       - uid: cn-log-virus
         title: VirusDetected
         condition: C
