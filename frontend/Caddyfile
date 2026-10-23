@@ -63,7 +63,10 @@ window.VITE_CSTAR_TENANT_SETUP_URL="{$VITE_CSTAR_TENANT_SETUP_URL}";`
 		route {
 			header Cache-Control "no-store"
 			header @immutable Cache-Control "public, max-age=31536000, immutable"
-			file_server
+			file_server {
+				pass_thru
+			}
+			respond "Not Found" 404
 		}
 	}
 	@uncached not path /assets/*
@@ -81,6 +84,8 @@ window.VITE_CSTAR_TENANT_SETUP_URL="{$VITE_CSTAR_TENANT_SETUP_URL}";`
 	rewrite @spa_router {http.matchers.file.relative}
 	header {
 		-Server
+		# Caddy also adds its own Via header after upstream header filtering.
+		-Via
 		X-Frame-Options "SAMEORIGIN"
 		X-Content-Type-Options "nosniff"
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
