@@ -187,7 +187,7 @@ export class AttachmentService {
   }
 
   private async rollbackCreatedAttachments(createdAttachments: AttachmentEntity[]): Promise<void> {
-    for (const attachment of createdAttachments.reverse()) {
+    for (const attachment of [...createdAttachments].reverse()) {
       try {
         await this.attachmentRepository.deleteByIdAndTenantId(attachment.id, attachment.tenantId)
       } catch (error) {

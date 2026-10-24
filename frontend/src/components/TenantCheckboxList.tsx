@@ -46,7 +46,7 @@ const TenantCheckboxList: FC<TenantCheckboxListProps> = ({
           Select Tenants
           {required && <span className="text-danger ms-1">*</span>}
         </label>
-        <div className="btn-group btn-group-sm" role="group">
+        <fieldset className="btn-group btn-group-sm">
           <button
             type="button"
             className="btn btn-outline-secondary"
@@ -63,7 +63,7 @@ const TenantCheckboxList: FC<TenantCheckboxListProps> = ({
           >
             None
           </button>
-        </div>
+        </fieldset>
       </div>
 
       <div
