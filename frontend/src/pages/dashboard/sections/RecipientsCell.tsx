@@ -15,7 +15,7 @@ const recipientList = (recipients?: NotificationRequest['recipients']): string[]
  * view all dialogue brings up the old modal for now
  */
 export const RecipientsCell: FC<{
-  recipients?: NonNullable<NotificationRequest['recipients']>
+  recipients?: NotificationRequest['recipients']
   onViewAll: () => void
 }> = ({ recipients, onViewAll }) => {
   const all = recipientList(recipients)

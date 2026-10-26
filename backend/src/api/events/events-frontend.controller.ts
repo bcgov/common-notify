@@ -44,7 +44,7 @@ import { parseListQuery } from '../../common/query/list-query.parser'
 import { CstarGroupListResponseDto } from './schemas/cstar-group-response.dto'
 
 /** The channels an event can be configured for, and so the only values its filter accepts. */
-const EVENT_CHANNEL_CODES = new Set([NotificationChannel.EMAIL, NotificationChannel.SMS])
+const EVENT_CHANNEL_CODES = [NotificationChannel.EMAIL, NotificationChannel.SMS]
 
 /**
  * Frontend Events API Controller
@@ -337,7 +337,7 @@ export class EventsFrontendController {
         // lower-case code would otherwise return an empty page rather than saying why.
         const channelCodes = values.map((value) => {
           const channelCode = value.toUpperCase()
-          if (!EVENT_CHANNEL_CODES.has(channelCode as NotificationChannel)) {
+          if (!EVENT_CHANNEL_CODES.includes(channelCode as NotificationChannel)) {
             throw new BadRequestException(`Invalid channel code: '${value}'`)
           }
           return channelCode

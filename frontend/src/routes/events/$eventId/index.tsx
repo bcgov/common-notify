@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import EditEvent from '@/pages/events/EditEvent'
 import type { EventTab } from '@/pages/events/components/EventTabs'
 
-const EVENT_TABS = new Set<string>(['settings', 'email', 'sms', 'third-party'])
+const EVENT_TABS: string[] = ['settings', 'email', 'sms', 'third-party']
 
 export const Route = createFileRoute('/events/$eventId/')({
   component: EditEventPage,
@@ -10,7 +10,7 @@ export const Route = createFileRoute('/events/$eventId/')({
   // saved page; anything else falls back to the page's own default tab. `edit` opens an active
   // email channel on its form rather than handing off to the saved page.
   validateSearch: (search: Record<string, unknown>): { tab?: EventTab; edit?: boolean } => ({
-    ...(typeof search.tab === 'string' && EVENT_TABS.has(search.tab)
+    ...(typeof search.tab === 'string' && EVENT_TABS.includes(search.tab)
       ? { tab: search.tab as EventTab }
       : {}),
     ...(search.edit === true ? { edit: true } : {}),

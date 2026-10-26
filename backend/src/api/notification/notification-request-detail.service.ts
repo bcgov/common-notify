@@ -45,8 +45,6 @@ const RETRY_PRESERVED_STATUSES = ['sent', 'blocked']
 /** Detail statuses between acceptance and a final sent/failed. */
 export const IN_FLIGHT_DETAIL_STATUSES = ['pending', 'queued', 'processing', 'sending']
 
-type EmailAddressType = 'primary' | 'cc' | 'bcc'
-
 @Injectable()
 export class NotificationRequestDetailService {
   constructor(
@@ -71,7 +69,11 @@ export class NotificationRequestDetailService {
     )
       return
     const now = new Date()
-    const makeEntity = (address: string, channel: string, emailAddressType?: EmailAddressType) =>
+    const makeEntity = (
+      address: string,
+      channel: string,
+      emailAddressType?: 'primary' | 'cc' | 'bcc',
+    ) =>
       this.detailRepository.create({
         notificationRequestId,
         recipientAddress: address,
@@ -390,8 +392,8 @@ export class NotificationRequestDetailService {
 
     // search applies to recipients
     if (search) {
-      const escaped = search.replace(/[\\%_]/g, String.raw`\$&`)
-      queryBuilder.andWhere(String.raw`detail.recipientAddress ILIKE :search ESCAPE '\'`, {
+      const escaped = search.replace(/[\\%_]/g, '\\$&')
+      queryBuilder.andWhere(`detail.recipientAddress ILIKE :search ESCAPE '\\'`, {
         search: `%${escaped}%`,
       })
     }
@@ -456,7 +458,7 @@ export class NotificationRequestDetailService {
     payload: NotifySimpleRequest | ProcessedNotifySimpleRequest | undefined,
   ): {
     recipients: {
-      email: { address: string; emailAddressType: EmailAddressType }[]
+      email: { address: string; emailAddressType: 'primary' | 'cc' | 'bcc' }[]
       sms: string[]
       msgApp: string[]
     }
@@ -466,7 +468,7 @@ export class NotificationRequestDetailService {
     }
 
     const recipients = {
-      email: [] as { address: string; emailAddressType: EmailAddressType }[],
+      email: [] as { address: string; emailAddressType: 'primary' | 'cc' | 'bcc' }[],
       sms: [] as string[],
       msgApp: [] as string[],
     }

@@ -58,7 +58,7 @@ export class SmsSegmentService {
     try {
       if (content?.templateId) {
         const template = await this.templatesRepository.findById(tenantId, content.templateId)
-        if (template?.channelCode !== 'SMS') return content.body
+        if (!template || template.channelCode !== 'SMS') return content.body
         const rendered = await this.templatesService.renderTemplateContent(template, params)
         return rendered.body
       }

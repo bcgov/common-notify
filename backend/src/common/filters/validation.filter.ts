@@ -64,7 +64,7 @@ export class ValidationExceptionFilter implements ExceptionFilter {
   }
 
   private formatValidationMessage(message: string): FormattedValidationMessage {
-    const dataFieldMatch = /^(.*?attachments\.\d+)\.property data should not exist$/.exec(message)
+    const dataFieldMatch = message.match(/^(.*?attachments\.\d+)\.property data should not exist$/)
     if (dataFieldMatch) {
       return {
         field: `${dataFieldMatch[1]}.data`,
@@ -72,8 +72,9 @@ export class ValidationExceptionFilter implements ExceptionFilter {
       }
     }
 
-    const attachmentFieldMatch =
-      /^(.*?attachments\.\d+)\.Attachment (filename|MIME type|content) (.+)$/.exec(message)
+    const attachmentFieldMatch = message.match(
+      /^(.*?attachments\.\d+)\.Attachment (filename|MIME type|content) (.+)$/,
+    )
     if (attachmentFieldMatch) {
       const [, prefix, fieldLabel, suffix] = attachmentFieldMatch
       const fieldKey =

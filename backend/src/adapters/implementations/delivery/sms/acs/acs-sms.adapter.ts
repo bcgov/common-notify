@@ -17,7 +17,7 @@ import {
 export class AcsSmsTransport implements ISmsTransport {
   readonly name = 'acs'
   private readonly logger = new Logger(AcsSmsTransport.name)
-  private readonly client: SmsClient | null = null
+  private client: SmsClient | null = null
 
   constructor(private readonly configService: ConfigService) {
     const connectionString = this.configService.get<string>('acs.connectionString')

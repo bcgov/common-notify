@@ -1,4 +1,4 @@
-import * as path from 'node:path'
+import * as path from 'path'
 
 function parseSentinels(value?: string): { host: string; port: number }[] | undefined {
   if (!value?.trim()) return undefined
@@ -9,14 +9,14 @@ function parseSentinels(value?: string): { host: string; port: number }[] | unde
     .map((entry) => {
       const index = entry.lastIndexOf(':')
       const host = index === -1 ? entry : entry.slice(0, index)
-      const port = index === -1 ? Number.NaN : Number.parseInt(entry.slice(index + 1), 10)
+      const port = index === -1 ? NaN : Number.parseInt(entry.slice(index + 1), 10)
       return { host, port: Number.isFinite(port) ? port : 26379 }
     })
     .filter((entry) => entry.host.length > 0)
   return sentinels.length > 0 ? sentinels : undefined
 }
 
-export default function configuration() {
+export default () => {
   const defaultEmailFrom = process.env.DEFAULT_EMAIL_FROM || 'notify_noreply@gov.bc.ca'
   const defaultSmsFrom = process.env.DEFAULT_SMS_FROM_NUMBER || '+15551234567'
   const defaultTemplateSubject = process.env.DEFAULT_TEMPLATE_SUBJECT || 'Notification'

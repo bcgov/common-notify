@@ -125,6 +125,15 @@
   align-self: center;
 }
 
+.file-upload__file-name {
+  overflow-wrap: anywhere;
+}
+
+.file-upload__file-size {
+  font-size: 12px;
+  line-height: 18px;
+}
+
 .file-upload__progress {
   display: flex;
   flex-direction: column;
@@ -211,14 +220,12 @@
 }
 
 .file-upload__file-name {
-  overflow-wrap: anywhere;
   font-weight: 400;
 }
 
 .file-upload__file-size {
   color: $text-secondary;
   font-size: $font-size-sm;
-  line-height: 18px;
 }
 
 .file-upload__error {

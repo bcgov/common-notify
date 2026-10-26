@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FC } from 'react'
-import type {
-  NotificationRequest,
-  NotificationRequestDetail,
-} from '@/interfaces/NotificationRequest'
+import type { NotificationRequestDetail } from '@/interfaces/NotificationRequest'
 import { DataTable } from '@/components/DataTable'
 import type { TableColumn } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
@@ -22,6 +19,7 @@ import {
   fetchNotificationRequest,
 } from '@/redux/thunks/notificationDetail.thunks'
 import RequestStatusSummary from '@/components/RequestStatusSummary'
+import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 import PageHeading from '@/components/PageHeading'
 import PageSubHeading from '@/components/PageSubHeading'
 import { showErrorToast } from '@/redux/utils/toastUtils'

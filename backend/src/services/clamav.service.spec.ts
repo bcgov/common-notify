@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { ClamavService } from './clamav.service'
 
 // Mock the net module
-vi.mock('node:net', () => ({
+vi.mock('net', () => ({
   createConnection: vi.fn(),
 }))
 

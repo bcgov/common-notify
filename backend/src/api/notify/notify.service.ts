@@ -9,7 +9,7 @@ import type { NotifyMsgAppChannel } from './schemas/notify-msg-app-channel'
 export class NotifyService {
   private readonly logger = new Logger(NotifyService.name)
 
-  constructor(private readonly inlineRenderingService: InlineRenderingService) {}
+  constructor(private inlineRenderingService: InlineRenderingService) {}
 
   notImplemented() {
     return {

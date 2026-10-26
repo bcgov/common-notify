@@ -1,7 +1,7 @@
 import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import axios, { AxiosInstance } from 'axios'
-import { randomBytes } from 'node:crypto'
+import { randomBytes } from 'crypto'
 
 /**
  * Kong Admin API Client
@@ -15,7 +15,7 @@ import { randomBytes } from 'node:crypto'
 @Injectable()
 export class KongAdminApiClient {
   private readonly logger = new Logger(KongAdminApiClient.name)
-  private readonly client: AxiosInstance
+  private client: AxiosInstance
   private accessToken: string | null = null
   private tokenExpiresAt: number = 0
 
@@ -25,7 +25,7 @@ export class KongAdminApiClient {
   private readonly clientSecret: string
   private readonly isDevelopmentMode: boolean
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(private configService: ConfigService) {
     const kongConfig = this.configService.get('kong')
 
     this.adminUrl = kongConfig?.adminUrl
@@ -213,7 +213,7 @@ export class KongAdminApiClient {
         (c: any) =>
           c.custom_id === tenantId ||
           c.username === tenantId ||
-          c.tags?.includes(`tenant:${tenantId}`),
+          (c.tags && c.tags.includes(`tenant:${tenantId}`)),
       )
 
       if (consumer) {

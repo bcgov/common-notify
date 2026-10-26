@@ -61,7 +61,7 @@
 .recipients-popover__item {
   font-size: 14px;
   color: $dark-text;
-  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .recipients-popover__view-all {

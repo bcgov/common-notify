@@ -16,7 +16,7 @@ export class TenantsService {
 
   constructor(
     @InjectRepository(Tenant)
-    private readonly tenantRepository: Repository<Tenant>,
+    private tenantRepository: Repository<Tenant>,
   ) {}
 
   /**

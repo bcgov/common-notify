@@ -438,7 +438,7 @@ describe('NotificationService', () => {
         const errors = await service.validateBusinessRules('invalid-tenant', request)
 
         // Should not validate other rules if tenant not found
-        expect(errors).toHaveLength(1)
+        expect(errors.length).toBe(1)
         expect(errors[0]).toContain('Tenant')
       })
     })

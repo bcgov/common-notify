@@ -103,7 +103,7 @@ if (!responseInterceptorRegistered) {
       if (!config?.skipGlobalLoading) {
         trackRequestEnd()
       }
-      if (response?.status === STATUS_CODES.Unauthorized) {
+      if (response && response.status === STATUS_CODES.Unauthorized) {
         // 401 = unauthorized
         // This could be either:
         // 1. Expired token - redirect to Keycloak to refresh
@@ -130,7 +130,7 @@ if (!responseInterceptorRegistered) {
 
         // For other 401 errors, let the error propagate (token refresh is handled elsewhere)
         return Promise.reject(error)
-      } else if (response?.status === STATUS_CODES.Forbidden) {
+      } else if (response && response.status === STATUS_CODES.Forbidden) {
         // 403 = authenticated but lacks permission: show toast instead of redirecting
         // But don't show if we're already on the not-authorized page
         if (!window.location.pathname.includes('/not-authorized')) {
@@ -196,7 +196,7 @@ export const post = async <T, M = object>(
   const { url, requiresAuthentication, params, data } = parameters
   if (requiresAuthentication) await setAuthHeader()
   // Use 'data' if provided (for POST body), otherwise use 'params' (legacy)
-  const bodyData = data ?? params
+  const bodyData = data || params
   return axios
     .post(url, bodyData, buildConfig(parameters))
     .then((response: AxiosResponse) => response.data as T)

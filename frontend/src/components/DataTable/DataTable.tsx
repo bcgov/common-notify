@@ -103,7 +103,7 @@ export function DataTable<T extends object>({
   activeFilters,
   onFilter,
   onRowClick,
-}: Readonly<TableProps<T>>) {
+}: TableProps<T>) {
   const rows = data ?? []
   const tableRef = useRef<HTMLTableElement>(null)
 

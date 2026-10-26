@@ -7,13 +7,13 @@ import type { NotifyMsgAppChannel } from './schemas/notify-msg-app-channel'
  */
 export type RenderingStrategy = 'template' | 'inline'
 
-type NotifyChannel = NotifyEmailChannel | NotifySmsChannel | NotifyMsgAppChannel
-
 /**
  * Determines whether to use template-based or inline rendering
  * @returns 'template' if content.templateId is specified, 'inline' if content.renderer is specified
  */
-export function getRenderingStrategy(channel: NotifyChannel): RenderingStrategy | null {
+export function getRenderingStrategy(
+  channel: NotifyEmailChannel | NotifySmsChannel | NotifyMsgAppChannel,
+): RenderingStrategy | null {
   if (channel.content?.templateId) {
     return 'template'
   }
@@ -28,13 +28,17 @@ export function getRenderingStrategy(channel: NotifyChannel): RenderingStrategy 
 /**
  * Checks if a channel has inline rendering configured
  */
-export function isInlineRendering(channel: NotifyChannel): boolean {
+export function isInlineRendering(
+  channel: NotifyEmailChannel | NotifySmsChannel | NotifyMsgAppChannel,
+): boolean {
   return getRenderingStrategy(channel) === 'inline'
 }
 
 /**
  * Checks if a channel has template-based rendering configured
  */
-export function isTemplateBasedRendering(channel: NotifyChannel): boolean {
+export function isTemplateBasedRendering(
+  channel: NotifyEmailChannel | NotifySmsChannel | NotifyMsgAppChannel,
+): boolean {
   return getRenderingStrategy(channel) === 'template'
 }

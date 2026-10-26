@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
+import { createCipheriv, createDecipheriv, randomBytes } from 'crypto'
 
 @Injectable()
 export class EncryptionService {
   private readonly algorithm = 'aes-256-gcm'
   private readonly key: Buffer
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(private configService: ConfigService) {
     const keyFromEnv = this.configService.get<string>('encryption.key')
 
     if (!keyFromEnv) {

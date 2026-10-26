@@ -229,7 +229,8 @@ export class EmailDeliveryWorker {
           | ResolvedEmailDeliveryPayload
 
         if (
-          !emailPayload.recipients?.to ||
+          !emailPayload.recipients ||
+          !emailPayload.recipients.to ||
           !Array.isArray(emailPayload.recipients.to) ||
           emailPayload.recipients.to.length === 0
         ) {
@@ -344,7 +345,8 @@ export class EmailDeliveryWorker {
         }
 
         if (
-          !emailPayload.recipients?.to ||
+          !emailPayload.recipients ||
+          !emailPayload.recipients.to ||
           !Array.isArray(emailPayload.recipients.to) ||
           emailPayload.recipients.to.length === 0
         ) {
@@ -676,7 +678,7 @@ export class EmailDeliveryWorker {
     for (const recipient of pending) {
       try {
         // Merge global params with per-recipient params; per-recipient takes precedence
-        const mergedParams = { ...params, ...recipient.params }
+        const mergedParams = { ...(params || {}), ...recipient.params }
 
         let subject: string | undefined
         let body: string

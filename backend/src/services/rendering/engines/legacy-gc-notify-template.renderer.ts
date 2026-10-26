@@ -28,7 +28,7 @@ const bulletList = (items: string[]): string => '\n\n' + items.map((item) => `* 
 
 /** "a", "a and b", "a, b and c" - no quotation marks or other decoration around items. */
 const inlineList = (items: string[]): string =>
-  items.length === 1 ? items[0] : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`
+  items.length === 1 ? items[0] : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`
 
 /**
  * Legacy GC Notify Template Renderer
@@ -124,7 +124,7 @@ export class LegacyGcNotifyTemplateRenderer implements ITemplateRenderer {
     // Replace all legacy GC Notify placeholder patterns:
     // - ((key))            plain interpolation
     // - ((key??content))   conditional: content shows only when key is truthy
-    const placeholderRegex = /\(\(([a-zA-Z_]\w*)(?:\?\?([\s\S]*?))?\)\)/g
+    const placeholderRegex = /\(\(([a-zA-Z_][a-zA-Z0-9_]*)(?:\?\?([\s\S]*?))?\)\)/g
 
     result = result.replace(placeholderRegex, (match, key, conditionalText) => {
       const value = values[key]

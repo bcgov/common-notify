@@ -231,8 +231,9 @@ describe('validateCsv row-level problems', () => {
     const rows = Array.from({ length: 500 }, () => ['not-an-email', 'Name'])
 
     expect(
-      validateCsv({ headers: ['email', 'firstName'], rows }, placeholders, 'email').rowIssues,
-    ).toHaveLength(100)
+      validateCsv({ headers: ['email', 'firstName'], rows }, placeholders, 'email').rowIssues
+        .length,
+    ).toBe(100)
   })
 })
 

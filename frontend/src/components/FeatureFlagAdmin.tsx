@@ -151,11 +151,11 @@ function CreateFlagFormModal({
   isOpen,
   onSuccess,
   onCancel,
-}: Readonly<{
+}: {
   isOpen: boolean
   onSuccess: () => void
   onCancel: () => void
-}>) {
+}) {
   const dispatch = useAppDispatch()
   const tenants = useAppSelector((state) => state.adminTenants.items)
   const flags = useAppSelector(selectAllFeatureFlagsList)
@@ -298,11 +298,11 @@ function TenantScopeModal({
   tenantId,
   flags,
   onClose,
-}: Readonly<{
+}: {
   tenantId: string
   flags: FeatureFlag[]
   onClose: () => void
-}>) {
+}) {
   const tenantFlags = flags.filter((flag) => flag.tenantId === tenantId)
   const globalFlags = flags.filter((flag) => !flag.tenantId)
 

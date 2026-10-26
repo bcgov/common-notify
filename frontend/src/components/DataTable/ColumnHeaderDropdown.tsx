@@ -27,7 +27,7 @@ export function ColumnHeaderDropdown({
   filterTitle,
   activeFilterValues,
   onFilter,
-}: Readonly<ColumnHeaderDropdownProps>) {
+}: ColumnHeaderDropdownProps) {
   const [open, setOpen] = useState(false)
   const [submenuOpen, setSubmenuOpen] = useState(false)
   const [pendingValues, setPendingValues] = useState<string[]>(activeFilterValues)

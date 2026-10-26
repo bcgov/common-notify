@@ -163,7 +163,7 @@ $preview-gutter: $spacing-xl * 1.5;
 
   dd {
     margin: 0;
-    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 }
 
@@ -190,7 +190,7 @@ $preview-gutter: $spacing-xl * 1.5;
   background: $white;
   font-family: inherit;
   white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .notification-preview__error {
@@ -224,14 +224,17 @@ $preview-gutter: $spacing-xl * 1.5;
 @media (max-width: $breakpoint-md) {
   .notification-preview__body {
     flex-direction: column;
-    height: auto;
-    max-height: $preview-pane-height;
-    overflow-y: auto;
   }
 
   .notification-preview__data {
     width: 100%;
     border-right: 0;
     border-bottom: 1px solid $border-default;
+  }
+
+  .notification-preview__body {
+    height: auto;
+    max-height: $preview-pane-height;
+    overflow-y: auto;
   }
 }

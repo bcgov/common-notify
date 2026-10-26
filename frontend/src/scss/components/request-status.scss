@@ -14,7 +14,7 @@
   // overflowing the table.
   .data-table td:last-child {
     white-space: normal;
-    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 }
 

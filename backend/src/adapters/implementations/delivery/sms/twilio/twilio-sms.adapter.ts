@@ -13,7 +13,7 @@ import { TransientDeliveryError, transientFromProviderError } from '../../../../
 export class TwilioSmsTransport implements ISmsTransport {
   readonly name = 'twilio'
   private readonly logger = new Logger(TwilioSmsTransport.name)
-  private readonly client: ReturnType<typeof twilio> | null = null
+  private client: ReturnType<typeof twilio> | null = null
 
   constructor(private readonly configService: ConfigService) {
     const accountSid = this.configService.get<string>('twilio.accountSid')

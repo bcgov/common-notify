@@ -172,7 +172,7 @@ export function downloadCsv(filename: string, csv: string): void {
   link.download = filename
   document.body.appendChild(link)
   link.click()
-  link.remove()
+  document.body.removeChild(link)
   URL.revokeObjectURL(url)
 }
 
@@ -463,7 +463,7 @@ function setParam(params: Record<string, unknown>, key: string, value: string): 
     target = target[segment] as Record<string, unknown>
   }
 
-  const leaf = segments.at(-1)!
+  const leaf = segments[segments.length - 1]
   if (!(leaf in target)) {
     target[leaf] = value
   }

@@ -1,10 +1,10 @@
 import type { PayloadAction } from '@reduxjs/toolkit'
 import { createSlice } from '@reduxjs/toolkit'
-import type { CodeTablesState } from '@/interfaces/CodeTables'
+import type { CodeTable, CodeTablesState } from '@/interfaces/CodeTables'
 import type { RootState } from '../store'
 import { fetchCodeTables } from '../thunks/codeTables.thunks'
 
-export type { CodeTable, CodeTablesState } from '@/interfaces/CodeTables'
+export type { CodeTable, CodeTablesState }
 
 const initialState: CodeTablesState = {
   statuses: [],

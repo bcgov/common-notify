@@ -7,8 +7,8 @@ import { Public } from './common/decorators/public.decorator'
 @Controller('health')
 export class HealthController {
   constructor(
-    private readonly health: HealthCheckService,
-    private readonly db: TypeOrmHealthIndicator,
+    private health: HealthCheckService,
+    private db: TypeOrmHealthIndicator,
   ) {}
 
   @Get()

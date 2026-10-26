@@ -1,6 +1,6 @@
 import { Controller, Get, Header, NotFoundException, Param, Query, Res } from '@nestjs/common'
 import type { Response } from 'express'
-import * as path from 'node:path'
+import * as path from 'path'
 import { Public } from '../../common/decorators/public.decorator'
 import { EmailLogoService } from './email-logo.service'
 import { EmailLogoStorageService } from './email-logo-storage.service'
