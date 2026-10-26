@@ -6,8 +6,8 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common'
-import { randomUUID } from 'crypto'
-import * as path from 'path'
+import { randomUUID } from 'node:crypto'
+import * as path from 'node:path'
 import { AttachmentRepository } from './attachment.repository'
 import { ATTACHMENT_STORAGE } from './attachment.constants'
 import { AttachmentStorage } from './attachment-storage.interface'
@@ -187,7 +187,7 @@ export class AttachmentService {
   }
 
   private async rollbackCreatedAttachments(createdAttachments: AttachmentEntity[]): Promise<void> {
-    for (const attachment of createdAttachments.reverse()) {
+    for (const attachment of [...createdAttachments].reverse()) {
       try {
         await this.attachmentRepository.deleteByIdAndTenantId(attachment.id, attachment.tenantId)
       } catch (error) {

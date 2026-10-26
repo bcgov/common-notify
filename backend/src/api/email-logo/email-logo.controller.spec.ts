@@ -22,6 +22,11 @@ describe('EmailLogoController', () => {
   } as unknown as Response
   const controller = new EmailLogoController(emailLogoService, emailLogoStorage)
 
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(response.type).mockReturnValue(response)
+  })
+
   it('keeps public access, immutable caching, and cross-origin image access', () => {
     const handler = EmailLogoController.prototype.getImage
     expect(Reflect.getMetadata(IS_PUBLIC_KEY, handler)).toBe(true)
@@ -31,11 +36,6 @@ describe('EmailLogoController', () => {
         { name: 'Cross-Origin-Resource-Policy', value: 'cross-origin' },
       ]),
     )
-  })
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    vi.mocked(response.type).mockReturnValue(response)
   })
 
   it('serves an approved logo using object storage content type metadata', async () => {
@@ -79,6 +79,49 @@ describe('EmailLogoController', () => {
     await controller.getImage('logo-id', response)
 
     expect(response.type).toHaveBeenCalledWith('image/svg+xml')
+  })
+
+  it('serves the email rendition when format=email is requested', async () => {
+    vi.mocked(emailLogoService.findByIdIfApproved).mockResolvedValue({
+      id: 'logo-id',
+      fileKey: 'logos/BC_AG_H_RGB_pos.svg',
+      emailFileKey: 'logos/BC_AG_H_RGB_pos.png',
+    } as EmailLogo)
+    vi.mocked(emailLogoStorage.head).mockResolvedValue({})
+    vi.mocked(emailLogoStorage.download).mockResolvedValue(Buffer.from('png'))
+
+    await controller.getImage('logo-id', response, 'email')
+
+    expect(emailLogoStorage.download).toHaveBeenCalledWith('logos/BC_AG_H_RGB_pos.png')
+    expect(response.type).toHaveBeenCalledWith('image/png')
+  })
+
+  it('falls back to the file key for format=email when there is no email rendition', async () => {
+    vi.mocked(emailLogoService.findByIdIfApproved).mockResolvedValue({
+      id: 'logo-id',
+      fileKey: 'logos/BC_AG_H_RGB_pos.svg',
+      emailFileKey: null,
+    } as EmailLogo)
+    vi.mocked(emailLogoStorage.head).mockResolvedValue({})
+    vi.mocked(emailLogoStorage.download).mockResolvedValue(Buffer.from('svg'))
+
+    await controller.getImage('logo-id', response, 'email')
+
+    expect(emailLogoStorage.download).toHaveBeenCalledWith('logos/BC_AG_H_RGB_pos.svg')
+  })
+
+  it('serves the SVG when no format is requested, even if an email rendition exists', async () => {
+    vi.mocked(emailLogoService.findByIdIfApproved).mockResolvedValue({
+      id: 'logo-id',
+      fileKey: 'logos/BC_AG_H_RGB_pos.svg',
+      emailFileKey: 'logos/BC_AG_H_RGB_pos.png',
+    } as EmailLogo)
+    vi.mocked(emailLogoStorage.head).mockResolvedValue({})
+    vi.mocked(emailLogoStorage.download).mockResolvedValue(Buffer.from('svg'))
+
+    await controller.getImage('logo-id', response)
+
+    expect(emailLogoStorage.download).toHaveBeenCalledWith('logos/BC_AG_H_RGB_pos.svg')
   })
 
   it('returns not found without reading storage when the logo is unavailable', async () => {

@@ -60,7 +60,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.2.3",
     "eslint-plugin-react": "^7.37.4",
-    "eslint-plugin-react-hooks": "~7.0.1",
+    "eslint-plugin-react-hooks": "~7.1.0",
     "jsdom": "^30.0.0",
     "msw": "^3.0.0",
     "prettier": "^3.5.3",
@@ -74,6 +74,9 @@
     "@types/react": "^19.0.10",
     "brace-expansion@1": "^1.1.12",
     "brace-expansion@5": "^5.0.8",
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "@vitest/mocker": {
+      "msw": "$msw"
+    }
   }
 }

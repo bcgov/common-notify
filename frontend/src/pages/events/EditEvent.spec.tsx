@@ -7,6 +7,8 @@ import { configureStore } from '@reduxjs/toolkit'
 import EditEvent from './EditEvent'
 import tenantReducer, { selectTenant } from '@/redux/slices/tenant.slice'
 import tenantSettingsReducer from '@/redux/slices/tenantSettings.slice'
+import apiKeyUsageReducer from '@/redux/slices/apiKeyUsage.slice'
+import { getApiKeyUsage } from '@/api/apiKeyUsage.api'
 import emailSettingsReducer from '@/redux/slices/emailSettings.slice'
 import userReducer from '@/redux/slices/user.slice'
 import {
@@ -25,6 +27,9 @@ import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import type { Tenant } from '@/interfaces/CstarTenant'
 
 const navigateMock = vi.fn()
+
+vi.mock('@/config/featureFlags/useFeatureFlag', () => ({ useFeatureFlag: () => true }))
+vi.mock('@/api/apiKeyUsage.api', () => ({ getApiKeyUsage: vi.fn() }))
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
@@ -111,6 +116,7 @@ function makeStore(
     reducer: {
       tenant: tenantReducer,
       tenantSettings: tenantSettingsReducer,
+      apiKeyUsage: apiKeyUsageReducer,
       emailSettings: emailSettingsReducer,
       user: userReducer,
     },
@@ -133,16 +139,18 @@ function renderPage({
   selectedTenant,
   eventId = 'event-1',
   initialTab,
+  editEmail,
 }: {
   cstarRoles?: string[]
   selectedTenant?: Tenant | null
   eventId?: string
   initialTab?: 'settings' | 'email' | 'sms' | 'third-party'
+  editEmail?: boolean
 } = {}) {
   const store = makeStore(cstarRoles, selectedTenant)
   const view = render(
     <Provider store={store}>
-      <EditEvent eventId={eventId} initialTab={initialTab} />
+      <EditEvent eventId={eventId} initialTab={initialTab} editEmail={editEmail} />
     </Provider>,
   )
   return { store, ...view }
@@ -158,6 +166,11 @@ describe('EditEvent', () => {
       event({ emailSettings: { ...configuredEmail, active: false } }),
     )
     vi.mocked(getSettings).mockResolvedValue(null)
+    vi.mocked(getApiKeyUsage).mockResolvedValue({
+      tenantId: 'tenant-1',
+      fiscalYearStart: '2026-04-01',
+      channels: [],
+    })
     vi.mocked(getApprovedEmailLogos).mockResolvedValue([])
   })
 
@@ -353,9 +366,50 @@ describe('EditEvent', () => {
   })
 
   describe('the email channel', () => {
-    it('sends the tab settings and hands off to the saved page', async () => {
+    it('hands an active channel off to the saved page', async () => {
       vi.mocked(getEventById).mockResolvedValue(event({ emailSettings: configuredEmail }))
       renderPage({ initialTab: 'email' })
+
+      await waitFor(() =>
+        expect(navigateMock).toHaveBeenCalledWith({
+          to: '/events/$eventId/saved',
+          params: { eventId: 'event-1' },
+          replace: true,
+        }),
+      )
+      expect(screen.queryByRole('switch', { name: 'Activate channel' })).not.toBeInTheDocument()
+    })
+
+    it('hands off when the email tab is opened on an active channel', async () => {
+      vi.mocked(getEventById).mockResolvedValue(event({ emailSettings: configuredEmail }))
+      renderPage()
+
+      await screen.findByRole('textbox', { name: /Event name/ })
+      expect(navigateMock).not.toHaveBeenCalled()
+      await userEvent.click(screen.getByRole('radio', { name: 'Email Notification' }))
+
+      await waitFor(() =>
+        expect(navigateMock).toHaveBeenCalledWith({
+          to: '/events/$eventId/saved',
+          params: { eventId: 'event-1' },
+          replace: true,
+        }),
+      )
+    })
+
+    it('opens an inactive channel on its form', async () => {
+      vi.mocked(getEventById).mockResolvedValue(
+        event({ emailSettings: { ...configuredEmail, active: false } }),
+      )
+      renderPage({ initialTab: 'email' })
+
+      expect(await screen.findByRole('switch', { name: 'Activate channel' })).toBeInTheDocument()
+      expect(navigateMock).not.toHaveBeenCalled()
+    })
+
+    it('sends the tab settings and hands off to the saved page', async () => {
+      vi.mocked(getEventById).mockResolvedValue(event({ emailSettings: configuredEmail }))
+      renderPage({ initialTab: 'email', editEmail: true })
 
       const senderField = await screen.findByRole('textbox', { name: /Sender email address/ })
       await userEvent.clear(senderField)
@@ -386,7 +440,7 @@ describe('EditEvent', () => {
 
     it('switches the channel off on its own, once confirmed', async () => {
       vi.mocked(getEventById).mockResolvedValue(event({ emailSettings: configuredEmail }))
-      renderPage({ initialTab: 'email' })
+      renderPage({ initialTab: 'email', editEmail: true })
 
       await userEvent.click(await screen.findByRole('switch', { name: 'Activate channel' }))
       await userEvent.click(await screen.findByRole('button', { name: 'Deactivate' }))
@@ -407,7 +461,7 @@ describe('EditEvent', () => {
 
     it('leaves the email channel switch locked', async () => {
       vi.mocked(getEventById).mockResolvedValue(event({ emailSettings: configuredEmail }))
-      renderPage({ cstarRoles: ['NOTIFY_VIEWER'], initialTab: 'email' })
+      renderPage({ cstarRoles: ['NOTIFY_VIEWER'], initialTab: 'email', editEmail: true })
 
       expect(await screen.findByRole('switch', { name: 'Activate channel' })).toBeDisabled()
       expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()

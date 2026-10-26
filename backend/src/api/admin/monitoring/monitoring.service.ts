@@ -2,7 +2,7 @@ import { Inject, Injectable, Optional, ServiceUnavailableException } from '@nest
 import { InjectRepository } from '@nestjs/typeorm'
 import { ConfigService } from '@nestjs/config'
 import { In, Repository } from 'typeorm'
-import type Bull from 'bull'
+import type { Job, Queue } from 'bullmq'
 import type Redis from 'ioredis'
 import { QueueName } from '../../../enum/queue-name.enum'
 import { ProviderToken } from '../../../enum/provider-token.enum'
@@ -15,11 +15,10 @@ import type { BatchProgress } from '../../../queue/batch-progress'
 import {
   MONITORING_WINDOW_MINUTES,
   addedCounterKey,
-  alignBullMetrics,
-  bullKey,
+  alignQueueMetrics,
   minuteOf,
 } from '../../../queue/queue-metrics'
-import type { BullMetrics } from '../../../queue/queue-metrics'
+import type { QueueMetrics } from '../../../queue/queue-metrics'
 import {
   HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_TTL_SECONDS,
@@ -105,7 +104,7 @@ function estimateClearMinutes(pending: number, finishedPerMinute: number): numbe
 const TRAILING_PUNCTUATION = new Set(['.', ',', ';', ':', '!', '?', ')', ']', '}', '>', "'", '"'])
 
 /**
- * Bull's failure reasons are provider error messages, which can quote the recipient. The page
+ * Failure reasons are provider error messages, which can quote the recipient. The page
  * is for spotting patterns, so addresses and numbers are masked before they leave the backend.
  */
 export function maskPersonalData(text: string): string {
@@ -153,7 +152,7 @@ export function buildRedisStats(info: Record<string, string>): RedisStatsDto {
   }
   if (maxMemoryPolicy !== 'noeviction') {
     statuses.push('critical')
-    reasons.push(`Eviction policy is ${maxMemoryPolicy}; Bull jobs can be silently dropped`)
+    reasons.push(`Eviction policy is ${maxMemoryPolicy}; queued jobs can be silently dropped`)
   }
   if (evictedKeys > 0) {
     statuses.push('critical')
@@ -310,7 +309,7 @@ export function evaluateQueue(input: QueueEvaluationInput, messagesMoving = fals
     input.unheldActiveJobs > 0
       ? {
           status: 'warning',
-          reason: `${input.unheldActiveJobs} active job(s) not held by any live worker (possibly stalled; Bull retries stalled jobs within about a minute)`,
+          reason: `${input.unheldActiveJobs} active job(s) not held by any live worker (possibly stalled; stalled jobs are retried within about a minute)`,
         }
       : null,
     backlog > 0 && liveWorkerPods === 0
@@ -337,12 +336,12 @@ export function evaluateQueue(input: QueueEvaluationInput, messagesMoving = fals
 }
 
 type JobIdentifiers = { notifyId?: unknown; notificationId?: unknown; tenantId?: unknown }
-type QueuedJob = { queue: string; job: Bull.Job }
+type QueuedJob = { queue: string; job: Job }
 
 const asString = (value: unknown): string | null => (typeof value === 'string' ? value : null)
 
 /** Only identifiers leave the job: its data also holds recipients and message content. */
-function jobIdentifiers(job: Bull.Job, tenantNames: Map<string, string>) {
+function jobIdentifiers(job: Job, tenantNames: Map<string, string>) {
   const data = (job.data ?? {}) as JobIdentifiers
   const tenantId = asString(data.tenantId)
   return {
@@ -354,12 +353,12 @@ function jobIdentifiers(job: Bull.Job, tenantNames: Map<string, string>) {
 
 /** Active jobs that report merge-batch progress; other jobs finish too fast to need a bar. */
 function activeBatches(
-  activeByQueue: Map<string, Bull.Job[]>,
+  activeByQueue: Map<string, Job[]>,
 ): Array<QueuedJob & { progress: BatchProgress }> {
   return [...activeByQueue.entries()]
     .flatMap(([queue, jobs]) =>
       jobs.flatMap((job) => {
-        const progress = readBatchProgress(job.progress())
+        const progress = readBatchProgress(job.progress)
         return progress ? [{ queue, job, progress }] : []
       }),
     )
@@ -417,12 +416,12 @@ export function buildSendsInProgress(
 
 /**
  * Active jobs no live worker reports holding. A job stays "active" in Redis after the pod
- * processing it dies, until Bull's stalled-job check moves it back to waiting, so these are
+ * processing it dies, until the stalled-job check moves it back to waiting, so these are
  * likely stalled. Only jobs older than UNHELD_GRACE_MS are counted, to allow for heartbeat lag.
  */
 export function countUnheldActiveJobs(
   queueName: string,
-  activeJobs: Bull.Job[],
+  activeJobs: Job[],
   workers: WorkerPodDto[],
   now: number,
 ): number {
@@ -539,27 +538,27 @@ export function buildReconcilerStats(
 }
 
 /**
- * Read-only view of the Bull queues, their workers and the Redis instance behind them, for the
+ * Read-only view of the queues, their workers and the Redis instance behind them, for the
  * admin monitoring page. Everything is read from Redis on each request, so the answer is the
  * same whichever pod serves it.
  */
 @Injectable()
 export class MonitoringService {
-  private readonly queues: Bull.Queue[]
+  private readonly queues: Queue[]
 
   constructor(
     @Optional() @Inject(ProviderToken.REDIS_CLIENT) private readonly redis: Redis | null,
-    @Optional() @Inject(QueueName.INGESTION) ingestionQueue: Bull.Queue | null,
-    @Optional() @Inject(QueueName.EMAIL_DELIVERY) emailQueue: Bull.Queue | null,
-    @Optional() @Inject(QueueName.SMS_DELIVERY) smsQueue: Bull.Queue | null,
-    @Optional() @Inject(QueueName.WEBHOOK_DELIVERY) webhookQueue: Bull.Queue | null,
+    @Optional() @Inject(QueueName.INGESTION) ingestionQueue: Queue | null,
+    @Optional() @Inject(QueueName.EMAIL_DELIVERY) emailQueue: Queue | null,
+    @Optional() @Inject(QueueName.SMS_DELIVERY) smsQueue: Queue | null,
+    @Optional() @Inject(QueueName.WEBHOOK_DELIVERY) webhookQueue: Queue | null,
     @InjectRepository(Tenant) private readonly tenantRepository: Repository<Tenant>,
     @InjectRepository(NotificationRequestDetail)
     private readonly detailRepository: Repository<NotificationRequestDetail>,
     @Optional() private readonly configService?: ConfigService,
   ) {
     this.queues = [ingestionQueue, emailQueue, smsQueue, webhookQueue].filter(
-      (queue): queue is Bull.Queue => !!queue,
+      (queue): queue is Queue => !!queue,
     )
   }
 
@@ -636,9 +635,9 @@ export class MonitoringService {
   }
 
   private async getQueueStats(
-    queue: Bull.Queue,
+    queue: Queue,
     workers: WorkerPodDto[],
-    activeJobs: Bull.Job[],
+    activeJobs: Job[],
     messages: MessageChannelStatsDto[],
     now: number,
   ): Promise<QueueStatsDto> {
@@ -651,8 +650,8 @@ export class MonitoringService {
       queue.getMetrics('failed', 0, MONITORING_WINDOW_MINUTES - 1),
     ])
 
-    const completedSeries = alignBullMetrics(completed as BullMetrics, now)
-    const failedSeries = alignBullMetrics(failed as BullMetrics, now)
+    const completedSeries = alignQueueMetrics(completed as QueueMetrics, now)
+    const failedSeries = alignQueueMetrics(failed as QueueMetrics, now)
     const window = MONITORING_THRESHOLDS.rateWindowMinutes
     const completedPerMinute = averageOfWholeMinutes(completedSeries, window)
     const failedPerMinute = averageOfWholeMinutes(failedSeries, window)
@@ -664,12 +663,14 @@ export class MonitoringService {
       {
         name: queue.name,
         isPaused,
+        // A paused BullMQ queue keeps its jobs in waiting; they are reported as paused, as they
+        // were when a paused queue moved them to a list of their own.
         counts: {
-          waiting: counts.waiting,
-          active: counts.active,
-          delayed: counts.delayed,
-          failed: counts.failed,
-          paused: (counts as Bull.JobCounts & { paused?: number }).paused ?? 0,
+          waiting: isPaused ? 0 : (counts.waiting ?? 0),
+          active: counts.active ?? 0,
+          delayed: counts.delayed ?? 0,
+          failed: counts.failed ?? 0,
+          paused: isPaused ? (counts.waiting ?? 0) : 0,
         },
         oldestWaitingAgeMs,
         throughput: {
@@ -689,28 +690,23 @@ export class MonitoringService {
   }
 
   /**
-   * Workers take from the right of the wait list, so its last entry is the next job out. A
-   * delayed job (scheduled send or retry backoff) only became ready at timestamp + delay, which
-   * is what its wait is measured from. Pausing moves the wait list to `paused`.
+   * The oldest waiting job is the next one out. A delayed job (scheduled send or retry backoff)
+   * only became ready at timestamp + delay, which is what its wait is measured from.
    */
-  private async getOldestWaitingAge(queue: Bull.Queue, now: number): Promise<number | null> {
-    const jobId =
-      (await queue.client.lindex(bullKey(queue.name, 'wait'), -1)) ??
-      (await queue.client.lindex(bullKey(queue.name, 'paused'), -1))
-    if (!jobId) return null
-    const job = await queue.getJob(jobId)
+  private async getOldestWaitingAge(queue: Queue, now: number): Promise<number | null> {
+    const [job] = await queue.getJobs(['waiting'], 0, 0, true)
     if (!job) return null
     const readyAt = job.timestamp + (job.opts?.delay ?? 0)
     return Math.max(0, now - readyAt)
   }
 
-  private async getAddedSeries(queue: Bull.Queue, now: number): Promise<number[]> {
+  private async getAddedSeries(queue: Queue, now: number): Promise<number[]> {
     const currentMinute = minuteOf(now)
     const keys: string[] = []
     for (let offset = MONITORING_WINDOW_MINUTES - 1; offset >= 0; offset--) {
       keys.push(addedCounterKey(queue.name, currentMinute - offset))
     }
-    const values = await queue.client.mget(...keys)
+    const values = await (this.redis as Redis).mget(...keys)
     return values.map((value) => Number(value ?? 0) || 0)
   }
 
@@ -752,7 +748,7 @@ export class MonitoringService {
       .slice(0, RECENT_FAILURES_LIMIT)
   }
 
-  private async getActiveJobs(): Promise<Map<string, Bull.Job[]>> {
+  private async getActiveJobs(): Promise<Map<string, Job[]>> {
     const perQueue = await Promise.all(
       this.queues.map(
         async (queue) =>

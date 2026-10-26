@@ -55,7 +55,7 @@ describe('GcNotifyInternalExecutionService', () => {
     updateStatus: ReturnType<typeof vi.fn>
   }
   let mockConfigurationRepository: { findOne: ReturnType<typeof vi.fn> }
-  let mockIngestionQueue: { add: ReturnType<typeof vi.fn> }
+  let mockIngestionQueue: { name: string; add: ReturnType<typeof vi.fn> }
   let mockAttachmentValidationService: { validateAttachments: ReturnType<typeof vi.fn> }
   let mockAttachmentProcessingService: { processAttachments: ReturnType<typeof vi.fn> }
   let mockSafelistService: { findBlocked: ReturnType<typeof vi.fn> }
@@ -88,7 +88,10 @@ describe('GcNotifyInternalExecutionService', () => {
     }
     mockNotificationRequestDetailService = { createPending: vi.fn(), updateStatus: vi.fn() }
     mockConfigurationRepository = { findOne: vi.fn().mockResolvedValue(null) }
-    mockIngestionQueue = { add: vi.fn().mockResolvedValue(undefined) }
+    mockIngestionQueue = {
+      name: 'notification-ingestion',
+      add: vi.fn().mockResolvedValue(undefined),
+    }
     mockAttachmentValidationService = { validateAttachments: vi.fn().mockResolvedValue(undefined) }
     mockAttachmentProcessingService = {
       // By default, echo back a single stored reference so callers can assert wiring.
@@ -210,6 +213,7 @@ describe('GcNotifyInternalExecutionService', () => {
 
       await flushMicrotasks()
       expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+        'notification-ingestion',
         expect.objectContaining({ notifyId: 'notif-1', tenantId: TENANT_ID }),
         expect.objectContaining({ jobId: 'notif-1' }),
       )
@@ -239,7 +243,7 @@ describe('GcNotifyInternalExecutionService', () => {
       await service.sendEmail(body, TENANT_ID)
 
       await flushMicrotasks()
-      const [[jobPayload]] = mockIngestionQueue.add.mock.calls
+      const [[, jobPayload]] = mockIngestionQueue.add.mock.calls
       const content = jobPayload.request.email.content
 
       // GC Notify renders `#` as an h2, so this also pins the dialect, not just the conversion.
@@ -336,7 +340,7 @@ describe('GcNotifyInternalExecutionService', () => {
       expect(mockAttachmentProcessingService.processAttachments).not.toHaveBeenCalled()
 
       await flushMicrotasks()
-      const [[jobPayload]] = mockIngestionQueue.add.mock.calls
+      const [[, jobPayload]] = mockIngestionQueue.add.mock.calls
       expect(jobPayload.request.email.attachments).toBeUndefined()
     })
 
@@ -374,7 +378,7 @@ describe('GcNotifyInternalExecutionService', () => {
       expect(mockAttachmentValidationService.validateAttachments).toHaveBeenCalledOnce()
 
       await flushMicrotasks()
-      const [[jobPayload]] = mockIngestionQueue.add.mock.calls
+      const [[, jobPayload]] = mockIngestionQueue.add.mock.calls
       expect(jobPayload.request.email.attachments).toEqual([{ attachmentId: 'att-1' }])
     })
 

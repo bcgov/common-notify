@@ -77,6 +77,8 @@ export default tseslint.config(
       // React rules (preserved from .eslintrc.yml)
       ...react.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
+      // react-hooks 7.1 flags existing setState-in-effect patterns; warn until they are refactored.
+      'react-hooks/set-state-in-effect': 'warn',
       'react/jsx-uses-react': 'off',
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',

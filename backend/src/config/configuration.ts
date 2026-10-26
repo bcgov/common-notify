@@ -1,6 +1,22 @@
-import * as path from 'path'
+import * as path from 'node:path'
 
-export default () => {
+function parseSentinels(value?: string): { host: string; port: number }[] | undefined {
+  if (!value?.trim()) return undefined
+  const sentinels = value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const index = entry.lastIndexOf(':')
+      const host = index === -1 ? entry : entry.slice(0, index)
+      const port = index === -1 ? Number.NaN : Number.parseInt(entry.slice(index + 1), 10)
+      return { host, port: Number.isFinite(port) ? port : 26379 }
+    })
+    .filter((entry) => entry.host.length > 0)
+  return sentinels.length > 0 ? sentinels : undefined
+}
+
+export default function configuration() {
   const defaultEmailFrom = process.env.DEFAULT_EMAIL_FROM || 'notify_noreply@gov.bc.ca'
   const defaultSmsFrom = process.env.DEFAULT_SMS_FROM_NUMBER || '+15551234567'
   const defaultTemplateSubject = process.env.DEFAULT_TEMPLATE_SUBJECT || 'Notification'
@@ -35,6 +51,9 @@ export default () => {
       port: Number.parseInt(process.env.REDIS_PORT || '6379', 10),
       password: process.env.REDIS_PASSWORD,
       db: Number.parseInt(process.env.REDIS_DB || '0', 10),
+      sentinels: parseSentinels(process.env.REDIS_SENTINELS),
+      masterName: process.env.REDIS_MASTER_NAME || 'mymaster',
+      sentinelPassword: process.env.REDIS_SENTINEL_PASSWORD,
     },
 
     // System defaults (used when sender store or provider override not set)

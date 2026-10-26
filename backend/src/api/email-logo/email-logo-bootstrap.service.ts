@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { readFile } from 'fs/promises'
-import * as path from 'path'
+import { readFile } from 'node:fs/promises'
+import * as path from 'node:path'
 import { ClamavService } from '../../services/clamav.service'
 import { EMAIL_LOGO_STORAGE, SYSTEM_EMAIL_LOGO_KEYS } from './email-logo.constants'
 import { EmailLogoStorage } from './email-logo-storage.interface'
@@ -41,7 +41,7 @@ export class EmailLogoBootstrapService implements OnModuleInit {
       await this.storage.upload({
         storageKey,
         content,
-        mimeType: 'image/svg+xml',
+        mimeType: filename.endsWith('.png') ? 'image/png' : 'image/svg+xml',
       })
       this.logger.log(`Uploaded email logo seed object "${storageKey}"`)
     }

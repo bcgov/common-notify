@@ -1,0 +1,33 @@
+@import '../variables';
+
+.no-data-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $spacing-sm;
+  padding: $spacing-md $spacing-sm;
+  background-color: $light-bg;
+
+  .no-data-card__icon {
+    display: flex;
+    color: $dark-text;
+
+    svg {
+      font-size: 20px;
+    }
+  }
+
+  .no-data-card__title,
+  .no-data-card__message {
+    max-width: 614px;
+    margin: 0;
+    font-size: $font-size-sm;
+    line-height: 21px;
+    color: $dark-text;
+    text-align: center;
+  }
+
+  .no-data-card__title {
+    font-weight: 700;
+  }
+}

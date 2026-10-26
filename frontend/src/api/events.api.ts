@@ -104,6 +104,8 @@ export interface EventSmsSettings {
 }
 
 export interface EventResponse {
+  /** Tenant-assigned sender; omitted when the SMS feature is disabled. */
+  senderPhoneNumber?: string | null
   id: string
   name: string
   description: string
@@ -341,6 +343,46 @@ export async function deactivateEventSmsChannel(eventId: string): Promise<EventR
       notFound: 'Event not found',
       unauthorized: 'You are not authorized to update this event',
       forbidden: 'You do not have permission to update this event',
+    })
+  }
+}
+
+/** What the send accepted, as the notify routes report it. `notifyId` tracks it from there. */
+export interface EventSendResponse {
+  notifyId: string
+  status: string
+  channels: string[]
+  createdAt: string
+  message: string
+}
+
+/**
+ * Send a test event notification using specific addresses instead of the event's addresses.
+ *
+ * @param eventId Event to send the test for
+ * @param params Values substituted into the template's placeholders
+ * @param recipients Addresses to send to, or merge rows carrying a value set per recipient.
+ *   Omitted, the test goes to the signed-in user.
+ * @returns The accepted request, whose notifyId links to its status
+ * @throws Error if the send is rejected
+ */
+export async function sendEventTestEmail(
+  eventId: string,
+  params: Record<string, string>,
+  recipients?: { to: string[] } | { mergeArray: string[][] },
+): Promise<EventSendResponse> {
+  try {
+    const apiParams = generateApiParameters('/api/v1/frontend/notifysimple/event/test')
+    return await post<EventSendResponse>({
+      ...apiParams,
+      data: { eventId, params, ...recipients },
+    })
+  } catch (error) {
+    throw toEventApiError(error, {
+      action: 'Failed to send the test notification',
+      notFound: 'Event not found',
+      unauthorized: 'You are not authorized to send this notification',
+      forbidden: 'You do not have permission to send a test notification for this event',
     })
   }
 }

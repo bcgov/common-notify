@@ -13,10 +13,10 @@ import {
 } from '@bcgov/design-system-react-components'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import EmailLogoMenu from '@/components/EmailLogoMenu'
+import StickyBar from '@/components/StickyBar'
 import TooltipTrigger from '@/components/TooltipTrigger'
 import { NotificationChannel } from '@/api/templates.api'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import { fetchApiKeyUsage } from '@/redux/thunks/apiKeyUsage.thunks'
 import { fetchApprovedEmailLogos, updateEmailSettings } from '@/redux/thunks/settings.thunks'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
@@ -69,9 +69,7 @@ const EmailSettings: FC = () => {
   const [showHeaderTitle, setShowHeaderTitle] = useState(useCustomEmailHeader)
   const [shouldShowValidation, setShouldShowValidation] = useState(false)
 
-  // Read-only daily/annual limits. Remounted per tenant by Settings.tsx.
   useEffect(() => {
-    dispatch(fetchApiKeyUsage())
     dispatch(fetchApprovedEmailLogos())
   }, [dispatch])
 
@@ -334,9 +332,11 @@ const EmailSettings: FC = () => {
         </p>
       </div>
 
-      <Button type="submit" variant="primary" isDisabled={isSaveDisabled}>
-        {saving ? 'Saving…' : 'Save email settings'}
-      </Button>
+      <StickyBar>
+        <Button type="submit" variant="primary" isDisabled={isSaveDisabled}>
+          {saving ? 'Saving…' : 'Save email settings'}
+        </Button>
+      </StickyBar>
     </form>
   )
 }

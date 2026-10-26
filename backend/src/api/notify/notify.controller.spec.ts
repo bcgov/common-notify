@@ -41,6 +41,7 @@ import { LimitAlertNotificationService } from './services/limit-alert-notificati
 import { SafelistService } from '../safelist/safelist.service'
 import { SmsSegmentService } from './services/sms-segment.service'
 import { NotificationDedupService } from './services/notification-dedup.service'
+import { EventNotificationResolver } from '../events/event-notification.resolver'
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 
 // Mock AuthGuard to bypass authentication in tests
@@ -81,6 +82,8 @@ const mockNotificationService = {
     { address: 'bob@example.com', params: {} },
   ]),
   validateMailMergeRules: vi.fn().mockResolvedValue([]),
+  cancelOrRescheduleNotification: vi.fn(),
+  mapToDto: vi.fn((notification) => notification),
 }
 
 const mockAttachmentValidationService = {
@@ -92,8 +95,9 @@ const mockAttachmentProcessingService = {
 }
 
 const mockIngestionQueue = {
+  name: 'notification-ingestion',
   add: vi.fn(),
-  process: vi.fn(),
+  getJob: vi.fn(),
 }
 
 const mockFeatureFlagService = {
@@ -147,6 +151,11 @@ const mockNotificationDedupService = {
   fingerprint: vi.fn().mockReturnValue('fingerprint-1'),
   findDuplicate: vi.fn().mockResolvedValue(null),
   claim: vi.fn(),
+}
+
+const mockEventNotificationResolver = {
+  resolveSend: vi.fn(),
+  resolveTestSend: vi.fn(),
 }
 
 describe('Notify Controllers', () => {
@@ -214,6 +223,7 @@ describe('Notify Controllers', () => {
           useValue: mockSmsSegmentService,
         },
         { provide: NotificationDedupService, useValue: mockNotificationDedupService },
+        { provide: EventNotificationResolver, useValue: mockEventNotificationResolver },
       ],
     })
       .overrideGuard(NotifyServiceGuard)
@@ -303,6 +313,88 @@ describe('Notify Controllers', () => {
       } finally {
         delegate.mockRestore()
       }
+    })
+
+    describe('cancel and reschedule', () => {
+      const cancelOrReschedule = (body: object, tenantId = 'tenant-1') =>
+        (app.get(NotifySimpleController) as any).doCancelOrReschedule(
+          tenantId,
+          'user-1',
+          'notification-1',
+          body,
+        )
+
+      function queuedJob(state: string, tenantId = 'tenant-1') {
+        return {
+          id: 'notification-1',
+          data: { notifyId: 'notification-1', tenantId, scheduledFor: '2026-11-01T12:00:00.000Z' },
+          getState: vi.fn().mockResolvedValue(state),
+          remove: vi.fn().mockResolvedValue(undefined),
+        }
+      }
+
+      beforeEach(() => {
+        mockNotificationService.cancelOrRescheduleNotification.mockResolvedValue({
+          id: 'notification-1',
+        })
+      })
+
+      it('removes a cancelled send’s ingestion job, found by its id', async () => {
+        const job = queuedJob('delayed')
+        mockIngestionQueue.getJob.mockResolvedValue(job)
+
+        await cancelOrReschedule({ action: 'cancel' })
+
+        expect(mockIngestionQueue.getJob).toHaveBeenCalledWith('notification-1')
+        expect(job.remove).toHaveBeenCalled()
+      })
+
+      it('re-queues a rescheduled send under the same id, due at the new time', async () => {
+        const job = queuedJob('delayed')
+        mockIngestionQueue.getJob.mockResolvedValue(job)
+        const sendAt = new Date(Date.now() + 2 * 60 * 60_000)
+
+        await cancelOrReschedule({ scheduledTime: sendAt.toISOString() })
+
+        expect(job.remove).toHaveBeenCalled()
+        const [name, data, options] = mockIngestionQueue.add.mock.calls[0]
+        expect(name).toBe('notification-ingestion')
+        // Ingestion delays the delivery jobs until scheduledFor, so it moves with the job.
+        expect(data).toMatchObject({
+          notifyId: 'notification-1',
+          scheduledFor: sendAt.toISOString(),
+        })
+        expect(options).toMatchObject({ jobId: 'notification-1', attempts: 3 })
+        expect(options.delay).toBeGreaterThan(119 * 60_000)
+        expect(options.delay).toBeLessThanOrEqual(120 * 60_000)
+      })
+
+      it.each(['active', 'completed'])('leaves a job that is already %s alone', async (state) => {
+        const job = queuedJob(state)
+        mockIngestionQueue.getJob.mockResolvedValue(job)
+
+        await cancelOrReschedule({ action: 'cancel' })
+
+        expect(job.remove).not.toHaveBeenCalled()
+      })
+
+      it('never touches another tenant’s job', async () => {
+        const job = queuedJob('delayed', 'tenant-2')
+        mockIngestionQueue.getJob.mockResolvedValue(job)
+
+        await cancelOrReschedule({ scheduledTime: new Date(Date.now() + 60_000).toISOString() })
+
+        expect(job.remove).not.toHaveBeenCalled()
+        expect(mockIngestionQueue.add).not.toHaveBeenCalled()
+      })
+
+      it('still returns the updated request when there is no job to change', async () => {
+        mockIngestionQueue.getJob.mockResolvedValue(undefined)
+
+        await expect(cancelOrReschedule({ action: 'cancel' })).resolves.toEqual({
+          id: 'notification-1',
+        })
+      })
     })
 
     describe('accepted usage limit-alert wiring', () => {
@@ -716,6 +808,62 @@ describe('Notify Controllers', () => {
         expect(response.body).toMatchObject({ notifyId: ORIGINAL_ID, duplicate: true })
         expectNothingAccepted()
       })
+
+      describe('event sends', () => {
+        const eventId = '12345678-1234-4234-8234-123456789012'
+        const resolved = {
+          email: {
+            recipients: { to: ['test@example.com'] },
+            content: { templateId: eventId },
+          },
+        }
+
+        beforeEach(() => {
+          mockEventNotificationResolver.resolveSend.mockResolvedValue(resolved)
+          mockEventNotificationResolver.resolveTestSend.mockResolvedValue(resolved)
+          mockNotificationDedupService.findDuplicate.mockResolvedValue(original)
+        })
+
+        it('sends every test, even one identical to an earlier send', async () => {
+          const response = await request(app.getHttpServer())
+            .post('/api/v1/frontend/notifysimple/event/test')
+            .send({ eventId, to: ['test@example.com'] })
+            .expect(202)
+
+          expect(mockNotificationDedupService.findDuplicate).not.toHaveBeenCalled()
+          expect(mockNotificationDedupService.claim).not.toHaveBeenCalled()
+          expect(mockNotificationService.create).toHaveBeenCalled()
+          expect(response.body.duplicate).toBeUndefined()
+        })
+
+        it('sends every merge test, even one identical to an earlier send', async () => {
+          mockEventNotificationResolver.resolveTestSend.mockResolvedValue({
+            email: {
+              content: { templateId: eventId },
+              recipients: { mergeArray: [['to'], ['test@example.com']] },
+            },
+          })
+
+          const response = await request(app.getHttpServer())
+            .post('/api/v1/frontend/notifysimple/event/test')
+            .send({ eventId, mergeArray: [['to'], ['test@example.com']] })
+            .expect(202)
+
+          expect(mockNotificationDedupService.findDuplicate).not.toHaveBeenCalled()
+          expect(mockNotificationDedupService.claim).not.toHaveBeenCalled()
+          expect(response.body.duplicate).toBeUndefined()
+        })
+
+        it('still deduplicates a full event send', async () => {
+          const response = await request(app.getHttpServer())
+            .post('/api/v1/frontend/notifysimple/event')
+            .send({ eventId })
+            .expect(202)
+
+          expect(response.body).toMatchObject({ notifyId: ORIGINAL_ID, duplicate: true })
+          expectNothingAccepted()
+        })
+      })
     })
 
     describe('POST /api/v1/notifysimple', () => {
@@ -757,6 +905,7 @@ describe('Notify Controllers', () => {
 
         await vi.waitFor(() => {
           expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+            'notification-ingestion',
             expect.objectContaining({
               request: expect.objectContaining({
                 sms: expect.objectContaining({
@@ -1482,6 +1631,7 @@ describe('Notify Controllers', () => {
 
         await vi.waitFor(() => {
           expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+            'notification-ingestion',
             expect.objectContaining({
               request: processedPayload,
             }),
@@ -1490,6 +1640,7 @@ describe('Notify Controllers', () => {
         })
 
         expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+          'notification-ingestion',
           expect.objectContaining({
             request: expect.not.objectContaining({
               email: expect.objectContaining({

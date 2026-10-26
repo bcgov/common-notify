@@ -26,6 +26,8 @@ global:
     databaseUser: ~
     redisHost: ~ # Redis host, should be set to common-notify-redis-master. Defaults to <release-name>-redis-master if not set
     redisSecret: ~ # Redis secret name, should be set to common-notify-redis. Defaults to <release-name>-redis if not set
+    redisSentinels: ~ # Comma-separated host:port list. When set, the backend discovers the master through Sentinel and follows a promotion; redisHost is then unused. Leave null for a direct connection to redisHost.
+    redisMasterName: ~ # Sentinel master group name. Must match the redis chart's sentinel.masterSet. Defaults to mymaster.
   #-- domain of the application, it is required, apps.silver.devops.gov.bc.ca for silver cluster and apps.devops.gov.bc.ca for gold cluster
   domain: 'apps.silver.devops.gov.bc.ca' # it is apps.gold.devops.gov.bc.ca for gold cluster
   databaseAlias: ~ # set using github action workflow during helm deploy.
@@ -133,8 +135,23 @@ backend:
     port: 3310
     #-- connection timeout in milliseconds
     timeout: 30000
-    #-- fail closed when ClamAV is disabled or unavailable
+    #-- fail closed when ClamAV is disabled or unavailable. false here covers
+    #-- DEV and PR environments, which share one single-replica instance:
+    #-- fail-closed there would block PR sends whenever it restarts. TEST and
+    #-- PROD set it true, where ClamAV runs two replicas behind a PDB.
     failClosed: false
+    #-- single replica for DEV/PR. TEST and PROD run 2.
+    replicas: 1
+    #-- Recreate is fine with one replica and avoids needing double the 768Mi
+    #-- during a rollout. TEST and PROD use RollingUpdate so a deploy never
+    #-- leaves zero scanners, which failClosed depends on.
+    deploymentStrategy: Recreate
+    pdb:
+      #-- off with a single replica: minAvailable 1 would permit zero voluntary
+      #-- disruptions and block node drains indefinitely
+      enabled: false
+      #-- must stay strictly BELOW the replica count, or drains never complete
+      minAvailable: 1
   #-- File attachments storage configuration
   attachments:
     #-- directory where attachments will be stored

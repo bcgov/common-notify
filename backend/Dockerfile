@@ -3,7 +3,7 @@
 # share them, so builds failed with 429 Too Many Requests on whichever FROM
 # happened to be unlucky. Same images, same digests, no credentials needed.
 # Build
-FROM mirror.gcr.io/library/node:24.18.0-slim AS build
+FROM mirror.gcr.io/library/node:24.22.1-slim AS build
 
 # Copy, build static files; see .dockerignore for exclusions
 WORKDIR /app
@@ -11,7 +11,7 @@ COPY . ./
 RUN npm ci --ignore-scripts --no-update-notifier && npm run build
 
 # Dependencies
-FROM mirror.gcr.io/library/node:24.18.0-slim AS dependencies
+FROM mirror.gcr.io/library/node:24.22.1-slim AS dependencies
 
 # Copy, build static files; see .dockerignore for exclusions
 WORKDIR /app
@@ -19,7 +19,7 @@ COPY . ./
 RUN npm ci --ignore-scripts --no-update-notifier --omit=dev
 
 # Deploy using minimal Distroless image
-FROM gcr.io/distroless/nodejs22-debian12:nonroot
+FROM gcr.io/distroless/nodejs22-debian13:nonroot
 ENV NODE_ENV=production
 
 # Copy app and dependencies

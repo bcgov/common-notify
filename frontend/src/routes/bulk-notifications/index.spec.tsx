@@ -103,13 +103,13 @@ describe('/bulk-notifications route', () => {
 
     expect(screen.queryByText('404')).not.toBeInTheDocument()
     expect(screen.queryByText('Bulk Notifications page')).not.toBeInTheDocument()
-    expect(screen.getByText('Loading...')).toBeInTheDocument()
+    expect(screen.getByRole('progressbar', { name: 'Loading...' })).toBeInTheDocument()
   })
 
   it('waits rather than flashing 404 while the tenant flags are still in flight', () => {
     renderRoute({ flagsTenantId: null })
 
-    expect(screen.getByText('Loading...')).toBeInTheDocument()
+    expect(screen.getByRole('progressbar', { name: 'Loading...' })).toBeInTheDocument()
   })
 
   it('falls back to 404 when the flag lookup fails, instead of waiting forever', async () => {
@@ -118,6 +118,8 @@ describe('/bulk-notifications route', () => {
     renderRoute({ flagsTenantId: null, flagsSynced: false, bulkEnabled: false })
 
     expect(await screen.findByText('404')).toBeInTheDocument()
-    await waitFor(() => expect(screen.queryByText('Loading...')).not.toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.queryByRole('progressbar', { name: 'Loading...' })).not.toBeInTheDocument(),
+    )
   })
 })

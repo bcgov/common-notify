@@ -20,6 +20,9 @@ import { TenantsService } from '../admin/tenants/tenants.service'
 import { NotificationPubSubService } from './notification-pubsub.service'
 import { TemplatesRepository } from '../templates/templates.repository'
 import { TemplatesService } from '../templates/templates.service'
+import { FeatureFlagService } from '../feature-flag/feature-flag.service'
+import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
+import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { ListQueryDto } from '../../common/query/list-query.dto'
 import { parseListQuery } from '../../common/query/list-query.parser'
 import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
@@ -55,6 +58,9 @@ const notificationListQueryConfig: QueryableFieldsConfig = {
   defaultSort: [{ field: 'createdAt', direction: 'DESC' }],
 }
 
+export const INTERNATIONAL_SMS_HINT =
+  'Only Canadian numbers can be sent to unless International SMS is enabled for this tenant.'
+
 @Injectable()
 export class NotificationService {
   private readonly logger = new Logger(NotificationService.name)
@@ -80,6 +86,8 @@ export class NotificationService {
     private readonly templatesRepository: TemplatesRepository,
     private readonly templatesService: TemplatesService,
     private readonly notificationPubSubService: NotificationPubSubService,
+    private readonly featureFlagService: FeatureFlagService,
+    private readonly tenantSettingsService: TenantSettingsService,
   ) {
     // Load validation limits from environment variables with sensible defaults
     this.emailMaxRecipients = this.configService.get<number>('VALIDATE_EMAIL_MAX_RECIPIENTS') ?? 100
@@ -229,6 +237,7 @@ export class NotificationService {
       recipients: recipients,
       delayedSendTime: delayedSendTime,
       requestRoute: dto.requestRoute,
+      eventId: dto.eventId,
     })
     const saved = await this.notificationRepository.save(notification)
     this.logger.debug(`Created notification request: ${saved.id}`)
@@ -307,6 +316,7 @@ export class NotificationService {
     }
 
     const seen = new Map<string, number>()
+    const internationalRows: Array<{ row: number; address: string }> = []
     for (let i = 1; i < mergeArray.length; i++) {
       if (errors.length >= MAIL_MERGE_MAX_REPORTED_ERRORS) {
         errors.push(
@@ -332,11 +342,47 @@ export class NotificationService {
           errors.push(`Row ${i}: "${address}" is a duplicate of row ${firstSeen}`)
         } else {
           seen.set(key, i)
+          if (isSms && this.phoneNumberService.isInternational(key)) {
+            internationalRows.push({ row: i, address })
+          }
         }
       }
     }
 
+    // Checked after the loop so the flag and the tenant setting are read once, not per row. Skipped
+    // when the loop already filled the error list and reported the omission.
+    if (
+      internationalRows.length > 0 &&
+      errors.length < MAIL_MERGE_MAX_REPORTED_ERRORS &&
+      !(await this.isInternationalSmsAllowed(tenantId))
+    ) {
+      for (const { row, address } of internationalRows) {
+        if (errors.length >= MAIL_MERGE_MAX_REPORTED_ERRORS) {
+          errors.push(
+            `Additional invalid rows omitted (showing first ${MAIL_MERGE_MAX_REPORTED_ERRORS})`,
+          )
+          break
+        }
+        errors.push(
+          `Row ${row}: "${address}" is an international number. ${INTERNATIONAL_SMS_HINT}`,
+        )
+      }
+    }
+
     return errors
+  }
+
+  /**
+   * Whether this tenant may send SMS outside Canada: the global flag must allow it, and
+   * then the tenant's own International SMS setting decides. Only runs when a request has an
+   * international number.
+   */
+  private async isInternationalSmsAllowed(tenantId: string): Promise<boolean> {
+    if (!(await this.featureFlagService.isEnabled(FeatureFlagCode.INTERNATIONAL_SMS, tenantId))) {
+      return false
+    }
+    const settings = await this.tenantSettingsService.findByTenantId(tenantId)
+    return settings?.internationalSmsEnabled ?? false
   }
 
   /**
@@ -636,6 +682,15 @@ export class NotificationService {
         )
       }
 
+      const international = request.sms.recipients.to.filter((number) =>
+        this.phoneNumberService.isInternational(number),
+      )
+      if (international.length > 0 && !(await this.isInternationalSmsAllowed(tenantId))) {
+        errors.push(
+          `SMS cannot be sent to international number(s): ${international.join(', ')}. ${INTERNATIONAL_SMS_HINT}`,
+        )
+      }
+
       // Only validate content if not using a template (template provides body)
       if (!smsTemplateId) {
         if (!request.sms.content?.body?.trim()) {
@@ -800,7 +855,7 @@ function setMergeParam(params: Record<string, unknown>, key: string, value: stri
     target = target[segment] as Record<string, unknown>
   }
 
-  const leaf = segments[segments.length - 1]
+  const leaf = segments.at(-1)!
   if (!(leaf in target)) {
     target[leaf] = value
   }
