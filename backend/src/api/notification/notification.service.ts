@@ -786,7 +786,7 @@ export class NotificationService {
       // Validate and reschedule
       const newScheduledTime = new Date(scheduledTime)
       if (Number.isNaN(newScheduledTime.getTime())) {
-        throw new Error(`Invalid scheduledTime format: '${scheduledTime}'`)
+        throw new TypeError(`Invalid scheduledTime format: '${scheduledTime}'`)
       }
 
       if (newScheduledTime <= new Date()) {
