@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common'
-import { createHmac } from 'crypto'
+import { createHmac } from 'node:crypto'
 import Bull from 'bull'
 import axios from 'axios'
 import { WebhookJobPayload } from '../queue.types'
@@ -51,7 +51,7 @@ export class WebhookDeliveryWorker {
 
       // Fetch the webhook config — it may have been deleted or deactivated since queuing
       const webhookConfig = await webhookService.findById(tenantId, webhookId)
-      if (!webhookConfig || !webhookConfig.active) {
+      if (!webhookConfig?.active) {
         logger.warn(
           `[${notificationId}] Webhook ${webhookId} not found or inactive — skipping delivery`,
         )
@@ -77,7 +77,7 @@ export class WebhookDeliveryWorker {
       // Build headers
       const requestHeaders: Record<string, string> = {
         'Content-Type': 'application/json',
-        ...(webhookConfig.headers ?? {}),
+        ...webhookConfig.headers,
       }
 
       // HMAC-SHA256 sign the raw JSON body if a secret is configured

@@ -117,8 +117,7 @@ export class SmsDeliveryWorker {
         }
 
         if (
-          !payload.recipients ||
-          !payload.recipients.to ||
+          !payload.recipients?.to ||
           !Array.isArray(payload.recipients.to) ||
           payload.recipients.to.length === 0
         ) {
@@ -513,7 +512,7 @@ export class SmsDeliveryWorker {
     for (const recipient of pending) {
       try {
         // Per-recipient params take precedence over the global ones.
-        const mergedParams = { ...(params || {}), ...recipient.params }
+        const mergedParams = { ...params, ...recipient.params }
 
         const body = template
           ? (await templatesService.renderTemplateContent(template, mergedParams)).body

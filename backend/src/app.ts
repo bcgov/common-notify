@@ -1,6 +1,5 @@
-import { NestFactory } from '@nestjs/core'
+import { NestFactory, ModuleRef } from '@nestjs/core'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
-import { ModuleRef } from '@nestjs/core'
 import { AppModule } from './app.module'
 import { StructuredLoggerService } from './common/logger'
 import type { NestExpressApplication } from '@nestjs/platform-express'

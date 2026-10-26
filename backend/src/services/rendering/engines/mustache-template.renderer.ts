@@ -46,7 +46,7 @@ export class MustacheTemplateRenderer implements ITemplateRenderer {
       context.personalisation,
       {},
       {
-        escape: (value: unknown) => String(value),
+        escape: String,
       },
     )
     return Promise.resolve({ body })

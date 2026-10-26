@@ -92,7 +92,9 @@ export class WebhookTriggerService implements OnModuleInit, OnModuleDestroy {
     if (activeWebhooks.length === 0) return
 
     const notificationStatus = notification.status?.code?.toLowerCase()
-    const notificationChannels = (notification.channelCodes ?? []).map((c) => c.toLowerCase())
+    const notificationChannels = new Set(
+      (notification.channelCodes ?? []).map((c) => c.toLowerCase()),
+    )
 
     for (const webhook of activeWebhooks) {
       const triggerTypes = webhook.triggerOn ?? []
@@ -116,7 +118,7 @@ export class WebhookTriggerService implements OnModuleInit, OnModuleDestroy {
       const channelTypes = webhook.channelType ?? []
       const channelMatches =
         channelTypes.length === 0 ||
-        channelTypes.some((ct) => notificationChannels.includes(ct.toLowerCase()))
+        channelTypes.some((ct) => notificationChannels.has(ct.toLowerCase()))
 
       if (!channelMatches) continue
 

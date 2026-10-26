@@ -2,7 +2,7 @@ import type { SelectQueryBuilder } from 'typeorm'
 import type { ParsedListQuery, QueryableFieldsConfig } from './list-query.types'
 
 function escapeLikePattern(value: string): string {
-  return value.replace(/[\\%_]/g, '\\$&')
+  return value.replace(/[\\%_]/g, String.raw`\$&`)
 }
 
 export function applyParsedListQueryToQueryBuilder<T>(
@@ -54,7 +54,9 @@ export function applyParsedListQueryToQueryBuilder<T>(
 
     if (filter.operator === 'like') {
       const value = escapeLikePattern(String(filter.value))
-      qb.andWhere(`${column} ILIKE :${paramName} ESCAPE '\\'`, { [paramName]: `%${value}%` })
+      qb.andWhere(String.raw`${column} ILIKE :${paramName} ESCAPE '\'`, {
+        [paramName]: `%${value}%`,
+      })
       continue
     }
 
