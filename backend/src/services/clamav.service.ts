@@ -163,6 +163,25 @@ export class ClamavService implements OnModuleInit {
   }
 
   /**
+   * Re-probe when marked unhealthy, rather than trusting the flag: a failed startup check or one
+   * dropped connection (a scanner pod draining) would otherwise end scanning for this pod's life.
+   */
+  private async ensureHealthy(): Promise<boolean> {
+    if (this.isHealthy) return true
+
+    try {
+      await this.healthCheck()
+      this.isHealthy = true
+      this.logger.log(`ClamAV reachable again (${this.host}:${this.port})`)
+    } catch (error) {
+      this.logger.warn(
+        `ClamAV health re-check failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      )
+    }
+    return this.isHealthy
+  }
+
+  /**
    * Scan a buffer (file content)
    *
    * @param buffer The file content to scan
@@ -185,7 +204,7 @@ export class ClamavService implements OnModuleInit {
       }
     }
 
-    if (!this.isHealthy) {
+    if (!(await this.ensureHealthy())) {
       if (this.failClosed) {
         const error = new Error('ClamAV is unavailable while fail-closed mode is enabled')
         this.logger.error(error.message)
