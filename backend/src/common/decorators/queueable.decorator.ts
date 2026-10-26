@@ -4,7 +4,7 @@ import {
   BadRequestException,
   UnprocessableEntityException,
 } from '@nestjs/common'
-import Bull from 'bull'
+import type { Queue } from 'bullmq'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotificationService } from '../../api/notification/notification.service'
 import { NotificationPubSubService } from '../../api/notification/notification-pubsub.service'
@@ -31,7 +31,7 @@ import type {
   NotificationDedupService,
 } from '../../api/notify/services/notification-dedup.service'
 import { mergeRequestChannel } from '../../queue/merge-batch-builder'
-import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../../queue/job-retention'
+import { INGESTION_JOB_OPTIONS } from '../../queue/job-options'
 
 interface AcceptedUsageResult extends RecordedUsageResult {
   channelCode: string
@@ -53,7 +53,7 @@ export interface QueueableContext {
   smsSegmentService?: SmsSegmentService
   eventNotificationResolver?: EventNotificationResolver
   notificationDedupService?: NotificationDedupService
-  queueMap: Map<QueueName, Bull.Queue>
+  queueMap: Map<QueueName, Queue>
 }
 
 export type EventSendMode = 'full' | 'test'
@@ -406,7 +406,7 @@ async function countMergeMessages(
  */
 export async function handleMerge(
   ctx: QueueableContext,
-  queue: Bull.Queue,
+  queue: Queue,
   queueName: QueueName,
   tenantId: string,
   dto: NotifySimpleRequest,
@@ -612,20 +612,12 @@ export async function handleMerge(
         ...(delayedSendTimestamp && { scheduledFor: delayedSendTimestamp }),
       }
 
-      const queueOptions: any = {
+      await queue.add(queue.name, jobPayload, {
         jobId: notificationRecord.id,
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 2000 },
-        removeOnComplete: COMPLETED_JOB_RETENTION,
-        removeOnFail: FAILED_JOB_RETENTION,
-      }
-
-      // Add delay if this is a scheduled send
-      if (delayMs > 0) {
-        queueOptions.delay = delayMs
-      }
-
-      await queue.add(jobPayload, queueOptions)
+        ...INGESTION_JOB_OPTIONS,
+        // Scheduled send
+        ...(delayMs > 0 && { delay: delayMs }),
+      })
 
       logger.log(
         `Mail merge ingestion job enqueued: ${notificationRecord.id} (tenant=${tenantId}, queue=${queueName})`,
@@ -667,7 +659,7 @@ export async function handleMerge(
  * Validation: Request payloads are validated by NestJS's global ValidationPipe before this decorator runs,
  * so the payload is guaranteed to match NotifySimpleRequest schema. The decorator focuses solely on queuing logic.
  *
- * The decorator will attempt to queue the notification to the specified Bull queue. If queuing fails (e.g. Redis is down),
+ * The decorator will attempt to queue the notification to the specified queue. If queuing fails (e.g. Redis is down),
  * the notification remains in PENDING status and will be retried by a scheduled job.
  *
  * @param queueName - Queue to add job to (from QueueName enum)
@@ -983,23 +975,12 @@ export function Queueable(
               ...(delayedSendTimestamp && { scheduledFor: delayedSendTimestamp }),
             }
 
-            const queueOptions: any = {
+            await queue.add(queue.name, jobPayload, {
               jobId: notificationRecord.id,
-              attempts: 3,
-              backoff: {
-                type: 'exponential',
-                delay: 2000,
-              },
-              removeOnComplete: COMPLETED_JOB_RETENTION,
-              removeOnFail: FAILED_JOB_RETENTION,
-            }
-
-            // Add delay if this is a scheduled send
-            if (delayMs > 0) {
-              queueOptions.delay = delayMs
-            }
-
-            await queue.add(jobPayload, queueOptions)
+              ...INGESTION_JOB_OPTIONS,
+              // Scheduled send
+              ...(delayMs > 0 && { delay: delayMs }),
+            })
 
             logger.log(
               `Job successfully enqueued: ${notificationRecord.id} (tenant=${tenantId}, queue=${queueName})`,

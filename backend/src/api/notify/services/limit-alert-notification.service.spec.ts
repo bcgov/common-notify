@@ -12,6 +12,7 @@ import {
   ProcessLimitAlertNotificationsInput,
 } from './limit-alert-notification.service'
 import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../../../queue/job-retention'
+import { BACKOFF_STRATEGY } from '../../../queue/job-options'
 
 describe('LimitAlertNotificationService', () => {
   let service: LimitAlertNotificationService
@@ -26,6 +27,7 @@ describe('LimitAlertNotificationService', () => {
     update: vi.fn(),
   }
   const ingestionQueue = {
+    name: 'notification-ingestion',
     add: vi.fn(),
   }
   const tenantsService = {
@@ -233,6 +235,7 @@ describe('LimitAlertNotificationService', () => {
 
     const createdPayload = notificationService.create.mock.calls[0][0].payload
     expect(ingestionQueue.add).toHaveBeenCalledWith(
+      'notification-ingestion',
       {
         notifyId: 'notification-1',
         tenantId: 'tenant-1',
@@ -242,7 +245,7 @@ describe('LimitAlertNotificationService', () => {
       {
         jobId: 'notification-1',
         attempts: 3,
-        backoff: { type: 'exponential', delay: 2000 },
+        backoff: { type: BACKOFF_STRATEGY, delay: 2000 },
         removeOnComplete: COMPLETED_JOB_RETENTION,
         removeOnFail: FAILED_JOB_RETENTION,
       },

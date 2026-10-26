@@ -19,32 +19,37 @@ import tenantSettingsReducer from './slices/tenantSettings.slice'
 import safelistReducer from './slices/safelist.slice'
 import emailSettingsReducer from './slices/emailSettings.slice'
 import smsSettingsReducer from './slices/smsSettings.slice'
+import { tenantGuardMiddleware } from './middleware/tenantGuard'
+
+export const reducers = {
+  auth: authReducer,
+  user: userReducer,
+  users: usersReducer,
+  cstar: cstarReducer,
+  loading: loadingReducer,
+  toast: toastReducer,
+  notification: notificationReducer,
+  notificationDetail: notificationDetailReducer,
+  codeTables: codeTablesReducer,
+  tenant: tenantReducer,
+  templates: templatesReducer,
+  events: eventsReducer,
+  featureFlags: featureFlagsReducer,
+  adminTenants: adminTenantsReducer,
+  apiKeys: apiKeysReducer,
+  apiKeyUsage: apiKeyUsageReducer,
+  tenantSettings: tenantSettingsReducer,
+  safelist: safelistReducer,
+  emailSettings: emailSettingsReducer,
+  smsSettings: smsSettingsReducer,
+}
 
 export const store = configureStore({
-  reducer: {
-    auth: authReducer,
-    user: userReducer,
-    users: usersReducer,
-    cstar: cstarReducer,
-    loading: loadingReducer,
-    toast: toastReducer,
-    notification: notificationReducer,
-    notificationDetail: notificationDetailReducer,
-    codeTables: codeTablesReducer,
-    tenant: tenantReducer,
-    templates: templatesReducer,
-    events: eventsReducer,
-    featureFlags: featureFlagsReducer,
-    adminTenants: adminTenantsReducer,
-    apiKeys: apiKeysReducer,
-    apiKeyUsage: apiKeyUsageReducer,
-    tenantSettings: tenantSettingsReducer,
-    safelist: safelistReducer,
-    emailSettings: emailSettingsReducer,
-    smsSettings: smsSettingsReducer,
-  },
+  reducer: reducers,
+  middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(tenantGuardMiddleware),
 })
 
 // Infer the `RootState` and `AppDispatch` types from the store itself
 export type RootState = ReturnType<typeof store.getState>
 export type AppDispatch = typeof store.dispatch
+export type AppStore = typeof store

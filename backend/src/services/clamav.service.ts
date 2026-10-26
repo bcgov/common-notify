@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import * as net from 'net'
+import * as net from 'node:net'
 
 /**
  * Quarantine details when a file is flagged by ClamAV
