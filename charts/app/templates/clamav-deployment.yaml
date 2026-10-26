@@ -25,6 +25,8 @@ spec:
         app.kubernetes.io/name: clamav
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      # clamd does not call the API server.
+      automountServiceAccountToken: false
       securityContext: {}
       containers:
         - name: clamav
