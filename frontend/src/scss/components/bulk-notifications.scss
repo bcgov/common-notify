@@ -54,7 +54,7 @@
   font-family: inherit;
   font-size: $font-size-base;
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .bulk-notifications__field {
@@ -84,7 +84,7 @@
 
 .bulk-notifications__columns {
   margin: 0;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .bulk-notifications__actions {

@@ -26,7 +26,7 @@ export class JwtUserExtractor {
     try {
       // Extract from JWT in Authorization header
       const authHeader = req.headers.authorization
-      if (authHeader && authHeader.startsWith('Bearer ')) {
+      if (authHeader?.startsWith('Bearer ')) {
         const token = authHeader.substring(7)
         const user = this.extractFromToken(token)
         if (user) return user

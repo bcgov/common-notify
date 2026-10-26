@@ -127,7 +127,7 @@ export const notificationApi = {
       return fetch(input, {
         ...init,
         headers: {
-          ...(init?.headers ?? {}),
+          ...init?.headers,
           Authorization: `Bearer ${token}`,
           ...(tenantId ? { 'x-tenant-id': tenantId } : {}),
         },
