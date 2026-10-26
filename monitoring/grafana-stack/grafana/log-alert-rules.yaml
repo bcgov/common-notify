@@ -385,7 +385,7 @@ groups:
         annotations:
           short: "{{ $labels.namespace }} ClamAV unavailable"
           summary: "ClamAV unavailable in {{ $labels.namespace }}"
-          description: "ClamAV could not scan an attachment in {{ $labels.namespace }}. With failClosed on (TEST and PROD) those notifications are held and retried, so a sustained outage is a delivery outage. With failClosed off they are delivered UNSCANNED. Check the clamav pods."
+          description: "ClamAV could not scan an attachment in {{ $labels.namespace }}. With failClosed on (TEST and PROD) the ingestion job retries for about 8 seconds and then the notification is marked FAILED, so any sustained outage is a delivery outage. With failClosed off they are delivered UNSCANNED. Check the clamav pods."
 
       - uid: cn-log-virus
         title: VirusDetected
