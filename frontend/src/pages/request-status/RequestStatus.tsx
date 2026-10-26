@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { FC } from 'react'
-import type { NotificationRequestDetail } from '@/interfaces/NotificationRequest'
+import type {
+  NotificationRequest,
+  NotificationRequestDetail,
+} from '@/interfaces/NotificationRequest'
 import { DataTable } from '@/components/DataTable'
 import type { TableColumn } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
@@ -19,7 +22,6 @@ import {
   fetchNotificationRequest,
 } from '@/redux/thunks/notificationDetail.thunks'
 import RequestStatusSummary from '@/components/RequestStatusSummary'
-import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 import PageHeading from '@/components/PageHeading'
 import PageSubHeading from '@/components/PageSubHeading'
 import { showErrorToast } from '@/redux/utils/toastUtils'
@@ -112,6 +114,11 @@ const RequestStatus: FC<RequestStatusProps> = ({ notificationRequestId }) => {
     dispatch(setSearch(searchInput))
   }
 
+  function clearSearch() {
+    setSearchInput('')
+    dispatch(setSearch(''))
+  }
+
   function handleLimitChange(newLimit: number) {
     dispatch(setLimit(newLimit))
   }
@@ -165,8 +172,10 @@ const RequestStatus: FC<RequestStatusProps> = ({ notificationRequestId }) => {
           columns={columns}
           data={details}
           keyExtractor={(row) => row.id}
-          isLoading={isLoading && !hasLoaded}
+          isLoading={isLoading && (!hasLoaded || details.length === 0)}
           emptyMessage="No delivery records found"
+          search={search}
+          onClearSearch={clearSearch}
           label="Notification Delivery Records"
           currentPage={page}
           pageSize={limit}

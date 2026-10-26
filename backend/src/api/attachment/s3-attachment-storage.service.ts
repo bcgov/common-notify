@@ -13,8 +13,8 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import * as crypto from 'crypto'
-import { Readable } from 'stream'
+import * as crypto from 'node:crypto'
+import { Readable } from 'node:stream'
 import {
   AttachmentStorage,
   HeadResult,

@@ -1,12 +1,12 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy, Inject, Optional } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import Redis from 'ioredis'
-import Bull from 'bull'
+import type { Queue } from 'bullmq'
 import { WebhookService } from '../../api/webhook/webhook.service'
 import { WebhookJobPayload } from '../queue.types'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotificationRequestDto } from '../../api/notification/schemas/notification-request'
-import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../job-retention'
+import { WEBHOOK_JOB_OPTIONS } from '../job-options'
 import { buildRedisOptions } from '../redis-connection'
 
 /**
@@ -36,7 +36,7 @@ export class WebhookTriggerService implements OnModuleInit, OnModuleDestroy {
     private readonly webhookService: WebhookService,
     @Optional()
     @Inject(QueueName.WEBHOOK_DELIVERY)
-    private readonly webhookQueue?: Bull.Queue<WebhookJobPayload>,
+    private readonly webhookQueue?: Queue<WebhookJobPayload>,
   ) {}
 
   onModuleInit(): void {
@@ -94,67 +94,68 @@ export class WebhookTriggerService implements OnModuleInit, OnModuleDestroy {
     const notificationStatus = notification.status?.code?.toLowerCase()
     const notificationChannels = (notification.channelCodes ?? []).map((c) => c.toLowerCase())
 
-    for (const webhook of activeWebhooks) {
-      const triggerTypes = webhook.triggerOn ?? []
+    // A tenant's webhooks are independent; each logs its own failure.
+    await Promise.all(
+      activeWebhooks.map(async (webhook) => {
+        const triggerTypes = webhook.triggerOn ?? []
 
-      // Map spec trigger values to notification statuses:
-      //   'success' → notification status 'completed'
-      //   'failure' → notification status 'failed'
-      // Empty triggerOn = fire for any status
-      const statusMatches =
-        triggerTypes.length === 0 ||
-        triggerTypes.some((t) => {
-          if (t === 'success') return notificationStatus === 'completed'
-          if (t === 'failure') return notificationStatus === 'failed'
-          return false
-        })
+        // Map spec trigger values to notification statuses:
+        //   'success' → notification status 'completed'
+        //   'failure' → notification status 'failed'
+        // Empty triggerOn = fire for any status
+        const statusMatches =
+          triggerTypes.length === 0 ||
+          triggerTypes.some((t) => {
+            if (t === 'success') return notificationStatus === 'completed'
+            if (t === 'failure') return notificationStatus === 'failed'
+            return false
+          })
 
-      if (!statusMatches) continue
+        if (!statusMatches) return
 
-      // Empty channelType = fire for any channel; otherwise fire if the request targeted any of
-      // the webhook's channels
-      const channelTypes = webhook.channelType ?? []
-      const channelMatches =
-        channelTypes.length === 0 ||
-        channelTypes.some((ct) => notificationChannels.includes(ct.toLowerCase()))
+        // Empty channelType = fire for any channel; otherwise fire if the request targeted any of
+        // the webhook's channels
+        const channelTypes = webhook.channelType ?? []
+        const channelMatches =
+          channelTypes.length === 0 ||
+          channelTypes.some((ct) => notificationChannels.includes(ct.toLowerCase()))
 
-      if (!channelMatches) continue
+        if (!channelMatches) return
 
-      const jobPayload: WebhookJobPayload = {
-        notificationId: notification.id,
-        tenantId,
-        webhookId: webhook.id,
-        event: 'notification.status.changed',
-        payload: {
-          notifyId: notification.id,
-          status: notification.status?.code, // Emit the status code rather than the status object
-          statusDisplayName: notification.status?.displayName,
-          channel: notification.channelCodes?.join(', '),
-          createdAt: notification.createdAt,
-          updatedAt: notification.updatedAt,
-        },
-      }
+        const jobPayload: WebhookJobPayload = {
+          notificationId: notification.id,
+          tenantId,
+          webhookId: webhook.id,
+          event: 'notification.status.changed',
+          payload: {
+            notifyId: notification.id,
+            status: notification.status?.code, // Emit the status code rather than the status object
+            statusDisplayName: notification.status?.displayName,
+            channel: notification.channelCodes?.join(', '),
+            createdAt: notification.createdAt,
+            updatedAt: notification.updatedAt,
+          },
+        }
 
-      try {
-        // Job ID includes status to allow one delivery per webhook per status transition
-        const jobId = `webhook_${webhook.id}_${notification.id}_${notificationStatus}`
-        await this.webhookQueue!.add(jobPayload, {
-          jobId,
-          attempts: 3,
-          backoff: { type: 'exponential', delay: 5000 },
-          // Every pod receives each status change and adds this job. Keeping the completed job is
-          // what lets Bull drop a slower pod's add as a duplicate instead of delivering it again.
-          removeOnComplete: COMPLETED_JOB_RETENTION,
-          removeOnFail: FAILED_JOB_RETENTION,
-        })
-        this.logger.log(
-          `[${notification.id}] Queued webhook delivery for webhook=${webhook.id} (status=${notificationStatus})`,
-        )
-      } catch (err) {
-        this.logger.error(
-          `[${notification.id}] Failed to queue webhook delivery for webhook=${webhook.id}: ${(err as Error)?.message}`,
-        )
-      }
-    }
+        try {
+          // Job ID includes status to allow one delivery per webhook per status transition
+          const jobId = `webhook_${webhook.id}_${notification.id}_${notificationStatus}`
+          // Every pod receives each status change and adds this job. Keeping the completed job
+          // (WEBHOOK_JOB_OPTIONS) is what lets BullMQ drop a slower pod's add as a duplicate
+          // instead of delivering it again.
+          await this.webhookQueue!.add(this.webhookQueue!.name, jobPayload, {
+            jobId,
+            ...WEBHOOK_JOB_OPTIONS,
+          })
+          this.logger.log(
+            `[${notification.id}] Queued webhook delivery for webhook=${webhook.id} (status=${notificationStatus})`,
+          )
+        } catch (err) {
+          this.logger.error(
+            `[${notification.id}] Failed to queue webhook delivery for webhook=${webhook.id}: ${(err as Error)?.message}`,
+          )
+        }
+      }),
+    )
   }
 }

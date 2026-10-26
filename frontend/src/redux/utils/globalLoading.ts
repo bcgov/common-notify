@@ -50,14 +50,12 @@ export function trackRequestStart(): void {
 
   // One timer for the whole burst: a second request starting does not restart the countdown, so a
   // page that fires five calls at once still shows the overlay 500ms after the first.
-  if (timer === null) {
-    timer = setTimeout(() => {
-      timer = null
-      if ((getRequestCount?.() ?? 0) > 0) {
-        dispatch?.(showLoading())
-      }
-    }, SHOW_DELAY_MS)
-  }
+  timer ??= setTimeout(() => {
+    timer = null
+    if ((getRequestCount?.() ?? 0) > 0) {
+      dispatch?.(showLoading())
+    }
+  }, SHOW_DELAY_MS)
 }
 
 /** A request has finished, whether it succeeded or failed. */

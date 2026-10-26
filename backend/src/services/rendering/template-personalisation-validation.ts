@@ -4,9 +4,9 @@ import type { Template } from '../../api/templates/entities/template.entity'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
 
-const IDENTIFIER_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/
+const IDENTIFIER_REGEX = /^[a-zA-Z_]\w*$/
 const HANDLEBARS_CONTROL_NAMES = new Set(['if', 'each', 'unless', 'with', 'else'])
-const LEGACY_GC_NOTIFY_PLACEHOLDER_REGEX = /\(\(([a-zA-Z_][a-zA-Z0-9_]*)(?:\?\?[^)]*)?\)\)/g
+const LEGACY_GC_NOTIFY_PLACEHOLDER_REGEX = /\(\(([a-zA-Z_]\w*)(?:\?\?[^)]*)?\)\)/g
 
 type MustacheToken = [string, string, number?, number?, MustacheToken[]?]
 
@@ -198,11 +198,7 @@ function resolveOwnPath(
 
   let current: unknown = personalisation
   for (const segment of path.split('.')) {
-    if (
-      typeof current !== 'object' ||
-      current === null ||
-      !Object.prototype.hasOwnProperty.call(current, segment)
-    ) {
+    if (typeof current !== 'object' || current === null || !Object.hasOwn(current, segment)) {
       return { found: false }
     }
     current = (current as Record<string, unknown>)[segment]

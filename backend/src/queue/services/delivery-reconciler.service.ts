@@ -9,7 +9,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm'
 import { FindOptionsWhere, In, IsNull, Repository } from 'typeorm'
 import { randomUUID } from 'node:crypto'
-import type Bull from 'bull'
+import type { Queue } from 'bullmq'
 import type Redis from 'ioredis'
 import { NotificationRequestDetail } from '../../api/notification/entities/notification-request-detail.entity'
 import { NotificationRequest } from '../../api/notification/entities/notification-request.entity'
@@ -20,7 +20,8 @@ import { NotificationStatus } from '../../enum/notification-status.enum'
 import { ProviderToken } from '../../enum/provider-token.enum'
 import { QueueName } from '../../enum/queue-name.enum'
 import { redisKey } from '../../common/redis/redis-namespace'
-import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../job-retention'
+import { DELIVERY_JOB_OPTIONS, INGESTION_JOB_OPTIONS } from '../job-options'
+import { StructuredLoggerService } from '../../common/logger'
 import {
   delayUntilScheduled,
   ingestionJobFromRequest,
@@ -64,19 +65,14 @@ end
 return 0
 `
 
-/** Bull states in which a job will still run without help. */
-const LIVE_JOB_STATES = new Set(['waiting', 'active', 'delayed', 'paused'])
+/** States in which a job will still run without help. */
+const LIVE_JOB_STATES = new Set(['waiting', 'active', 'delayed', 'prioritized', 'waiting-children'])
 const DELIVERY_CHANNELS = [NotificationChannel.EMAIL, NotificationChannel.SMS]
-
-const JOB_OPTIONS = {
-  attempts: 3,
-  backoff: { type: 'exponential', delay: 2000 },
-} as const
 
 export type ReconcileOutcome = 'in-progress' | 'retried' | 'requeued' | 'gave-up'
 
 /**
- * Work Postgres says is owed, keyed by the Bull job that should be doing it:
+ * Work Postgres says is owed, keyed by the job that should be doing it:
  *   - `pending`: a request stored but never queued (Redis unreachable at acceptance), job
  *     `<notifyId>` on ingestion;
  *   - `ingestion`: a request queued but never fanned out, job `<notifyId>` on ingestion;
@@ -98,7 +94,7 @@ interface StuckWork {
  * Finds work Postgres says is still owed but no job is left to do, and puts it back on a queue -
  * from a request that never reached Redis at all to one batch of a merge that lost its job.
  *
- * The queue's own recovery covers a worker dying mid-job: Bull notices the lapsed lock and
+ * The queue's own recovery covers a worker dying mid-job: BullMQ notices the lapsed lock and
  * retries. It does not cover a job that ends up failed (out of retries, or stalled more often
  * than maxStalledCount) or one that never reached Redis; what it owed would stay pending forever.
  * Postgres is the record of what is owed, so this compares it with what the queue holds:
@@ -126,9 +122,10 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
     private readonly requestRepository: Repository<NotificationRequest>,
     private readonly notificationService: NotificationService,
     @Optional() @Inject(ProviderToken.REDIS_CLIENT) private readonly redis?: Redis | null,
-    @Optional() @Inject(QueueName.EMAIL_DELIVERY) private readonly emailQueue?: Bull.Queue | null,
-    @Optional() @Inject(QueueName.SMS_DELIVERY) private readonly smsQueue?: Bull.Queue | null,
-    @Optional() @Inject(QueueName.INGESTION) private readonly ingestionQueue?: Bull.Queue | null,
+    @Optional() @Inject(QueueName.EMAIL_DELIVERY) private readonly emailQueue?: Queue | null,
+    @Optional() @Inject(QueueName.SMS_DELIVERY) private readonly smsQueue?: Queue | null,
+    @Optional() @Inject(QueueName.INGESTION) private readonly ingestionQueue?: Queue | null,
+    @Optional() private readonly structuredLogger?: StructuredLoggerService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -316,7 +313,7 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
       .andWhere('request.status <> :scheduled', { scheduled: NotificationStatus.SCHEDULED })
   }
 
-  private queueFor(item: StuckWork): Bull.Queue | null | undefined {
+  private queueFor(item: StuckWork): Queue | null | undefined {
     if (item.kind === 'ingestion' || item.kind === 'pending' || item.kind === 'scheduled')
       return this.ingestionQueue
     return item.channel === NotificationChannel.SMS ? this.smsQueue : this.emailQueue
@@ -353,11 +350,9 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
     // Finished or gone while work is still owed: replace it.
     if (job) await job.remove().catch(() => undefined)
     if (item.kind === 'batch') {
-      await queue.add(await this.rebuildBatchJob(item), {
+      await queue.add(queue.name, await this.rebuildBatchJob(item), {
         jobId: item.jobId,
-        ...JOB_OPTIONS,
-        removeOnComplete: true,
-        removeOnFail: FAILED_JOB_RETENTION,
+        ...DELIVERY_JOB_OPTIONS,
       })
     } else {
       await this.reingest(item)
@@ -375,7 +370,7 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
 
   /**
    * Run ingestion for the request again, from the stored request. A finished ingestion job of the
-   * same id is removed first, or Bull would treat the add as a duplicate and do nothing. A
+   * same id is removed first, or BullMQ would treat the add as a duplicate and do nothing. A
    * scheduled send keeps its delay. A request recovered from PENDING then moves on as acceptance
    * would have moved it - to SCHEDULED or QUEUED - so it leaves this finder.
    */
@@ -391,12 +386,10 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
     const delay = delayUntilScheduled(job)
     const previous = await this.ingestionQueue.getJob(item.notifyId)
     if (previous) await previous.remove().catch(() => undefined)
-    await this.ingestionQueue.add(job, {
+    await this.ingestionQueue.add(this.ingestionQueue.name, job, {
       jobId: item.notifyId,
-      ...JOB_OPTIONS,
+      ...INGESTION_JOB_OPTIONS,
       ...(delay > 0 && { delay }),
-      removeOnComplete: COMPLETED_JOB_RETENTION,
-      removeOnFail: FAILED_JOB_RETENTION,
     })
 
     if (item.kind === 'pending') {
@@ -462,5 +455,17 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
       status: sent > 0 ? NotificationStatus.PARTIALLY_COMPLETED : NotificationStatus.FAILED,
       updatedBy: 'delivery-reconciler',
     })
+    // The send failure line the delivery alerts count. Only batch and delivery work carry a
+    // channel; a request that never fanned out is not attributed to one.
+    if (item.channel === NotificationChannel.EMAIL || item.channel === NotificationChannel.SMS) {
+      this.structuredLogger?.logNotificationFailure(
+        item.notifyId,
+        item.tenantId,
+        item.channel === NotificationChannel.EMAIL ? 'email' : 'sms',
+        `Not delivered: the ${item.kind} failed ${attempts} recovery attempt(s)`,
+        undefined,
+        DeliveryReconcilerService.name,
+      )
+    }
   }
 }
