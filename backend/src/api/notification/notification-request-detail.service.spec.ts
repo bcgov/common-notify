@@ -129,6 +129,33 @@ describe('NotificationRequestDetailService', () => {
     })
   })
 
+  describe('findByRequestIdPaginated', () => {
+    it('escapes LIKE wildcards in the recipient search', async () => {
+      const builder = {
+        innerJoin: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        andWhere: vi.fn().mockReturnThis(),
+        addOrderBy: vi.fn().mockReturnThis(),
+        skip: vi.fn().mockReturnThis(),
+        take: vi.fn().mockReturnThis(),
+        getManyAndCount: vi.fn().mockResolvedValue([[], 0]),
+      }
+      detailRepository.createQueryBuilder.mockReturnValue(builder)
+
+      await service.findByRequestIdPaginated(
+        'request-1',
+        'tenant-1',
+        { page: 1, limit: 10, filters: [], sorts: [] },
+        '50%_a\\b',
+      )
+
+      expect(builder.andWhere).toHaveBeenCalledWith(
+        "detail.recipientAddress ILIKE :search ESCAPE '\\'",
+        { search: '%50\\%\\_a\\\\b%' },
+      )
+    })
+  })
+
   describe('createBlocked', () => {
     it('records one row per blocked recipient with the reason', async () => {
       await service.createBlocked(

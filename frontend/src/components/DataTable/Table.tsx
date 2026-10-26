@@ -17,7 +17,7 @@ export function Table({
   className = '',
   children,
   ...props
-}: TableProps) {
+}: Readonly<TableProps>) {
   const tableClass = [
     'data-table',
     `data-table--${variant}`,
