@@ -90,10 +90,10 @@ const ApiKeyRevealModal: FC<ApiKeyRevealModalProps> = ({
             Copy API Key
           </Button>
           {didCopy && (
-            <span className="api-key__copied" role="status">
+            <output className="api-key__copied">
               <SvgCheckCircleIcon />
               API Key copied
-            </span>
+            </output>
           )}
         </div>
 

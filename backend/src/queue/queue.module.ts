@@ -6,21 +6,24 @@ import {
   Inject,
   Logger,
   Optional,
+  Provider,
   forwardRef,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { InjectRepository, TypeOrmModule } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
-import type Bull from 'bull'
+import { TypeOrmModule } from '@nestjs/typeorm'
+import type { Job, Queue, Worker } from 'bullmq'
 import type Redis from 'ioredis'
 import { QueueName } from '../enum/queue-name.enum'
-import { createQueue, createRedisClient } from './redis-connection'
+import { createQueue, createRedisClient, createWorker, type RedisConfig } from './redis-connection'
 import { WorkerHeartbeat } from './worker-heartbeat'
 import { ProviderToken } from '../enum/provider-token.enum'
 import { IngestionWorker } from './workers/ingestion.worker'
 import { EmailDeliveryWorker } from './workers/email-delivery.worker'
 import { SmsDeliveryWorker } from './workers/sms-delivery.worker'
 import { WebhookDeliveryWorker } from './workers/webhook-delivery.worker'
+import { MergeBatchRunner } from './workers/merge-batch-runner'
+import { DeliveryFailureHandler } from './workers/delivery-failure-handler'
+import type { QueueProcessor } from './workers/queue-processor'
 import { DeliveryReconcilerService } from './services/delivery-reconciler.service'
 import { WebhookTriggerService } from './services/webhook-trigger.service'
 import { NotificationRequest } from '../api/notification/entities/notification-request.entity'
@@ -28,27 +31,28 @@ import { NotificationRequestDetail } from '../api/notification/entities/notifica
 import { NotificationService } from '../api/notification/notification.service'
 import { NotificationRequestDetailService } from '../api/notification/notification-request-detail.service'
 import { NotificationPubSubService } from '../api/notification/notification-pubsub.service'
-import { TemplatesRepository } from '../api/templates/templates.repository'
-import { TenantSettingsService } from '../api/tenant-settings/tenant-settings.service'
-import { TemplatesService } from '../api/templates/templates.service'
-import { InlineRenderingService } from '../services/rendering/inline-rendering.service'
-import { EMAIL_ADAPTER, IEmailTransport, SMS_ADAPTER, ISmsTransport } from '../adapters'
 import { TenantsModule } from '../api/admin/tenants/tenants.module'
 import { TemplatesModule } from '../api/templates/templates.module'
 import { TenantSettingsModule } from '../api/tenant-settings/tenant-settings.module'
+import { FeatureFlagModule } from '../api/feature-flag/feature-flag.module'
 import { EventsModule } from '../api/events/events.module'
-import { EventNotificationResolver } from '../api/events/event-notification.resolver'
 import { NotifyModule } from '../api/notify/notify.module'
 import { WebhookModule } from '../api/webhook/webhook.module'
-import { WebhookService } from '../api/webhook/webhook.service'
-import { WebhookDeliveryLogRepository } from '../api/webhook/webhook-delivery-log.repository'
-import { AttachmentResolverService } from '../api/notify/services/attachment-resolver.service'
-import { ClamavService } from '../services/clamav.service'
 import { ClamavModule } from '../services/clamav.module'
 import { AttachmentModule } from '../api/attachment/attachment.module'
-import { AttachmentService } from '../api/attachment/attachment.service'
-import { StructuredLoggerService } from '../common/logger'
 import { PhoneNumberService } from '../api/notify/services/phone-number.service'
+
+/** A queue's provider; null when Redis is not configured (in tests), so nothing connects. */
+function queueProvider(name: QueueName): Provider {
+  return {
+    provide: name,
+    useFactory: (configService: ConfigService, redis: Redis | null) => {
+      const redisConfig = configService.get<RedisConfig>('redis')
+      return redisConfig ? createQueue(name, redisConfig, redis) : null
+    },
+    inject: [ConfigService, ProviderToken.REDIS_CLIENT],
+  }
+}
 
 /**
  * Queue Module
@@ -70,6 +74,7 @@ import { PhoneNumberService } from '../api/notify/services/phone-number.service'
     TenantsModule,
     TemplatesModule,
     TenantSettingsModule,
+    FeatureFlagModule,
     WebhookModule,
     AttachmentModule,
     ClamavModule,
@@ -82,6 +87,12 @@ import { PhoneNumberService } from '../api/notify/services/phone-number.service'
     NotificationRequestDetailService,
     NotificationPubSubService,
     PhoneNumberService,
+    MergeBatchRunner,
+    DeliveryFailureHandler,
+    IngestionWorker,
+    EmailDeliveryWorker,
+    SmsDeliveryWorker,
+    WebhookDeliveryWorker,
     // Provides a direct Redis connection for advanced use cases
     // Inject with: @Inject(ProviderToken.REDIS_CLIENT) redisClient: Redis
     {
@@ -96,71 +107,10 @@ import { PhoneNumberService } from '../api/notify/services/phone-number.service'
       inject: [ConfigService],
     },
 
-    // Each queue is a separate provider with its own Redis connection.
-    // BullMQ automatically handles job persistence, retries, and scheduling.
-    // Bull creates its own Redis connections to avoid conflicts with enableReadyCheck.
-    //
-    // Injection pattern:
-    // @Inject(QueueName.INGESTION) ingestionQueue: Bull.Queue
-    // @Inject(QueueName.EMAIL_DELIVERY) emailQueue: Bull.Queue
-    // @Inject(QueueName.SMS_DELIVERY) smsQueue: Bull.Queue
-    // @Inject(QueueName.WEBHOOK_DELIVERY) webhookQueue: Bull.Queue
-    {
-      provide: QueueName.INGESTION,
-      useFactory: (configService: ConfigService) => {
-        const redisConfig = configService.get('redis')
-
-        // No redis config (e.g. in tests): skip queue initialization
-        if (!redisConfig) {
-          return null
-        }
-
-        return createQueue(QueueName.INGESTION, redisConfig)
-      },
-      inject: [ConfigService],
-    },
-    {
-      provide: QueueName.EMAIL_DELIVERY,
-      useFactory: (configService: ConfigService) => {
-        const redisConfig = configService.get('redis')
-
-        // No redis config (e.g. in tests): skip queue initialization
-        if (!redisConfig) {
-          return null
-        }
-
-        return createQueue(QueueName.EMAIL_DELIVERY, redisConfig)
-      },
-      inject: [ConfigService],
-    },
-    {
-      provide: QueueName.SMS_DELIVERY,
-      useFactory: (configService: ConfigService) => {
-        const redisConfig = configService.get('redis')
-
-        // No redis config (e.g. in tests): skip queue initialization
-        if (!redisConfig) {
-          return null
-        }
-
-        return createQueue(QueueName.SMS_DELIVERY, redisConfig)
-      },
-      inject: [ConfigService],
-    },
-    {
-      provide: QueueName.WEBHOOK_DELIVERY,
-      useFactory: (configService: ConfigService) => {
-        const redisConfig = configService.get('redis')
-
-        // No redis config (e.g. in tests): skip queue initialization
-        if (!redisConfig) {
-          return null
-        }
-
-        return createQueue(QueueName.WEBHOOK_DELIVERY, redisConfig)
-      },
-      inject: [ConfigService],
-    },
+    // One BullMQ Queue - the producer side - per queue, each with its own Redis connection.
+    // Inject with: @Inject(QueueName.EMAIL_DELIVERY) emailQueue: Queue<DeliveryJobPayload>
+    // Workers - the consumer side - are created in onModuleInit.
+    ...Object.values(QueueName).map(queueProvider),
     WebhookTriggerService,
   ],
   exports: [
@@ -174,31 +124,19 @@ import { PhoneNumberService } from '../api/notify/services/phone-number.service'
 export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplicationShutdown {
   private readonly logger = new Logger(QueueModule.name)
   private heartbeat?: WorkerHeartbeat
+  /** This pod's workers, keyed by queue; created in onModuleInit. */
+  private readonly workers = new Map<QueueName, Worker>()
 
   constructor(
-    @Inject(QueueName.INGESTION) private readonly ingestionQueue?: Bull.Queue,
-    @Inject(QueueName.EMAIL_DELIVERY) private readonly emailQueue?: Bull.Queue,
-    @Inject(QueueName.SMS_DELIVERY) private readonly smsQueue?: Bull.Queue,
-    @Inject(QueueName.WEBHOOK_DELIVERY) private readonly webhookQueue?: Bull.Queue,
-    @InjectRepository(NotificationRequest)
-    private readonly notificationRepository?: Repository<NotificationRequest>,
+    @Inject(QueueName.INGESTION) private readonly ingestionQueue?: Queue | null,
+    @Inject(QueueName.EMAIL_DELIVERY) private readonly emailQueue?: Queue | null,
+    @Inject(QueueName.SMS_DELIVERY) private readonly smsQueue?: Queue | null,
+    @Inject(QueueName.WEBHOOK_DELIVERY) private readonly webhookQueue?: Queue | null,
     private readonly configService?: ConfigService,
-    private readonly notificationService?: NotificationService,
-    private readonly templatesRepository?: TemplatesRepository,
-    private readonly templatesService?: TemplatesService,
-    private readonly inlineRenderingService?: InlineRenderingService,
-    private readonly attachmentResolverService?: AttachmentResolverService,
-    private readonly attachmentService?: AttachmentService,
-    @Inject(EMAIL_ADAPTER) private readonly emailAdapter?: IEmailTransport,
-    @Inject(SMS_ADAPTER) private readonly smsAdapter?: ISmsTransport,
-    private readonly notificationRequestDetailService?: NotificationRequestDetailService,
-    private readonly tenantSettingsService?: TenantSettingsService,
-    private readonly clamavService?: ClamavService,
-    private readonly phoneNumberService?: PhoneNumberService,
-    private readonly webhookService?: WebhookService,
-    private readonly webhookDeliveryLogRepository?: WebhookDeliveryLogRepository,
-    @Optional() private readonly structuredLogger?: StructuredLoggerService,
-    @Optional() private readonly eventNotificationResolver?: EventNotificationResolver,
+    private readonly ingestionWorker?: IngestionWorker,
+    private readonly emailDeliveryWorker?: EmailDeliveryWorker,
+    private readonly smsDeliveryWorker?: SmsDeliveryWorker,
+    private readonly webhookDeliveryWorker?: WebhookDeliveryWorker,
     @Optional()
     @Inject(ProviderToken.REDIS_CLIENT)
     private readonly redisClient?: Redis | null,
@@ -212,33 +150,41 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
 
   /**
    * Let in-flight jobs finish before the pod exits. Without this a deploy or an HPA scale-down
-   * kills a merge batch part-way through and Bull re-runs it on another pod once its lock lapses.
+   * kills a merge batch part-way through and BullMQ re-runs it on another pod once its lock
+   * lapses.
    *
-   * Every queue stops taking new work on this pod first; then ingestion drains ahead of the
-   * delivery queues it feeds, and delivery ahead of the webhooks it triggers. Runs before
-   * onApplicationShutdown, where TypeORM closes its connection, so a finishing job can still
-   * record what it sent. The wait is capped below the pod's termination grace period
-   * (QUEUE_SHUTDOWN_DRAIN_MS, set by the chart); a batch still running then is re-run elsewhere,
-   * and the delivery workers skip recipients already sent.
+   * Every worker stops taking new work on this pod first; then ingestion drains ahead of the
+   * delivery queues it feeds, and delivery ahead of the webhooks it triggers. The queues' own
+   * connections close last. Runs before onApplicationShutdown, where TypeORM closes its
+   * connection, so a finishing job can still record what it sent. The wait is capped below the
+   * pod's termination grace period (QUEUE_SHUTDOWN_DRAIN_MS, set by the chart); a batch still
+   * running then is re-run elsewhere, and the delivery workers skip recipients already sent.
    */
   async beforeApplicationShutdown(): Promise<void> {
     const stages = [
-      [this.ingestionQueue],
-      [this.emailQueue, this.smsQueue],
-      [this.webhookQueue],
-    ].map((stage) => stage.filter((queue): queue is Bull.Queue => !!queue))
-    const queues = stages.flat()
-    if (queues.length === 0) return
+      [QueueName.INGESTION],
+      [QueueName.EMAIL_DELIVERY, QueueName.SMS_DELIVERY],
+      [QueueName.WEBHOOK_DELIVERY],
+    ].map((stage) =>
+      stage.map((name) => this.workers.get(name)).filter((worker): worker is Worker => !!worker),
+    )
+    const workers = stages.flat()
+    const queues = [this.ingestionQueue, this.emailQueue, this.smsQueue, this.webhookQueue].filter(
+      (queue): queue is Queue => !!queue,
+    )
+    if (workers.length === 0 && queues.length === 0) return
 
     const drainMs = Number.parseInt(process.env.QUEUE_SHUTDOWN_DRAIN_MS || '100000', 10)
     this.logger.log(`Draining queue workers (up to ${drainMs / 1000}s)`)
 
     const drain = async (): Promise<void> => {
       // Local pause without waiting: stops fetching new jobs on this pod only.
-      await Promise.all(queues.map((queue) => queue.pause(true, true)))
+      await Promise.all(workers.map((worker) => worker.pause(true)))
+      // A stage closes once its active jobs finish.
       for (const stage of stages) {
-        await Promise.all(stage.map((queue) => queue.close()))
+        await Promise.all(stage.map((worker) => worker.close()))
       }
+      await Promise.all(queues.map((queue) => queue.close()))
     }
 
     let timer: NodeJS.Timeout | undefined
@@ -265,103 +211,27 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
   }
 
   onModuleInit(): void {
+    const redisConfig = this.configService?.get<RedisConfig>('redis')
     // Skip queue initialization if queues are not available (e.g., in tests without Redis)
-    if (!this.ingestionQueue || !this.emailQueue || !this.smsQueue) {
+    if (!redisConfig || !this.ingestionQueue || !this.emailQueue || !this.smsQueue) {
       this.logger.debug('Queue configuration not available - skipping worker initialization')
       return
     }
 
-    this.logger.debug('Initializing queue workers...')
-    this.logger.debug(
-      `Dependency check - notificationService available: ${!!this.notificationService}`,
-    )
-
-    // Read concurrency configuration
-    const concurrency = this.configService?.get<number>('queue.ingestionWorkerConcurrency') || 1
-    this.logger.debug(`Ingestion worker concurrency: ${concurrency}`)
-
     // Published per pod so the admin monitoring page can list every pod's workers.
     this.heartbeat = this.redisClient ? new WorkerHeartbeat(this.redisClient) : undefined
 
-    // Initialize workers in background - don't block app startup
-    // Workers will be ready when first job is queued
+    const workers: Array<[Queue | null | undefined, QueueProcessor<never> | undefined]> = [
+      [this.ingestionQueue, this.ingestionWorker],
+      [this.emailQueue, this.emailDeliveryWorker],
+      [this.smsQueue, this.smsDeliveryWorker],
+      [this.webhookQueue, this.webhookDeliveryWorker],
+    ]
     try {
-      this.logger.debug('About to initialize ingestion worker...')
-      // Initialize ingestion worker - orchestrates fan-out to delivery queues
-      IngestionWorker.initialize({
-        ingestionQueue: this.ingestionQueue,
-        emailQueue: this.emailQueue,
-        smsQueue: this.smsQueue,
-        notificationService: this.notificationService,
-        requestDetailService: this.notificationRequestDetailService,
-        configService: this.configService,
-        clamavService: this.clamavService,
-        concurrency,
-        attachmentService: this.attachmentService,
-        phoneNumberService: this.phoneNumberService,
-      })
-      this.heartbeat?.track(this.ingestionQueue, concurrency)
-      this.logger.debug('Ingestion worker initialization started')
-
-      this.logger.debug('About to initialize email delivery worker...')
-      // Initialize email delivery worker - handles email sending
-      // IMPORTANT: Do NOT await these - initialize() does not await process()
-      // and returns immediately after setting up listeners
-      const emailConcurrency =
-        this.configService?.get<number>('queue.emailDeliveryWorkerConcurrency') || 2
-      EmailDeliveryWorker.initialize({
-        emailQueue: this.emailQueue,
-        notificationService: this.notificationService,
-        templatesRepository: this.templatesRepository,
-        templatesService: this.templatesService,
-        inlineRenderingService: this.inlineRenderingService,
-        attachmentResolverService: this.attachmentResolverService,
-        emailAdapter: this.emailAdapter,
-        requestDetailService: this.notificationRequestDetailService,
-        concurrency: emailConcurrency,
-        structuredLogger: this.structuredLogger,
-        tenantSettingsService: this.tenantSettingsService,
-        eventNotificationResolver: this.eventNotificationResolver,
-      })
-      this.heartbeat?.track(this.emailQueue, emailConcurrency)
-      this.logger.log('Email delivery worker initialization started')
-
-      this.logger.log('About to initialize SMS delivery worker...')
-      // Initialize SMS delivery worker - handles SMS sending
-      // IMPORTANT: Do NOT await these - initialize() does not await process()
-      // and returns immediately after setting up listeners
-      const smsConcurrency =
-        this.configService?.get<number>('queue.smsDeliveryWorkerConcurrency') || 2
-      SmsDeliveryWorker.initialize({
-        smsQueue: this.smsQueue,
-        notificationService: this.notificationService,
-        templatesRepository: this.templatesRepository,
-        templatesService: this.templatesService,
-        inlineRenderingService: this.inlineRenderingService,
-        smsAdapter: this.smsAdapter,
-        requestDetailService: this.notificationRequestDetailService,
-        concurrency: smsConcurrency,
-        structuredLogger: this.structuredLogger,
-      })
-      this.heartbeat?.track(this.smsQueue, smsConcurrency)
-      this.logger.log('SMS delivery worker initialization started')
-
-      // Initialize webhook delivery worker — handles HTTP POST callbacks
-      if (this.webhookQueue && this.webhookService && this.webhookDeliveryLogRepository) {
-        const webhookConcurrency =
-          this.configService?.get<number>('queue.webhookDeliveryWorkerConcurrency') || 2
-        WebhookDeliveryWorker.initialize(
-          this.webhookQueue,
-          this.webhookService,
-          this.webhookDeliveryLogRepository,
-          webhookConcurrency,
-        )
-        this.heartbeat?.track(this.webhookQueue, webhookConcurrency)
-        this.logger.log('Webhook delivery worker initialization started')
+      for (const [queue, worker] of workers) {
+        if (queue && worker) this.startWorker(worker, redisConfig)
       }
-
       this.heartbeat?.start()
-
       this.logger.log('Queue workers initialized successfully')
     } catch (error) {
       this.logger.error(
@@ -369,5 +239,40 @@ export class QueueModule implements OnModuleInit, OnModuleDestroy, BeforeApplica
       )
       this.logger.debug(error)
     }
+  }
+
+  /** Run a worker against its queue at its configured concurrency. */
+  private startWorker<T>(processor: QueueProcessor<T>, redisConfig: RedisConfig): void {
+    const concurrency =
+      this.configService?.get<number>(`queue.${processor.concurrency.configKey}`) ||
+      processor.concurrency.default
+    this.logger.log(`Registering ${processor.queueName} worker (concurrency=${concurrency})`)
+
+    const worker = createWorker<T>(
+      processor.queueName,
+      (job) => processor.process(job),
+      redisConfig,
+      concurrency,
+    )
+    const { onCompleted, onFailed } = processor
+    if (onCompleted) {
+      worker.on('completed', (job: Job<T>) => onCompleted.call(processor, job))
+    }
+    if (onFailed) {
+      // BullMQ types the job as optional here; a job that stalls out never reaches this event.
+      worker.on('failed', (job: Job<T> | undefined, error: Error) => {
+        if (!job) return
+        // An event listener's rejection reaches nothing but Node's unhandled-rejection handler.
+        Promise.resolve()
+          .then(() => onFailed.call(processor, job, error))
+          .catch((handlerError: Error) => {
+            this.logger.error(
+              `[${processor.queueName}] Failed-job handler threw for job ${job.id}: ${handlerError.message}`,
+            )
+          })
+      })
+    }
+    this.heartbeat?.track(worker as Worker, concurrency)
+    this.workers.set(processor.queueName, worker as Worker)
   }
 }

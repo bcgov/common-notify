@@ -12,6 +12,7 @@ import SearchField from '@/components/SearchField'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
 import GenericModal from '@/components/GenericModal'
+import NoDataCard from '@/components/NoDataCard'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import '@/scss/components/templates.scss'
@@ -103,12 +104,15 @@ const Templates: FC = () => {
     filters,
     isLoading,
     hasLoaded,
+    hasNoData,
   } = useAppSelector((state) => state.templates)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const { canEdit } = useCstarRoles()
   const [searchInput, setSearchInput] = useState(search)
   const [dialog, setDialog] = useState<DeleteDialog | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  // A search or filter that matches nothing still shows the table and its empty message.
+  const hasNoTemplates = hasNoData && !search && Object.keys(filters).length === 0
 
   const columns: TableColumn<TemplateResponse>[] = [
     ...baseColumns,
@@ -155,6 +159,11 @@ const Templates: FC = () => {
     dispatch(setFilter({ field: key, values }))
   }
 
+  function clearSearch() {
+    setSearchInput('')
+    dispatch(setSearch(''))
+  }
+
   async function handleDeleteClick(row: TemplateResponse) {
     try {
       const { events } = await getTemplateUsage(row.id)
@@ -192,39 +201,53 @@ const Templates: FC = () => {
     <div className="page">
       <PageHeading title="Notification Templates" />
 
-      <div className="page__toolbar">
-        <SearchField
-          value={searchInput}
-          onChange={setSearchInput}
-          onSearch={handleSearch}
-          placeholder="Search Notification Templates..."
-          ariaLabel="Search templates"
-        >
-          <Button onPress={() => navigate({ to: '/template-create' })} isDisabled={!canEdit}>
-            Create New Template
-          </Button>
-        </SearchField>
-      </div>
+      {hasNoTemplates ? (
+        <NoDataCard
+          title="No templates yet."
+          message="Notification templates will appear here once they have been created. To get started, create a notification template."
+          actionLabel="Create notification template"
+          actionTo="/template-create"
+          isActionDisabled={!canEdit}
+        />
+      ) : (
+        <>
+          <div className="page__toolbar">
+            <SearchField
+              value={searchInput}
+              onChange={setSearchInput}
+              onSearch={handleSearch}
+              placeholder="Search Notification Templates..."
+              ariaLabel="Search templates"
+            >
+              <Button onPress={() => navigate({ to: '/template-create' })} isDisabled={!canEdit}>
+                Create New Template
+              </Button>
+            </SearchField>
+          </div>
 
-      <DataTable
-        columns={columns}
-        data={templates}
-        keyExtractor={(row) => row.id}
-        emptyMessage="No templates found"
-        currentPage={page}
-        pageSize={limit}
-        totalCount={count}
-        isLoading={isLoading && !hasLoaded}
-        sortBy={sortBy ?? undefined}
-        sortOrder={sortOrder}
-        onSort={handleSort}
-        activeFilters={filters}
-        onFilter={handleFilter}
-        onPageChange={(nextPage) => dispatch(setPage(nextPage))}
-        onPageSizeChange={handleLimitChange}
-        pageSizeOptions={[15, 30]}
-        label="Notification Templates"
-      />
+          <DataTable
+            columns={columns}
+            data={templates}
+            keyExtractor={(row) => row.id}
+            emptyMessage="No templates found"
+            search={search}
+            onClearSearch={clearSearch}
+            currentPage={page}
+            pageSize={limit}
+            totalCount={count}
+            isLoading={isLoading && (!hasLoaded || templates.length === 0)}
+            sortBy={sortBy ?? undefined}
+            sortOrder={sortOrder}
+            onSort={handleSort}
+            activeFilters={filters}
+            onFilter={handleFilter}
+            onPageChange={(nextPage) => dispatch(setPage(nextPage))}
+            onPageSizeChange={handleLimitChange}
+            pageSizeOptions={[15, 30]}
+            label="Notification Templates"
+          />
+        </>
+      )}
 
       {dialog?.kind === 'confirm' && (
         <GenericModal

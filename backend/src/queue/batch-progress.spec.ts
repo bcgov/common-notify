@@ -1,35 +1,35 @@
 import { describe, it, expect, vi } from 'vitest'
-import type Bull from 'bull'
+import type { Job } from 'bullmq'
 import { batchProgressReporter, readBatchProgress } from './batch-progress'
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 describe('batchProgressReporter', () => {
   it('writes the progress to the job', async () => {
-    const job = { id: '1', progress: vi.fn().mockResolvedValue(undefined) }
-    batchProgressReporter(job as unknown as Bull.Job)({ sent: 3, failed: 1, total: 10 })
+    const job = { id: '1', updateProgress: vi.fn().mockResolvedValue(undefined) }
+    batchProgressReporter(job as unknown as Job)({ sent: 3, failed: 1, total: 10 })
     await flush()
-    expect(job.progress).toHaveBeenCalledWith({ sent: 3, failed: 1, total: 10 })
+    expect(job.updateProgress).toHaveBeenCalledWith({ sent: 3, failed: 1, total: 10 })
   })
 
   it('never throws into the send loop, even when the write fails synchronously', async () => {
     const job = {
       id: '1',
-      progress: vi.fn(() => {
+      updateProgress: vi.fn(() => {
         throw new Error('not a function in this test double')
       }),
     }
     expect(() =>
-      batchProgressReporter(job as unknown as Bull.Job)({ sent: 0, failed: 0, total: 1 }),
+      batchProgressReporter(job as unknown as Job)({ sent: 0, failed: 0, total: 1 }),
     ).not.toThrow()
     await flush()
   })
 
   it('swallows a rejected write', async () => {
-    const job = { id: '1', progress: vi.fn().mockRejectedValue(new Error('redis down')) }
-    batchProgressReporter(job as unknown as Bull.Job)({ sent: 0, failed: 0, total: 1 })
+    const job = { id: '1', updateProgress: vi.fn().mockRejectedValue(new Error('redis down')) }
+    batchProgressReporter(job as unknown as Job)({ sent: 0, failed: 0, total: 1 })
     await flush()
-    expect(job.progress).toHaveBeenCalled()
+    expect(job.updateProgress).toHaveBeenCalled()
   })
 })
 
@@ -42,7 +42,7 @@ describe('readBatchProgress', () => {
     })
   })
 
-  it('returns null for Bull default progress and malformed values', () => {
+  it('returns null for a default job progress and malformed values', () => {
     expect(readBatchProgress(0)).toBeNull()
     expect(readBatchProgress({ sent: '1', failed: 0, total: 5 })).toBeNull()
     expect(readBatchProgress(null)).toBeNull()

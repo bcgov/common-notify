@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { EventEmitter } from 'events'
-import type Bull from 'bull'
+import type { Job, Worker } from 'bullmq'
 import type Redis from 'ioredis'
 import {
   HEARTBEAT_TTL_SECONDS,
@@ -25,17 +25,17 @@ function fakeRedis() {
   return { redis: { multi: vi.fn(() => multi) } as unknown as Redis, multi }
 }
 
-const job = (id: string | number) => ({ id }) as unknown as Bull.Job
+const job = (id: string | number) => ({ id }) as unknown as Job
 
-function fakeQueue(name: string) {
-  return Object.assign(new EventEmitter(), { name }) as unknown as Bull.Queue
+function fakeWorker(name: string) {
+  return Object.assign(new EventEmitter(), { name }) as unknown as Worker
 }
 
 describe('WorkerHeartbeat', () => {
   it('publishes per-queue activity with an expiring key and indexes the pod', async () => {
     const { redis, multi } = fakeRedis()
     const heartbeat = new WorkerHeartbeat(redis)
-    const queue = fakeQueue('email-delivery')
+    const queue = fakeWorker('email-delivery')
     heartbeat.track(queue, 2)
 
     queue.emit('active', job(1))
@@ -66,7 +66,7 @@ describe('WorkerHeartbeat', () => {
   it('ignores a job this pod never ran finishing', async () => {
     const { redis, multi } = fakeRedis()
     const heartbeat = new WorkerHeartbeat(redis)
-    const queue = fakeQueue('sms-delivery')
+    const queue = fakeWorker('sms-delivery')
     heartbeat.track(queue, 1)
 
     queue.emit('completed', job(9))
@@ -76,12 +76,10 @@ describe('WorkerHeartbeat', () => {
     expect(payload.queues[0]).toMatchObject({ active: 0, completed: 0 })
   })
 
-  it("keeps a running job busy when the stalled-job check fails another pod's job", async () => {
-    // Bull's stalled-job check runs on every worker and emits a local `failed` for a job it
-    // gives up on, even one a dead pod was running. That must not end this pod's own job.
+  it('ignores a finish for a job this worker never started', async () => {
     const { redis, multi } = fakeRedis()
     const heartbeat = new WorkerHeartbeat(redis)
-    const queue = fakeQueue('email-delivery')
+    const queue = fakeWorker('email-delivery')
     heartbeat.track(queue, 2)
 
     queue.emit('active', job('mine'))
@@ -101,7 +99,7 @@ describe('WorkerHeartbeat', () => {
   it('reports draining while the pod shuts down, then removes itself', async () => {
     const { redis, multi } = fakeRedis()
     const heartbeat = new WorkerHeartbeat(redis)
-    heartbeat.track(fakeQueue('email-delivery'), 2)
+    heartbeat.track(fakeWorker('email-delivery'), 2)
 
     await heartbeat.beat()
     expect(JSON.parse(multi.set.mock.calls[0][1]).draining).toBe(false)

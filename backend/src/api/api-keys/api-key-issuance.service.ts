@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { randomBytes } from 'crypto'
+import { randomBytes } from 'node:crypto'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { ApiKeyConsumer, ApiKeyIssuedVia } from './entities/api-key-consumer.entity'
@@ -282,7 +282,7 @@ export class ApiKeyIssuanceService {
 
     // Same 404 whether the key does not exist or belongs to another tenant: a tenant
     // should not be able to probe for other tenants' clientIds.
-    if (!binding || binding.tenantId !== tenantId) {
+    if (binding?.tenantId !== tenantId) {
       throw new NotFoundException(`No API key "${clientId}" exists for this tenant`)
     }
 
