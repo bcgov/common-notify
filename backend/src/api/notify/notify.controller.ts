@@ -18,7 +18,7 @@ import {
   Request,
   Req,
 } from '@nestjs/common'
-import Bull from 'bull'
+import type { Queue } from 'bullmq'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { SmsChannelFeatureFlagGuard } from '../../common/guards/sms-channel-feature-flag.guard'
 import { HtmlBodyTypeFeatureFlagGuard } from '../../common/guards/html-body-type-feature-flag.guard'
@@ -43,6 +43,7 @@ import {
 } from './schemas/cancel-or-reschedule.dto'
 import { Queueable } from '../../common/decorators/queueable.decorator'
 import { QueueName } from '../../enum/queue-name.enum'
+import { INGESTION_JOB_OPTIONS } from '../../queue/job-options'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { NotificationService } from '../notification/notification.service'
@@ -90,7 +91,7 @@ import {
 @Controller('notifysimple')
 @UseGuards(NotifyServiceGuard, HtmlBodyTypeFeatureFlagGuard)
 export class NotifySimpleController {
-  private readonly queueMap: Map<QueueName, Bull.Queue>
+  private readonly queueMap: Map<QueueName, Queue>
 
   constructor(
     private readonly notifyService: NotifyService,
@@ -103,7 +104,7 @@ export class NotifySimpleController {
     readonly safelistService: SafelistService,
     readonly smsSegmentService: SmsSegmentService,
     readonly notificationDedupService: NotificationDedupService,
-    @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
+    @Inject(QueueName.INGESTION) private readonly ingestionQueue: Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
   }
@@ -518,6 +519,17 @@ export class NotifySimpleController {
     )
   }
 
+  /**
+   * The request's ingestion job while it has not started - waiting, or delayed until its send
+   * time - and only if it belongs to this tenant. Null once it is running or done.
+   */
+  private async pendingIngestionJob(notificationId: string, tenantId: string) {
+    const job = await this.ingestionQueue.getJob(notificationId)
+    if (!job || job.data?.tenantId !== tenantId) return null
+    const state = await job.getState()
+    return state === 'delayed' || state === 'waiting' ? job : null
+  }
+
   private async doCancelOrReschedule(
     tenantId: string,
     updatedBy: string,
@@ -554,8 +566,8 @@ export class NotifySimpleController {
       // If cancelling, attempt to remove from queue (non-fatal if it fails)
       if (action === 'cancel') {
         try {
-          const jobs = await this.ingestionQueue.getJobs(['delayed', 'waiting'])
-          const jobToRemove = jobs.find((job) => job.data?.notificationId === notificationId)
+          // The ingestion job is keyed by the notifyId.
+          const jobToRemove = await this.pendingIngestionJob(notificationId, tenantId)
 
           if (jobToRemove) {
             await jobToRemove.remove()
@@ -573,19 +585,23 @@ export class NotifySimpleController {
       } else if (scheduledTime) {
         // If rescheduling, attempt to update the job delay (non-fatal if it fails)
         try {
-          const newDelay = new Date(scheduledTime).getTime() - Date.now()
-
-          const jobs = await this.ingestionQueue.getJobs(['delayed', 'waiting'])
-          const jobToUpdate = jobs.find((job) => job.data?.notificationId === notificationId)
+          const sendAt = new Date(scheduledTime)
+          const newDelay = sendAt.getTime() - Date.now()
+          const jobToUpdate = await this.pendingIngestionJob(notificationId, tenantId)
 
           if (jobToUpdate) {
             await jobToUpdate.remove()
-            await this.ingestionQueue.add(jobToUpdate.data, {
-              delay: Math.max(0, newDelay),
-              jobId: `${tenantId}-${notificationId}`,
-              attempts: jobToUpdate.opts.attempts,
-              backoff: jobToUpdate.opts.backoff,
-            })
+            // Same id, so dedup and the reconciler still find it. scheduledFor moves too: ingestion
+            // delays the delivery jobs until it, so a send moved earlier would otherwise wait.
+            await this.ingestionQueue.add(
+              this.ingestionQueue.name,
+              { ...jobToUpdate.data, scheduledFor: sendAt.toISOString() },
+              {
+                jobId: notificationId,
+                ...INGESTION_JOB_OPTIONS,
+                delay: Math.max(0, newDelay),
+              },
+            )
             logger.log(`Updated queue job delay for rescheduled notification: ${notificationId}`, {
               tenantId,
               newDelay,
@@ -631,7 +647,7 @@ export class NotifySimpleController {
 @Controller('frontend/notifysimple')
 @UseGuards(NotifyFrontendRoleGuard, HtmlBodyTypeFeatureFlagGuard)
 export class NotifySimpleFrontendController {
-  private readonly queueMap: Map<QueueName, Bull.Queue>
+  private readonly queueMap: Map<QueueName, Queue>
 
   constructor(
     private readonly notifyService: NotifyService,
@@ -645,7 +661,7 @@ export class NotifySimpleFrontendController {
     readonly smsSegmentService: SmsSegmentService,
     readonly eventNotificationResolver: EventNotificationResolver,
     readonly notificationDedupService: NotificationDedupService,
-    @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
+    @Inject(QueueName.INGESTION) private readonly ingestionQueue: Queue,
   ) {
     this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
   }

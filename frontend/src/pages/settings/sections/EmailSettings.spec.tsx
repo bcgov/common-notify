@@ -151,10 +151,10 @@ describe('EmailSettings section', () => {
     expect(screen.getByPlaceholderText('Enter a reply to email address')).toBeInTheDocument()
   })
 
-  it('fetches the usage limits and renders them', () => {
+  it('renders the usage limits from the store without re-fetching them', () => {
     renderWithRoles()
 
-    expect(fetchApiKeyUsage).toHaveBeenCalledTimes(1)
+    expect(fetchApiKeyUsage).not.toHaveBeenCalled()
     expect(fetchApprovedEmailLogos).toHaveBeenCalledTimes(1)
     expect(screen.getByText('500 emails/day')).toBeInTheDocument()
     expect(screen.getByText('1,000,500 emails/year')).toBeInTheDocument()

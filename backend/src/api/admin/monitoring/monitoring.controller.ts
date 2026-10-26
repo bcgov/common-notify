@@ -11,7 +11,7 @@ import type { QueueMonitoringResponseDto } from './schemas/queue-monitoring.dto'
 const KEEPALIVE_MS = 25_000
 
 /**
- * Admin monitoring of the Bull queues, their workers and Redis.
+ * Admin monitoring of the queues, their workers and Redis.
  *
  * Route: /api/v1/frontend/admin/monitoring
  * Guarded by NotifyAdminGuard + NOTIFY_ADMIN (SSO role); not tenant-scoped.
