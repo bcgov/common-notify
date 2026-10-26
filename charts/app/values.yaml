@@ -135,8 +135,23 @@ backend:
     port: 3310
     #-- connection timeout in milliseconds
     timeout: 30000
-    #-- fail closed when ClamAV is disabled or unavailable
+    #-- fail closed when ClamAV is disabled or unavailable. false here covers
+    #-- DEV and PR environments, which share one single-replica instance:
+    #-- fail-closed there would block PR sends whenever it restarts. TEST and
+    #-- PROD set it true, where ClamAV runs two replicas behind a PDB.
     failClosed: false
+    #-- single replica for DEV/PR. TEST and PROD run 2.
+    replicas: 1
+    #-- Recreate is fine with one replica and avoids needing double the 768Mi
+    #-- during a rollout. TEST and PROD use RollingUpdate so a deploy never
+    #-- leaves zero scanners, which failClosed depends on.
+    deploymentStrategy: Recreate
+    pdb:
+      #-- off with a single replica: minAvailable 1 would permit zero voluntary
+      #-- disruptions and block node drains indefinitely
+      enabled: false
+      #-- must stay strictly BELOW the replica count, or drains never complete
+      minAvailable: 1
   #-- File attachments storage configuration
   attachments:
     #-- directory where attachments will be stored
