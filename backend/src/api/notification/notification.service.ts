@@ -327,9 +327,8 @@ export class NotificationService {
       return 'Request must provide either a templateId or inline content (subject/body), not both'
     }
     if (!templateId) {
-      return hasInlineContent
-        ? null
-        : `Request must provide either a templateId or inline content (${isSms ? 'body' : 'subject/body'})`
+      if (hasInlineContent) return null
+      return `Request must provide either a templateId or inline content (${isSms ? 'body' : 'subject/body'})`
     }
 
     const template = await this.templatesRepository.findById(tenantId, templateId)
