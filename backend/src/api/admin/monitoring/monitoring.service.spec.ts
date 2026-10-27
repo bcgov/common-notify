@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { ServiceUnavailableException } from '@nestjs/common'
-import type Bull from 'bull'
+import type { Job, Queue } from 'bullmq'
 import type Redis from 'ioredis'
 import type { Repository } from 'typeorm'
 import {
@@ -88,7 +88,7 @@ describe('buildRedisStats', () => {
     expect(buildRedisStats(healthyInfo({ used_memory: 660 * MB })).status).toBe('critical')
   })
 
-  it('is critical when Redis could evict Bull keys', () => {
+  it('is critical when Redis could evict queue keys', () => {
     const stats = buildRedisStats(healthyInfo({ maxmemory_policy: 'allkeys-lru', evicted_keys: 3 }))
     expect(stats.status).toBe('critical')
     expect(stats.reasons).toHaveLength(2)
@@ -235,7 +235,7 @@ describe('countUnheldActiveJobs', () => {
       },
     ],
   })
-  const job = (ageMs: number) => ({ processedOn: now - ageMs }) as unknown as Bull.Job
+  const job = (ageMs: number) => ({ processedOn: now - ageMs }) as unknown as Job
 
   it('is zero when live workers report holding every active job', () => {
     expect(countUnheldActiveJobs('email-delivery', [job(60_000)], [pod(1)], now)).toBe(0)
@@ -367,15 +367,11 @@ describe('MonitoringService', () => {
         data: [],
         count: 0,
       }),
-      getJob: vi.fn().mockResolvedValue({ timestamp: now - 30_000, opts: {} }),
+      getJobs: vi.fn().mockResolvedValue([{ timestamp: now - 30_000, opts: {} }]),
       getFailed: vi.fn().mockResolvedValue([]),
       getActive: vi.fn().mockResolvedValue([]),
-      client: {
-        lindex: vi.fn().mockResolvedValue('job-1'),
-        mget: vi.fn((...keys: string[]) => Promise.resolve(keys.map(() => null))),
-      },
       ...overrides,
-    } as unknown as Bull.Queue
+    } as unknown as Queue
   }
 
   /** Reconcile activity as the pipeline returns it: last pass, recent actions, then minute counts. */
@@ -414,7 +410,14 @@ describe('MonitoringService', () => {
         ),
       zremrangebyscore: vi.fn().mockResolvedValue(0),
       zrange: vi.fn().mockResolvedValue(workers.map((_, i) => `pod-${i}`)),
-      mget: vi.fn().mockResolvedValue(workers.map((worker) => JSON.stringify(worker))),
+      // Worker heartbeats; the per-minute added counters are read through the same call.
+      mget: vi.fn((...keys: string[]) =>
+        Promise.resolve(
+          keys[0]?.includes(':metrics:added:')
+            ? keys.map(() => null)
+            : workers.map((worker) => JSON.stringify(worker)),
+        ),
+      ),
     } as unknown as Redis
   }
 
@@ -682,9 +685,9 @@ describe('MonitoringService', () => {
       id: 'req-1-EMAIL-0',
       processedOn: now - 20_000,
       data: { notifyId: 'req-1', tenantId: 't-1', mailMergeData: { recipients: ['secret'] } },
-      progress: () => ({ sent: 37, failed: 2, total: 100 }),
+      progress: { sent: 37, failed: 2, total: 100 },
     }
-    const single = { id: '9', processedOn: now, data: {}, progress: () => 0 }
+    const single = { id: '9', processedOn: now, data: {}, progress: 0 }
     const queue = fakeQueue('email-delivery', {
       getActive: vi.fn().mockResolvedValue([batch, single]),
     })

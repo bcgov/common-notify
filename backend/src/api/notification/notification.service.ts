@@ -855,7 +855,7 @@ function setMergeParam(params: Record<string, unknown>, key: string, value: stri
     target = target[segment] as Record<string, unknown>
   }
 
-  const leaf = segments[segments.length - 1]
+  const leaf = segments.at(-1)!
   if (!(leaf in target)) {
     target[leaf] = value
   }

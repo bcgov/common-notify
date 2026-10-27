@@ -85,7 +85,7 @@ export interface RecentFailureDto {
   notificationId: string | null
   tenantId: string | null
   tenantName: string | null
-  /** Bull's failure reason with email addresses and phone numbers masked. */
+  /** The job's failure reason with email addresses and phone numbers masked. */
   reason: string
   attemptsMade: number
   failedAt: string | null

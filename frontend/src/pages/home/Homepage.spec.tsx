@@ -7,6 +7,7 @@ import Dashboard from '@/pages/dashboard/Dashboard'
 import codeTablesReducer from '@/redux/slices/codeTables.slice'
 import notificationReducer from '@/redux/slices/notification.slice'
 import tenantReducer from '@/redux/slices/tenant.slice'
+import userReducer from '@/redux/slices/user.slice'
 import type { CodeTablesState } from '@/interfaces/CodeTables'
 import type { PaginatedNotificationResponse } from '@/interfaces/PaginatedNotificationResponse'
 
@@ -83,6 +84,7 @@ describe('Dashboard with CodeTables', () => {
         codeTables: codeTablesReducer,
         notification: notificationReducer,
         tenant: tenantReducer,
+        user: userReducer,
       },
       preloadedState: initialState,
     } as any)
