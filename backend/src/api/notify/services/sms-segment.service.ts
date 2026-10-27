@@ -3,6 +3,7 @@ import { TemplatesRepository } from '../../templates/templates.repository'
 import { TemplatesService } from '../../templates/templates.service'
 import { InlineRenderingService } from '../../../services/rendering/inline-rendering.service'
 import { countSmsSegments } from '../../../common/utils/sms-segments'
+import { describeError } from '../../../common/utils/describe-error'
 import type { NotifySimpleRequest } from '../schemas/notify-simple-request'
 import type { ProcessedNotifySimpleRequest } from '../schemas/stored-notify-attachment'
 
@@ -38,43 +39,76 @@ export class SmsSegmentService {
   ): Promise<number> {
     if (!request?.sms) return 0
 
-    const body = await this.resolveBody(tenantId, request)
-    return countSmsSegments(body)
+    const render = await this.bodyRenderer(tenantId, request)
+    return countSmsSegments(await render({}))
   }
 
   /**
-   * Resolve the SMS body that will be sent, mirroring SmsDeliveryWorker: a stored template
-   * rendered with the request's personalisation, an inline renderer, or a literal body.
+   * Total segments for an SMS merge: each row renders its own body, so this is the sum of every
+   * row's segments rather than rows x segments. `rowParams` are each row's own params, which win
+   * over the request's. Fails open per row, the same way as `countSegmentsPerRecipient`.
    */
-  private async resolveBody(
+  async countMergeSegments(
+    tenantId: string,
+    request: NotifySimpleRequest,
+    rowParams: Array<Record<string, unknown>>,
+  ): Promise<number> {
+    if (!request?.sms) return 0
+
+    // The template is looked up once for the whole merge; rendering is CPU-only, so the rows can
+    // run together without touching the connection pool.
+    const render = await this.bodyRenderer(tenantId, request)
+    const bodies = await Promise.all(rowParams.map((params) => render(params)))
+    return bodies.reduce((total, body) => total + countSmsSegments(body), 0)
+  }
+
+  /**
+   * Resolve how the SMS body will be produced, mirroring SmsDeliveryWorker: a stored template
+   * rendered with the request's personalisation, an inline renderer, or a literal body. The
+   * returned function renders one body; its argument overrides the request's params.
+   */
+  private async bodyRenderer(
     tenantId: string,
     request: NotifySimpleRequest | ProcessedNotifySimpleRequest,
-  ): Promise<string | undefined> {
+  ): Promise<(rowParams: Record<string, unknown>) => Promise<string | undefined>> {
     const sms = request.sms!
     const content = sms.content
     // Channel-level params override request-level params, as in the delivery worker.
-    const params = { ...request.params, ...sms.params }
-
-    try {
-      if (content?.templateId) {
-        const template = await this.templatesRepository.findById(tenantId, content.templateId)
-        if (!template || template.channelCode !== 'SMS') return content.body
-        const rendered = await this.templatesService.renderTemplateContent(template, params)
-        return rendered.body
-      }
-
-      if (content?.renderer) {
-        const rendered = await this.inlineRenderingService.renderSms(content, params)
-        return rendered.body
-      }
-
-      return content?.body
-    } catch (error) {
+    const baseParams = { ...request.params, ...sms.params }
+    const failOpen = (error: unknown) => {
       this.logger.warn(
         `Failed to resolve SMS body for segment counting (tenant=${tenantId}); ` +
-          `counting as a single segment: ${error instanceof Error ? error.message : String(error)}`,
+          `counting as a single segment: ${describeError(error)}`,
       )
       return undefined
     }
+    const guarded =
+      (render: (params: Record<string, unknown>) => Promise<string | undefined>) =>
+      (rowParams: Record<string, unknown>) =>
+        render({ ...baseParams, ...rowParams }).catch(failOpen)
+    // The same body for every row, with nothing to render.
+    const fixed = (body: string | undefined) => () => Promise.resolve(body)
+
+    if (content?.templateId) {
+      let template
+      try {
+        template = await this.templatesRepository.findById(tenantId, content.templateId)
+      } catch (error) {
+        return fixed(failOpen(error))
+      }
+      if (template?.channelCode !== 'SMS') return fixed(content.body)
+      return guarded(
+        async (params) =>
+          (await this.templatesService.renderTemplateContent(template, params)).body,
+      )
+    }
+
+    if (content?.renderer) {
+      return guarded(
+        async (params) => (await this.inlineRenderingService.renderSms(content, params)).body,
+      )
+    }
+
+    return fixed(content?.body)
   }
 }

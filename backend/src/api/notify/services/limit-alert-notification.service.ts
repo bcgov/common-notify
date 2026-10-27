@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
-import Bull from 'bull'
+import type { Queue } from 'bullmq'
 import {
   ClaimedLimitAlert,
   LimitAlertService,
@@ -11,7 +11,7 @@ import { QueueName } from '../../../enum/queue-name.enum'
 import { IngestionJobPayload } from '../../../queue/queue.types'
 import { NotifySimpleRequest } from '../schemas/notify-simple-request'
 import { TenantsService } from '../../admin/tenants/tenants.service'
-import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../../../queue/job-retention'
+import { INGESTION_JOB_OPTIONS } from '../../../queue/job-options'
 
 export type ProcessLimitAlertNotificationsInput = ProcessLimitAlertUsageInput
 
@@ -65,7 +65,7 @@ export class LimitAlertNotificationService {
     private readonly notificationService: NotificationService,
     private readonly tenantsService: TenantsService,
     @Inject(QueueName.INGESTION)
-    private readonly ingestionQueue: Bull.Queue<IngestionJobPayload>,
+    private readonly ingestionQueue: Queue<IngestionJobPayload>,
   ) {}
 
   async processAcceptedUsage(input: ProcessLimitAlertNotificationsInput): Promise<void> {
@@ -127,12 +127,9 @@ export class LimitAlertNotificationService {
       requestedAt: new Date().toISOString(),
     }
 
-    await this.ingestionQueue.add(jobPayload, {
+    await this.ingestionQueue.add(this.ingestionQueue.name, jobPayload, {
       jobId: notificationRecord.id,
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 },
-      removeOnComplete: COMPLETED_JOB_RETENTION,
-      removeOnFail: FAILED_JOB_RETENTION,
+      ...INGESTION_JOB_OPTIONS,
     })
 
     await this.notificationService.update(notificationRecord.id, claim.tenantId, {

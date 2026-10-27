@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { BadRequestException } from '@nestjs/common'
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest'
 import { GcNotifyInternalExecutionService } from './gc-notify-internal-execution.service'
 import { TemplatesRepository } from '../templates/templates.repository'
 import { TemplatesService } from '../templates/templates.service'
@@ -15,20 +15,8 @@ import { GcNotifyBulkValidationService } from './gc-notify-bulk-validation.servi
 import { ApiKeyUsageService } from '../api-keys/api-key-usage.service'
 import { SmsSegmentService } from '../notify/services/sms-segment.service'
 import { NotificationDedupService } from '../notify/services/notification-dedup.service'
-import {
-  enforceLimits,
-  handleMerge,
-  recordAcceptedUsage,
-  resolveSmsSegments,
-} from '../../common/decorators/queueable.decorator'
-
-vi.mock('../../common/decorators/queueable.decorator', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../common/decorators/queueable.decorator')>()),
-  handleMerge: vi.fn(),
-  enforceLimits: vi.fn(),
-  recordAcceptedUsage: vi.fn(),
-  resolveSmsSegments: vi.fn(),
-}))
+import { NotifySubmissionService } from '../notify/services/notify-submission.service'
+import { EventNotificationResolver } from '../events/event-notification.resolver'
 import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
@@ -55,7 +43,7 @@ describe('GcNotifyInternalExecutionService', () => {
     updateStatus: ReturnType<typeof vi.fn>
   }
   let mockConfigurationRepository: { findOne: ReturnType<typeof vi.fn> }
-  let mockIngestionQueue: { add: ReturnType<typeof vi.fn> }
+  let mockIngestionQueue: { name: string; add: ReturnType<typeof vi.fn> }
   let mockAttachmentValidationService: { validateAttachments: ReturnType<typeof vi.fn> }
   let mockAttachmentProcessingService: { processAttachments: ReturnType<typeof vi.fn> }
   let mockSafelistService: { findBlocked: ReturnType<typeof vi.fn> }
@@ -70,6 +58,13 @@ describe('GcNotifyInternalExecutionService', () => {
     findDuplicate: ReturnType<typeof vi.fn>
     claim: ReturnType<typeof vi.fn>
   }
+
+  // The real service, so dedup (findDuplicateSend/claimSend) runs against the mock dedup service;
+  // only the steps below are stubbed.
+  let acceptMerge: MockInstance<NotifySubmissionService['acceptMerge']>
+  let enforceLimits: MockInstance<NotifySubmissionService['enforceLimits']>
+  let recordAcceptedUsage: MockInstance<NotifySubmissionService['recordAcceptedUsage']>
+  let resolveSmsSegments: MockInstance<NotifySubmissionService['resolveSmsSegments']>
 
   const TENANT_ID = 'tenant-1'
 
@@ -88,7 +83,10 @@ describe('GcNotifyInternalExecutionService', () => {
     }
     mockNotificationRequestDetailService = { createPending: vi.fn(), updateStatus: vi.fn() }
     mockConfigurationRepository = { findOne: vi.fn().mockResolvedValue(null) }
-    mockIngestionQueue = { add: vi.fn().mockResolvedValue(undefined) }
+    mockIngestionQueue = {
+      name: 'notification-ingestion',
+      add: vi.fn().mockResolvedValue(undefined),
+    }
     mockAttachmentValidationService = { validateAttachments: vi.fn().mockResolvedValue(undefined) }
     mockAttachmentProcessingService = {
       // By default, echo back a single stored reference so callers can assert wiring.
@@ -100,12 +98,6 @@ describe('GcNotifyInternalExecutionService', () => {
     // existing expectations in this suite.
     mockSafelistService = { findBlocked: vi.fn().mockResolvedValue([]) }
     mockBulkValidationService.validateRows.mockReturnValue({ valid: true, errors: [] })
-    // vi.clearAllMocks() does not reach a module mock, so these are reset explicitly - otherwise a
-    // mockRejectedValue set in one test leaks into every test that runs after it.
-    for (const fn of [handleMerge, enforceLimits, recordAcceptedUsage, resolveSmsSegments]) {
-      vi.mocked(fn).mockReset()
-    }
-    vi.mocked(resolveSmsSegments).mockResolvedValue(1)
     // The response reports the address delivery will send from, resolved for this tenant.
     mockTenantSettingsService = {
       resolveSenderAddress: vi.fn().mockResolvedValue('permits@gov.bc.ca'),
@@ -137,10 +129,17 @@ describe('GcNotifyInternalExecutionService', () => {
         { provide: AttachmentValidationService, useValue: mockAttachmentValidationService },
         { provide: AttachmentProcessingService, useValue: mockAttachmentProcessingService },
         { provide: NotificationDedupService, useValue: mockNotificationDedupService },
+        { provide: EventNotificationResolver, useValue: {} },
+        NotifySubmissionService,
       ],
     }).compile()
 
     service = module.get<GcNotifyInternalExecutionService>(GcNotifyInternalExecutionService)
+    const submission = module.get(NotifySubmissionService)
+    acceptMerge = vi.spyOn(submission, 'acceptMerge').mockResolvedValue(undefined as never)
+    enforceLimits = vi.spyOn(submission, 'enforceLimits').mockResolvedValue(undefined)
+    recordAcceptedUsage = vi.spyOn(submission, 'recordAcceptedUsage').mockResolvedValue([])
+    resolveSmsSegments = vi.spyOn(submission, 'resolveSmsSegments').mockResolvedValue(1)
   })
 
   describe('sendEmail', () => {
@@ -210,6 +209,7 @@ describe('GcNotifyInternalExecutionService', () => {
 
       await flushMicrotasks()
       expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+        'notification-ingestion',
         expect.objectContaining({ notifyId: 'notif-1', tenantId: TENANT_ID }),
         expect.objectContaining({ jobId: 'notif-1' }),
       )
@@ -239,7 +239,7 @@ describe('GcNotifyInternalExecutionService', () => {
       await service.sendEmail(body, TENANT_ID)
 
       await flushMicrotasks()
-      const [[jobPayload]] = mockIngestionQueue.add.mock.calls
+      const [[, jobPayload]] = mockIngestionQueue.add.mock.calls
       const content = jobPayload.request.email.content
 
       // GC Notify renders `#` as an h2, so this also pins the dialect, not just the conversion.
@@ -336,7 +336,7 @@ describe('GcNotifyInternalExecutionService', () => {
       expect(mockAttachmentProcessingService.processAttachments).not.toHaveBeenCalled()
 
       await flushMicrotasks()
-      const [[jobPayload]] = mockIngestionQueue.add.mock.calls
+      const [[, jobPayload]] = mockIngestionQueue.add.mock.calls
       expect(jobPayload.request.email.attachments).toBeUndefined()
     })
 
@@ -374,7 +374,7 @@ describe('GcNotifyInternalExecutionService', () => {
       expect(mockAttachmentValidationService.validateAttachments).toHaveBeenCalledOnce()
 
       await flushMicrotasks()
-      const [[jobPayload]] = mockIngestionQueue.add.mock.calls
+      const [[, jobPayload]] = mockIngestionQueue.add.mock.calls
       expect(jobPayload.request.email.attachments).toEqual([{ attachmentId: 'att-1' }])
     })
 
@@ -474,10 +474,6 @@ describe('GcNotifyInternalExecutionService', () => {
 
   describe('usage counting on single sends', () => {
     beforeEach(() => {
-      vi.mocked(enforceLimits).mockClear()
-      vi.mocked(recordAcceptedUsage).mockClear()
-      vi.mocked(resolveSmsSegments).mockClear()
-      vi.mocked(resolveSmsSegments).mockResolvedValue(1)
       mockNotificationService.create.mockResolvedValue({
         id: 'notif-1',
         createdAt: new Date('2026-01-01T00:00:00Z'),
@@ -502,10 +498,10 @@ describe('GcNotifyInternalExecutionService', () => {
         'consumer-7',
       )
 
-      expect(enforceLimits).toHaveBeenCalledWith(expect.anything(), 'consumer-7', [
+      expect(enforceLimits).toHaveBeenCalledWith('consumer-7', [
         { channel: NotificationChannel.EMAIL, count: 1 },
       ])
-      expect(recordAcceptedUsage).toHaveBeenCalledWith(expect.anything(), 'consumer-7', [
+      expect(recordAcceptedUsage).toHaveBeenCalledWith('consumer-7', [
         { channel: NotificationChannel.EMAIL, count: 1 },
       ])
     })
@@ -520,7 +516,7 @@ describe('GcNotifyInternalExecutionService', () => {
         body: 'a'.repeat(400),
         bodyType: 'text',
       })
-      vi.mocked(resolveSmsSegments).mockResolvedValue(3)
+      resolveSmsSegments.mockResolvedValue(3)
 
       await service.sendSms(
         { phone_number: '+15555550100', template_id: 'tpl-2' },
@@ -528,10 +524,10 @@ describe('GcNotifyInternalExecutionService', () => {
         'consumer-7',
       )
 
-      expect(enforceLimits).toHaveBeenCalledWith(expect.anything(), 'consumer-7', [
+      expect(enforceLimits).toHaveBeenCalledWith('consumer-7', [
         { channel: NotificationChannel.SMS, count: 3 },
       ])
-      expect(recordAcceptedUsage).toHaveBeenCalledWith(expect.anything(), 'consumer-7', [
+      expect(recordAcceptedUsage).toHaveBeenCalledWith('consumer-7', [
         { channel: NotificationChannel.SMS, count: 3 },
       ])
     })
@@ -547,7 +543,7 @@ describe('GcNotifyInternalExecutionService', () => {
         body: 'b',
         bodyType: 'markdown',
       })
-      vi.mocked(enforceLimits).mockRejectedValueOnce(new Error('over limit'))
+      enforceLimits.mockRejectedValueOnce(new Error('over limit'))
 
       await expect(
         service.sendEmail(
@@ -579,10 +575,6 @@ describe('GcNotifyInternalExecutionService', () => {
     const smsBody = { phone_number: '+15555550100', template_id: 'tpl-2' }
 
     beforeEach(() => {
-      vi.mocked(enforceLimits).mockClear()
-      vi.mocked(recordAcceptedUsage).mockClear()
-      vi.mocked(resolveSmsSegments).mockClear()
-      vi.mocked(resolveSmsSegments).mockResolvedValue(1)
       mockNotificationDedupService.enabled = true
       mockNotificationDedupService.claim.mockResolvedValue({
         kind: 'proceed',
@@ -705,7 +697,7 @@ describe('GcNotifyInternalExecutionService', () => {
         version: 2,
         channelCode: NotificationChannel.EMAIL,
       })
-      vi.mocked(handleMerge).mockResolvedValue({
+      acceptMerge.mockResolvedValue({
         notifyId: ORIGINAL_ID,
         duplicate: true,
         createdAt: original.createdAt,
@@ -748,17 +740,14 @@ describe('GcNotifyInternalExecutionService', () => {
     } as any
 
     beforeEach(() => {
-      // vi.clearAllMocks() in the outer hook does not reach a module mock, so calls would
-      // otherwise accumulate across these tests and calls[0] would be a stale one.
-      vi.mocked(handleMerge).mockClear()
       mockTemplatesRepository.findById.mockResolvedValue(TEMPLATE)
-      vi.mocked(handleMerge).mockResolvedValue(accepted as never)
+      acceptMerge.mockResolvedValue(accepted as never)
     })
 
     it('renames the GC Notify recipient column to the "to" column the merge pipeline requires', async () => {
       await service.sendBulk(bulkBody, TENANT_ID)
 
-      const dto = vi.mocked(handleMerge).mock.calls[0][4] as any
+      const dto = acceptMerge.mock.calls[0][0].dto as any
       expect(dto.email.recipients.mergeArray).toEqual([
         ['to', 'first_name'],
         ['alice@example.com', 'Alice'],
@@ -804,8 +793,8 @@ describe('GcNotifyInternalExecutionService', () => {
         TENANT_ID,
       )
 
-      const dto = vi.mocked(handleMerge).mock.calls[0][4] as any
-      const channel = vi.mocked(handleMerge).mock.calls[0][7]
+      const dto = acceptMerge.mock.calls[0][0].dto as any
+      const channel = acceptMerge.mock.calls[0][0].channel
       expect(channel).toBe(NotificationChannel.SMS)
       expect(dto.sms.recipients.mergeArray[0]).toEqual(['to', 'first_name'])
     })
@@ -820,7 +809,7 @@ describe('GcNotifyInternalExecutionService', () => {
         TENANT_ID,
       )
 
-      const dto = vi.mocked(handleMerge).mock.calls[0][4] as any
+      const dto = acceptMerge.mock.calls[0][0].dto as any
       // The trailing newline must not become a recipient with no address.
       expect(dto.email.recipients.mergeArray).toEqual([
         ['to', 'first_name'],
@@ -836,7 +825,7 @@ describe('GcNotifyInternalExecutionService', () => {
           TENANT_ID,
         ),
       ).rejects.toMatchObject({ status: 400 })
-      expect(handleMerge).not.toHaveBeenCalled()
+      expect(acceptMerge).not.toHaveBeenCalled()
     })
 
     it('rejects a header with no recipient column', async () => {
@@ -850,7 +839,7 @@ describe('GcNotifyInternalExecutionService', () => {
           TENANT_ID,
         ),
       ).rejects.toMatchObject({ status: 400 })
-      expect(handleMerge).not.toHaveBeenCalled()
+      expect(acceptMerge).not.toHaveBeenCalled()
     })
 
     it('rejects invalid rows atomically with 422 and never enqueues', async () => {
@@ -861,18 +850,15 @@ describe('GcNotifyInternalExecutionService', () => {
         status: 422,
         response: { errors: messages.map((message) => ({ error: 'ValidationError', message })) },
       })
-      expect(handleMerge).not.toHaveBeenCalled()
+      expect(acceptMerge).not.toHaveBeenCalled()
     })
 
     it('counts the send against the calling API key, in billable segments for SMS', async () => {
       await service.sendBulk(bulkBody, TENANT_ID, 'consumer-9')
 
-      const [ctx, , , , , apiKeyConsumerId] = vi.mocked(handleMerge).mock.calls[0]
+      const submission = acceptMerge.mock.calls[0][0]
       // Without the consumer the merge path records nothing, so this argument is the whole feature.
-      expect(apiKeyConsumerId).toBe('consumer-9')
-      // assertWithinLimits before accepting, recordUsage after; countSegments prices SMS.
-      expect(ctx.apiKeyUsageService).toBe(mockApiKeyUsageService)
-      expect(ctx.smsSegmentService).toBe(mockSmsSegmentService)
+      expect(submission.apiKeyConsumerId).toBe('consumer-9')
     })
 
     it('carries a scheduled send through to the merge and back into the job shape', async () => {
@@ -881,7 +867,7 @@ describe('GcNotifyInternalExecutionService', () => {
         TENANT_ID,
       )
 
-      const dto = vi.mocked(handleMerge).mock.calls[0][4] as any
+      const dto = acceptMerge.mock.calls[0][0].dto as any
       expect(dto.email.delayedSend).toBe('2026-06-25T15:15:00Z')
       expect(result.data.scheduled_for).toBe('2026-06-25T15:15:00Z')
     })

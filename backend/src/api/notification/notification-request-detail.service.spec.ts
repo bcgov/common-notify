@@ -15,6 +15,7 @@ describe('NotificationRequestDetailService', () => {
     update: vi.fn().mockResolvedValue(undefined),
     increment: vi.fn().mockResolvedValue(undefined),
     find: vi.fn().mockResolvedValue([]),
+    createQueryBuilder: vi.fn(),
   }
 
   beforeEach(async () => {
@@ -94,6 +95,64 @@ describe('NotificationRequestDetailService', () => {
 
       const [options] = detailRepository.find.mock.calls[0]
       expect(options.where).not.toHaveProperty('batchId')
+    })
+  })
+
+  it('markFailed leaves delivered and blocked rows alone', async () => {
+    await service.markFailed('request-1', 'gave up')
+
+    const [where, values] = detailRepository.update.mock.calls[0]
+    expect(excludedStatuses(where)).toEqual(['sent', 'blocked'])
+    expect(values).toMatchObject({ status: 'failed', errorMessage: 'gave up' })
+  })
+
+  describe('countByStatuses', () => {
+    it('counts every status in one grouped query', async () => {
+      const builder = {
+        select: vi.fn().mockReturnThis(),
+        addSelect: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        groupBy: vi.fn().mockReturnThis(),
+        getRawMany: vi.fn().mockResolvedValue([
+          { status: 'sent', count: '7' },
+          { status: 'failed', count: '2' },
+        ]),
+      }
+      detailRepository.createQueryBuilder.mockReturnValue(builder)
+
+      await expect(service.countByStatuses('request-1')).resolves.toEqual({ sent: 7, failed: 2 })
+      expect(builder.where).toHaveBeenCalledWith(expect.any(String), {
+        notificationRequestId: 'request-1',
+      })
+      expect(builder.groupBy).toHaveBeenCalledWith('detail.status')
+      expect(builder.getRawMany).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('findByRequestIdPaginated', () => {
+    it('escapes LIKE wildcards in the recipient search', async () => {
+      const builder = {
+        innerJoin: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        andWhere: vi.fn().mockReturnThis(),
+        addOrderBy: vi.fn().mockReturnThis(),
+        skip: vi.fn().mockReturnThis(),
+        take: vi.fn().mockReturnThis(),
+        getManyAndCount: vi.fn().mockResolvedValue([[], 0]),
+      }
+      detailRepository.createQueryBuilder.mockReturnValue(builder)
+
+      await service.findByRequestIdPaginated(
+        'request-1',
+        'tenant-1',
+        { page: 1, limit: 10, filters: [], sorts: [] },
+        '50%_a\\b',
+      )
+
+      expect(builder.andWhere).toHaveBeenCalledWith(
+        "detail.recipientAddress ILIKE :search ESCAPE '\\'",
+        { search: '%50\\%\\_a\\\\b%' },
+      )
     })
   })
 

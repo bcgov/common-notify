@@ -8,7 +8,7 @@ import { Rate } from 'k6/metrics'
  * Fires a fixed BURST of notifysimple requests as fast as possible to pile jobs
  * onto the ingestion queue, then exits. This script only PRODUCES the burst and
  * confirms it was accepted (202); the actual DRAIN RATE and peak queue depth are
- * measured by the workflow's monitor step (oc + redis-cli against the Bull queues),
+ * measured by the workflow's monitor step (oc + redis-cli against the BullMQ queues),
  * because the app exposes no queue-depth metric or API-key-readable status.
  *
  * This is the test that exposes INGESTION_WORKER_CONCURRENCY=1 as the drain

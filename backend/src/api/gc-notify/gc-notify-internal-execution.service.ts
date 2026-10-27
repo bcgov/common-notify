@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
-import Bull from 'bull'
+import type { Queue } from 'bullmq'
 import { TemplatesRepository } from '../templates/templates.repository'
 import { TemplatesService } from '../templates/templates.service'
 import { Template } from '../templates/entities/template.entity'
@@ -34,28 +34,17 @@ import { Template as GcTemplate } from './schemas/template'
 import { Links } from './schemas/links'
 import type { FileAttachment } from './schemas/file-attachment'
 import Papa from 'papaparse'
-import {
-  claimSend,
-  enforceLimits,
-  findDuplicateSend,
-  handleMerge,
-  recordAcceptedUsage,
-  resolveSmsSegments,
-} from '../../common/decorators/queueable.decorator'
-import type { QueueableContext } from '../../common/decorators/queueable.decorator'
 import { PostBulkRequest } from './schemas/post-bulk-request'
 import { PostBulkResponse } from './schemas/post-bulk-response'
 import { GcNotifyBulkValidationService } from './gc-notify-bulk-validation.service'
-import { ApiKeyUsageService } from '../api-keys/api-key-usage.service'
-import { SmsSegmentService } from '../notify/services/sms-segment.service'
 import { AttachmentValidationService } from '../notify/services/attachment-validation.service'
 import { AttachmentProcessingService } from '../notify/services/attachment-processing.service'
-import { NotificationDedupService } from '../notify/services/notification-dedup.service'
+import { NotifySubmissionService } from '../notify/services/notify-submission.service'
 import type { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
 import type { NotifyEmailChannel } from '../notify/schemas/notify-email-channel'
 import type { NotifyAttachment } from '../notify/schemas/notify-attachment'
 import type { StoredNotifyAttachment } from '../notify/schemas/stored-notify-attachment'
-import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from '../../queue/job-retention'
+import { INGESTION_JOB_OPTIONS } from '../../queue/job-options'
 
 const TEMPLATE_LIST_QUERY_CONFIG: QueryableFieldsConfig = {
   sortableFields: { name: 'template.name', updatedAt: 'template.updatedAt' },
@@ -149,7 +138,7 @@ type TemplateParamValue = string | unknown[]
  * Mirrors the real GC Notify API's own behavior: the response (201, rendered
  * content) is returned synchronously, while actual delivery happens
  * asynchronously - reusing the same durable create-then-enqueue pattern the
- * native /notifysimple flow uses (see common/decorators/queueable.decorator.ts),
+ * native /notifysimple flow uses (see NotifySubmissionService),
  * translated into the ingestion queue's job shape so the existing email/sms
  * delivery workers can be reused unmodified.
  *
@@ -181,13 +170,11 @@ export class GcNotifyInternalExecutionService {
     private readonly tenantSettingsService: TenantSettingsService,
     @InjectRepository(NotifyConfiguration)
     private readonly configurationRepository: Repository<NotifyConfiguration>,
-    @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue<IngestionJobPayload>,
+    @Inject(QueueName.INGESTION) private readonly ingestionQueue: Queue<IngestionJobPayload>,
     private readonly attachmentValidationService: AttachmentValidationService,
     private readonly attachmentProcessingService: AttachmentProcessingService,
     private readonly bulkValidationService: GcNotifyBulkValidationService,
-    private readonly apiKeyUsageService: ApiKeyUsageService,
-    private readonly smsSegmentService: SmsSegmentService,
-    private readonly notificationDedupService: NotificationDedupService,
+    private readonly submissionService: NotifySubmissionService,
   ) {}
 
   async sendEmail(
@@ -212,7 +199,7 @@ export class GcNotifyInternalExecutionService {
     // Fingerprinted from the GC Notify body, not the notifyRequest built below: storing the
     // attachments gives each file a new id, so that would never match. Checked before storing
     // them so a duplicate uploads nothing.
-    const { fingerprint, duplicate } = await findDuplicateSend(this.queueableContext(), tenantId, {
+    const { fingerprint, duplicate } = await this.submissionService.findDuplicateSend(tenantId, {
       email: { recipients: { to: [body.email_address] } },
       gcNotify: { ...body, email_address: undefined, templateVersion: template.version },
     })
@@ -244,7 +231,7 @@ export class GcNotifyInternalExecutionService {
     }
 
     // One email_address per request, so one message. Checked before the send is accepted and
-    // recorded after, the same order the @Queueable path uses.
+    // recorded after, the same order the /notifysimple path uses.
     const usage = [{ channel: NotificationChannel.EMAIL, count: 1 }]
     const { id } = duplicate
       ? { id: duplicate.notifyId }
@@ -288,7 +275,7 @@ export class GcNotifyInternalExecutionService {
     const fromNumber = await this.resolveDefaultSender('gc_notify_default_sms_sender')
 
     // Before segment counting, which renders the body.
-    const { fingerprint, duplicate } = await findDuplicateSend(this.queueableContext(), tenantId, {
+    const { fingerprint, duplicate } = await this.submissionService.findDuplicateSend(tenantId, {
       sms: { recipients: { to: [body.phone_number] } },
       gcNotify: { ...body, phone_number: undefined, templateVersion: template.version },
     })
@@ -320,7 +307,7 @@ export class GcNotifyInternalExecutionService {
           [
             {
               channel: NotificationChannel.SMS,
-              count: await resolveSmsSegments(this.queueableContext(), tenantId, notifyRequest),
+              count: await this.submissionService.resolveSmsSegments(tenantId, notifyRequest),
             },
           ],
         )
@@ -345,7 +332,7 @@ export class GcNotifyInternalExecutionService {
   /**
    * GC Notify-compatible bulk send.
    *
-   * Reuses the ordinary mail-merge path rather than reimplementing it: `handleMerge` already
+   * Reuses the ordinary mail-merge path rather than reimplementing it: `acceptMerge` already
    * extracts recipients, applies the safelist, counts SMS segments, creates the notification
    * record and enqueues the ingestion fan-out. This method's job is only translation - GC Notify's
    * request shape in, GC Notify's job shape out.
@@ -385,16 +372,13 @@ export class GcNotifyInternalExecutionService {
       ? { sms: channelPayload, reference: body.reference }
       : { email: channelPayload, reference: body.reference }) as unknown as NotifySimpleRequest
 
-    const accepted = (await handleMerge(
-      this.queueableContext(),
-      this.ingestionQueue as unknown as Bull.Queue,
-      QueueName.INGESTION,
+    const accepted = await this.submissionService.acceptMerge({
       tenantId,
-      notifyRequest,
+      dto: notifyRequest,
+      channel,
       apiKeyConsumerId,
       requestRoute,
-      channel,
-    )) as { notifyId: string; recipientCount: number; createdAt: Date }
+    })
 
     // created_by, api_key, service_name and sender_id are deliberately absent: GC Notify fills them
     // from its own user and key model, and inventing values here would misreport who sent what.
@@ -476,28 +460,6 @@ export class GcNotifyInternalExecutionService {
 
     const mappedHeader = header.map((column, index) => (index === recipientColumn ? 'to' : column))
     return [mappedHeader, ...dataRows]
-  }
-
-  /**
-   * The queueable context `handleMerge` needs. `apiKeyUsageService` and `smsSegmentService` are
-   * what make a bulk send count: the first checks the key's limits before accepting and records the
-   * usage after, the second prices an SMS in billable segments rather than one per recipient.
-   *
-   * `limitAlertNotificationService` is absent, so crossing a threshold is recorded but does not
-   * send the alert email `/notifysimple` would.
-   */
-  private queueableContext(): QueueableContext {
-    return {
-      notificationService: this.notificationService,
-      attachmentValidationService: this.attachmentValidationService,
-      attachmentProcessingService: this.attachmentProcessingService,
-      safelistService: this.safelistService,
-      notificationRequestDetailService: this.notificationRequestDetailService,
-      apiKeyUsageService: this.apiKeyUsageService,
-      smsSegmentService: this.smsSegmentService,
-      notificationDedupService: this.notificationDedupService,
-      queueMap: new Map([[QueueName.INGESTION, this.ingestionQueue as unknown as Bull.Queue]]),
-    }
   }
 
   private async requireTemplate(
@@ -676,7 +638,7 @@ export class GcNotifyInternalExecutionService {
 
   /**
    * Reject a send that would reach a recipient this tenant has not safelisted, in the GC Notify
-   * error shape. Mirrors the @Queueable guardrail so the compatibility routes cannot be used to
+   * error shape. Mirrors the /notifysimple guardrail so the compatibility routes cannot be used to
    * step around it. Does nothing when the safelist is not enforced in this environment.
    */
   private async enforceSafelist(
@@ -714,7 +676,7 @@ export class GcNotifyInternalExecutionService {
   }
 
   /**
-   * A single send in the @Queueable order: limits checked before accepting, usage recorded
+   * A single send in the /notifysimple order: limits checked before accepting, usage recorded
    * after. A send that turns out to be a duplicate at the claim is neither created nor counted.
    */
   private async acceptSend(
@@ -726,7 +688,7 @@ export class GcNotifyInternalExecutionService {
     apiKeyConsumerId: string | undefined,
     usage: Array<{ channel: string; count: number }>,
   ): Promise<{ id: string }> {
-    await enforceLimits(this.queueableContext(), apiKeyConsumerId, usage)
+    await this.submissionService.enforceLimits(apiKeyConsumerId, usage)
 
     const accepted = await this.createAndEnqueue(
       tenantId,
@@ -737,13 +699,13 @@ export class GcNotifyInternalExecutionService {
     )
 
     if (!accepted.duplicate) {
-      await recordAcceptedUsage(this.queueableContext(), apiKeyConsumerId, usage)
+      await this.submissionService.recordAcceptedUsage(apiKeyConsumerId, usage)
     }
     return accepted
   }
 
   /**
-   * Mirrors the create-then-enqueue pattern from @Queueable: synchronously create
+   * Mirrors the create-then-enqueue pattern from NotifySubmissionService: synchronously create
    * a durable notification_request record (PENDING), then enqueue the ingestion
    * job asynchronously so the response isn't blocked on queue availability.
    */
@@ -759,7 +721,7 @@ export class GcNotifyInternalExecutionService {
     await this.enforceSafelist(tenantId, notifyRequest)
 
     // Last before the create, so nothing that can still reject the send runs after the claim.
-    const claim = await claimSend(this.queueableContext(), tenantId, fingerprint)
+    const claim = await this.submissionService.claimSend(tenantId, fingerprint)
     if (claim.kind === 'duplicate') {
       return { id: claim.original.notifyId, duplicate: true }
     }
@@ -794,12 +756,9 @@ export class GcNotifyInternalExecutionService {
           ...(scheduledFor && { scheduledFor }),
         }
 
-        await this.ingestionQueue.add(jobPayload, {
+        await this.ingestionQueue.add(this.ingestionQueue.name, jobPayload, {
           jobId: notificationRecord.id,
-          attempts: 3,
-          backoff: { type: 'exponential', delay: 2000 },
-          removeOnComplete: COMPLETED_JOB_RETENTION,
-          removeOnFail: FAILED_JOB_RETENTION,
+          ...INGESTION_JOB_OPTIONS,
           ...(delayMs > 0 && { delay: delayMs }),
         })
 
@@ -817,7 +776,7 @@ export class GcNotifyInternalExecutionService {
         )
       } catch (error) {
         // Redis unavailable - record stays PENDING and is picked up by the
-        // existing scheduled retry job, same as @Queueable's fallback.
+        // existing scheduled retry job, same as the /notifysimple fallback.
         this.logger.warn(
           `Failed to enqueue GC Notify job (will be retried): ${notificationRecord.id}`,
           {

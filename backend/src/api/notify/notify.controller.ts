@@ -18,7 +18,7 @@ import {
   Request,
   Req,
 } from '@nestjs/common'
-import Bull from 'bull'
+import type { Queue } from 'bullmq'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { SmsChannelFeatureFlagGuard } from '../../common/guards/sms-channel-feature-flag.guard'
 import { HtmlBodyTypeFeatureFlagGuard } from '../../common/guards/html-body-type-feature-flag.guard'
@@ -41,20 +41,12 @@ import {
   CancelNotificationDto,
   RescheduleNotificationDto,
 } from './schemas/cancel-or-reschedule.dto'
-import { Queueable } from '../../common/decorators/queueable.decorator'
 import { QueueName } from '../../enum/queue-name.enum'
+import { INGESTION_JOB_OPTIONS } from '../../queue/job-options'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { NotificationService } from '../notification/notification.service'
-import { NotificationRequestDetailService } from '../notification/notification-request-detail.service'
-import { ApiKeyUsageService } from '../api-keys/api-key-usage.service'
-import { AttachmentProcessingService } from './services/attachment-processing.service'
-import { AttachmentValidationService } from './services/attachment-validation.service'
-import { LimitAlertNotificationService } from './services/limit-alert-notification.service'
-import { SafelistService } from '../safelist/safelist.service'
-import { SmsSegmentService } from './services/sms-segment.service'
-import { EventNotificationResolver } from '../events/event-notification.resolver'
-import { NotificationDedupService } from './services/notification-dedup.service'
+import { NotifySubmissionService } from './services/notify-submission.service'
 import { NotificationRequestDto } from '../notification/schemas/notification-request'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
@@ -76,12 +68,8 @@ import {
   CallbackRegistrationUpdateRequest,
 } from '../webhook/schemas/callback-registration.dto'
 
-// Note: All endpoints except NotifySimpleController.simpleSend are
-// placeholders and return 501 Not Implemented. This is intentional to allow incremental
-// implementation and testing of the simple send flow first, which is the current priority.
-//
-// Anything requiring queueing should use the @Queueable decorator and implement the method with an
-// empty body (the decorator will handle the logic).
+// Send routes delegate to NotifySubmissionService, which owns dedup, limits, the safelist and
+// queueing. NotifyEventController and ChesEmailController are placeholders that return 501.
 //
 // Uses NotifyServiceGuard for service-to-service calls that require x-tenant-id header
 // and valid client_id + tenant_id mapping in the database.
@@ -90,23 +78,11 @@ import {
 @Controller('notifysimple')
 @UseGuards(NotifyServiceGuard, HtmlBodyTypeFeatureFlagGuard)
 export class NotifySimpleController {
-  private readonly queueMap: Map<QueueName, Bull.Queue>
-
   constructor(
-    private readonly notifyService: NotifyService,
     private readonly notificationService: NotificationService,
-    readonly attachmentValidationService: AttachmentValidationService,
-    readonly attachmentProcessingService: AttachmentProcessingService,
-    readonly notificationRequestDetailService: NotificationRequestDetailService,
-    readonly apiKeyUsageService: ApiKeyUsageService,
-    readonly limitAlertNotificationService: LimitAlertNotificationService,
-    readonly safelistService: SafelistService,
-    readonly smsSegmentService: SmsSegmentService,
-    readonly notificationDedupService: NotificationDedupService,
-    @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
-  ) {
-    this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
-  }
+    private readonly submissionService: NotifySubmissionService,
+    @Inject(QueueName.INGESTION) private readonly ingestionQueue: Queue,
+  ) {}
 
   @Version('1')
   @Post()
@@ -202,14 +178,11 @@ export class NotifySimpleController {
     status: 200,
     description: 'Preview: rendered content and unchanged recipients, keyed by channel.',
   })
-  @Queueable(QueueName.INGESTION)
   simpleSend(
-    @Req() _req: any,
-    @Body() _body: NotifySimpleRequest,
+    @Req() req: any,
+    @Body() body: NotifySimpleRequest,
   ): Promise<NotificationAcceptanceResponse> {
-    // Validation of templateId XOR content is handled by @ValidateTemplateOrContent() decorator on DTO
-    // Implementation provided by @Queueable decorator
-    return undefined as any
+    return this.submissionService.submit(req, body)
   }
 
   @Version('1')
@@ -328,12 +301,11 @@ export class NotifySimpleController {
     status: 200,
     description: 'Preview: rendered content and unchanged recipients in an email entry.',
   })
-  @Queueable(QueueName.INGESTION, NotificationChannel.EMAIL)
   simpleSendEmail(
-    @Req() _req: any,
-    @Body() _body: NotifyEmailChannel,
+    @Req() req: any,
+    @Body() body: NotifyEmailChannel,
   ): Promise<NotificationAcceptanceResponse> {
-    return undefined as any
+    return this.submissionService.submit(req, body, { channel: NotificationChannel.EMAIL })
   }
 
   @Version('1')
@@ -456,14 +428,11 @@ export class NotifySimpleController {
       },
     },
   })
-  @Queueable(QueueName.INGESTION)
   simpleSendSms(
-    @Req() _req: any,
-    @Body() _body: NotifySimpleRequest,
+    @Req() req: any,
+    @Body() body: NotifySimpleRequest,
   ): Promise<NotificationAcceptanceResponse> {
-    // Validation of templateId XOR content is handled by @ValidateTemplateOrContent() decorator on DTO
-    // Implementation provided by @Queueable decorator
-    return undefined as any
+    return this.submissionService.submit(req, body)
   }
 
   @Version('1')
@@ -518,6 +487,17 @@ export class NotifySimpleController {
     )
   }
 
+  /**
+   * The request's ingestion job while it has not started - waiting, or delayed until its send
+   * time - and only if it belongs to this tenant. Null once it is running or done.
+   */
+  private async pendingIngestionJob(notificationId: string, tenantId: string) {
+    const job = await this.ingestionQueue.getJob(notificationId)
+    if (!job || job.data?.tenantId !== tenantId) return null
+    const state = await job.getState()
+    return state === 'delayed' || state === 'waiting' ? job : null
+  }
+
   private async doCancelOrReschedule(
     tenantId: string,
     updatedBy: string,
@@ -554,8 +534,8 @@ export class NotifySimpleController {
       // If cancelling, attempt to remove from queue (non-fatal if it fails)
       if (action === 'cancel') {
         try {
-          const jobs = await this.ingestionQueue.getJobs(['delayed', 'waiting'])
-          const jobToRemove = jobs.find((job) => job.data?.notificationId === notificationId)
+          // The ingestion job is keyed by the notifyId.
+          const jobToRemove = await this.pendingIngestionJob(notificationId, tenantId)
 
           if (jobToRemove) {
             await jobToRemove.remove()
@@ -573,19 +553,23 @@ export class NotifySimpleController {
       } else if (scheduledTime) {
         // If rescheduling, attempt to update the job delay (non-fatal if it fails)
         try {
-          const newDelay = new Date(scheduledTime).getTime() - Date.now()
-
-          const jobs = await this.ingestionQueue.getJobs(['delayed', 'waiting'])
-          const jobToUpdate = jobs.find((job) => job.data?.notificationId === notificationId)
+          const sendAt = new Date(scheduledTime)
+          const newDelay = sendAt.getTime() - Date.now()
+          const jobToUpdate = await this.pendingIngestionJob(notificationId, tenantId)
 
           if (jobToUpdate) {
             await jobToUpdate.remove()
-            await this.ingestionQueue.add(jobToUpdate.data, {
-              delay: Math.max(0, newDelay),
-              jobId: `${tenantId}-${notificationId}`,
-              attempts: jobToUpdate.opts.attempts,
-              backoff: jobToUpdate.opts.backoff,
-            })
+            // Same id, so dedup and the reconciler still find it. scheduledFor moves too: ingestion
+            // delays the delivery jobs until it, so a send moved earlier would otherwise wait.
+            await this.ingestionQueue.add(
+              this.ingestionQueue.name,
+              { ...jobToUpdate.data, scheduledFor: sendAt.toISOString() },
+              {
+                jobId: notificationId,
+                ...INGESTION_JOB_OPTIONS,
+                delay: Math.max(0, newDelay),
+              },
+            )
             logger.log(`Updated queue job delay for rescheduled notification: ${notificationId}`, {
               tenantId,
               newDelay,
@@ -631,30 +615,17 @@ export class NotifySimpleController {
 @Controller('frontend/notifysimple')
 @UseGuards(NotifyFrontendRoleGuard, HtmlBodyTypeFeatureFlagGuard)
 export class NotifySimpleFrontendController {
-  private readonly queueMap: Map<QueueName, Bull.Queue>
-
   constructor(
-    private readonly notifyService: NotifyService,
     private readonly notificationService: NotificationService,
-    readonly attachmentValidationService: AttachmentValidationService,
-    readonly attachmentProcessingService: AttachmentProcessingService,
-    readonly notificationRequestDetailService: NotificationRequestDetailService,
-    readonly apiKeyUsageService: ApiKeyUsageService,
-    readonly limitAlertNotificationService: LimitAlertNotificationService,
-    readonly safelistService: SafelistService,
-    readonly smsSegmentService: SmsSegmentService,
-    readonly eventNotificationResolver: EventNotificationResolver,
-    readonly notificationDedupService: NotificationDedupService,
-    @Inject(QueueName.INGESTION) private readonly ingestionQueue: Bull.Queue,
-  ) {
-    this.queueMap = new Map([[QueueName.INGESTION, this.ingestionQueue]])
-  }
+    private readonly submissionService: NotifySubmissionService,
+    @Inject(QueueName.INGESTION) private readonly ingestionQueue: Queue,
+  ) {}
 
   /**
    * Ad-hoc email send from the UI, used by the mail merge screen: the recipient list and the
    * per-recipient template values both come from `recipients.mergeArray`.
    *
-   * The bare email-channel body is wrapped into a NotifySimpleRequest by @Queueable, so this shares
+   * The bare email-channel body is wrapped into a NotifySimpleRequest by the submission service, so this shares
    * the merge validation, safelist filtering and fan-out with NotifySimpleController.simpleSendEmail.
    * Open to template editors as well as operations admins — the same pair as `canEdit` on the
    * frontend, which gates the Send button on the Bulk Notifications screen.
@@ -671,13 +642,11 @@ export class NotifySimpleFrontendController {
   @Roles(CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN, CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
   @UseGuards(FeatureFlagGuard, MailMergeUiLimitsGuard)
   @FeatureFlag(FeatureFlagCode.BULK_NOTIFICATIONS)
-  @Queueable(QueueName.INGESTION, NotificationChannel.EMAIL)
   sendEmail(
-    @Req() _req: any,
-    @Body() _body: NotifyEmailChannel,
+    @Req() req: any,
+    @Body() body: NotifyEmailChannel,
   ): Promise<NotificationAcceptanceResponse> {
-    // Implementation provided by @Queueable
-    return undefined as any
+    return this.submissionService.submit(req, body, { channel: NotificationChannel.EMAIL })
   }
 
   /**
@@ -693,13 +662,11 @@ export class NotifySimpleFrontendController {
   @Roles(CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN, CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
   @UseGuards(FeatureFlagGuard, SmsChannelFeatureFlagGuard, MailMergeUiLimitsGuard)
   @FeatureFlag(FeatureFlagCode.BULK_NOTIFICATIONS)
-  @Queueable(QueueName.INGESTION)
   sendSms(
-    @Req() _req: any,
-    @Body() _body: NotifySimpleRequest,
+    @Req() req: any,
+    @Body() body: NotifySimpleRequest,
   ): Promise<NotificationAcceptanceResponse> {
-    // Implementation provided by @Queueable
-    return undefined as any
+    return this.submissionService.submit(req, body)
   }
 
   @Version('1')
@@ -708,12 +675,11 @@ export class NotifySimpleFrontendController {
   @Roles(CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN, CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
   @UseGuards(FeatureFlagGuard)
   @FeatureFlag(FeatureFlagCode.EVENTS)
-  @Queueable(QueueName.INGESTION, undefined, { eventSend: 'full' })
   sendEventNotification(
-    @Req() _req: any,
-    @Body() _body: NotifyEventSendRequest,
+    @Req() req: any,
+    @Body() body: NotifyEventSendRequest,
   ): Promise<NotificationAcceptanceResponse> {
-    return undefined as any
+    return this.submissionService.submit(req, body, { eventSend: 'full' })
   }
 
   @Version('1')
@@ -722,12 +688,11 @@ export class NotifySimpleFrontendController {
   @Roles(CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN, CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR)
   @UseGuards(FeatureFlagGuard)
   @FeatureFlag(FeatureFlagCode.EVENTS)
-  @Queueable(QueueName.INGESTION, undefined, { eventSend: 'test' })
   sendEventTest(
-    @Req() _req: any,
-    @Body() _body: NotifyEventTestSendRequest,
+    @Req() req: any,
+    @Body() body: NotifyEventTestSendRequest,
   ): Promise<NotificationAcceptanceResponse> {
-    return undefined as any
+    return this.submissionService.submit(req, body, { eventSend: 'test' })
   }
 
   @Version('1')
@@ -753,16 +718,8 @@ export class NotifySimpleFrontendController {
 
     // Use the shared logic from NotifySimpleController
     const simpleController = new NotifySimpleController(
-      this.notifyService,
       this.notificationService,
-      this.attachmentValidationService,
-      this.attachmentProcessingService,
-      this.notificationRequestDetailService,
-      this.apiKeyUsageService,
-      this.limitAlertNotificationService,
-      this.safelistService,
-      this.smsSegmentService,
-      this.notificationDedupService,
+      this.submissionService,
       this.ingestionQueue,
     )
     return (simpleController as any).doCancelOrReschedule(tenantId, userId, notificationId, body)
