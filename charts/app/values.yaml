@@ -289,3 +289,14 @@ frontend:
       limits:
         cpu: 200m
         memory: 256Mi
+
+#-- Weekly prune of pgBackRest's backup.history.
+pgbackrestHistoryPrune:
+  #-- enable or disable the weekly prune
+  enabled: true
+  #-- Sunday 09:30, offset off the hour because backups run on the hour.
+  schedule: "30 9 * * 0"
+  #-- days of manifests to keep
+  retentionDays: 14
+  #-- in-cluster imagestream, so no Docker Hub pull
+  image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
