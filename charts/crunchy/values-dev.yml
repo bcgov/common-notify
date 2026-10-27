@@ -1,35 +1,3 @@
-# DEV overrides for the Crunchy Postgres cluster.
-#
-# WHY DEV NEEDS MORE STORAGE THAN TEST OR PROD
-#   PR environments create and drop databases constantly, and every backup
-#   leaves a manifest in pgBackRest's backup.history, which pgBackRest keeps
-#   forever. In October that reached 1.8G across 4,423 files and filled the 5Gi
-#   repo, which stopped WAL archiving, filled the 2Gi /pgwal, and left Postgres
-#   unable to write WAL. Patroni crash-looped it for four days while the pod
-#   still reported 4/4 Running, and every deploy failed on the Flyway init
-#   container.
-#
-#   The volumes were expanded live to 15Gi (repo1) and 6Gi (pgwal) to recover.
-#   This file makes that the DECLARED state, and it must never be lower than the
-#   live PVCs: volumeClaimTemplates is immutable and a shrink is forbidden, so
-#   the operator aborts its ENTIRE reconcile - which is what then blocked the
-#   per-PR user passwords and produced the "password authentication failed"
-#   errors.
-#
-#   pgdata stays at 5Gi; it was only 38% used throughout.
-#
-#   charts/app/templates/pgbackrest-history-prune.yaml addresses the cause; this
-#   file covers the headroom.
-#
-# WHY A SEPARATE FILE
-#   bcgov/action-crunchy takes a single `values_file` - no layering, no --set -
-#   so a per-environment change means a per-environment FILE. .deployer.yml
-#   selects this one when environment == DEV.
-#
-# KEEP IN SYNC
-#   A FULL COPY of values.yml; helm needs the complete override layer. Only
-#   replicas, storage and walStorage may differ. pr-validate.yml fails the build
-#   if anything else diverges.
 # Values from bcgov/quickstart-openshift
 global:
   config:

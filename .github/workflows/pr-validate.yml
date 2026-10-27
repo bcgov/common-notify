@@ -29,14 +29,6 @@ jobs:
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@v6
-      # values-prod.yml and values-dev.yml are FULL COPIES of values.yml, because
-      # action-crunchy takes a single values file and there is no overlay to layer
-      # a short override onto. Duplicating a database config is only safe if the
-      # copies cannot silently diverge - a storage class, backup target or
-      # Postgres version drifting between environments is the fault that stays
-      # hidden until a restore. Only the replica count and the volume sizes may
-      # differ, and only those because prod runs a standby and dev needs a larger
-      # backup repo.
       - name: Fail if the per-env files differ outside replicas and volume sizes
         run: |
           STATUS=0

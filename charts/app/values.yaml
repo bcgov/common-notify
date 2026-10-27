@@ -291,20 +291,12 @@ frontend:
         memory: 256Mi
 
 #-- Weekly prune of pgBackRest's backup.history.
-#-- pgBackRest keeps one manifest per backup forever and has NO retention option
-#-- for them (`pgbackrest help expire` offers only --repo-retention-*). In dev
-#-- that reached 1.8G / 4,422 files over ~196 days and filled the 5Gi repo,
-#-- which stopped WAL archiving, filled /pgwal, and crash-looped Postgres while
-#-- the pod still read 4/4 Running. The manifests are informational - restore
-#-- does not read them.
 pgbackrestHistoryPrune:
   #-- enable or disable the weekly prune
   enabled: true
-  #-- Sunday 09:30. Offset off the hour because the full backup runs at 08:00
-  #-- and incrementals on every other hour.
+  #-- Sunday 09:30, offset off the hour because backups run on the hour.
   schedule: "30 9 * * 0"
-  #-- keep this many days of manifests; ~24 backups/day at ~115KB each, so 14
-  #-- days bounds history at roughly 40MB
+  #-- days of manifests to keep
   retentionDays: 14
-  #-- in-cluster imagestream, so no Docker Hub pull and no rate limiting
+  #-- in-cluster imagestream, so no Docker Hub pull
   image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest

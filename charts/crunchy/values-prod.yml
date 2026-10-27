@@ -1,24 +1,3 @@
-# PROD overrides for the Crunchy Postgres cluster. CCP-5826.
-#
-# WHY THIS FILE EXISTS AT ALL
-#   bcgov/action-crunchy takes a single `values_file` - no layering, no --set -
-#   so a per-environment change means a per-environment FILE, not an overlay.
-#   .deployer.yml selects this one when environment == PROD.
-#
-# WHY DEV AND TEST STAY AT 1
-#   A standby instance pod requests ~4.25Gi of memory (4Gi database + three
-#   sidecars). Measured headroom on requests.memory:
-#     dev   10710Mi / 12Gi -> 1578Mi free   does NOT fit
-#     test   9572Mi / 12Gi -> 2716Mi free   does NOT fit
-#     prod   9314Mi / 16Gi -> 7070Mi free   fits, taking prod to ~83%
-#   Setting replicas: 2 globally would leave dev and test with a permanently
-#   unschedulable pod, so this is not a preference - it is required.
-#
-# KEEP IN SYNC
-#   This is a FULL COPY of values.yml, because helm needs the complete override
-#   layer. Only `crunchy.instances.replicas` may differ. pr-validate.yml fails
-#   the build if anything else diverges - that guard is the reason duplicating
-#   a database config here is defensible.
 # Values from bcgov/quickstart-openshift
 global:
   config:
@@ -49,7 +28,7 @@ crunchy: # enable it for TEST and PROD, for PR based pipelines simply use single
     target: ~ # 2024-03-24 17:16:00-07 this is the target timestamp to go back to in current cluster
   instances:
     name: db # high availability
-    replicas: 2 # PROD only. See the header for why DEV/TEST stay at 1.
+    replicas: 2
     metadata:
       annotations:
         prometheus.io/scrape: 'true'
