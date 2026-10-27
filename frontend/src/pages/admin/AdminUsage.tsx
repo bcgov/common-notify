@@ -27,6 +27,7 @@ const AdminUsage: FC = () => {
     adminCount,
     adminSearch,
     adminUpdatingKey,
+    adminError,
   } = useAppSelector((state) => state.apiKeyUsage)
   const isAdmin = UserService.hasRole('NOTIFY_ADMIN')
   const [editingRow, setEditingRow] = useState<AdminTenantUsageRow | null>(null)
@@ -141,6 +142,7 @@ const AdminUsage: FC = () => {
   return (
     <div className="page">
       <PageHeading title="Tenant Usage & Limits" />
+      {adminError && <div role="alert">{adminError}</div>}
 
       <DataTable
         columns={columns}
