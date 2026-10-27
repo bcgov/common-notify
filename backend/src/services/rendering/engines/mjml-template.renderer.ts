@@ -96,12 +96,10 @@ export class MjmlTemplateRenderer implements ITemplateRenderer {
     }
   }
 
-  renderSms(context: RenderContext, _options?: RenderOptions): Promise<RenderedSms> {
+  async renderSms(context: RenderContext, _options?: RenderOptions): Promise<RenderedSms> {
     validateTemplate(context.template.body)
 
     // SMS is plain text: no MJML compilation.
-    return Promise.resolve({
-      body: renderPlainText(context.template.body, context.personalisation),
-    })
+    return { body: renderPlainText(context.template.body, context.personalisation) }
   }
 }
