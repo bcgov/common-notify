@@ -27,6 +27,7 @@ import { SmsSegmentService } from './sms-segment.service'
 import { NotificationDedupService } from './notification-dedup.service'
 import type { DedupClaim, DuplicateNotification } from './notification-dedup.service'
 import { extractRequestRoute } from '../../../common/utils/extract-request-route'
+import { describeError } from '../../../common/utils/describe-error'
 import { mergeRequestChannel } from '../../../queue/merge-batch-builder'
 import { INGESTION_JOB_OPTIONS } from '../../../queue/job-options'
 
@@ -284,7 +285,7 @@ export class NotifySubmissionService {
       return Math.max(1, await this.smsSegmentService.countSegmentsPerRecipient(tenantId, payload))
     } catch (error) {
       this.logger.warn(
-        `Failed to count SMS segments, billing as a single segment: ${errorMessage(error)}`,
+        `Failed to count SMS segments, billing as a single segment: ${describeError(error)}`,
       )
       return 1
     }
@@ -329,7 +330,7 @@ export class NotifySubmissionService {
             }))
           } catch (error) {
             this.logger.warn(
-              `Failed to record ${channel} usage for API key ${apiKeyConsumerId}: ${errorMessage(error)}`,
+              `Failed to record ${channel} usage for API key ${apiKeyConsumerId}: ${describeError(error)}`,
             )
             return []
           }
@@ -604,7 +605,7 @@ export class NotifySubmissionService {
       )
     } catch (error) {
       this.logger.warn(
-        `Failed to record blocked mail merge recipients for ${notifyId}: ${errorMessage(error)}`,
+        `Failed to record blocked mail merge recipients for ${notifyId}: ${describeError(error)}`,
       )
     }
   }
@@ -631,7 +632,7 @@ export class NotifySubmissionService {
       )
     } catch (error) {
       this.logger.warn(
-        `Failed to count SMS merge segments, billing one segment per recipient: ${errorMessage(error)}`,
+        `Failed to count SMS merge segments, billing one segment per recipient: ${describeError(error)}`,
       )
       return recipients.length
     }
@@ -650,7 +651,7 @@ export class NotifySubmissionService {
         usageResults,
       })
     } catch (error) {
-      this.logger.warn(`Failed to process usage limit alerts: ${errorMessage(error)}`)
+      this.logger.warn(`Failed to process usage limit alerts: ${describeError(error)}`)
     }
   }
 
@@ -739,17 +740,6 @@ export class NotifySubmissionService {
         })
       }
     })
-  }
-}
-
-function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message
-  if (typeof error === 'string') return error
-  try {
-    return JSON.stringify(error) ?? 'Unknown error'
-  } catch {
-    // Circular, or holds a BigInt.
-    return 'Unknown error'
   }
 }
 

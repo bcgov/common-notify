@@ -3,6 +3,7 @@ import { TemplatesRepository } from '../../templates/templates.repository'
 import { TemplatesService } from '../../templates/templates.service'
 import { InlineRenderingService } from '../../../services/rendering/inline-rendering.service'
 import { countSmsSegments } from '../../../common/utils/sms-segments'
+import { describeError } from '../../../common/utils/describe-error'
 import type { NotifySimpleRequest } from '../schemas/notify-simple-request'
 import type { ProcessedNotifySimpleRequest } from '../schemas/stored-notify-attachment'
 
@@ -77,7 +78,7 @@ export class SmsSegmentService {
     const failOpen = (error: unknown) => {
       this.logger.warn(
         `Failed to resolve SMS body for segment counting (tenant=${tenantId}); ` +
-          `counting as a single segment: ${error instanceof Error ? error.message : String(error)}`,
+          `counting as a single segment: ${describeError(error)}`,
       )
       return undefined
     }
@@ -85,15 +86,17 @@ export class SmsSegmentService {
       (render: (params: Record<string, unknown>) => Promise<string | undefined>) =>
       (rowParams: Record<string, unknown>) =>
         render({ ...baseParams, ...rowParams }).catch(failOpen)
+    // The same body for every row, with nothing to render.
+    const fixed = (body: string | undefined) => () => Promise.resolve(body)
 
     if (content?.templateId) {
       let template
       try {
         template = await this.templatesRepository.findById(tenantId, content.templateId)
       } catch (error) {
-        return async () => failOpen(error)
+        return fixed(failOpen(error))
       }
-      if (template?.channelCode !== 'SMS') return async () => content.body
+      if (template?.channelCode !== 'SMS') return fixed(content.body)
       return guarded(
         async (params) =>
           (await this.templatesService.renderTemplateContent(template, params)).body,
@@ -106,6 +109,6 @@ export class SmsSegmentService {
       )
     }
 
-    return async () => content?.body
+    return fixed(content?.body)
   }
 }
