@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Logger } from '@nestjs/common'
-import axios from 'axios'
+import axios, { type AxiosResponse } from 'axios'
 import type { Job } from 'bullmq'
 import { WebhookDeliveryWorker } from './webhook-delivery.worker'
 import { WEBHOOK_JOB_OPTIONS } from '../job-options'
+import { WEBHOOK_LOGGED_BODY_CHARS, WEBHOOK_MAX_RESPONSE_BYTES } from './webhook-request'
 import type { WebhookJobPayload } from '../queue.types'
 import type { WebhookService } from '../../api/webhook/webhook.service'
 import type { WebhookDeliveryLogRepository } from '../../api/webhook/webhook-delivery-log.repository'
@@ -40,6 +41,7 @@ describe('WebhookDeliveryWorker', () => {
     vi.clearAllMocks()
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => {})
     vi.spyOn(Logger.prototype, 'error').mockImplementation(() => {})
+    vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => {})
     webhookService.findById.mockResolvedValue({
       active: true,
       url: 'https://tenant.example/hook',
@@ -72,5 +74,97 @@ describe('WebhookDeliveryWorker', () => {
     expect(deliveryLog.logAttempt).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'FAILED', attemptNumber: 3, nextRetryAt: undefined }),
     )
+  })
+
+  const httpError = (status: number, data: unknown = '') =>
+    new axios.AxiosError(
+      `Request failed with status code ${status}`,
+      'ERR_BAD_RESPONSE',
+      undefined,
+      {},
+      {
+        status,
+        data,
+      } as AxiosResponse,
+    )
+
+  const lastLogged = () => deliveryLog.logAttempt.mock.calls.at(-1)[0]
+
+  it('posts with redirects off, a size cap and the filtering agents', async () => {
+    vi.mocked(axios.post).mockResolvedValue({ status: 200, data: 'ok' })
+
+    await worker.process(job(0))
+
+    expect(axios.post).toHaveBeenCalledWith(
+      'https://tenant.example/hook',
+      expect.anything(),
+      expect.objectContaining({
+        maxRedirects: 0,
+        maxContentLength: WEBHOOK_MAX_RESPONSE_BYTES,
+        httpAgent: expect.anything(),
+        httpsAgent: expect.anything(),
+        proxy: false,
+      }),
+    )
+  })
+
+  it('records a redirect as a failed delivery, without retrying', async () => {
+    vi.mocked(axios.post).mockRejectedValue(httpError(302))
+
+    await expect(worker.process(job(0))).resolves.toMatchObject({ success: false, statusCode: 302 })
+    expect(lastLogged()).toMatchObject({ status: 'FAILED', httpStatusCode: 302 })
+  })
+
+  it('records a hostname that resolves internally as failed, without retrying', async () => {
+    vi.mocked(axios.post).mockRejectedValue(
+      axios.AxiosError.from(
+        new Error(
+          'DNS lookup 10.0.0.5(family:4, host:tenant.example) is not allowed. Because, It is private IP address.',
+        ),
+      ),
+    )
+
+    await expect(worker.process(job(0))).resolves.toMatchObject({ success: false })
+    expect(lastLogged()).toMatchObject({ status: 'FAILED' })
+    expect(lastLogged().responseBody).toContain('10.0.0.5')
+  })
+
+  it('records an oversize response as failed, without retrying', async () => {
+    vi.mocked(axios.post).mockRejectedValue(
+      new axios.AxiosError(
+        `maxContentLength size of ${WEBHOOK_MAX_RESPONSE_BYTES} exceeded`,
+        axios.AxiosError.ERR_BAD_RESPONSE,
+      ),
+    )
+
+    await expect(worker.process(job(0))).resolves.toMatchObject({ success: false })
+    expect(lastLogged()).toMatchObject({ status: 'FAILED' })
+  })
+
+  it.each([
+    ['a success', () => Promise.resolve({ status: 200, data: 'x'.repeat(50_000) })],
+    ['a 4xx', () => Promise.reject(httpError(400, 'x'.repeat(50_000)))],
+  ])('truncates the stored body of %s', async (_label, respond) => {
+    vi.mocked(axios.post).mockImplementation(respond)
+
+    await worker.process(job(0))
+
+    expect(lastLogged().responseBody).toHaveLength(WEBHOOK_LOGGED_BODY_CHARS)
+  })
+
+  // Rows registered before the DTO rejected these headers still hold them.
+  it('drops blocked headers stored on an existing registration', async () => {
+    webhookService.findById.mockResolvedValue({
+      active: true,
+      url: 'https://tenant.example/hook',
+      webhookType: 'generic',
+      headers: { Host: 'redis.svc', 'X-Forwarded-For': '10.0.0.1', Authorization: 'Bearer t' },
+    })
+    vi.mocked(axios.post).mockResolvedValue({ status: 200, data: '' })
+
+    await worker.process(job(0))
+
+    const { headers } = vi.mocked(axios.post).mock.calls[0][2]
+    expect(headers).toEqual({ 'Content-Type': 'application/json', Authorization: 'Bearer t' })
   })
 })

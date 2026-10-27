@@ -8,42 +8,60 @@ import {
   IsEnum,
   IsIn,
   IsNotEmpty,
+  IsByteLength,
+  MaxLength,
 } from 'class-validator'
 // PartialType from @nestjs/swagger, not @nestjs/mapped-types: only this one carries the
 // @ApiProperty metadata across, without which the update DTO publishes as an empty schema.
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger'
 import { WebhookType } from '../../../enum/webhook-type.enum'
+import { AllowedWebhookHeaders } from './allowed-webhook-headers.validator'
 
 export const CHANNEL_TYPE_VALUES = ['email', 'sms', 'msgApp'] as const
 export const TRIGGER_VALUES = ['success', 'failure'] as const
+// webhook_config.url is VARCHAR(2048).
+export const CALLBACK_URL_MAX_LENGTH = 2048
+// webhook_config.secret is VARCHAR(512) holding base64(28-byte IV and tag + secret), which caps
+// the plaintext at 356 UTF-8 bytes. Bytes, not characters, are what overflow the column.
+export const CALLBACK_SECRET_MAX_BYTES = 356
 
 export class CallbackRegistrationRequest {
   @ApiProperty({
     description: 'HTTPS endpoint Notify POSTs delivery events to. Plain HTTP is rejected.',
     format: 'uri',
     example: 'https://example.gov.bc.ca/hooks/notify',
+    maxLength: CALLBACK_URL_MAX_LENGTH,
   })
   @IsNotEmpty()
   @IsUrl({ protocols: ['https'], require_protocol: true })
+  @MaxLength(CALLBACK_URL_MAX_LENGTH)
   url: string
 
   @ApiPropertyOptional({
     description:
       'Shared secret. When set, each call carries an HMAC of the body in X-Webhook-Signature so ' +
-      'you can verify it came from Notify.',
+      'you can verify it came from Notify. The secret itself is never sent - to authenticate ' +
+      'Notify to your endpoint, put a token in headers.Authorization instead.',
     example: 's3cr3t-value-you-generate',
+    maxLength: CALLBACK_SECRET_MAX_BYTES,
   })
   @IsOptional()
   @IsString()
+  @IsByteLength(0, CALLBACK_SECRET_MAX_BYTES, {
+    message: `secret must be at most ${CALLBACK_SECRET_MAX_BYTES} bytes`,
+  })
   secret?: string
 
   @ApiPropertyOptional({
     description:
-      'Extra headers sent with every call, for example an auth token your endpoint expects.',
+      'Extra headers sent with every call, for example an auth token your endpoint expects. ' +
+      'Values must be strings. Host, Cookie, Forwarded, X-Forwarded-*, X-Real-IP, Proxy-*, ' +
+      'X-Webhook-Signature and connection/framing headers are rejected.',
     example: { 'X-Environment': 'production' },
   })
   @IsOptional()
   @IsObject()
+  @AllowedWebhookHeaders()
   headers?: Record<string, string>
 
   @ApiProperty({
