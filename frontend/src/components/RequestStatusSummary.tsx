@@ -1,6 +1,8 @@
-import { BootstrapIcon } from '@/components/BootstrapIcon'
 import type { FC } from 'react'
 import { Separator } from '@bcgov/design-system-react-components'
+import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer'
+import GroupIcon from '@mui/icons-material/Group'
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import { NotificationChannel } from '@/enum/notification-channel.enum'
 import '@/scss/components/request-status.scss'
 import type { NotificationStatusCode } from '@/interfaces/NotificationRequest'
@@ -46,7 +48,7 @@ const RequestStatusSummary: FC<RequestStatusSummaryProps> = ({
     <div className="request-summary">
       <div className="request-summary__section">
         <span className="request-summary__label">
-          <BootstrapIcon name="chat-square-text" fontSize="small" />
+          <QuestionAnswerIcon fontSize="small" />
           Channels
         </span>
         <span className="request-summary__value">{formatChannels(channels)}</span>
@@ -56,7 +58,7 @@ const RequestStatusSummary: FC<RequestStatusSummaryProps> = ({
 
       <div className="request-summary__section">
         <span className="request-summary__label">
-          <BootstrapIcon name="people" fontSize="small" />
+          <GroupIcon fontSize="small" />
           Recipients
         </span>
         <span className="request-summary__value">{recipientsCount}</span>
@@ -66,7 +68,7 @@ const RequestStatusSummary: FC<RequestStatusSummaryProps> = ({
 
       <div className="request-summary__section">
         <span className="request-summary__label">
-          <BootstrapIcon name="calendar" fontSize="small" />
+          <CalendarTodayIcon fontSize="small" />
           Sent
         </span>
         <span className="request-summary__value">{formatSentDate(sentDate)}</span>

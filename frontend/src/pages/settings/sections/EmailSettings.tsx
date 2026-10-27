@@ -1,4 +1,3 @@
-import { BootstrapIcon } from '@/components/BootstrapIcon'
 import { useEffect, useState } from 'react'
 import type { FC, SubmitEvent } from 'react'
 import {
@@ -12,6 +11,7 @@ import {
   TextField,
   Tooltip,
 } from '@bcgov/design-system-react-components'
+import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import EmailLogoMenu from '@/components/EmailLogoMenu'
 import StickyBar from '@/components/StickyBar'
 import TooltipTrigger from '@/components/TooltipTrigger'
@@ -250,7 +250,7 @@ const EmailSettings: FC = () => {
             href="https://www2.gov.bc.ca/gov/content/governments/services-for-government/policies-procedures/bc-visual-identity"
             target="_blank"
             rel="noopener noreferrer"
-            iconRight={<BootstrapIcon name="box-arrow-up-right" fontSize="inherit" />}
+            iconRight={<OpenInNewIcon fontSize="inherit" />}
           >
             ministry GCPE communications office
           </Link>{' '}
