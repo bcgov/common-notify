@@ -33,9 +33,9 @@ export class FeatureFlagGuard implements CanActivate {
   private readonly logger = new Logger(FeatureFlagGuard.name)
 
   constructor(
-    private reflector: Reflector,
-    private featureFlagService: FeatureFlagService,
-    private tenantsService: TenantsService,
+    private readonly reflector: Reflector,
+    private readonly featureFlagService: FeatureFlagService,
+    private readonly tenantsService: TenantsService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {

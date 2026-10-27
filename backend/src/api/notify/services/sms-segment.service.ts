@@ -93,7 +93,7 @@ export class SmsSegmentService {
       } catch (error) {
         return async () => failOpen(error)
       }
-      if (!template || template.channelCode !== 'SMS') return async () => content.body
+      if (template?.channelCode !== 'SMS') return async () => content.body
       return guarded(
         async (params) =>
           (await this.templatesService.renderTemplateContent(template, params)).body,

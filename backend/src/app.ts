@@ -1,4 +1,4 @@
-import { NestFactory } from '@nestjs/core'
+import { NestFactory, ModuleRef } from '@nestjs/core'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { AppModule } from './app.module'
 import { StructuredLoggerService } from './common/logger'
