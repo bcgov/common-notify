@@ -7,7 +7,6 @@ import {
   RenderedSms,
   RenderOptions,
 } from '../../../adapters/interfaces'
-import { renderPlainText } from '../utils/render-plain-text'
 import { splitPersonalisation } from '../utils/split-personalisation'
 
 /**
@@ -69,7 +68,11 @@ export class HandlebarsTemplateRenderer implements ITemplateRenderer {
     // Validate template for dangerous patterns
     validateTemplate(context.template.body)
 
-    const body = renderPlainText(context.template.body, context.personalisation)
+    // SMS is plain text, never HTML: noEscape keeps personalisation literal. Without it
+    // Handlebars escapes for HTML and a value like "O'Brien" is sent as "O&#x27;Brien".
+    const body = Handlebars.compile(context.template.body, { noEscape: true })(
+      context.personalisation,
+    )
     return Promise.resolve({ body })
   }
 }

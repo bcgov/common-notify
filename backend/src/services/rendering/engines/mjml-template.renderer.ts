@@ -8,7 +8,6 @@ import {
   RenderedSms,
   RenderOptions,
 } from '../../../adapters/interfaces'
-import { renderPlainText } from '../utils/render-plain-text'
 import { splitPersonalisation } from '../utils/split-personalisation'
 
 const validateTemplate = (template: string): void => {
@@ -99,7 +98,9 @@ export class MjmlTemplateRenderer implements ITemplateRenderer {
   async renderSms(context: RenderContext, _options?: RenderOptions): Promise<RenderedSms> {
     validateTemplate(context.template.body)
 
-    // SMS is plain text: no MJML compilation.
-    return { body: renderPlainText(context.template.body, context.personalisation) }
+    // SMS is plain text: no MJML compilation and no HTML escaping of personalisation.
+    return {
+      body: Handlebars.compile(context.template.body, { noEscape: true })(context.personalisation),
+    }
   }
 }
