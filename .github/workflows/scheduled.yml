@@ -17,8 +17,11 @@ jobs:
     env:
       # https://tecadmin.net/getting-yesterdays-date-in-bash/
       CUTOFF: "1 week ago"
-    runs-on: ubuntu-slim
+    # ubuntu-slim has no helm; the job reported success while purging nothing.
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      pull-requests: read
     steps:
       - name: Clean up Helm Releases
         uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
@@ -36,6 +39,8 @@ jobs:
             # Echos
             echo "Delete stale Helm releases"
             echo "Cutoff: ${{ env.CUTOFF }}"
+
+            command -v helm >/dev/null || { echo "::error::helm not found on runner"; exit 1; }
 
             # Before date, list of releases
             BEFORE=$(date +%s -d "${{ env.CUTOFF }}")
@@ -55,9 +60,26 @@ jobs:
               fi
               UPDATED=$(date "+%s" -d "$LAST_DEPLOYED" || echo "0")
 
-              # Compare to cutoff and delete as necessary
-              if [[ ${UPDATED} < ${BEFORE} ]]; then
-                echo -e "\nOlder than cutoff: ${r}"
+              # Age alone would delete the environment of an open PR that just
+              # has not been pushed to in a week.
+              PR_NUM=${r##*-}
+              PR_STATE=$(GH_TOKEN="${{ secrets.GITHUB_TOKEN }}" \
+                gh pr view "${PR_NUM}" --repo "${{ github.repository }}" \
+                --json state -q .state 2>/dev/null || echo "UNKNOWN")
+              if [ "${PR_STATE}" = "OPEN" ]; then
+                echo -e "\nPR #${PR_NUM} still open: ${r}"
+                echo "Skipping"
+                continue
+              fi
+              if [ "${PR_STATE}" = "UNKNOWN" ]; then
+                echo -e "\nCould not read PR #${PR_NUM} state: ${r}"
+                echo "Skipping to stay safe"
+                continue
+              fi
+
+              # -lt, not <, which inside [[ ]] compares as strings.
+              if [ "${UPDATED}" -lt "${BEFORE}" ]; then
+                echo -e "\nOlder than cutoff and PR ${PR_STATE}: ${r}"
                 helm uninstall --no-hooks ${r}
                 oc delete pvc/${r}-bitnami-pg-0 || true
               else
