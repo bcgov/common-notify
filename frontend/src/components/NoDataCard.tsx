@@ -2,7 +2,7 @@ import type { FC } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import type { LinkProps } from '@tanstack/react-router'
 import { Button } from '@bcgov/design-system-react-components'
-import DashboardOutlined from '@mui/icons-material/DashboardOutlined'
+import { BootstrapIcon } from './BootstrapIcon'
 import '@/scss/components/no-data-card.scss'
 
 interface NoDataCardProps {
@@ -27,7 +27,7 @@ const NoDataCard: FC<NoDataCardProps> = ({
   return (
     <div className="no-data-card">
       <span className="no-data-card__icon" aria-hidden="true">
-        <DashboardOutlined />
+        <BootstrapIcon name="grid" fontSize="small" />
       </span>
       <p className="no-data-card__title">{title}</p>
       <p className="no-data-card__message">{message}</p>
