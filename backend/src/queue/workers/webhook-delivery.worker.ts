@@ -1,11 +1,15 @@
-import { Logger } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
+import { describeError } from '../../common/utils/describe-error'
 import { createHmac } from 'crypto'
-import Bull from 'bull'
+import type { Job } from 'bullmq'
 import axios from 'axios'
 import { WebhookJobPayload } from '../queue.types'
 import { WebhookService } from '../../api/webhook/webhook.service'
 import { WebhookType } from '../../enum/webhook-type.enum'
 import { WebhookDeliveryLogRepository } from '../../api/webhook/webhook-delivery-log.repository'
+import { QueueName } from '../../enum/queue-name.enum'
+import { QueueProcessor } from './queue-processor'
+import { maxAttempts, retryDelay } from '../job-options'
 
 /**
  * Webhook Delivery Worker
@@ -19,170 +23,156 @@ import { WebhookDeliveryLogRepository } from '../../api/webhook/webhook-delivery
  *
  * Retry strategy:
  * - 4xx responses: treated as permanent failures (bad client config), no retry
- * - 5xx responses / network errors: retried up to 3 attempts (~5s, 10s, 20s)
+ * - 5xx responses / network errors: 3 attempts, retried after 5s then 15s (WEBHOOK_JOB_OPTIONS)
  *
  * Idempotency: Job key is webhook_{webhookId}_{notificationId}_{status}
  */
-export class WebhookDeliveryWorker {
-  /**
-   * Initialize the webhook delivery worker on a queue
-   * @param webhookQueue The Bull queue instance for webhook delivery jobs
-   * @param webhookService Service for fetching webhook configs and delivery logs
-   * @param webhookDeliveryLogRepository Repository for logging delivery attempts
-   * @param concurrency Number of jobs to process in parallel (default: 2)
-   */
-  static initialize(
-    webhookQueue: Bull.Queue<WebhookJobPayload>,
-    webhookService: WebhookService,
-    webhookDeliveryLogRepository: WebhookDeliveryLogRepository,
-    concurrency: number = 2,
-  ): void {
-    const logger = new Logger(WebhookDeliveryWorker.name)
+@Injectable()
+export class WebhookDeliveryWorker implements QueueProcessor<WebhookJobPayload> {
+  readonly queueName = QueueName.WEBHOOK_DELIVERY
+  readonly concurrency = { configKey: 'webhookDeliveryWorkerConcurrency', default: 2 }
+  private readonly logger = new Logger(WebhookDeliveryWorker.name)
 
-    logger.log(`Registering webhook delivery worker processor (concurrency=${concurrency})`)
+  constructor(
+    private readonly webhookService: WebhookService,
+    private readonly webhookDeliveryLogRepository: WebhookDeliveryLogRepository,
+  ) {}
 
-    webhookQueue.process(concurrency, async (job: Bull.Job<WebhookJobPayload>) => {
-      const { notificationId, tenantId, webhookId, event, payload } = job.data
-      const attemptNumber = (job.attemptsMade || 0) + 1
+  async process(job: Job<WebhookJobPayload>): Promise<unknown> {
+    const { notificationId, tenantId, webhookId, payload } = job.data
+    const attemptNumber = (job.attemptsMade || 0) + 1
 
-      logger.log(
-        `[${notificationId}] Processing webhook delivery job for webhook=${webhookId} (attempt ${attemptNumber})`,
+    this.logger.log(
+      `[${notificationId}] Processing webhook delivery job for webhook=${webhookId} (attempt ${attemptNumber})`,
+    )
+
+    // It may have been deleted or deactivated since the job was queued.
+    const webhookConfig = await this.webhookService.findById(tenantId, webhookId)
+    if (!webhookConfig?.active) {
+      this.logger.warn(
+        `[${notificationId}] Webhook ${webhookId} not found or inactive — skipping delivery`,
       )
+      return { success: false, reason: 'webhook_inactive' }
+    }
 
-      // Fetch the webhook config — it may have been deleted or deactivated since queuing
-      const webhookConfig = await webhookService.findById(tenantId, webhookId)
-      if (!webhookConfig || !webhookConfig.active) {
-        logger.warn(
-          `[${notificationId}] Webhook ${webhookId} not found or inactive — skipping delivery`,
-        )
-        return { success: false, reason: 'webhook_inactive' }
-      }
-
-      // Build the POST body
-      const genericPostBody = {
-        event,
-        notificationId,
-        tenantId,
-        data: payload,
-        deliveredAt: new Date().toISOString(),
-      }
-
-      // Teams expects a payload formatted in a certain way
-      const postBody =
-        webhookConfig.webhookType === WebhookType.TEAMS
-          ? buildTeamsPayload(notificationId, payload)
-          : genericPostBody
-      const bodyString = JSON.stringify(postBody)
-
-      // Build headers
-      const requestHeaders: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...(webhookConfig.headers ?? {}),
-      }
-
-      // HMAC-SHA256 sign the raw JSON body if a secret is configured
-      if (webhookConfig.secret) {
-        const hmac = createHmac('sha256', webhookConfig.secret).update(bodyString).digest('hex')
-        requestHeaders['X-Webhook-Signature'] = `sha256=${hmac}`
-      }
-
-      let httpStatusCode: number | undefined
-      let responseBody: string | undefined
-
-      try {
-        const response = await axios.post(webhookConfig.url, postBody, {
-          headers: requestHeaders,
-          timeout: 30_000,
-        })
-
-        httpStatusCode = response.status
-        responseBody =
-          typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
-
-        await webhookDeliveryLogRepository.logAttempt({
-          webhookConfigId: webhookId,
-          notificationId,
-          tenantId,
-          eventType: event,
-          httpStatusCode,
-          responseBody,
-          attemptNumber,
-          status: 'SENT',
-        })
-
-        logger.log(
-          `[${notificationId}] Webhook delivered to ${webhookConfig.url} (status=${httpStatusCode})`,
-        )
-        return { success: true, statusCode: httpStatusCode }
-      } catch (error) {
-        const isLastAttempt = (job.attemptsMade || 0) >= (job.opts.attempts || 3) - 1
-
-        if (axios.isAxiosError(error) && error.response) {
-          httpStatusCode = error.response.status
-          responseBody =
-            typeof error.response.data === 'string'
-              ? error.response.data
-              : JSON.stringify(error.response.data)
-
-          // 4xx = client error (bad URL, auth failure, etc.) — do not retry
-          if (httpStatusCode >= 400 && httpStatusCode < 500) {
-            await webhookDeliveryLogRepository.logAttempt({
-              webhookConfigId: webhookId,
-              notificationId,
-              tenantId,
-              eventType: event,
-              httpStatusCode,
-              responseBody,
-              attemptNumber,
-              status: 'FAILED',
-            })
-            logger.warn(
-              `[${notificationId}] Webhook ${webhookId} returned ${httpStatusCode} (4xx) — not retrying`,
-            )
-            return { success: false, statusCode: httpStatusCode }
+    // Teams expects a payload formatted in a certain way
+    const postBody =
+      webhookConfig.webhookType === WebhookType.TEAMS
+        ? buildTeamsPayload(notificationId, payload)
+        : {
+            event: job.data.event,
+            notificationId,
+            tenantId,
+            data: payload,
+            deliveredAt: new Date().toISOString(),
           }
-        }
+    const bodyString = JSON.stringify(postBody)
 
-        const errorMessage = error instanceof Error ? error.message : String(error)
-        const deliveryStatus = isLastAttempt ? 'FAILED' : 'RETRYING'
+    const requestHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(webhookConfig.headers ?? {}),
+    }
+    // HMAC-SHA256 sign the raw JSON body if a secret is configured
+    if (webhookConfig.secret) {
+      const hmac = createHmac('sha256', webhookConfig.secret).update(bodyString).digest('hex')
+      requestHeaders['X-Webhook-Signature'] = `sha256=${hmac}`
+    }
 
-        await webhookDeliveryLogRepository.logAttempt({
-          webhookConfigId: webhookId,
-          notificationId,
-          tenantId,
-          eventType: event,
-          httpStatusCode,
-          responseBody: responseBody ?? errorMessage,
-          attemptNumber,
-          status: deliveryStatus,
-          nextRetryAt: isLastAttempt
-            ? undefined
-            : new Date(Date.now() + 5000 * Math.pow(2, attemptNumber)),
-        })
-
-        logger.error(
-          `[${notificationId}] Webhook delivery to ${webhookConfig.url} failed (attempt ${attemptNumber}): ${errorMessage}`,
-        )
-
-        // Re-throw to trigger Bull retry for 5xx / network errors
-        throw error
-      }
-    })
-
-    webhookQueue.on('completed', (job: Bull.Job<WebhookJobPayload>) => {
-      const { notificationId, webhookId } = job.data
-      logger.debug(`[${notificationId}] Webhook delivery job completed for webhook=${webhookId}`)
-    })
-
-    webhookQueue.on('failed', (job: Bull.Job<WebhookJobPayload>, err: Error) => {
-      const { notificationId, webhookId } = job.data
-      logger.error(
-        `[${notificationId}] Webhook delivery job failed for webhook=${webhookId} (attempt ${job.attemptsMade}/${job.opts.attempts}): ${err.message}`,
+    try {
+      const response = await axios.post(webhookConfig.url, postBody, {
+        headers: requestHeaders,
+        timeout: 30_000,
+      })
+      const httpStatusCode = response.status
+      await this.logAttempt(job, {
+        httpStatusCode,
+        responseBody: responseText(response.data),
+        status: 'SENT',
+      })
+      this.logger.log(
+        `[${notificationId}] Webhook delivered to ${webhookConfig.url} (status=${httpStatusCode})`,
       )
-    })
-
-    logger.log('Webhook delivery worker initialized')
+      return { success: true, statusCode: httpStatusCode }
+    } catch (error) {
+      return this.handleDeliveryError(job, webhookConfig.url, error)
+    }
   }
+
+  onCompleted(job: Job<WebhookJobPayload>): void {
+    const { notificationId, webhookId } = job.data
+    this.logger.debug(`[${notificationId}] Webhook delivery job completed for webhook=${webhookId}`)
+  }
+
+  onFailed(job: Job<WebhookJobPayload>, error: Error): void {
+    const { notificationId, webhookId } = job.data
+    this.logger.error(
+      `[${notificationId}] Webhook delivery job failed for webhook=${webhookId} (attempt ${job.attemptsMade}/${job.opts.attempts}): ${error.message}`,
+    )
+  }
+
+  /**
+   * A 4xx is the tenant's configuration (a bad URL, a rejected credential): logged and not
+   * retried. Anything else - a 5xx, a network error - is rethrown for the queue to retry.
+   */
+  private async handleDeliveryError(
+    job: Job<WebhookJobPayload>,
+    url: string,
+    error: unknown,
+  ): Promise<{ success: false; statusCode: number }> {
+    const { notificationId, webhookId } = job.data
+    const attemptNumber = (job.attemptsMade ?? 0) + 1
+    const isLastAttempt = attemptNumber >= maxAttempts(job)
+    const response = axios.isAxiosError(error) ? error.response : undefined
+    const httpStatusCode = response?.status
+    const responseBody = response ? responseText(response.data) : undefined
+
+    if (httpStatusCode && httpStatusCode >= 400 && httpStatusCode < 500) {
+      await this.logAttempt(job, { httpStatusCode, responseBody, status: 'FAILED' })
+      this.logger.warn(
+        `[${notificationId}] Webhook ${webhookId} returned ${httpStatusCode} (4xx) — not retrying`,
+      )
+      return { success: false, statusCode: httpStatusCode }
+    }
+
+    const errorMessage = describeError(error)
+    await this.logAttempt(job, {
+      httpStatusCode,
+      responseBody: responseBody ?? errorMessage,
+      status: isLastAttempt ? 'FAILED' : 'RETRYING',
+      // The same schedule the queue retries on.
+      nextRetryAt: isLastAttempt
+        ? undefined
+        : new Date(Date.now() + retryDelay(job, attemptNumber)),
+    })
+    this.logger.error(
+      `[${notificationId}] Webhook delivery to ${url} failed (attempt ${attemptNumber}): ${errorMessage}`,
+    )
+    throw error
+  }
+
+  private async logAttempt(
+    job: Job<WebhookJobPayload>,
+    attempt: {
+      httpStatusCode?: number
+      responseBody?: string
+      status: 'SENT' | 'FAILED' | 'RETRYING'
+      nextRetryAt?: Date
+    },
+  ): Promise<void> {
+    const { notificationId, tenantId, webhookId, event } = job.data
+    await this.webhookDeliveryLogRepository.logAttempt({
+      webhookConfigId: webhookId,
+      notificationId,
+      tenantId,
+      eventType: event,
+      attemptNumber: (job.attemptsMade || 0) + 1,
+      ...attempt,
+    })
+  }
+}
+
+function responseText(data: unknown): string {
+  return typeof data === 'string' ? data : JSON.stringify(data)
 }
 
 function buildTeamsPayload(notificationId: string, payload: any): any {

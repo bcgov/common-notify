@@ -1,5 +1,5 @@
 # Build
-FROM node:24.21.0-slim AS build
+FROM node:24.22.1-slim AS build
 
 # Copy, build static files; see .dockerignore for exclusions
 WORKDIR /app
@@ -7,7 +7,7 @@ COPY . ./
 RUN npm ci --ignore-scripts --no-update-notifier && npm run build
 
 # Dependencies
-FROM node:24.21.0-slim AS dependencies
+FROM node:24.22.1-slim AS dependencies
 
 # Copy, build static files; see .dockerignore for exclusions
 WORKDIR /app
@@ -15,7 +15,7 @@ COPY . ./
 RUN npm ci --ignore-scripts --no-update-notifier --omit=dev
 
 # Deploy using minimal Distroless image
-FROM gcr.io/distroless/nodejs22-debian12:nonroot
+FROM gcr.io/distroless/nodejs22-debian13:nonroot
 ENV NODE_ENV=production
 
 # Copy app and dependencies

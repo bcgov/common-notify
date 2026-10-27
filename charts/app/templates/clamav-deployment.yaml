@@ -10,9 +10,19 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.backend.clamav.replicas | default 1 }}
   strategy:
+    {{- if eq (.Values.backend.clamav.deploymentStrategy | default "Recreate") "RollingUpdate" }}
+    type: RollingUpdate
+    rollingUpdate:
+      # maxSurge 0 keeps the pod count at replicas, since each pod asks for
+      # 768Mi. maxUnavailable 1 keeps one scanner serving through the rollout,
+      # which failClosed depends on.
+      maxUnavailable: 1
+      maxSurge: 0
+    {{- else }}
     type: Recreate
+    {{- end }}
   selector:
     matchLabels:
       app: clamav
@@ -26,6 +36,21 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
       securityContext: {}
+      {{- if gt (int (.Values.backend.clamav.replicas | default 1)) 1 }}
+      # Spread the replicas across nodes, so losing one node does not take the
+      # whole scanner out. Preferred, not required: a single-node shortage
+      # should degrade placement, not leave a pod unschedulable.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app: clamav
+                    app.kubernetes.io/instance: {{ .Release.Name }}
+      {{- end }}
       containers:
         - name: clamav
           # Using official ClamAV image with custom command to bypass chown operations

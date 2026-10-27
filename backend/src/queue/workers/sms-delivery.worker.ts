@@ -1,626 +1,301 @@
-import { BadRequestException, HttpException, Logger, NotFoundException } from '@nestjs/common'
-import Bull from 'bull'
-import { DeliveryJobPayload, MailMergeJobData } from '../queue.types'
-import { batchProgressReporter, type BatchProgressReporter } from '../batch-progress'
-import { loadBatchRecipients } from './merge-batch-recipients'
-import { TransientDeliveryError, isTransientDeliveryError } from '../../adapters/delivery-errors'
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common'
+import type { Job } from 'bullmq'
+import { DeliveryJobPayload } from '../queue.types'
+import { SMS_CHANNEL } from './delivery-channel'
+import { DeliveryFailureHandler } from './delivery-failure-handler'
+import { MergeBatchRunner, MergeSender } from './merge-batch-runner'
+import { DeliveryWorker } from './delivery-worker'
+import { TransientDeliveryError } from '../../adapters/delivery-errors'
+import { QueueName } from '../../enum/queue-name.enum'
 import { NotificationService } from '../../api/notification/notification.service'
 import { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import { TemplatesRepository } from '../../api/templates/templates.repository'
 import { TemplatesService } from '../../api/templates/templates.service'
 import { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
 import { NotificationStatus } from '../../enum/notification-status.enum'
-import { ISmsTransport, SmsRecipientResult } from '../../adapters'
+import { ISmsTransport, SMS_ADAPTER, SmsRecipientResult } from '../../adapters'
 import { StructuredLoggerService } from '../../common/logger'
 import { PhoneNumberService } from '../../api/notify/services/phone-number.service'
 
-export interface SmsDeliveryWorkerDeps {
-  /** The Bull queue instance for SMS delivery jobs */
-  smsQueue: Bull.Queue<DeliveryJobPayload>
-  /** Service for database updates */
-  notificationService: NotificationService
-  /** Repository for template resolution */
-  templatesRepository: TemplatesRepository
-  /** Service for template rendering */
-  templatesService: TemplatesService
-  /** Service for inline template rendering */
-  inlineRenderingService: InlineRenderingService
-  /** SMS transport adapter for sending SMS messages */
-  smsAdapter: ISmsTransport
-  requestDetailService: NotificationRequestDetailService
-  /** Number of jobs to process in parallel (default: 2) */
-  concurrency?: number
-  structuredLogger?: StructuredLoggerService
+type SmsPayload = DeliveryJobPayload['payload']
+
+interface SmsSendResult {
+  externalId: string
+  provider: string
+  providerResponse?: string
+  /** Per-recipient outcomes, from a transport that reports them. */
+  results?: SmsRecipientResult[]
+}
+
+function hasBody(payload: SmsPayload): boolean {
+  return !!payload.content?.body && typeof payload.content.body === 'string'
 }
 
 /**
  * SMS Delivery Worker
  *
- * Processes SMS delivery jobs:
- * 1. Receives SMS delivery jobs from the SMS_DELIVERY queue
- * 2. Updates notification status to SENDING in database
- * 3. Gets the appropriate adapter (future: GC Notify, Twilio, etc)
- * 4. Sends SMS via adapter
- * 5. Updates notification status to COMPLETED on success, FAILED on error
- * 6. Implements retry logic with exponential backoff
+ * A plain send renders its body (a server template or inline content) and sends it to every
+ * recipient through the SMS adapter; a transport that reports per recipient has each outcome
+ * recorded on its own row. A merge batch sends each recipient their own rendering
+ * (MergeBatchRunner). A failure is settled by DeliveryFailureHandler and retried.
  *
- * Idempotency: Job key is notifyId_sms, preventing duplicate delivery
- * Tracing: All operations logged with notifyId for end-to-end visibility
+ * Idempotency: the job key is notifyId_sms, or the batchId for a merge batch.
  */
-export class SmsDeliveryWorker {
-  private readonly logger = new Logger(SmsDeliveryWorker.name)
-  private static readonly phoneNumberService = new PhoneNumberService()
+@Injectable()
+export class SmsDeliveryWorker extends DeliveryWorker {
+  readonly queueName = QueueName.SMS_DELIVERY
+  readonly concurrency = { configKey: 'smsDeliveryWorkerConcurrency', default: 2 }
+  protected readonly channel = SMS_CHANNEL
+  protected readonly logger = new Logger(SmsDeliveryWorker.name)
 
-  private static isPermanentValidationError(error: unknown): error is HttpException {
-    return error instanceof HttpException && error.getStatus() === 400
+  constructor(
+    private readonly notificationService: NotificationService,
+    private readonly requestDetailService: NotificationRequestDetailService,
+    private readonly templatesRepository: TemplatesRepository,
+    private readonly templatesService: TemplatesService,
+    private readonly inlineRenderingService: InlineRenderingService,
+    @Inject(SMS_ADAPTER) private readonly smsAdapter: ISmsTransport,
+    private readonly phoneNumberService: PhoneNumberService,
+    mergeBatches: MergeBatchRunner,
+    failures: DeliveryFailureHandler,
+    @Optional() structuredLogger?: StructuredLoggerService,
+  ) {
+    super(mergeBatches, failures, structuredLogger)
   }
 
-  /** Initialize the SMS delivery worker on a queue */
-  static initialize({
-    smsQueue,
-    notificationService,
-    templatesRepository,
-    templatesService,
-    inlineRenderingService,
-    smsAdapter,
-    requestDetailService,
-    concurrency = 2,
-    structuredLogger,
-  }: SmsDeliveryWorkerDeps): void {
-    const logger = new Logger(SmsDeliveryWorker.name)
-    const workerContext = SmsDeliveryWorker.name
+  /** Render each merge recipient's body from their own params and send it. */
+  protected mergeSender(job: Job<DeliveryJobPayload>): MergeSender {
+    const { notifyId } = job.data
+    return {
+      channel: SMS_CHANNEL,
+      hasInlineContent: (content) => !!content?.body,
+      send: async (recipient, params, { template, inline }) => {
+        const { body } = template
+          ? await this.templatesService.renderTemplateContent(template, params)
+          : await this.inlineRenderingService.renderSms(inline, params)
+        const result = await this.sendSms(
+          { recipients: { to: [recipient.address] }, content: { body } },
+          notifyId,
+        )
+        return result.externalId
+      },
+    }
+  }
 
-    logger.log(`Registering SMS delivery worker processor (concurrency=${concurrency})`)
+  /** A plain send: one body to every recipient on the job. */
+  protected async deliver(job: Job<DeliveryJobPayload>, startedAt: number): Promise<unknown> {
+    const { notifyId, tenantId } = job.data
+    const payload = this.validatedPayload(job.data.payload)
 
-    // Register the job processor with configurable concurrency
-    // Note: Don't await process() - it sets up listeners and never resolves
-    smsQueue.process(concurrency, async (job: Bull.Job<DeliveryJobPayload>) => {
-      const { notifyId, tenantId, payload, request } = job.data
-      const startedAt = Date.now()
+    // A redelivered job (a stalled worker, a rolling deploy) must not send again to anyone a
+    // previous attempt already reached. resetForRetry keeps their rows; the send list, which comes
+    // from the payload rather than those rows, is filtered against them below. The lookup runs on
+    // every attempt because a stalled job is re-run without incrementing attemptsMade.
+    if ((job.attemptsMade ?? 0) > 0) {
+      await this.requestDetailService.resetForRetry(notifyId)
+    }
+    const alreadySent = await this.requestDetailService.findSentAddresses(notifyId)
 
-      logger.debug(`[${notifyId}] Processing SMS delivery job for tenant=${tenantId}`)
+    let resolved = await this.render(job.data, payload)
 
+    await this.notificationService.update(notifyId, tenantId, {
+      status: NotificationStatus.SENDING,
+      updatedBy: 'system',
+    })
+    await this.requestDetailService.updateStatus(notifyId, NotificationStatus.SENDING, {
+      preserveCompleted: true,
+    })
+    this.logger.debug(`[${notifyId}] Updated notification status to SENDING`)
+
+    if (alreadySent.size > 0) {
+      const remaining = resolved.recipients.to.filter((recipient) => !alreadySent.has(recipient))
+      if (remaining.length === 0) {
+        this.logger.log(
+          `[${notifyId}] Every recipient was delivered on an earlier attempt; nothing to re-send`,
+        )
+        await this.notificationService.update(notifyId, tenantId, {
+          status: NotificationStatus.COMPLETED,
+          updatedBy: 'system',
+        })
+        return { success: true, notifyId }
+      }
+
+      this.logger.log(
+        `[${notifyId}] Skipping ${alreadySent.size} recipient(s) delivered on an earlier attempt`,
+      )
+      resolved = { ...resolved, recipients: { ...resolved.recipients, to: remaining } }
+    }
+
+    const result = await this.sendSms(resolved, notifyId)
+    this.logger.debug(`[${notifyId}] SMS sent: ${result.providerResponse ?? ''}`)
+
+    const finalStatus = await this.recordOutcome(notifyId, result)
+    await this.notificationService.update(notifyId, tenantId, {
+      status: finalStatus,
+      updatedBy: 'system',
+    })
+    this.logger.log(`[${notifyId}] Notification marked as ${finalStatus.toUpperCase()}`)
+    this.structuredLogger?.logNotificationSuccess(
+      notifyId,
+      tenantId,
+      'sms',
+      result.externalId,
+      Date.now() - startedAt,
+      SMS_CHANNEL.context,
+    )
+
+    return { success: true, externalId: result.externalId, provider: result.provider }
+  }
+
+  private validatedPayload(payload: SmsPayload): SmsPayload {
+    if (!payload || typeof payload !== 'object') {
+      throw new Error('Invalid delivery job: SMS payload is missing or invalid')
+    }
+    const to = payload.recipients?.to
+    if (!Array.isArray(to) || to.length === 0) {
+      throw new Error('Invalid SMS payload: recipient phone number is missing or invalid')
+    }
+    const invalidIndex = to.findIndex((recipient) => !this.phoneNumberService.isValid(recipient))
+    if (invalidIndex !== -1) {
+      throw new BadRequestException(
+        `Invalid SMS payload: recipient phone number at index ${invalidIndex} is not valid E.164`,
+      )
+    }
+    // A template supplies the body when rendered, so only inline content needs one now.
+    if (!payload.content?.templateId && !hasBody(payload)) {
+      throw new Error('Invalid SMS payload: body is missing or invalid')
+    }
+    return payload
+  }
+
+  /** Render the body from a server template or inline content. SMS is always plain text. */
+  private async render(
+    { notifyId, tenantId, request }: DeliveryJobPayload,
+    payload: SmsPayload,
+  ): Promise<SmsPayload> {
+    const templateId = payload.content?.templateId
+    const params = { ...request?.params, ...payload.params }
+    let rendered = payload
+
+    if (templateId) {
+      rendered = await this.renderTemplate(notifyId, tenantId, templateId, payload, params)
+    } else if (payload.content?.renderer) {
+      this.logger.debug(
+        `[${notifyId}] Rendering inline content with renderer: ${payload.content.renderer}`,
+      )
       try {
-        // Validate DeliveryJobPayload structure
-        if (!notifyId || typeof notifyId !== 'string') {
-          throw new Error('Invalid delivery job: notifyId is missing or invalid')
-        }
-        if (!tenantId || typeof tenantId !== 'string') {
-          throw new Error('Invalid delivery job: tenantId is missing or invalid')
-        }
-
-        // Emit a structured lifecycle "start" event.
-        structuredLogger?.logNotificationStart(notifyId, tenantId, 'sms', workerContext)
-
-        // A merge batch carries its recipients in mailMergeData, not a single payload: each one
-        // gets its own rendered body, so they are sent individually below.
-        if (job.data.mailMerge && job.data.mailMergeData && job.data.batchId) {
-          return await SmsDeliveryWorker.processMergeBatch(
-            job.data.batchId,
-            job.data.mailMergeData,
-            notifyId,
-            tenantId,
-            logger,
-            templatesRepository,
-            templatesService,
-            inlineRenderingService,
-            smsAdapter,
-            requestDetailService,
-            notificationService,
-            batchProgressReporter(job),
-          )
-        }
-
-        // Validate job data
-        if (!payload || typeof payload !== 'object') {
-          throw new Error('Invalid delivery job: SMS payload is missing or invalid')
-        }
-
-        if (
-          !payload.recipients ||
-          !payload.recipients.to ||
-          !Array.isArray(payload.recipients.to) ||
-          payload.recipients.to.length === 0
-        ) {
-          throw new Error('Invalid SMS payload: recipient phone number is missing or invalid')
-        }
-
-        const invalidRecipientIndex = payload.recipients.to.findIndex(
-          (recipient) => !SmsDeliveryWorker.phoneNumberService.isValid(recipient),
-        )
-        if (invalidRecipientIndex !== -1) {
-          throw new BadRequestException(
-            `Invalid SMS payload: recipient phone number at index ${invalidRecipientIndex} is not valid E.164`,
-          )
-        }
-
-        // A redelivered job (a stalled worker, a rolling deploy) must not send again to anyone a
-        // previous attempt already reached. resetForRetry keeps their rows; this filters them out
-        // of the send list, which comes from the payload rather than from those rows. The lookup
-        // runs on every attempt because Bull re-runs a stalled job without incrementing
-        // attemptsMade.
-        if ((job.attemptsMade ?? 0) > 0) {
-          await requestDetailService.resetForRetry(notifyId)
-        }
-        const alreadySent = await requestDetailService.findSentAddresses(notifyId)
-
-        let resolvedPayload = payload
-        const smsTemplateId = payload.content?.templateId
-        if (
-          !smsTemplateId &&
-          (!payload.content?.body || typeof payload.content.body !== 'string')
-        ) {
-          throw new Error('Invalid SMS payload: body is missing or invalid')
-        }
-
-        if (smsTemplateId) {
-          logger.debug(`[${notifyId}] Resolving template: ${smsTemplateId}`)
-          try {
-            const template = await templatesRepository.findById(tenantId, smsTemplateId)
-            if (!template) {
-              throw new NotFoundException(
-                `Template '${smsTemplateId}' not found for tenant '${tenantId}'`,
-              )
-            }
-
-            // Merge template content into SMS payload if channel matches
-            if (template.channelCode === 'SMS') {
-              // Render the template with personalisation data from request.params.
-              // SMS always renders as plain text, so no bodyType override applies here.
-              const rendered = await templatesService.renderTemplateContent(template, {
-                ...request?.params,
-                ...payload.params,
-              })
-
-              resolvedPayload = {
-                ...payload,
-                content: {
-                  ...payload.content,
-                  body: rendered.body,
-                  bodyType: rendered.bodyType,
-                },
-              }
-              logger.debug(`[${notifyId}] Template resolved and rendered into SMS payload`)
-            }
-          } catch (templateError) {
-            logger.error(
-              `[${notifyId}] Failed to resolve template: ${(templateError as Error).message}`,
-            )
-            throw templateError
-          }
-        } else if (payload.content?.renderer) {
-          // Handle inline rendering if renderer is specified and no templateId
-          logger.debug(
-            `[${notifyId}] Rendering inline content with renderer: ${payload.content.renderer}`,
-          )
-          try {
-            const rendered = await inlineRenderingService.renderSms(payload.content, {
-              ...request?.params,
-              ...payload.params,
-            })
-
-            resolvedPayload = {
-              ...payload,
-              content: {
-                ...payload.content,
-                body: rendered.body,
-              },
-            }
-            logger.debug(`[${notifyId}] Inline content rendered successfully`)
-          } catch (renderError) {
-            logger.error(
-              `[${notifyId}] Failed to render inline content: ${(renderError as Error).message}`,
-            )
-            throw renderError
-          }
-        }
-
-        if (!resolvedPayload.content?.body || typeof resolvedPayload.content.body !== 'string') {
-          throw new Error('Invalid SMS payload: body is missing or invalid')
-        }
-
-        // Update status to SENDING
-        await notificationService.update(notifyId, tenantId, {
-          status: NotificationStatus.SENDING,
-          updatedBy: 'system',
-        })
-        await requestDetailService.updateStatus(notifyId, NotificationStatus.SENDING, {
-          preserveCompleted: true,
-        })
-        logger.debug(`[${notifyId}] Updated notification status to SENDING`)
-
-        if (alreadySent.size > 0) {
-          const remaining = resolvedPayload.recipients.to.filter(
-            (recipient: string) => !alreadySent.has(recipient),
-          )
-
-          if (remaining.length === 0) {
-            logger.log(
-              `[${notifyId}] Every recipient was delivered on an earlier attempt; nothing to re-send`,
-            )
-            await notificationService.update(notifyId, tenantId, {
-              status: NotificationStatus.COMPLETED,
-              updatedBy: 'system',
-            })
-            return { success: true, notifyId }
-          }
-
-          logger.log(
-            `[${notifyId}] Skipping ${alreadySent.size} recipient(s) delivered on an earlier attempt`,
-          )
-          resolvedPayload = {
-            ...resolvedPayload,
-            recipients: { ...resolvedPayload.recipients, to: remaining },
-          }
-        }
-
-        // Send SMS using the injected adapter
-        const result = await SmsDeliveryWorker.sendSmsViaAdapter(
-          resolvedPayload,
-          logger,
-          notifyId,
-          smsAdapter,
-        )
-
-        logger.debug(`[${notifyId}] SMS sent: ${result.providerResponse ?? ''}`)
-
-        // A transport that reports per recipient gets each outcome recorded on its own row, so a
-        // partial failure is visible and - crucially - the successes are not repeated by a retry.
-        // A transport that cannot (or a send that wholly succeeded) is still all-or-nothing.
-        let finalStatus = NotificationStatus.COMPLETED
-        if (result.results && result.results.length > 0) {
-          for (const recipient of result.results) {
-            // The provider could not take it: still owed, not failed. Sent again below.
-            if (recipient.transient) continue
-            if (recipient.success) {
-              await requestDetailService.markRecipientSent(
-                notifyId,
-                null,
-                recipient.to,
-                recipient.messageId,
-              )
-            } else {
-              await requestDetailService.markRecipientFailed(
-                notifyId,
-                null,
-                recipient.to,
-                recipient.error ?? 'Send failed',
-              )
-            }
-          }
-
-          // Who was sent is recorded above, so the retry skips them; the rest are sent again once
-          // the provider is back.
-          const owed = result.results.filter((recipient) => recipient.transient)
-          if (owed.length > 0) {
-            throw new TransientDeliveryError(
-              `${owed.length} recipient(s) not sent, provider unavailable: ${owed[0].error ?? ''}`,
-              502,
-            )
-          }
-
-          const failedCount = result.results.filter((recipient) => !recipient.success).length
-          if (failedCount > 0) {
-            finalStatus = NotificationStatus.PARTIALLY_COMPLETED
-            logger.warn(
-              `[${notifyId}] SMS partially delivered: ${failedCount} of ${result.results.length} recipient(s) failed`,
-            )
-          }
-        } else {
-          // Request has made it to the sms gateway, update request detail records as sent
-          await requestDetailService.markSent(notifyId, result.externalId)
-        }
-
-        await notificationService.update(notifyId, tenantId, {
-          status: finalStatus,
-          updatedBy: 'system',
-        })
-        logger.log(`[${notifyId}] Notification marked as ${finalStatus.toUpperCase()}`)
-        structuredLogger?.logNotificationSuccess(
-          notifyId,
-          tenantId,
-          'sms',
-          result.externalId,
-          Date.now() - startedAt,
-          workerContext,
-        )
-
-        return { success: true, externalId: result.externalId, provider: result.provider }
+        const { body } = await this.inlineRenderingService.renderSms(payload.content, params)
+        rendered = { ...payload, content: { ...payload.content, body } }
+        this.logger.debug(`[${notifyId}] Inline content rendered successfully`)
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error)
-        const attempt = (job.attemptsMade || 0) + 1
-        const finalAttempt = (job.attemptsMade || 0) >= (job.opts.attempts || 3) - 1
-        logger.error(
-          `[${notifyId}] Failed to send SMS delivery job (attempt ${attempt}/3): ${errorMessage}`,
-          error instanceof Error ? error.stack : '',
+        this.logger.error(
+          `[${notifyId}] Failed to render inline content: ${(error as Error).message}`,
         )
-
-        // The provider could not take it right now. Nothing is marked failed, even on the last
-        // attempt: the recipients stay owed, and the delivery reconciler re-queues the job once
-        // Bull's retries are spent.
-        if (isTransientDeliveryError(error)) throw error
-
-        // A merge batch settles only itself: its sent rows, and every other batch, are not its
-        // to fail.
-        const batchId = job.data.mailMerge ? job.data.batchId : undefined
-        if (batchId) {
-          if (finalAttempt || SmsDeliveryWorker.isPermanentValidationError(error)) {
-            await requestDetailService.markBatchUnsentFailed(notifyId, batchId, errorMessage)
-            await SmsDeliveryWorker.settleMergeRequest(
-              notifyId,
-              tenantId,
-              requestDetailService,
-              notificationService,
-              logger,
-            )
-            job.discard()
-            logger.error(`[${notifyId}] Batch ${batchId} failed; its unsent recipients are FAILED`)
-          }
-          throw error
-        }
-
-        if (SmsDeliveryWorker.isPermanentValidationError(error)) {
-          await notificationService.update(notifyId, tenantId, {
-            status: NotificationStatus.FAILED,
-            updatedBy: 'system',
-            errorReason: errorMessage,
-          })
-          await requestDetailService.markFailed(notifyId, errorMessage)
-          job.discard()
-          logger.error(
-            `[${notifyId}] Notification marked as FAILED after permanent validation error. Error: ${errorMessage}`,
-          )
-          throw error
-        }
-
-        // Update status to FAILED only on final attempt (when no retries left)
-        if (finalAttempt) {
-          await notificationService.update(notifyId, tenantId, {
-            status: NotificationStatus.FAILED,
-            updatedBy: 'system',
-            errorReason: errorMessage,
-          })
-          await requestDetailService.markFailed(notifyId, errorMessage)
-          logger.error(
-            `[${notifyId}] Notification marked as FAILED after 3 attempts. Error: ${errorMessage}`,
-          )
-          structuredLogger?.logNotificationFailure(
-            notifyId,
-            tenantId,
-            'sms',
-            error instanceof Error ? error : errorMessage,
-            Date.now() - startedAt,
-            workerContext,
-          )
-        }
-
-        // Re-throw to trigger BullMQ retry logic
         throw error
       }
-    })
+    }
 
-    // Event listeners for job lifecycle
-    smsQueue.on('completed', (job: Bull.Job<DeliveryJobPayload>) => {
-      const { notifyId } = job.data
-      logger.debug(`[${notifyId}] SMS delivery job completed`)
-      structuredLogger?.logQueueOperation('complete', smsQueue.name, job.id?.toString(), notifyId, {
-        channel: 'sms',
-        context: workerContext,
-      })
-    })
-
-    smsQueue.on('failed', (job: Bull.Job<DeliveryJobPayload>, err: Error) => {
-      const { notifyId } = job.data
-      logger.error(
-        `[${notifyId}] SMS delivery job failed (attempt ${job.attemptsMade}/${job.opts.attempts}): error=${err.message}`,
-      )
-      structuredLogger?.logQueueOperation('failed', smsQueue.name, job.id?.toString(), notifyId, {
-        channel: 'sms',
-        context: workerContext,
-        error: err.message,
-        attemptsMade: job.attemptsMade,
-        maxAttempts: job.opts.attempts,
-      })
-    })
-
-    logger.log('SMS delivery worker initialized')
+    if (!hasBody(rendered)) {
+      throw new Error('Invalid SMS payload: body is missing or invalid')
+    }
+    return rendered
   }
 
-  /**
-   * Send SMS via adapter
-   * @param payload SMS payload
-   * @param logger Logger instance
-   * @param notifyId Notification ID for tracing
-   * @param smsAdapter SMS transport adapter
-   * @returns Promise with send result
-   */
-  /**
-   * Send one batch of a merge: render each recipient's body from their own params and send it.
-   *
-   * A failed recipient is recorded and skipped rather than throwing, so one bad row cannot strand
-   * the addresses already delivered in this batch; only systemic errors (a missing template) throw
-   * to trigger a retry of the whole batch.
-   */
-  private static async processMergeBatch(
-    batchId: string,
-    mailMergeData: MailMergeJobData,
+  private async renderTemplate(
     notifyId: string,
     tenantId: string,
-    logger: Logger,
-    templatesRepository: TemplatesRepository,
-    templatesService: TemplatesService,
-    inlineRenderingService: InlineRenderingService,
-    smsAdapter: ISmsTransport,
-    requestDetailService: NotificationRequestDetailService,
-    notificationService: NotificationService,
-    reportProgress?: BatchProgressReporter,
-  ): Promise<{ success: boolean; batchId: string; sent: number; failed: number }> {
-    const { content, params } = mailMergeData
-    const { recipients, alreadySent } = await loadBatchRecipients(
-      requestDetailService,
-      notifyId,
-      batchId,
-      mailMergeData.recipients,
-    )
-    const templateId = content?.templateId
-    const hasInlineContent = !!content?.body
-
-    // A merge renders from exactly one source: a server template or inline content.
-    if (templateId && hasInlineContent) {
-      throw new Error('SMS merge requires either a templateId or inline content, not both')
-    }
-    if (!templateId && !hasInlineContent) {
-      throw new Error('SMS merge requires either a templateId or inline content')
-    }
-
-    const template = templateId ? await templatesRepository.findById(tenantId, templateId) : null
-    if (templateId) {
+    templateId: string,
+    payload: SmsPayload,
+    params: Record<string, unknown>,
+  ): Promise<SmsPayload> {
+    this.logger.debug(`[${notifyId}] Resolving template: ${templateId}`)
+    try {
+      const template = await this.templatesRepository.findById(tenantId, templateId)
       if (!template) {
         throw new NotFoundException(`Template '${templateId}' not found for tenant '${tenantId}'`)
       }
-      if (template.channelCode !== 'SMS') {
-        throw new Error(`Template '${templateId}' is not an SMS template`)
-      }
+      // A template of another channel leaves the payload's own content to be validated.
+      if (template.channelCode !== 'SMS') return payload
+
+      const { body, bodyType } = await this.templatesService.renderTemplateContent(template, params)
+      this.logger.debug(`[${notifyId}] Template resolved and rendered into SMS payload`)
+      return { ...payload, content: { ...payload.content, body, bodyType } }
+    } catch (error) {
+      this.logger.error(`[${notifyId}] Failed to resolve template: ${(error as Error).message}`)
+      throw error
+    }
+  }
+
+  /**
+   * Record who the send reached, and return the request's status. A transport that reports per
+   * recipient has each outcome written to its own row, so a partial failure is visible and the
+   * successes are not repeated by a retry; one that cannot is all-or-nothing.
+   */
+  private async recordOutcome(
+    notifyId: string,
+    result: SmsSendResult,
+  ): Promise<NotificationStatus> {
+    if (!result.results?.length) {
+      await this.requestDetailService.markSent(notifyId, result.externalId)
+      return NotificationStatus.COMPLETED
     }
 
-    // Inline content defaults to handlebars so per-recipient variables are substituted.
-    const inlineContent = content
-      ? { ...content, renderer: content.renderer ?? ('handlebars' as const) }
-      : null
-
-    logger.debug(
-      `[${notifyId}] Processing SMS merge batch ${batchId}: ${recipients.length} recipient(s)`,
-    )
-
-    // The merge branch returns before the retry handling above, so a redelivered batch filters
-    // here instead. Addresses delivered by an earlier attempt keep their rows and are skipped.
-    const pending = alreadySent.size
-      ? recipients.filter((recipient) => !alreadySent.has(recipient.address))
-      : recipients
-
-    if (alreadySent.size > 0) {
-      logger.log(
-        `[${notifyId}] Batch ${batchId}: skipping ${alreadySent.size} recipient(s) delivered on an earlier attempt`,
-      )
-    }
-
-    let sent = 0
-    let failed = 0
-    // Recipients delivered by an earlier attempt count as sent, so a retried batch resumes its bar.
-    const progress = () => ({ sent: alreadySent.size + sent, failed, total: recipients.length })
-    reportProgress?.(progress())
-
-    for (const recipient of pending) {
-      try {
-        // Per-recipient params take precedence over the global ones.
-        const mergedParams = { ...(params || {}), ...recipient.params }
-
-        const body = template
-          ? (await templatesService.renderTemplateContent(template, mergedParams)).body
-          : (await inlineRenderingService.renderSms(inlineContent!, mergedParams)).body
-
-        const result = await SmsDeliveryWorker.sendSmsViaAdapter(
-          { recipients: { to: [recipient.address] }, content: { body } },
-          logger,
-          notifyId,
-          smsAdapter,
-        )
-
-        await requestDetailService.markRecipientSent(
-          notifyId,
-          batchId,
-          recipient.address,
-          result.externalId,
-        )
-        sent++
-      } catch (recipientError) {
-        // The provider, not this recipient: stop the batch and leave the rest owed. The job is
-        // retried, skipping whoever was sent, and the circuit breaker holds it until it is back.
-        if (isTransientDeliveryError(recipientError)) {
-          logger.warn(
-            `[${notifyId}] Batch ${batchId} paused after ${sent} sent: ${recipientError.message}`,
+    // One row at a time: a plain send's recipient list is unbounded, and this keeps it to one
+    // pooled connection rather than one per recipient.
+    for (const recipient of result.results) {
+      // The provider could not take it: still owed, not failed. Sent again below.
+      if (recipient.transient) continue
+      await (recipient.success
+        ? this.requestDetailService.markRecipientSent(
+            notifyId,
+            null,
+            recipient.to,
+            recipient.messageId,
           )
-          throw recipientError
-        }
-        const errorMessage =
-          recipientError instanceof Error ? recipientError.message : String(recipientError)
-        logger.error(
-          `[${notifyId}] SMS merge recipient send failed (batch=${batchId}): ${errorMessage}`,
-        )
-        await requestDetailService.markRecipientFailed(
-          notifyId,
-          batchId,
-          recipient.address,
-          errorMessage,
-        )
-        failed++
-      }
-      reportProgress?.(progress())
+        : this.requestDetailService.markRecipientFailed(
+            notifyId,
+            null,
+            recipient.to,
+            recipient.error ?? 'Send failed',
+          ))
     }
 
-    logger.log(`[${notifyId}] SMS merge batch ${batchId} complete: sent=${sent}, failed=${failed}`)
-    await SmsDeliveryWorker.settleMergeRequest(
-      notifyId,
-      tenantId,
-      requestDetailService,
-      notificationService,
-      logger,
-    )
-
-    return { success: failed === 0, batchId, sent, failed }
-  }
-
-  /** Settle the parent request once no recipients remain pending across all batches. */
-  private static async settleMergeRequest(
-    notifyId: string,
-    tenantId: string,
-    requestDetailService: NotificationRequestDetailService,
-    notificationService: NotificationService,
-    logger: Logger,
-  ): Promise<void> {
-    const pendingRemaining = await requestDetailService.countByStatus(notifyId, 'pending')
-    if (pendingRemaining === 0) {
-      const failedRemaining = await requestDetailService.countByStatus(notifyId, 'failed')
-      const sentRemaining = await requestDetailService.countByStatus(notifyId, 'sent')
-      let finalStatus: NotificationStatus
-      if (failedRemaining === 0) {
-        finalStatus = NotificationStatus.COMPLETED
-      } else if (sentRemaining === 0) {
-        finalStatus = NotificationStatus.FAILED
-      } else {
-        finalStatus = NotificationStatus.PARTIALLY_COMPLETED
-      }
-      await notificationService.update(notifyId, tenantId, {
-        status: finalStatus,
-        updatedBy: 'sms-delivery-worker',
-      })
-      logger.log(
-        `[${notifyId}] All SMS merge batches complete; parent marked ${finalStatus.toUpperCase()}`,
+    // Who was sent is recorded above, so the retry skips them; the rest are sent again once the
+    // provider is back.
+    const owed = result.results.filter((recipient) => recipient.transient)
+    if (owed.length > 0) {
+      throw new TransientDeliveryError(
+        `${owed.length} recipient(s) not sent, provider unavailable: ${owed[0].error ?? ''}`,
+        502,
       )
     }
+
+    const failedCount = result.results.filter((recipient) => !recipient.success).length
+    if (failedCount === 0) return NotificationStatus.COMPLETED
+    this.logger.warn(
+      `[${notifyId}] SMS partially delivered: ${failedCount} of ${result.results.length} recipient(s) failed`,
+    )
+    return NotificationStatus.PARTIALLY_COMPLETED
   }
 
-  private static async sendSmsViaAdapter(
-    payload: any,
-    logger: Logger,
-    notifyId: string,
-    smsAdapter: ISmsTransport,
-  ): Promise<{
-    externalId: string
-    provider: string
-    providerResponse?: string
-    results?: SmsRecipientResult[]
-  }> {
-    logger.debug(`[${notifyId}] Sending SMS via ${smsAdapter.name} adapter`)
+  private async sendSms(payload: any, notifyId: string): Promise<SmsSendResult> {
+    this.logger.debug(`[${notifyId}] Sending SMS via ${this.smsAdapter.name} adapter`)
 
     // Tagged with our id so a provider delivery report can be matched back to this notification.
-    const result = await smsAdapter.send({ ...(payload as object), tag: notifyId } as any)
+    const result = await this.smsAdapter.send({ ...(payload as object), tag: notifyId } as any)
 
     return {
-      externalId: result.messageId || result.providerResponse || `${smsAdapter.name}-${Date.now()}`,
-      provider: smsAdapter.name,
+      externalId:
+        result.messageId || result.providerResponse || `${this.smsAdapter.name}-${Date.now()}`,
+      provider: this.smsAdapter.name,
       providerResponse: result.providerResponse,
-      // Passed through so the caller can record who actually received the message.
       results: result.results,
     }
   }

@@ -169,12 +169,12 @@ const FileUpload: FC<FileUploadProps> = ({
               </div>
             ) : (
               successMessage && (
-                <p className="file-upload__success" role="status">
+                <output className="file-upload__success">
                   {/* The design system's own circle-check, which inherits the success colour via
                       currentColor. The id is scoped so two uploads on a page cannot collide. */}
                   <SvgCheckCircleIcon id={`${inputId}-success-icon`} />
                   {successMessage}
-                </p>
+                </output>
               )
             )}
           </div>

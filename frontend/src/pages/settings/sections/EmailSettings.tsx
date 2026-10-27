@@ -17,7 +17,6 @@ import StickyBar from '@/components/StickyBar'
 import TooltipTrigger from '@/components/TooltipTrigger'
 import { NotificationChannel } from '@/api/templates.api'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import { fetchApiKeyUsage } from '@/redux/thunks/apiKeyUsage.thunks'
 import { fetchApprovedEmailLogos, updateEmailSettings } from '@/redux/thunks/settings.thunks'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
@@ -70,9 +69,7 @@ const EmailSettings: FC = () => {
   const [showHeaderTitle, setShowHeaderTitle] = useState(useCustomEmailHeader)
   const [shouldShowValidation, setShouldShowValidation] = useState(false)
 
-  // Read-only daily/annual limits. Remounted per tenant by Settings.tsx.
   useEffect(() => {
-    dispatch(fetchApiKeyUsage())
     dispatch(fetchApprovedEmailLogos())
   }, [dispatch])
 

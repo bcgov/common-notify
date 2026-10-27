@@ -14,7 +14,7 @@ export class TenantSettingsService {
 
   constructor(
     @InjectRepository(TenantSettings)
-    private tenantSettingsRepository: Repository<TenantSettings>,
+    private readonly tenantSettingsRepository: Repository<TenantSettings>,
     private readonly emailLogoService: EmailLogoService,
     private readonly configService: ConfigService,
   ) {}

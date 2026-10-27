@@ -101,10 +101,10 @@ describe('SmsSettings section', () => {
     expect(screen.getByLabelText('SMS notifications')).toBeInTheDocument()
   })
 
-  it('fetches the usage limits and renders them', () => {
+  it('renders the usage limits from the store without re-fetching them', () => {
     renderWithRoles()
 
-    expect(fetchApiKeyUsage).toHaveBeenCalledTimes(1)
+    expect(fetchApiKeyUsage).not.toHaveBeenCalled()
     expect(screen.getByText('1,000 SMS/day')).toBeInTheDocument()
     expect(screen.getByText('50,000 SMS/year')).toBeInTheDocument()
   })

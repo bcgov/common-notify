@@ -28,7 +28,7 @@ export function TableHeaderCell({
   onFilter,
   children,
   ...props
-}: TableHeaderCellProps) {
+}: Readonly<TableHeaderCellProps>) {
   const ariaSort = sortable
     ? sortOrder === 'asc'
       ? 'ascending'
