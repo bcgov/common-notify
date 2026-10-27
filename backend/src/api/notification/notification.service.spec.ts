@@ -325,6 +325,38 @@ describe('NotificationService', () => {
     })
   })
 
+  describe('cancelOrRescheduleNotification', () => {
+    beforeEach(() => {
+      mockRepository.findOne.mockResolvedValue({ id: 'notif-uuid', status: 'scheduled' })
+    })
+
+    it('should throw a TypeError when scheduledTime is not a valid date', async () => {
+      await expect(
+        service.cancelOrRescheduleNotification(
+          'notif-uuid',
+          'tenant-uuid',
+          'user-1',
+          undefined,
+          'not-a-date',
+        ),
+      ).rejects.toThrow(new TypeError("Invalid scheduledTime format: 'not-a-date'"))
+      expect(mockRepository.update).not.toHaveBeenCalled()
+    })
+
+    it('should reject a scheduledTime in the past', async () => {
+      await expect(
+        service.cancelOrRescheduleNotification(
+          'notif-uuid',
+          'tenant-uuid',
+          'user-1',
+          undefined,
+          '2000-01-01T00:00:00Z',
+        ),
+      ).rejects.toThrow('scheduledTime must be in the future')
+      expect(mockRepository.update).not.toHaveBeenCalled()
+    })
+  })
+
   describe('update', () => {
     it('should update status and return the notification', async () => {
       const id = 'notif-uuid'
