@@ -47,6 +47,17 @@ describe('callback headers', () => {
     expect(await headerErrors(registration({ 'X-Retry': 3 }))).toHaveLength(1)
   })
 
+  it.each([
+    ['a string', 'Host: x'],
+    ['an array', ['Host: x']],
+  ])('rejects headers given as %s', async (_label, headers) => {
+    const [error] = await headerErrors(registration(headers))
+
+    expect(error.constraints?.allowedWebhookHeaders).toBe(
+      'headers must be an object of header names to string values',
+    )
+  })
+
   it('applies to updates as well', async () => {
     expect(
       await headerErrors({ headers: { Host: 'x' } }, CallbackRegistrationUpdateRequest),

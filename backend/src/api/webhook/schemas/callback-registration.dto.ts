@@ -15,7 +15,7 @@ import {
 // @ApiProperty metadata across, without which the update DTO publishes as an empty schema.
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger'
 import { WebhookType } from '../../../enum/webhook-type.enum'
-import { AllowedWebhookHeaders } from './allowed-webhook-headers.validator'
+import { AllowedWebhookHeaders } from '../allowed-webhook-headers.validator'
 
 export const CHANNEL_TYPE_VALUES = ['email', 'sms', 'msgApp'] as const
 export const TRIGGER_VALUES = ['success', 'failure'] as const

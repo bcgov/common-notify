@@ -5,7 +5,7 @@ import {
   ValidatorConstraint,
   ValidatorConstraintInterface,
 } from 'class-validator'
-import { isBlockedWebhookHeader } from '../webhook-headers'
+import { isBlockedWebhookHeader } from './webhook-headers'
 
 @ValidatorConstraint({ name: 'allowedWebhookHeaders', async: false })
 export class AllowedWebhookHeadersConstraint implements ValidatorConstraintInterface {
