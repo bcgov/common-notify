@@ -276,6 +276,7 @@ function checkRecipient(
   column: string,
   channel: BulkChannel,
   firstSeenAt: Map<string, number>,
+  internationalSmsAllowed: boolean,
 ): RowIssue | null {
   // Syntax and number validity are separate: readable separators are allowed,
   // but letters, extensions, misplaced plus signs and unbalanced parentheses are not.
@@ -316,6 +317,17 @@ function checkRecipient(
           'SMS is not supported in the country or region for this phone number. Remove this recipient.',
       }
     }
+
+    if (!internationalSmsAllowed && phone.country !== 'CA') {
+      return {
+        row: rowNumber,
+        column,
+        value,
+        title: 'International SMS is disabled',
+        detail:
+          'This recipient cannot receive the SMS. Contact your tenant administrator or remove this recipient.',
+      }
+    }
   }
 
   const normalised = recipientKey(value, channel)
@@ -342,6 +354,7 @@ function checkCell(
   isRecipient: boolean,
   channel: BulkChannel,
   firstSeenAt: Map<string, number>,
+  internationalSmsAllowed: boolean,
 ): RowIssue | null {
   if (!value) {
     return {
@@ -352,7 +365,9 @@ function checkCell(
     }
   }
 
-  return isRecipient ? checkRecipient(value, rowNumber, column, channel, firstSeenAt) : null
+  return isRecipient
+    ? checkRecipient(value, rowNumber, column, channel, firstSeenAt, internationalSmsAllowed)
+    : null
 }
 
 /**
@@ -360,11 +375,15 @@ function checkCell(
  *
  * A file-level problem short-circuits: if the columns are wrong there is no point reporting the
  * same mistake once per row.
+ *
+ * `internationalSmsAllowed` is whether the international_sms flag and the tenant's International
+ * SMS setting are both on; without it, SMS recipients must be Canadian.
  */
 export function validateCsv(
   parsed: ParsedCsv,
   placeholders: string[],
   channel: BulkChannel,
+  internationalSmsAllowed = false,
 ): ValidationResult {
   const { headers, rows } = parsed
   const recipientColumn = RECIPIENT_COLUMN[channel]
@@ -389,6 +408,7 @@ export function validateCsv(
         column === recipientIndex,
         channel,
         firstSeenAt,
+        internationalSmsAllowed,
       )
       if (issue) rowIssues.push(issue)
     }

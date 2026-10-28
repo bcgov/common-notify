@@ -198,6 +198,26 @@ describe('validateCsv row-level problems', () => {
     ])
   })
 
+  it('flags US numbers unless International SMS is allowed', () => {
+    const parsed = { headers: ['phone'], rows: [['+12505551234'], ['+1 206 555 0123']] }
+
+    const [issue, ...rest] = validateCsv(parsed, [], 'sms').rowIssues
+
+    expect(rest).toEqual([])
+    expect(issue).toMatchObject({
+      row: 3,
+      column: 'phone',
+      title: 'International SMS is disabled',
+    })
+    expect(issue.detail).toContain('Contact your tenant administrator')
+  })
+
+  it('accepts US numbers when International SMS is allowed', () => {
+    const parsed = { headers: ['phone'], rows: [['+12505551234'], ['+1 206 555 0123']] }
+
+    expect(validateCsv(parsed, [], 'sms', true).rowIssues).toEqual([])
+  })
+
   it.each(['+12505551234', '250-555-1234', '(250) 555-1234'])(
     'accepts supported normalizable SMS recipient %s',
     (phone) => {
