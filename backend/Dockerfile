@@ -1,7 +1,3 @@
-# Pulled via mirror.gcr.io, Google's anonymous Docker Hub mirror. Anonymous
-# pulls straight from docker.io are rate limited PER IP, and GitHub's runners
-# share them, so builds failed with 429 Too Many Requests on whichever FROM
-# happened to be unlucky. Same images, same digests, no credentials needed.
 # Build
 FROM mirror.gcr.io/library/node:24.22.1-slim AS build
 
