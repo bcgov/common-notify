@@ -660,9 +660,11 @@ export class NotificationService {
       errors.push('At least one recipient is required (email, SMS, or msgApp)')
     }
 
-    errors.push(...this.validateEmailChannel(request.email, emailTemplateId))
-    errors.push(...(await this.validateSmsChannel(tenantId, request.sms, smsTemplateId)))
-    errors.push(...this.validateMsgAppChannel(request.msgApp, msgAppTemplateId))
+    errors.push(
+      ...this.validateEmailChannel(request.email, emailTemplateId),
+      ...(await this.validateSmsChannel(tenantId, request.sms, smsTemplateId)),
+      ...this.validateMsgAppChannel(request.msgApp, msgAppTemplateId),
+    )
 
     return errors
   }
