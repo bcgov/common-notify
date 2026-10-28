@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { describeError } from '../../common/utils/describe-error'
-import { createHmac } from 'crypto'
+import { createHmac } from 'node:crypto'
 import type { Job } from 'bullmq'
 import axios from 'axios'
 import { WebhookJobPayload } from '../queue.types'
@@ -70,7 +70,7 @@ export class WebhookDeliveryWorker implements QueueProcessor<WebhookJobPayload> 
 
     const requestHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...(webhookConfig.headers ?? {}),
+      ...webhookConfig.headers,
     }
     // HMAC-SHA256 sign the raw JSON body if a secret is configured
     if (webhookConfig.secret) {

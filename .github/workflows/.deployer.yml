@@ -119,6 +119,7 @@ jobs:
           oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
           oc_server: ${{ inputs.oc_server }}
           triggers: ${{ inputs.redis_triggers }}
+          diff_branch: ${{ github.event_name == 'pull_request' && github.event.repository.default_branch || 'HEAD^' }}
           ref: ${{ github.ref }}
           commands: |
             # Deploy Redis using Bitnami Helm chart
