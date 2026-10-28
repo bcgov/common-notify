@@ -187,28 +187,30 @@ export class AttachmentService {
   }
 
   private async rollbackCreatedAttachments(createdAttachments: AttachmentEntity[]): Promise<void> {
-    for (const attachment of [...createdAttachments].reverse()) {
-      try {
-        await this.attachmentRepository.deleteByIdAndTenantId(attachment.id, attachment.tenantId)
-      } catch (error) {
-        this.logger.warn('Failed to roll back attachment metadata', {
-          tenantId: attachment.tenantId,
-          attachmentId: attachment.id,
-          storageKey: attachment.storageKey,
-          error: error instanceof Error ? error.message : String(error),
-        })
-      }
+    await Promise.all(
+      createdAttachments.map(async (attachment) => {
+        try {
+          await this.attachmentRepository.deleteByIdAndTenantId(attachment.id, attachment.tenantId)
+        } catch (error) {
+          this.logger.warn('Failed to roll back attachment metadata', {
+            tenantId: attachment.tenantId,
+            attachmentId: attachment.id,
+            storageKey: attachment.storageKey,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
 
-      try {
-        await this.attachmentStorage.delete(attachment.storageKey)
-      } catch (error) {
-        this.logger.warn('Failed to roll back attachment object', {
-          tenantId: attachment.tenantId,
-          attachmentId: attachment.id,
-          storageKey: attachment.storageKey,
-          error: error instanceof Error ? error.message : String(error),
-        })
-      }
-    }
+        try {
+          await this.attachmentStorage.delete(attachment.storageKey)
+        } catch (error) {
+          this.logger.warn('Failed to roll back attachment object', {
+            tenantId: attachment.tenantId,
+            attachmentId: attachment.id,
+            storageKey: attachment.storageKey,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+      }),
+    )
   }
 }

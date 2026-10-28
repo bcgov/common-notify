@@ -52,16 +52,14 @@ export interface RowIssue {
   detail: string
 }
 
-/**
- * A problem with the file as a whole - wrong columns, no rows, too many rows.
- *
- * These are reported inline under the upload control rather than in the table, because there is no
- * row to point at and because they invalidate every row at once.
- */
-export type FileIssue = string
-
 export interface ValidationResult {
-  fileIssue: FileIssue | null
+  /**
+   * A problem with the file as a whole - wrong columns, no rows, too many rows.
+   *
+   * These are reported inline under the upload control rather than in the table, because there is no
+   * row to point at and because they invalidate every row at once.
+   */
+  fileIssue: string | null
   rowIssues: RowIssue[]
 }
 
