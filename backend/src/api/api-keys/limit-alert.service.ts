@@ -92,57 +92,62 @@ export class LimitAlertService {
       tenantConsumers.length > 0 ? tenantConsumers.map(({ id }) => id) : [consumer.id]
 
     const usageByChannel = this.groupUsageByChannel(input.usageResults)
-    const claimed: ClaimedLimitAlert[] = []
+    const recipientEmail = settings.alertEmail
 
-    for (const [channelCode, usage] of usageByChannel) {
-      const where = { apiKeyConsumerId: In(tenantConsumerIds), channelCode }
-      const [limits, alertConfigs] = await Promise.all([
-        this.apiKeyLimitRepository.find({ where }),
-        this.apiKeyLimitAlertRepository.find({ where }),
-      ])
-      const limit = lowestLimitsByChannel(limits).get(channelCode)
-      const warnThresholdPercent = lowestThresholdsByChannel(
-        alertConfigs.filter((alertConfig) => alertConfig.alertsEnabled),
-      ).get(channelCode)
+    const claimedByChannel = await Promise.all(
+      [...usageByChannel].map(async ([channelCode, usage]): Promise<ClaimedLimitAlert[]> => {
+        const where = { apiKeyConsumerId: In(tenantConsumerIds), channelCode }
+        const [limits, alertConfigs] = await Promise.all([
+          this.apiKeyLimitRepository.find({ where }),
+          this.apiKeyLimitAlertRepository.find({ where }),
+        ])
+        const limit = lowestLimitsByChannel(limits).get(channelCode)
+        const warnThresholdPercent = lowestThresholdsByChannel(
+          alertConfigs.filter((alertConfig) => alertConfig.alertsEnabled),
+        ).get(channelCode)
 
-      if (!limit || warnThresholdPercent === undefined) continue
+        if (!limit || warnThresholdPercent === undefined) return []
 
-      const candidates = evaluateLimitAlerts({
-        channelCode,
-        alertsEnabled: true,
-        warnThresholdPercent,
-        dailyLimit: limit.dailyLimit,
-        annualLimit: limit.annualLimit,
-        dayUsage: usage.get(UsagePeriodType.DAY)?.sentCount,
-        yearUsage: usage.get(UsagePeriodType.YEAR)?.sentCount,
-      })
-
-      for (const candidate of candidates) {
-        const usageResult =
-          candidate.periodTypeCode === 'DAY'
-            ? usage.get(UsagePeriodType.DAY)
-            : usage.get(UsagePeriodType.YEAR)
-        const periodStart = usageResult!.periodStart
-        const claim = await this.claim(tenantConsumerIds[0], candidate, periodStart)
-        if (!claim) continue
-
-        claimed.push({
-          alertLogId: claim.id,
-          tenantId: consumer.tenantId,
-          recipientEmail: settings.alertEmail,
-          apiKeyConsumerId: input.apiKeyConsumerId,
-          channelCode: candidate.channelCode,
-          periodTypeCode: candidate.periodTypeCode,
-          alertLevel: candidate.alertLevel,
-          periodStart,
-          sentCount: candidate.sentCount,
-          limit: candidate.limit,
-          percent: candidate.percent,
+        const candidates = evaluateLimitAlerts({
+          channelCode,
+          alertsEnabled: true,
+          warnThresholdPercent,
+          dailyLimit: limit.dailyLimit,
+          annualLimit: limit.annualLimit,
+          dayUsage: usage.get(UsagePeriodType.DAY)?.sentCount,
+          yearUsage: usage.get(UsagePeriodType.YEAR)?.sentCount,
         })
-      }
-    }
 
-    return claimed
+        const claims = await Promise.all(
+          candidates.map(async (candidate): Promise<ClaimedLimitAlert | null> => {
+            const usageResult =
+              candidate.periodTypeCode === 'DAY'
+                ? usage.get(UsagePeriodType.DAY)
+                : usage.get(UsagePeriodType.YEAR)
+            const periodStart = usageResult!.periodStart
+            const claim = await this.claim(tenantConsumerIds[0], candidate, periodStart)
+            if (!claim) return null
+
+            return {
+              alertLogId: claim.id,
+              tenantId: consumer.tenantId,
+              recipientEmail,
+              apiKeyConsumerId: input.apiKeyConsumerId,
+              channelCode: candidate.channelCode,
+              periodTypeCode: candidate.periodTypeCode,
+              alertLevel: candidate.alertLevel,
+              periodStart,
+              sentCount: candidate.sentCount,
+              limit: candidate.limit,
+              percent: candidate.percent,
+            }
+          }),
+        )
+        return claims.filter((claim): claim is ClaimedLimitAlert => claim !== null)
+      }),
+    )
+
+    return claimedByChannel.flat()
   }
 
   async markNotificationCreated(alertLogId: string, notificationRequestId: string): Promise<void> {

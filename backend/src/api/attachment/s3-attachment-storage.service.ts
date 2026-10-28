@@ -36,8 +36,8 @@ export class S3AttachmentStorageService implements AttachmentStorage {
   }
 
   async upload(input: UploadInput): Promise<UploadResult> {
-    const contentMd5 = crypto.createHash('md5').update(input.content).digest('base64')
-    const contentSha256 = crypto.createHash('sha256').update(input.content).digest('hex')
+    const sha256 = crypto.createHash('sha256').update(input.content).digest()
+    const contentSha256 = sha256.toString('hex')
 
     try {
       await this.s3Client.send(
@@ -46,7 +46,7 @@ export class S3AttachmentStorageService implements AttachmentStorage {
           Key: input.storageKey,
           Body: input.content,
           ContentType: input.mimeType,
-          ContentMD5: contentMd5,
+          ChecksumSHA256: sha256.toString('base64'),
         }),
       )
     } catch (error) {

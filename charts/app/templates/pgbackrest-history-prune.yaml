@@ -1,0 +1,112 @@
+{{- if .Values.pgbackrestHistoryPrune.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-pgbackrest-history-prune
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-pgbackrest-history-prune
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-pgbackrest-history-prune
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-pgbackrest-history-prune
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-pgbackrest-history-prune
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-pgbackrest-history-prune
+  namespace: {{ .Release.Namespace }}
+spec:
+  schedule: {{ .Values.pgbackrestHistoryPrune.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          serviceAccountName: {{ .Release.Name }}-pgbackrest-history-prune
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+          volumes:
+            - name: oc-cache
+              emptyDir: {}
+          containers:
+            - name: prune
+              image: {{ .Values.pgbackrestHistoryPrune.image | quote }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              volumeMounts:
+                - name: oc-cache
+                  mountPath: /tmp
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  cpu: 100m
+                  memory: 64Mi
+              env:
+                - name: RETENTION_DAYS
+                  value: {{ .Values.pgbackrestHistoryPrune.retentionDays | quote }}
+                - name: HOME
+                  value: /tmp
+                - name: KUBECACHEDIR
+                  value: /tmp/.kube/cache
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -euo pipefail
+                  POD=$(oc get pods \
+                    -l postgres-operator.crunchydata.com/data=pgbackrest \
+                    -o name | head -1)
+                  if [ -z "${POD}" ]; then
+                    echo "No pgbackrest repo host found; nothing to do."
+                    exit 0
+                  fi
+                  echo "Repo host: ${POD}  retention: ${RETENTION_DAYS}d"
+                  oc exec "${POD}" -c pgbackrest -- sh -c '
+                    H=/pgbackrest/repo1/backup/db/backup.history
+                    [ -d "$H" ] || { echo "No backup.history; nothing to do."; exit 0; }
+                    CUTOFF=$(date -d "-'"${RETENTION_DAYS}"' days" +%Y%m%d)
+                    echo "before: $(du -sh $H | cut -f1), cutoff $CUTOFF"
+                    n=0
+                    for f in "$H"/*/*.manifest.gz; do
+                      [ -e "$f" ] || continue
+                      b=${f##*/}; d=${b%%-*}
+                      case "$d" in ""|*[!0-9]*) continue;; esac
+                      if [ "$d" -lt "$CUTOFF" ]; then rm -f "$f" && n=$((n+1)); fi
+                    done
+                    echo "pruned $n manifests older than $CUTOFF"
+                    echo "after:  $(du -sh $H | cut -f1)"
+                    df -h /pgbackrest/repo1 | tail -1
+                  '
+{{- end }}

@@ -52,7 +52,7 @@ describe('S3AttachmentStorageService', () => {
     })
   })
 
-  it('uploads with ContentMD5 and verifies with HeadObjectCommand', async () => {
+  it('uploads with ChecksumSHA256 and verifies with HeadObjectCommand', async () => {
     const content = Buffer.from('hello world')
     mockS3Client.send
       .mockResolvedValueOnce({})
@@ -75,7 +75,7 @@ describe('S3AttachmentStorageService', () => {
       Bucket: 'notify-local',
       Key: 'attachment-123.pdf',
       ContentType: 'application/pdf',
-      ContentMD5: 'XrY7u+Ae7tCTyyK7j1rNww==',
+      ChecksumSHA256: 'uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek=',
     })
     expect(mockS3Client.send.mock.calls[1][0]).toBeInstanceOf(HeadObjectCommand)
     expect(mockS3Client.send.mock.calls[1][0].input).toEqual({

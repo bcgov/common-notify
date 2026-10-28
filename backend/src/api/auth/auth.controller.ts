@@ -88,14 +88,16 @@ export class AuthController {
 
       // Sync each tenant to the database (upsert)
       // This ensures the tenant is in the database and up-to-date
-      for (const cstarTenant of tenants || []) {
-        try {
-          await this.tenantsService.upsertFromCstar(cstarTenant)
-        } catch (error) {
-          // Log sync error but continue - don't fail the entire request if one tenant fails
-          console.error(`Failed to sync tenant ${cstarTenant.id}: ${error}`)
-        }
-      }
+      await Promise.all(
+        (tenants || []).map(async (cstarTenant) => {
+          try {
+            await this.tenantsService.upsertFromCstar(cstarTenant)
+          } catch (error) {
+            // Log sync error but continue - don't fail the entire request if one tenant fails
+            console.error(`Failed to sync tenant ${cstarTenant.id}: ${error}`)
+          }
+        }),
+      )
 
       return {
         tenants: tenants || [],
