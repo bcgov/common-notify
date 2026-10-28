@@ -325,6 +325,38 @@ describe('NotificationService', () => {
     })
   })
 
+  describe('cancelOrRescheduleNotification', () => {
+    beforeEach(() => {
+      mockRepository.findOne.mockResolvedValue({ id: 'notif-uuid', status: 'scheduled' })
+    })
+
+    it('should throw a TypeError when scheduledTime is not a valid date', async () => {
+      await expect(
+        service.cancelOrRescheduleNotification(
+          'notif-uuid',
+          'tenant-uuid',
+          'user-1',
+          undefined,
+          'not-a-date',
+        ),
+      ).rejects.toThrow(new TypeError("Invalid scheduledTime format: 'not-a-date'"))
+      expect(mockRepository.update).not.toHaveBeenCalled()
+    })
+
+    it('should reject a scheduledTime in the past', async () => {
+      await expect(
+        service.cancelOrRescheduleNotification(
+          'notif-uuid',
+          'tenant-uuid',
+          'user-1',
+          undefined,
+          '2000-01-01T00:00:00Z',
+        ),
+      ).rejects.toThrow('scheduledTime must be in the future')
+      expect(mockRepository.update).not.toHaveBeenCalled()
+    })
+  })
+
   describe('update', () => {
     it('should update status and return the notification', async () => {
       const id = 'notif-uuid'
@@ -1564,6 +1596,228 @@ describe('NotificationService', () => {
 
       expect(errors).toEqual([])
       expect(mockFeatureFlagService.isEnabled).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('validateMailMergeRules', () => {
+    const emailMerge = (rows: string[][], content: any = { subject: 'S', body: 'B' }, extra = {}) =>
+      ({ email: { recipients: { mergeArray: rows }, content, ...extra } }) as any
+    const smsMerge = (rows: string[][]) =>
+      ({ sms: { recipients: { mergeArray: rows }, content: { body: 'Hi' } } }) as any
+    const omitted = 'Additional invalid rows omitted (showing first 100)'
+
+    beforeEach(() => {
+      mockTenantsService.findOne.mockResolvedValue({ id: 'tenant-123', status: 'active' })
+      mockFeatureFlagService.isEnabled.mockResolvedValue(false)
+    })
+
+    it('stops when the tenant is not found', async () => {
+      mockTenantsService.findOne.mockResolvedValue(null)
+
+      const errors = await service.validateMailMergeRules('tenant-123', emailMerge([['bad']]))
+
+      expect(errors).toEqual([`Tenant 'tenant-123' not found`])
+    })
+
+    it('reports an inactive tenant and carries on', async () => {
+      mockTenantsService.findOne.mockResolvedValue({ id: 'tenant-123', status: 'suspended' })
+
+      const errors = await service.validateMailMergeRules('tenant-123', emailMerge([['to'], ['']]))
+
+      expect(errors).toEqual([
+        'Tenant is not active (status: suspended)',
+        'Row 1: email address is missing',
+      ])
+    })
+
+    it('rejects a templateId together with inline content', async () => {
+      const errors = await service.validateMailMergeRules(
+        'tenant-123',
+        emailMerge([['to']], { templateId: 't-1', body: 'B' }),
+      )
+
+      expect(errors).toEqual([
+        'Request must provide either a templateId or inline content (subject/body), not both',
+      ])
+      expect(mockTemplatesRepository.findById).not.toHaveBeenCalled()
+    })
+
+    it('reports a missing template', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue(null)
+
+      const errors = await service.validateMailMergeRules(
+        'tenant-123',
+        emailMerge([['to']], { templateId: 't-1' }),
+      )
+
+      expect(errors).toEqual([`Template 't-1' not found for tenant 'tenant-123'`])
+    })
+
+    it('reports a template for the wrong channel', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({ channelCode: NotificationChannel.SMS })
+
+      const errors = await service.validateMailMergeRules(
+        'tenant-123',
+        emailMerge([['to']], { templateId: 't-1' }),
+      )
+
+      expect(errors).toEqual([`Template 't-1' is not a EMAIL template`])
+    })
+
+    it('accepts a template for the right channel', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({ channelCode: NotificationChannel.EMAIL })
+
+      const errors = await service.validateMailMergeRules(
+        'tenant-123',
+        emailMerge([['to']], { templateId: 't-1' }),
+      )
+
+      expect(errors).toEqual([])
+    })
+
+    it('requires a template or inline content, naming the fields per channel', async () => {
+      const emailErrors = await service.validateMailMergeRules(
+        'tenant-123',
+        emailMerge([['to']], {}),
+      )
+      const smsErrors = await service.validateMailMergeRules(
+        'tenant-123',
+        { sms: { recipients: { mergeArray: [['to']] }, content: { subject: 'S' } } } as any,
+        NotificationChannel.SMS,
+      )
+
+      expect(emailErrors).toEqual([
+        'Request must provide either a templateId or inline content (subject/body)',
+      ])
+      expect(smsErrors).toEqual([
+        'Request must provide either a templateId or inline content (body)',
+      ])
+    })
+
+    it('rejects a delayedSend in the past or more than 10 days out', async () => {
+      const past = new Date(Date.now() - 60_000).toISOString()
+      const farFuture = new Date(Date.now() + 11 * 24 * 60 * 60 * 1000).toISOString()
+      const soon = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+
+      const run = (delayedSend: string) =>
+        service.validateMailMergeRules(
+          'tenant-123',
+          emailMerge([['to']], undefined, { delayedSend }),
+        )
+
+      expect(await run(past)).toEqual(['delayedSend must be in the future'])
+      expect(await run(farFuture)).toEqual(['delayedSend must be within 10 days from now'])
+      expect(await run(soon)).toEqual([])
+    })
+
+    it('stops when the header row does not start with "to"', async () => {
+      const errors = await service.validateMailMergeRules(
+        'tenant-123',
+        emailMerge([['email'], ['not-an-email']]),
+      )
+
+      expect(errors).toEqual(['The first column of the header row must be "to"'])
+    })
+
+    it('accepts a padded, mixed-case "to" header', async () => {
+      const errors = await service.validateMailMergeRules(
+        'tenant-123',
+        emailMerge([[' To '], ['a@example.com']]),
+      )
+
+      expect(errors).toEqual([])
+    })
+
+    it('reports missing, invalid and case-insensitive duplicate email rows', async () => {
+      const errors = await service.validateMailMergeRules(
+        'tenant-123',
+        emailMerge([['to'], ['a@example.com'], [''], ['nope'], ['A@Example.com']]),
+      )
+
+      expect(errors).toEqual([
+        'Row 2: email address is missing',
+        'Row 3: "nope" is not a valid email address',
+        'Row 4: "A@Example.com" is a duplicate of row 1',
+      ])
+    })
+
+    it('reports invalid phone numbers and duplicates by their E.164 form', async () => {
+      const errors = await service.validateMailMergeRules(
+        'tenant-123',
+        smsMerge([['to'], ['+12505551234'], ['2505551234'], ['abc'], ['']]),
+        NotificationChannel.SMS,
+      )
+
+      expect(errors).toEqual([
+        'Row 2: "2505551234" is a duplicate of row 1',
+        'Row 3: "abc" is not a valid phone number',
+        'Row 4: phone number is missing',
+      ])
+    })
+
+    it('caps row errors and notes the omission', async () => {
+      const rows = [['to'], ...Array.from({ length: 150 }, () => ['nope'])]
+
+      const errors = await service.validateMailMergeRules('tenant-123', emailMerge(rows))
+
+      expect(errors).toHaveLength(101)
+      expect(errors[99]).toBe('Row 100: "nope" is not a valid email address')
+      expect(errors[100]).toBe(omitted)
+    })
+
+    it('counts earlier errors towards the cap', async () => {
+      mockTenantsService.findOne.mockResolvedValue({ id: 'tenant-123', status: 'suspended' })
+      const rows = [['to'], ...Array.from({ length: 150 }, () => ['nope'])]
+
+      const errors = await service.validateMailMergeRules('tenant-123', emailMerge(rows))
+
+      expect(errors).toHaveLength(101)
+      expect(errors[99]).toBe('Row 99: "nope" is not a valid email address')
+      expect(errors[100]).toBe(omitted)
+    })
+
+    it('does not cap a list that reaches exactly the limit on the last row', async () => {
+      const rows = [['to'], ...Array.from({ length: 100 }, () => ['nope'])]
+
+      const errors = await service.validateMailMergeRules('tenant-123', emailMerge(rows))
+
+      expect(errors).toHaveLength(100)
+      expect(errors).not.toContain(omitted)
+    })
+
+    it('skips the international check once the row loop has filled the list', async () => {
+      const rows = [['to'], ['+442071838750'], ...Array.from({ length: 120 }, () => ['abc'])]
+
+      const errors = await service.validateMailMergeRules(
+        'tenant-123',
+        smsMerge(rows),
+        NotificationChannel.SMS,
+      )
+
+      expect(errors).toHaveLength(101)
+      expect(errors[100]).toBe(omitted)
+      expect(mockFeatureFlagService.isEnabled).not.toHaveBeenCalled()
+    })
+
+    it('caps international row errors too', async () => {
+      const rows = [
+        ['to'],
+        ...Array.from({ length: 98 }, () => ['abc']),
+        ['+442071838750'],
+        ['+442071838751'],
+        ['+442071838752'],
+      ]
+
+      const errors = await service.validateMailMergeRules(
+        'tenant-123',
+        smsMerge(rows),
+        NotificationChannel.SMS,
+      )
+
+      expect(errors).toHaveLength(101)
+      expect(errors[98]).toMatch(/^Row 99: "\+442071838750" is an international number/)
+      expect(errors[99]).toMatch(/^Row 100: "\+442071838751" is an international number/)
+      expect(errors[100]).toBe(omitted)
     })
   })
 })

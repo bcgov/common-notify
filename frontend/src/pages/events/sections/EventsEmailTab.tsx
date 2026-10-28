@@ -70,11 +70,6 @@ export type EmailSettingsValues = {
   headerTitle: string
 }
 
-// The Apply payload carries `active` - switching the channel on is only persisted here, since
-// the backend requires a complete set of settings alongside it. Turning it off is the one thing
-// that saves on its own, via onDeactivate.
-export type EmailApplyValues = EmailSettingsValues
-
 const EMAIL_PATTERN =
   /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i
 
@@ -95,7 +90,7 @@ function senderEmailProblem(value: string): string {
 type EventsEmailTabProps = {
   values: EmailSettingsValues
   /** Saves the email channel settings, including whether the channel is switched on. */
-  onSave: (values: EmailApplyValues) => Promise<void>
+  onSave: (values: EmailSettingsValues) => Promise<void>
   /** Immediately persists switching the channel off, ahead of the rest of the tab's settings. */
   onDeactivate: () => Promise<void>
   isDisabled?: boolean

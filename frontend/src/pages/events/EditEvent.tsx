@@ -7,9 +7,9 @@ import type { EventTab } from './components/EventTabs'
 import EventsTab from './sections/EventsTab'
 import type { EventSettingsValues } from './sections/EventsTab'
 import EventsEmailTab, { UNSAVED_EMAIL_CHANGES_MESSAGE } from './sections/EventsEmailTab'
-import type { EmailApplyValues } from './sections/EventsEmailTab'
+import type { EmailSettingsValues } from './sections/EventsEmailTab'
 import EventsSmsTab, { UNSAVED_SMS_CHANGES_MESSAGE } from './sections/EventsSmsTab'
-import type { SmsApplyValues } from './sections/EventsSmsTab'
+import type { SmsSettingsValues } from './sections/EventsSmsTab'
 import EventsThirdPartyTab from './sections/EventsThirdPartyTab'
 import UnsavedChanges from '@/components/UnsavedChanges'
 import {
@@ -162,7 +162,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings', editE
 
   // Errors and success messages are surfaced by the channel tabs themselves, so these just
   // persist and re-sync state - failures propagate up to the tab's own try/catch.
-  async function handleSaveEmailSettings(values: EmailApplyValues) {
+  async function handleSaveEmailSettings(values: EmailSettingsValues) {
     const updated = await updateEventEmailSettings(eventId, {
       active: values.active,
       senderEmail: values.senderEmail || null,
@@ -188,7 +188,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings', editE
     setEvent(updated)
   }
 
-  async function handleSaveSmsSettings(values: SmsApplyValues) {
+  async function handleSaveSmsSettings(values: SmsSettingsValues) {
     const updated = await updateEventSmsSettings(eventId, {
       active: values.active,
       templateId: values.templateId,
