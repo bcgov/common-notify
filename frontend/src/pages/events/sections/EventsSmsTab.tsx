@@ -26,7 +26,6 @@ import EventsSmsEstimate from '../components/EventsSmsEstimate'
 export const UNSAVED_SMS_CHANGES_MESSAGE =
   'You have unsaved changes to your SMS notification settings. If you leave this page, your changes will be lost.'
 export type SmsSettingsValues = { active: boolean; templateId: string | null; to: string[] }
-export type SmsApplyValues = SmsSettingsValues
 const ADDITIONAL_RECIPIENTS_ID = 'additional-recipients'
 
 // Mirrors backend/src/api/notify/services/phone-number.service.ts's normalize/isValid logic, so
@@ -80,7 +79,7 @@ function duplicatePhoneNumbers(addresses: string[]): string[] {
 
 type EventsSmsTabProps = Readonly<{
   values: SmsSettingsValues
-  onSave: (values: SmsApplyValues) => Promise<void>
+  onSave: (values: SmsSettingsValues) => Promise<void>
   onDeactivate: () => Promise<void>
   isDisabled?: boolean
   isConfigured: boolean

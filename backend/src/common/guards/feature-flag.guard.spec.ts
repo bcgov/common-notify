@@ -207,6 +207,25 @@ describe('FeatureFlagGuard', () => {
 
       await expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
     })
+
+    it('should reject request when a global feature flag is disabled and no tenant is given', async () => {
+      const mockContext = {
+        switchToHttp: () => ({
+          getRequest: () => ({
+            headers: {},
+          }),
+        }),
+        getHandler: () => ({}),
+        getClass: () => ({}),
+      } as unknown as ExecutionContext
+
+      vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue('GLOBAL_FEATURE')
+      vi.spyOn(featureFlagService, 'isEnabled').mockResolvedValue(false)
+
+      await expect(guard.canActivate(mockContext)).rejects.toThrow(
+        'Feature "GLOBAL_FEATURE" is not enabled',
+      )
+    })
   })
 
   describe('Global Feature Flags (no tenant)', () => {

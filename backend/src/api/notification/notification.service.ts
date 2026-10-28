@@ -13,6 +13,7 @@ import { PaginatedNotificationResponse } from './schemas/paginated-response'
 import { isEmail } from 'class-validator'
 import { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
 import { ProcessedNotifySimpleRequest } from '../notify/schemas/stored-notify-attachment'
+import { NotifyContent, NotifySmsContent } from '../notify/schemas/notify-content'
 import { MAIL_MERGE_MAX_REPORTED_ERRORS } from '../notify/schemas/mail-merge.constants'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { PhoneNumberService } from '../notify/services/phone-number.service'
@@ -259,55 +260,29 @@ export class NotificationService {
     dto: NotifySimpleRequest,
     channel: NotificationChannel = NotificationChannel.EMAIL,
   ): Promise<string[]> {
-    const errors: string[] = []
-
     const isSms = channel === NotificationChannel.SMS
     const channelPayload = isSms ? dto.sms : dto.email
     const mergeArray = channelPayload?.recipients?.mergeArray ?? []
-    const templateId = channelPayload?.content?.templateId
-    const content = channelPayload?.content
-    // An SMS has no subject, so inline content means a body.
-    const hasInlineContent = !!(
-      content &&
-      (content.body || (!isSms && (content as { subject?: string }).subject))
-    )
 
     const tenant = await this.tenantsService.findOne(tenantId)
     if (!tenant) {
-      errors.push(`Tenant '${tenantId}' not found`)
-      return errors
+      return [`Tenant '${tenantId}' not found`]
     }
+
+    const errors: string[] = []
     if (tenant.status !== 'active') {
       errors.push(`Tenant is not active (status: ${tenant.status})`)
     }
 
-    // A merge renders from exactly one source: a server template or inline content.
-    if (templateId && hasInlineContent) {
-      errors.push(
-        'Request must provide either a templateId or inline content (subject/body), not both',
-      )
-    } else if (templateId) {
-      const template = await this.templatesRepository.findById(tenantId, templateId)
-      if (!template) {
-        errors.push(`Template '${templateId}' not found for tenant '${tenantId}'`)
-      } else if (template.channelCode !== channel) {
-        errors.push(`Template '${templateId}' is not a ${channel} template`)
-      }
-    } else if (!hasInlineContent) {
-      errors.push(
-        `Request must provide either a templateId or inline content (${isSms ? 'body' : 'subject/body'})`,
-      )
-    }
+    const contentError = await this.validateMergeContentSource(
+      tenantId,
+      channelPayload?.content,
+      channel,
+    )
+    if (contentError) errors.push(contentError)
 
-    if (channelPayload?.delayedSend) {
-      const scheduledTime = new Date(channelPayload.delayedSend).getTime()
-      const now = Date.now()
-      if (scheduledTime <= now) {
-        errors.push(`delayedSend must be in the future`)
-      } else if (scheduledTime > now + 10 * 24 * 60 * 60 * 1000) {
-        errors.push(`delayedSend must be within 10 days from now`)
-      }
-    }
+    const delayedSendError = validateDelayedSend(channelPayload?.delayedSend)
+    if (delayedSendError) errors.push(delayedSendError)
 
     const header = mergeArray[0] ?? []
     if ((header[0] ?? '').trim().toLowerCase() !== 'to') {
@@ -315,39 +290,7 @@ export class NotificationService {
       return errors
     }
 
-    const seen = new Map<string, number>()
-    const internationalRows: Array<{ row: number; address: string }> = []
-    for (let i = 1; i < mergeArray.length; i++) {
-      if (errors.length >= MAIL_MERGE_MAX_REPORTED_ERRORS) {
-        errors.push(
-          `Additional invalid rows omitted (showing first ${MAIL_MERGE_MAX_REPORTED_ERRORS})`,
-        )
-        break
-      }
-      const address = (mergeArray[i]?.[0] ?? '').trim()
-      // SMS rows are keyed by their E.164 form, so the same number written two ways is still a
-      // duplicate; email rows are keyed case-insensitively.
-      const normalised = isSms ? this.phoneNumberService.normalize(address) : address.toLowerCase()
-
-      if (!address) {
-        errors.push(`Row ${i}: ${isSms ? 'phone number' : 'email address'} is missing`)
-      } else if (isSms ? normalised === null : !isEmail(address)) {
-        errors.push(
-          `Row ${i}: "${address}" is not a valid ${isSms ? 'phone number' : 'email address'}`,
-        )
-      } else {
-        const key = normalised as string
-        const firstSeen = seen.get(key)
-        if (firstSeen !== undefined) {
-          errors.push(`Row ${i}: "${address}" is a duplicate of row ${firstSeen}`)
-        } else {
-          seen.set(key, i)
-          if (isSms && this.phoneNumberService.isInternational(key)) {
-            internationalRows.push({ row: i, address })
-          }
-        }
-      }
-    }
+    const internationalRows = this.validateMergeRows(mergeArray, isSms, errors)
 
     // Checked after the loop so the flag and the tenant setting are read once, not per row. Skipped
     // when the loop already filled the error list and reported the omission.
@@ -356,20 +299,108 @@ export class NotificationService {
       errors.length < MAIL_MERGE_MAX_REPORTED_ERRORS &&
       !(await this.isInternationalSmsAllowed(tenantId))
     ) {
-      for (const { row, address } of internationalRows) {
-        if (errors.length >= MAIL_MERGE_MAX_REPORTED_ERRORS) {
-          errors.push(
-            `Additional invalid rows omitted (showing first ${MAIL_MERGE_MAX_REPORTED_ERRORS})`,
-          )
-          break
-        }
-        errors.push(
-          `Row ${row}: "${address}" is an international number. ${INTERNATIONAL_SMS_HINT}`,
-        )
-      }
+      pushInternationalRowErrors(errors, internationalRows)
     }
 
     return errors
+  }
+
+  /**
+   * A merge renders from exactly one source: a server template or inline content. Returns the
+   * error for a request that gives both, neither, or a template that is missing or for another
+   * channel; null when the source is valid.
+   */
+  private async validateMergeContentSource(
+    tenantId: string,
+    content: NotifyContent | NotifySmsContent | undefined,
+    channel: NotificationChannel,
+  ): Promise<string | null> {
+    const isSms = channel === NotificationChannel.SMS
+    const templateId = content?.templateId
+    // An SMS has no subject, so inline content means a body.
+    const hasInlineContent = !!(
+      content &&
+      (content.body || (!isSms && (content as { subject?: string }).subject))
+    )
+
+    if (templateId && hasInlineContent) {
+      return 'Request must provide either a templateId or inline content (subject/body), not both'
+    }
+    if (!templateId) {
+      if (hasInlineContent) return null
+      return `Request must provide either a templateId or inline content (${isSms ? 'body' : 'subject/body'})`
+    }
+
+    const template = await this.templatesRepository.findById(tenantId, templateId)
+    if (!template) {
+      return `Template '${templateId}' not found for tenant '${tenantId}'`
+    }
+    return template.channelCode === channel
+      ? null
+      : `Template '${templateId}' is not a ${channel} template`
+  }
+
+  /**
+   * Validate each data row's address, appending errors to `errors` up to the reporting cap.
+   * Returns the valid, unique SMS rows that are international, for the caller to check against
+   * the tenant's International SMS setting.
+   */
+  private validateMergeRows(
+    mergeArray: string[][],
+    isSms: boolean,
+    errors: string[],
+  ): Array<{ row: number; address: string }> {
+    const seen = new Map<string, number>()
+    const internationalRows: Array<{ row: number; address: string }> = []
+    for (let i = 1; i < mergeArray.length; i++) {
+      if (errors.length >= MAIL_MERGE_MAX_REPORTED_ERRORS) {
+        errors.push(MAIL_MERGE_ERRORS_OMITTED)
+        break
+      }
+      const address = (mergeArray[i]?.[0] ?? '').trim()
+      const result = this.checkMergeRowAddress(i, address, isSms, seen)
+      if (result.error) {
+        errors.push(result.error)
+      } else if (isSms && this.phoneNumberService.isInternational(result.key)) {
+        internationalRows.push({ row: i, address })
+      }
+    }
+    return internationalRows
+  }
+
+  /**
+   * Check one row's address: present, well-formed and not a repeat of an earlier row. A new
+   * address is recorded in `seen` and its key returned. SMS rows are keyed by their E.164 form,
+   * so the same number written two ways is still a duplicate; email rows are keyed
+   * case-insensitively.
+   */
+  private checkMergeRowAddress(
+    row: number,
+    address: string,
+    isSms: boolean,
+    seen: Map<string, number>,
+  ): { error: string; key?: never } | { error?: never; key: string } {
+    const label = isSms ? 'phone number' : 'email address'
+    if (!address) {
+      return { error: `Row ${row}: ${label} is missing` }
+    }
+
+    let key: string | null = null
+    if (isSms) {
+      key = this.phoneNumberService.normalize(address)
+    } else if (isEmail(address)) {
+      key = address.toLowerCase()
+    }
+    if (key === null) {
+      return { error: `Row ${row}: "${address}" is not a valid ${label}` }
+    }
+
+    const firstSeen = seen.get(key)
+    if (firstSeen !== undefined) {
+      return { error: `Row ${row}: "${address}" is a duplicate of row ${firstSeen}` }
+    }
+    seen.set(key, row)
+    return { key }
   }
 
   /**
@@ -786,7 +817,7 @@ export class NotificationService {
       // Validate and reschedule
       const newScheduledTime = new Date(scheduledTime)
       if (Number.isNaN(newScheduledTime.getTime())) {
-        throw new Error(`Invalid scheduledTime format: '${scheduledTime}'`)
+        throw new TypeError(`Invalid scheduledTime format: '${scheduledTime}'`)
       }
 
       if (newScheduledTime <= new Date()) {
@@ -821,6 +852,34 @@ export class NotificationService {
 
 /** Keys that would reach Object.prototype if written blindly into a nested object. */
 const UNSAFE_PARAM_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype'])
+
+const MAIL_MERGE_ERRORS_OMITTED = `Additional invalid rows omitted (showing first ${MAIL_MERGE_MAX_REPORTED_ERRORS})`
+
+/** A scheduled send must be in the future and at most 10 days out. Returns null when valid. */
+function validateDelayedSend(delayedSend: string | undefined): string | null {
+  if (!delayedSend) return null
+  const scheduledTime = new Date(delayedSend).getTime()
+  const now = Date.now()
+  if (scheduledTime <= now) return `delayedSend must be in the future`
+  if (scheduledTime > now + 10 * 24 * 60 * 60 * 1000) {
+    return `delayedSend must be within 10 days from now`
+  }
+  return null
+}
+
+/** Append an error for each international row, up to the mail merge reporting cap. */
+function pushInternationalRowErrors(
+  errors: string[],
+  internationalRows: Array<{ row: number; address: string }>,
+): void {
+  for (const { row, address } of internationalRows) {
+    if (errors.length >= MAIL_MERGE_MAX_REPORTED_ERRORS) {
+      errors.push(MAIL_MERGE_ERRORS_OMITTED)
+      break
+    }
+    errors.push(`Row ${row}: "${address}" is an international number. ${INTERNATIONAL_SMS_HINT}`)
+  }
+}
 
 /**
  * Write one mail-merge cell into the params object, expanding a dotted column name into the nested

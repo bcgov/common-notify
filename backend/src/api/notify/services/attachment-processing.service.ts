@@ -1,10 +1,9 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
+import { NotifyAttachment } from '../schemas/notify-attachment'
 import { NotifySimpleRequest } from '../schemas/notify-simple-request'
 import {
-  ProcessedNotifyEmailChannel,
-  ProcessedNotifyMsgAppChannel,
   ProcessedNotifySimpleRequest,
-  ProcessedNotifySmsChannel,
+  StoredNotifyAttachment,
 } from '../schemas/stored-notify-attachment'
 import { AttachmentService } from '../../attachment/attachment.service'
 
@@ -20,60 +19,28 @@ export class AttachmentProcessingService {
     return {
       ...request,
       email: request.email
-        ? await this.processEmailChannel(request.email, tenantId, uploadedBy)
+        ? await this.processChannel(request.email, tenantId, uploadedBy)
         : undefined,
-      sms: request.sms
-        ? await this.processSmsChannel(request.sms, tenantId, uploadedBy)
-        : undefined,
+      sms: request.sms ? await this.processChannel(request.sms, tenantId, uploadedBy) : undefined,
       msgApp: request.msgApp
-        ? await this.processMsgAppChannel(request.msgApp, tenantId, uploadedBy)
+        ? await this.processChannel(request.msgApp, tenantId, uploadedBy)
         : undefined,
     }
   }
 
-  private async processEmailChannel(
-    channel: NonNullable<NotifySimpleRequest['email']>,
+  private async processChannel<T extends { attachments?: NotifyAttachment[] }>(
+    channel: T,
     tenantId: string,
     uploadedBy?: string,
-  ): Promise<ProcessedNotifyEmailChannel> {
-    return {
-      ...channel,
-      attachments: channel.attachments
-        ? await this.storeDecodedAttachments(channel.attachments, tenantId, uploadedBy)
-        : channel.attachments === undefined
-          ? undefined
-          : [],
+  ): Promise<Omit<T, 'attachments'> & { attachments?: StoredNotifyAttachment[] }> {
+    let attachments: StoredNotifyAttachment[] | undefined
+    if (channel.attachments) {
+      attachments = await this.storeDecodedAttachments(channel.attachments, tenantId, uploadedBy)
+    } else if (channel.attachments !== undefined) {
+      attachments = []
     }
-  }
 
-  private async processSmsChannel(
-    channel: NonNullable<NotifySimpleRequest['sms']>,
-    tenantId: string,
-    uploadedBy?: string,
-  ): Promise<ProcessedNotifySmsChannel> {
-    return {
-      ...channel,
-      attachments: channel.attachments
-        ? await this.storeDecodedAttachments(channel.attachments, tenantId, uploadedBy)
-        : channel.attachments === undefined
-          ? undefined
-          : [],
-    }
-  }
-
-  private async processMsgAppChannel(
-    channel: NonNullable<NotifySimpleRequest['msgApp']>,
-    tenantId: string,
-    uploadedBy?: string,
-  ): Promise<ProcessedNotifyMsgAppChannel> {
-    return {
-      ...channel,
-      attachments: channel.attachments
-        ? await this.storeDecodedAttachments(channel.attachments, tenantId, uploadedBy)
-        : channel.attachments === undefined
-          ? undefined
-          : [],
-    }
+    return { ...channel, attachments }
   }
 
   private async storeDecodedAttachments(

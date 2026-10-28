@@ -83,17 +83,19 @@ export class LimitAlertNotificationService {
       return
     }
 
-    for (const claim of claims) {
-      try {
-        await this.createAndEnqueue(claim)
-      } catch (error) {
-        this.logger.error(
-          `Failed to process limit alert ${claim.alertLogId} for API key consumer ${claim.apiKeyConsumerId}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        )
-      }
-    }
+    await Promise.all(
+      claims.map(async (claim) => {
+        try {
+          await this.createAndEnqueue(claim)
+        } catch (error) {
+          this.logger.error(
+            `Failed to process limit alert ${claim.alertLogId} for API key consumer ${claim.apiKeyConsumerId}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          )
+        }
+      }),
+    )
   }
 
   private async createAndEnqueue(claim: ClaimedLimitAlert): Promise<void> {
