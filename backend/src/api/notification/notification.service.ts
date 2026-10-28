@@ -62,6 +62,20 @@ const notificationListQueryConfig: QueryableFieldsConfig = {
 export const INTERNATIONAL_SMS_HINT =
   'Only Canadian numbers can be sent to unless International SMS is enabled for this tenant.'
 
+type BusinessRulesRequest = NotifySimpleRequest | ProcessedNotifySimpleRequest
+
+/** Empty and too-long checks for inline content. Both are reported when both apply. */
+function checkText(label: string, value: string | undefined, max: number, unit = ''): string[] {
+  const errors: string[] = []
+  if (!value?.trim()) {
+    errors.push(`${label} cannot be empty`)
+  }
+  if (value && value.length > max) {
+    errors.push(`${label} too long (${value.length}). Max: ${max}${unit}`)
+  }
+  return errors
+}
+
 @Injectable()
 export class NotificationService {
   private readonly logger = new Logger(NotificationService.name)
@@ -592,18 +606,14 @@ export class NotificationService {
    * @param request The NotifySimpleRequest to validate
    * @returns Array of validation error messages (empty if valid)
    */
-  async validateBusinessRules(
-    tenantId: string,
-    request: NotifySimpleRequest | ProcessedNotifySimpleRequest,
-  ): Promise<string[]> {
-    const errors: string[] = []
-
+  async validateBusinessRules(tenantId: string, request: BusinessRulesRequest): Promise<string[]> {
     // Verify tenant exists and is active
     const tenant = await this.tenantsService.findOne(tenantId)
     if (!tenant) {
-      errors.push(`Tenant '${tenantId}' not found`)
-      return errors // Stop here, can't proceed without valid tenant
+      return [`Tenant '${tenantId}' not found`] // Stop here, can't proceed without valid tenant
     }
+
+    const errors: string[] = []
 
     if (tenant.status !== 'active') {
       errors.push(`Tenant is not active (status: ${tenant.status})`)
@@ -611,51 +621,34 @@ export class NotificationService {
 
     // Validate each channel's template. templateId lives in the channel's content, so each channel
     // is validated against its own expected channel code.
-    const validateChannelTemplate = async (
-      templateId: string,
-      expectedChannelCode: 'EMAIL' | 'SMS' | 'MSGAPP',
-      channelParams?: Record<string, unknown>,
-    ): Promise<void> => {
-      try {
-        const template = await this.templatesRepository.findById(tenantId, templateId)
-        if (!template) {
-          errors.push(
-            `Template '${templateId}' not found for tenant '${tenantId}'. Please verify the template ID is correct.`,
-          )
-        } else if (template.channelCode !== expectedChannelCode) {
-          errors.push(
-            `Template '${templateId}' has channel code '${template.channelCode}' but requested channel is '${expectedChannelCode}'.`,
-          )
-        } else if (expectedChannelCode === 'EMAIL' || expectedChannelCode === 'SMS') {
-          // Channel params override request params, matching the delivery workers. The
-          // /notifysimple/email and /notifysimple/sms shorthands post a bare channel object, so
-          // everything the caller sent — params included — arrives under the channel and there is
-          // no top-level params at all; reading only request.params reports every placeholder as
-          // missing and rejects the send before it is ever queued.
-          await this.templatesService.renderTemplateContent(template as any, {
-            ...request.params,
-            ...channelParams,
-          })
-        }
-      } catch (error) {
-        if (error instanceof BadRequestException) {
-          throw error
-        }
-        errors.push(
-          `Failed to validate template: ${error instanceof Error ? error.message : String(error)}`,
-        )
-      }
-    }
-
     const emailTemplateId = request.email?.content?.templateId
     const smsTemplateId = request.sms?.content?.templateId
     const msgAppTemplateId = request.msgApp?.content?.templateId
 
-    if (emailTemplateId)
-      await validateChannelTemplate(emailTemplateId, 'EMAIL', request.email?.params)
-    if (smsTemplateId) await validateChannelTemplate(smsTemplateId, 'SMS', request.sms?.params)
-    if (msgAppTemplateId)
-      await validateChannelTemplate(msgAppTemplateId, 'MSGAPP', request.msgApp?.params)
+    if (emailTemplateId) {
+      errors.push(
+        ...(await this.validateChannelTemplate(tenantId, emailTemplateId, 'EMAIL', {
+          ...request.params,
+          ...request.email?.params,
+        })),
+      )
+    }
+    if (smsTemplateId) {
+      errors.push(
+        ...(await this.validateChannelTemplate(tenantId, smsTemplateId, 'SMS', {
+          ...request.params,
+          ...request.sms?.params,
+        })),
+      )
+    }
+    if (msgAppTemplateId) {
+      errors.push(
+        ...(await this.validateChannelTemplate(tenantId, msgAppTemplateId, 'MSGAPP', {
+          ...request.params,
+          ...request.msgApp?.params,
+        })),
+      )
+    }
 
     // Ensure at least one channel has recipients
     const emailRecipients = request.email?.recipients?.to?.length ?? 0
@@ -667,101 +660,124 @@ export class NotificationService {
       errors.push('At least one recipient is required (email, SMS, or msgApp)')
     }
 
-    // Validate email channel
-    if (request.email?.recipients?.to) {
-      if (request.email.recipients.to.length > this.emailMaxRecipients) {
-        errors.push(
-          `Too many email recipients (${request.email.recipients.to.length}). Max: ${this.emailMaxRecipients}`,
-        )
+    errors.push(...this.validateEmailChannel(request.email, emailTemplateId))
+    errors.push(...(await this.validateSmsChannel(tenantId, request.sms, smsTemplateId)))
+    errors.push(...this.validateMsgAppChannel(request.msgApp, msgAppTemplateId))
+
+    return errors
+  }
+
+  /**
+   * Checks a channel's template exists, belongs to that channel, and (for email and SMS) renders
+   * with the params supplied. A BadRequestException from rendering propagates to the caller.
+   *
+   * @param params Request params merged with channel params, channel params taking precedence
+   */
+  private async validateChannelTemplate(
+    tenantId: string,
+    templateId: string,
+    expectedChannelCode: 'EMAIL' | 'SMS' | 'MSGAPP',
+    params: Record<string, unknown>,
+  ): Promise<string[]> {
+    try {
+      const template = await this.templatesRepository.findById(tenantId, templateId)
+      if (!template) {
+        return [
+          `Template '${templateId}' not found for tenant '${tenantId}'. Please verify the template ID is correct.`,
+        ]
       }
-
-      // Only validate content if not using a template (template provides subject/body)
-      if (!emailTemplateId) {
-        if (!request.email.content?.subject?.trim()) {
-          errors.push('Email subject cannot be empty')
-        }
-
-        if (
-          request.email.content?.subject &&
-          request.email.content.subject.length > this.emailMaxSubjectLength
-        ) {
-          errors.push(
-            `Email subject too long (${request.email.content.subject.length}). Max: ${this.emailMaxSubjectLength}`,
-          )
-        }
-
-        if (!request.email.content?.body?.trim()) {
-          errors.push('Email body cannot be empty')
-        }
-
-        if (
-          request.email.content?.body &&
-          request.email.content.body.length > this.emailMaxBodyLength
-        ) {
-          errors.push(
-            `Email body too long (${request.email.content.body.length}). Max: ${this.emailMaxBodyLength} characters`,
-          )
-        }
+      if (template.channelCode !== expectedChannelCode) {
+        return [
+          `Template '${templateId}' has channel code '${template.channelCode}' but requested channel is '${expectedChannelCode}'.`,
+        ]
       }
+      if (expectedChannelCode === 'EMAIL' || expectedChannelCode === 'SMS') {
+        // Channel params override request params, matching the delivery workers. The
+        // /notifysimple/email and /notifysimple/sms shorthands post a bare channel object, so
+        // everything the caller sent — params included — arrives under the channel and there is
+        // no top-level params at all; reading only request.params reports every placeholder as
+        // missing and rejects the send before it is ever queued.
+        await this.templatesService.renderTemplateContent(template as any, params)
+      }
+      return []
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error
+      }
+      return [
+        `Failed to validate template: ${error instanceof Error ? error.message : String(error)}`,
+      ]
+    }
+  }
+
+  private validateEmailChannel(
+    email: BusinessRulesRequest['email'],
+    templateId: string | undefined,
+  ): string[] {
+    if (!email?.recipients?.to) return []
+
+    const errors: string[] = []
+    const { to } = email.recipients
+    if (to.length > this.emailMaxRecipients) {
+      errors.push(`Too many email recipients (${to.length}). Max: ${this.emailMaxRecipients}`)
     }
 
-    // Validate SMS channel
-    if (request.sms?.recipients?.to) {
-      if (request.sms.recipients.to.length > this.smsMaxRecipients) {
-        errors.push(
-          `Too many SMS recipients (${request.sms.recipients.to.length}). Max: ${this.smsMaxRecipients}`,
-        )
-      }
-
-      const international = request.sms.recipients.to.filter((number) =>
-        this.phoneNumberService.isInternational(number),
+    // Only validate content if not using a template (template provides subject/body)
+    if (!templateId) {
+      errors.push(
+        ...checkText('Email subject', email.content?.subject, this.emailMaxSubjectLength),
+        ...checkText('Email body', email.content?.body, this.emailMaxBodyLength, ' characters'),
       )
-      if (international.length > 0 && !(await this.isInternationalSmsAllowed(tenantId))) {
-        errors.push(
-          `SMS cannot be sent to international number(s): ${international.join(', ')}. ${INTERNATIONAL_SMS_HINT}`,
-        )
-      }
+    }
+    return errors
+  }
 
-      // Only validate content if not using a template (template provides body)
-      if (!smsTemplateId) {
-        if (!request.sms.content?.body?.trim()) {
-          errors.push('SMS body cannot be empty')
-        }
+  private async validateSmsChannel(
+    tenantId: string,
+    sms: BusinessRulesRequest['sms'],
+    templateId: string | undefined,
+  ): Promise<string[]> {
+    if (!sms?.recipients?.to) return []
 
-        if (request.sms.content?.body && request.sms.content.body.length > this.smsMaxBodyLength) {
-          // SMS can be split across multiple messages, but warn if very long
-          errors.push(
-            `SMS body too long (${request.sms.content.body.length}). Max: ${this.smsMaxBodyLength} characters`,
-          )
-        }
-      }
+    const errors: string[] = []
+    const { to } = sms.recipients
+    if (to.length > this.smsMaxRecipients) {
+      errors.push(`Too many SMS recipients (${to.length}). Max: ${this.smsMaxRecipients}`)
     }
 
-    // Validate msgApp channel
-    if (request.msgApp?.recipients?.to) {
-      if (request.msgApp.recipients.to.length > this.msgAppMaxRecipients) {
-        errors.push(
-          `Too many msgApp recipients (${request.msgApp.recipients.to.length}). Max: ${this.msgAppMaxRecipients}`,
-        )
-      }
-
-      // Only validate content if not using a template (template provides body)
-      if (!msgAppTemplateId) {
-        if (!request.msgApp.content?.body?.trim()) {
-          errors.push('MsgApp body cannot be empty')
-        }
-
-        if (
-          request.msgApp.content?.body &&
-          request.msgApp.content.body.length > this.msgAppMaxBodyLength
-        ) {
-          errors.push(
-            `MsgApp body too long (${request.msgApp.content.body.length}). Max: ${this.msgAppMaxBodyLength} characters`,
-          )
-        }
-      }
+    const international = to.filter((number) => this.phoneNumberService.isInternational(number))
+    if (international.length > 0 && !(await this.isInternationalSmsAllowed(tenantId))) {
+      errors.push(
+        `SMS cannot be sent to international number(s): ${international.join(', ')}. ${INTERNATIONAL_SMS_HINT}`,
+      )
     }
 
+    // Only validate content if not using a template (template provides body)
+    if (!templateId) {
+      // SMS can be split across multiple messages, but reject if very long
+      errors.push(...checkText('SMS body', sms.content?.body, this.smsMaxBodyLength, ' characters'))
+    }
+    return errors
+  }
+
+  private validateMsgAppChannel(
+    msgApp: BusinessRulesRequest['msgApp'],
+    templateId: string | undefined,
+  ): string[] {
+    if (!msgApp?.recipients?.to) return []
+
+    const errors: string[] = []
+    const { to } = msgApp.recipients
+    if (to.length > this.msgAppMaxRecipients) {
+      errors.push(`Too many msgApp recipients (${to.length}). Max: ${this.msgAppMaxRecipients}`)
+    }
+
+    // Only validate content if not using a template (template provides body)
+    if (!templateId) {
+      errors.push(
+        ...checkText('MsgApp body', msgApp.content?.body, this.msgAppMaxBodyLength, ' characters'),
+      )
+    }
     return errors
   }
 

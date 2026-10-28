@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { NotificationService } from './notification.service'
+import { INTERNATIONAL_SMS_HINT, NotificationService } from './notification.service'
 import { NotificationRequest } from './entities/notification-request.entity'
 import { NotificationStatus } from './schemas/create-notification-request'
 import { TenantsService } from '../admin/tenants/tenants.service'
@@ -1222,6 +1222,66 @@ describe('NotificationService', () => {
         const errors = await service.validateBusinessRules('tenant-123', request)
 
         expect(errors).toContain('At least one recipient is required (email, SMS, or msgApp)')
+      })
+    })
+
+    describe('full error list', () => {
+      it('reports every content and limit error, in order', async () => {
+        mockTenantsService.findOne.mockResolvedValueOnce({ ...mockTenant, status: 'suspended' })
+        mockFeatureFlagService.isEnabled.mockResolvedValueOnce(false)
+        const canadian = Array.from({ length: 50 }, () => '+16045551234')
+        const request: any = {
+          email: {
+            recipients: { to: Array.from({ length: 101 }, () => 'a@example.com') },
+            content: { subject: ' '.repeat(501), body: 'x'.repeat(50001) },
+          },
+          sms: {
+            recipients: { to: [...canadian, '+442071838750'] },
+            content: { body: ' '.repeat(1601) },
+          },
+          msgApp: {
+            recipients: { to: Array.from({ length: 101 }, () => 'user-1') },
+            content: { body: '' },
+          },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toEqual([
+          'Tenant is not active (status: suspended)',
+          'Too many email recipients (101). Max: 100',
+          'Email subject cannot be empty',
+          'Email subject too long (501). Max: 500',
+          'Email body too long (50001). Max: 50000 characters',
+          'Too many SMS recipients (51). Max: 50',
+          `SMS cannot be sent to international number(s): +442071838750. ${INTERNATIONAL_SMS_HINT}`,
+          'SMS body cannot be empty',
+          'SMS body too long (1601). Max: 1600 characters',
+          'Too many msgApp recipients (101). Max: 100',
+          'MsgApp body cannot be empty',
+        ])
+      })
+
+      it('reports every template error before the recipient check, in channel order', async () => {
+        mockTemplatesRepository.findById.mockImplementation(async (_tenantId, id: string) => {
+          if (id === 'tpl-s') return { id, channelCode: 'EMAIL' }
+          if (id === 'tpl-m') throw new Error('db down')
+          return null
+        })
+        const request: any = {
+          email: { content: { templateId: 'tpl-e' } },
+          sms: { content: { templateId: 'tpl-s' } },
+          msgApp: { content: { templateId: 'tpl-m' } },
+        }
+
+        const errors = await service.validateBusinessRules('tenant-123', request)
+
+        expect(errors).toEqual([
+          "Template 'tpl-e' not found for tenant 'tenant-123'. Please verify the template ID is correct.",
+          "Template 'tpl-s' has channel code 'EMAIL' but requested channel is 'SMS'.",
+          'Failed to validate template: db down',
+          'At least one recipient is required (email, SMS, or msgApp)',
+        ])
       })
     })
 
