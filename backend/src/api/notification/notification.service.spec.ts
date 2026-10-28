@@ -121,6 +121,11 @@ describe('NotificationService', () => {
   })
 
   describe('create', () => {
+    beforeEach(() => {
+      // No reload row, so create() returns the saved entity
+      mockRepository.findOne.mockResolvedValue(null)
+    })
+
     it('should create and save a notification request', async () => {
       const dto = { tenantId: 'tenant-uuid', createdBy: 'user1' }
       const mockNotification = {
@@ -997,7 +1002,7 @@ describe('NotificationService', () => {
 
         const request: any = {
           sms: {
-            recipients: { to: ['+12025551234'] },
+            recipients: { to: ['+16045551234'] },
             content: { templateId: 'template-123' },
             params: { code: '123456' },
           },
@@ -1021,7 +1026,7 @@ describe('NotificationService', () => {
         const request: any = {
           params: { code: '123456' },
           sms: {
-            recipients: { to: ['+12025551234'] },
+            recipients: { to: ['+16045551234'] },
             content: { templateId: 'template-123' },
           },
         }
@@ -1302,7 +1307,7 @@ describe('NotificationService', () => {
       it('should return empty error array for valid SMS request', async () => {
         const request: any = {
           sms: {
-            recipients: { to: ['+12025551234'] },
+            recipients: { to: ['+16045551234'] },
             content: { body: 'Test message' },
           },
         }
@@ -1332,7 +1337,7 @@ describe('NotificationService', () => {
             content: { subject: 'Test', body: 'Test body' },
           },
           sms: {
-            recipients: { to: ['+12025551234'] },
+            recipients: { to: ['+16045551234'] },
             content: { body: 'Test message' },
           },
           msgApp: {
