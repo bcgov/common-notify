@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { describeError } from '../../common/utils/describe-error'
-import { createHmac } from 'crypto'
+import { createHmac } from 'node:crypto'
 import type { Job } from 'bullmq'
 import axios from 'axios'
 import { WebhookJobPayload } from '../queue.types'

@@ -37,6 +37,17 @@ describe('AttachmentProcessingService', () => {
     expect(mockAttachmentService.uploadAttachments).not.toHaveBeenCalled()
   })
 
+  it('should map null attachments to an empty array without uploading', async () => {
+    const request = {
+      email: { recipients: { to: ['test@example.com'] }, attachments: null },
+    } as unknown as NotifySimpleRequest
+
+    const result = await service.processAttachments(request, 'tenant-123')
+
+    expect(result.email?.attachments).toEqual([])
+    expect(mockAttachmentService.uploadAttachments).not.toHaveBeenCalled()
+  })
+
   it('should return attachmentId only for email attachments', async () => {
     mockAttachmentService.uploadAttachments.mockResolvedValue([
       { id: 'attachment-1' },
