@@ -41,6 +41,7 @@ import { LimitAlertNotificationService } from './services/limit-alert-notificati
 import { SafelistService } from '../safelist/safelist.service'
 import { SmsSegmentService } from './services/sms-segment.service'
 import { NotificationDedupService } from './services/notification-dedup.service'
+import { NotifySubmissionService } from './services/notify-submission.service'
 import { EventNotificationResolver } from '../events/event-notification.resolver'
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 
@@ -143,6 +144,10 @@ const mockLimitAlertNotificationService = {
 
 const mockSmsSegmentService = {
   countSegmentsPerRecipient: vi.fn().mockResolvedValue(1),
+  // One segment per row unless a test says otherwise.
+  countMergeSegments: vi.fn((_tenantId: string, _request: unknown, rows: unknown[]) =>
+    Promise.resolve(rows.length),
+  ),
 }
 
 // Disabled unless a test opts in, so every other send test runs the undeduplicated path.
@@ -177,6 +182,9 @@ describe('Notify Controllers', () => {
     mockSafelistService.isEnforced.mockResolvedValue(false)
     mockSafelistService.findBlocked.mockResolvedValue([])
     mockSmsSegmentService.countSegmentsPerRecipient.mockResolvedValue(1)
+    mockSmsSegmentService.countMergeSegments.mockImplementation((_tenantId, _request, rows) =>
+      Promise.resolve(rows.length),
+    )
     mockNotificationDedupService.enabled = false
     mockNotificationDedupService.fingerprint.mockReturnValue('fingerprint-1')
     mockNotificationDedupService.findDuplicate.mockResolvedValue(null)
@@ -224,6 +232,7 @@ describe('Notify Controllers', () => {
         },
         { provide: NotificationDedupService, useValue: mockNotificationDedupService },
         { provide: EventNotificationResolver, useValue: mockEventNotificationResolver },
+        NotifySubmissionService,
       ],
     })
       .overrideGuard(NotifyServiceGuard)
@@ -290,8 +299,10 @@ describe('Notify Controllers', () => {
     })
 
     it('receives the limit-alert provider through Nest injection', () => {
-      const controller = app.get(NotifySimpleController)
-      expect(controller.limitAlertNotificationService).toBe(mockLimitAlertNotificationService)
+      const submission = app.get(NotifySubmissionService)
+      expect((submission as any).limitAlertNotificationService).toBe(
+        mockLimitAlertNotificationService,
+      )
     })
 
     it('passes the same provider to the manually constructed frontend delegate', async () => {
@@ -307,9 +318,9 @@ describe('Notify Controllers', () => {
           { action: 'cancel' },
         )
 
-        expect(
-          (delegate.mock.instances[0] as NotifySimpleController).limitAlertNotificationService,
-        ).toBe(mockLimitAlertNotificationService)
+        expect((delegate.mock.instances[0] as any).submissionService).toBe(
+          app.get(NotifySubmissionService),
+        )
       } finally {
         delegate.mockRestore()
       }
@@ -591,9 +602,9 @@ describe('Notify Controllers', () => {
             sentCount: 85,
           },
         ])
-        const controller = app.get(NotifySimpleController)
-        const provider = controller.limitAlertNotificationService
-        ;(controller as any).limitAlertNotificationService = undefined
+        const submission = app.get(NotifySubmissionService) as any
+        const provider = submission.limitAlertNotificationService
+        submission.limitAlertNotificationService = undefined
 
         try {
           const response = await request(app.getHttpServer())
@@ -602,7 +613,7 @@ describe('Notify Controllers', () => {
             .expect(202)
           expect(response.body.status).toBe('accepted')
         } finally {
-          ;(controller as any).limitAlertNotificationService = provider
+          submission.limitAlertNotificationService = provider
         }
       })
 
@@ -1070,7 +1081,7 @@ describe('Notify Controllers', () => {
       })
 
       it('hands the email shorthand params to validation under the channel, not top level', async () => {
-        // /notifysimple/email posts a bare channel, which @Queueable wraps as { email: body }.
+        // /notifysimple/email posts a bare channel, which the submission service wraps as { email: body }.
         // Everything the caller sent lands under email — so validateBusinessRules sees no
         // top-level params and must read the channel's own params to resolve placeholders.
         const templateId = '12345678-1234-4234-8234-123456789012'
@@ -1355,13 +1366,10 @@ describe('Notify Controllers', () => {
         })
 
         it('should bill each recipient on its own body rather than assuming a uniform one', async () => {
-          // Two recipients whose rendered bodies span 3 and 1 segments: the old email-only code
-          // multiplied one count by the recipient total, which would have billed 2 or 6 here.
-          mockSmsSegmentService.countSegmentsPerRecipient
-            .mockResolvedValueOnce(3)
-            .mockResolvedValueOnce(1)
+          // Rows spanning 3 and 1 segments; the per-row sum is covered in sms-segment.service.spec.
+          mockSmsSegmentService.countMergeSegments.mockResolvedValue(4)
 
-          return request(app.getHttpServer())
+          await request(app.getHttpServer())
             .post('/api/v1/notifysimple/sms')
             .send(validSmsMerge)
             .expect(202)
@@ -1369,10 +1377,16 @@ describe('Notify Controllers', () => {
               expect(res.body.recipientCount).toBe(2)
               expect(res.body.billableMessageCount).toBe(4)
             })
+          // Each row's own params, so each recipient's body is rendered separately.
+          expect(mockSmsSegmentService.countMergeSegments).toHaveBeenCalledWith(
+            'test-tenant-id',
+            expect.anything(),
+            [{}, {}],
+          )
         })
 
         it('should enforce limits on segments, not on recipients', async () => {
-          mockSmsSegmentService.countSegmentsPerRecipient.mockResolvedValue(4)
+          mockSmsSegmentService.countMergeSegments.mockResolvedValue(8)
           mockApiKeyConsumerId = 'consumer-1'
 
           await request(app.getHttpServer())
