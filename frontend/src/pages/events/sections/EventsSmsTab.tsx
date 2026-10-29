@@ -1,18 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { SubmitEvent } from 'react'
-import {
-  Button,
-  Callout,
-  Checkbox,
-  CheckboxGroup,
-  Select,
-  Switch,
-  TextArea,
-  TextField,
-} from '@bcgov/design-system-react-components'
+import { Button, Callout, TextArea, TextField } from '@bcgov/design-system-react-components'
 import { parsePhoneNumberFromString } from 'libphonenumber-js/min'
 import EventsAdditionalRecipients from '../components/EventsAdditionalRecipients'
 import ConfirmDeactivateDialog from '../components/ConfirmDeactivateDialog'
+import ChannelActiveSwitch from '../components/ChannelActiveSwitch'
+import RecipientSourcesGroup from '../components/RecipientSourcesGroup'
+import TemplateSelect from '../components/TemplateSelect'
+import { ADDITIONAL_RECIPIENTS_ID } from '../constants'
 import { useChannelDeactivation } from '../hooks/useChannelDeactivation'
 import StickyBar from '@/components/StickyBar'
 import UnsavedChanges from '@/components/UnsavedChanges'
@@ -26,7 +21,6 @@ import EventsSmsEstimate from '../components/EventsSmsEstimate'
 export const UNSAVED_SMS_CHANGES_MESSAGE =
   'You have unsaved changes to your SMS notification settings. If you leave this page, your changes will be lost.'
 export type SmsSettingsValues = { active: boolean; templateId: string | null; to: string[] }
-const ADDITIONAL_RECIPIENTS_ID = 'additional-recipients'
 
 // Mirrors backend/src/api/notify/services/phone-number.service.ts's normalize/isValid logic, so
 // a number accepted here is accepted by the backend's IsNormalizablePhoneNumber validator too.
@@ -266,22 +260,15 @@ export default function EventsSmsTab({
         />
       ) : (
         <form className="events__form" onSubmit={handleSubmit} noValidate>
-          <div className="events__switch-field">
-            <span className="events__field-label">Activate channel</span>
-            <Switch
-              labelPosition="right"
-              aria-label="Activate channel"
-              isSelected={channelActive}
-              onChange={(next) => {
-                if (next) setChannelActive(true)
-                else if (values.active) requestDeactivate()
-                else setChannelActive(false)
-              }}
-              isDisabled={disabled || (!channelActive && smsNotificationsEnabled === false)}
-            >
-              {channelActive ? 'On' : 'Off'}
-            </Switch>
-          </div>
+          <ChannelActiveSwitch
+            isSelected={channelActive}
+            onChange={(next) => {
+              if (next) setChannelActive(true)
+              else if (values.active) requestDeactivate()
+              else setChannelActive(false)
+            }}
+            isDisabled={disabled || (!channelActive && smsNotificationsEnabled === false)}
+          />
           {smsNotificationsEnabled === false && (
             <p className="events__help">
               SMS notifications are also turned off in tenant Settings. An administrator must enable
@@ -302,24 +289,13 @@ export default function EventsSmsTab({
                 isDisabled={fieldsDisabled}
                 description="Your default phone number from your account (IDIR) will be used. The number must be registered before it can send notifications through this service."
               />
-              <CheckboxGroup
-                label="Recipient(s)"
+              <RecipientSourcesGroup
                 value={selectedRecipients}
                 onChange={setSelectedRecipients}
                 isDisabled={fieldsDisabled}
-                isRequired
-                validationBehavior="aria"
-                isInvalid={validationAttempted && Boolean(recipientError)}
-                errorMessage={recipientError}
-              >
-                <Checkbox value="subscription-service" isDisabled>
-                  Subscription Service
-                </Checkbox>
-                <Checkbox value="cstar-groups" isDisabled>
-                  CSTAR Group(s)
-                </Checkbox>
-                <Checkbox value={ADDITIONAL_RECIPIENTS_ID}>Additional recipient(s)</Checkbox>
-              </CheckboxGroup>
+                errorMessage={validationAttempted ? recipientError : undefined}
+                isCstarEnabled={false}
+              />
               {selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) && (
                 <EventsAdditionalRecipients
                   key={recipientsResetKey}
@@ -331,21 +307,16 @@ export default function EventsSmsTab({
                   variant="sms"
                 />
               )}
-              <Select
-                label="Template"
-                placeholder="Select a template..."
-                items={templates.map((template) => ({ id: template.id, label: template.name }))}
+              <TemplateSelect
+                templates={templates}
                 value={templateId}
-                onChange={(key) => {
-                  setTemplateId(key == null ? undefined : String(key))
+                onChange={(nextTemplateId) => {
+                  setTemplateId(nextTemplateId)
                   setSampleValues({})
                 }}
                 size="medium"
                 isDisabled={fieldsDisabled}
-                isRequired
-                validationBehavior="aria"
-                isInvalid={validationAttempted && Boolean(templateError)}
-                errorMessage={templateError}
+                errorMessage={validationAttempted ? templateError : undefined}
               />
               {selectedTemplate && (
                 <div className="events__template-preview events__template-preview--auto-size">

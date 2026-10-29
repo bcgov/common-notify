@@ -3,12 +3,9 @@ import { resolveEmailHeaderTitle } from '@/utils/emailHeaderTitle'
 import type { FC, SubmitEvent } from 'react'
 import {
   Button,
-  Checkbox,
-  CheckboxGroup,
   Radio,
   RadioGroup,
   Select,
-  Switch,
   TextField,
   Tooltip,
   TooltipTrigger,
@@ -19,6 +16,10 @@ import type { RecipientAddresses } from '../components/EventsAdditionalRecipient
 import EventsCstarGroups from '../components/EventsCstarGroups'
 import type { CstarGroupSelections } from '../components/EventsCstarGroups'
 import ConfirmDeactivateDialog from '../components/ConfirmDeactivateDialog'
+import ChannelActiveSwitch from '../components/ChannelActiveSwitch'
+import RecipientSourcesGroup from '../components/RecipientSourcesGroup'
+import TemplateSelect from '../components/TemplateSelect'
+import { ADDITIONAL_RECIPIENTS_ID, CSTAR_GROUPS_ID } from '../constants'
 import { useChannelDeactivation } from '../hooks/useChannelDeactivation'
 import EventsEmailPreviewModal from './EventsEmailPreviewModal'
 import StickyBar from '@/components/StickyBar'
@@ -45,11 +46,6 @@ const SENDER_EMAIL_DOMAIN = 'gov.bc.ca'
 
 const HEADER_TENANT_DEFAULT_ID = 'tenant-default'
 const HEADER_CUSTOM_ID = 'custom'
-
-// Subscription service recipients are not implemented yet.
-const SUBSCRIPTION_SERVICE_ID = 'subscription-service'
-const CSTAR_GROUPS_ID = 'cstar-groups'
-const ADDITIONAL_RECIPIENTS_ID = 'additional-recipients'
 
 // What a recipient source contributes while its checkbox is off. Its own fields are left holding
 // what was entered, so checking it back on restores them, but nothing there is saved or validated.
@@ -213,7 +209,6 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     }
   }, [headerTitle, tenantName, values.useCustomHeader])
 
-  const templateItems = templates.map((t) => ({ id: t.id, label: t.name }))
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId)
 
   const logoItems = [
@@ -353,18 +348,11 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
 
   return (
     <form className="events__form" onSubmit={handleSubmit}>
-      <div className="events__switch-field">
-        <span className="events__field-label">Activate channel</span>
-        <Switch
-          labelPosition="right"
-          aria-label="Activate channel"
-          isSelected={channelActive}
-          onChange={handleSwitchChange}
-          isDisabled={isFormDisabled}
-        >
-          {channelActive ? 'On' : 'Off'}
-        </Switch>
-      </div>
+      <ChannelActiveSwitch
+        isSelected={channelActive}
+        onChange={handleSwitchChange}
+        isDisabled={isFormDisabled}
+      />
 
       <ConfirmDeactivateDialog
         isOpen={isConfirmOpen}
@@ -421,27 +409,15 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
             errorMessage={displayedSenderEmailError}
           />
 
-          <CheckboxGroup
-            label="Recipient(s)"
+          <RecipientSourcesGroup
             value={selectedRecipients}
             onChange={(value) => {
               setSelectedRecipients(value)
               setSettingsChanged(true)
             }}
             isDisabled={areFieldsDisabled}
-            isRequired
-            // Native validation flags an empty group as soon as it is touched; drive the error
-            // from validationAttempted instead so it only appears after a save attempt.
-            validationBehavior="aria"
-            isInvalid={Boolean(displayedRecipientSelectionError)}
             errorMessage={displayedRecipientSelectionError}
-          >
-            <Checkbox value={SUBSCRIPTION_SERVICE_ID} isDisabled>
-              Subscription Service
-            </Checkbox>
-            <Checkbox value={CSTAR_GROUPS_ID}>CSTAR Group(s)</Checkbox>
-            <Checkbox value={ADDITIONAL_RECIPIENTS_ID}>Additional recipient(s)</Checkbox>
-          </CheckboxGroup>
+          />
 
           {selectedRecipients.includes(CSTAR_GROUPS_ID) && (
             <EventsCstarGroups
@@ -467,20 +443,15 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
             />
           )}
 
-          <Select
-            label="Template"
-            placeholder="Select a template..."
-            items={templateItems}
+          <TemplateSelect
+            templates={templates}
             value={selectedTemplateId}
-            onChange={(key) => {
-              setSelectedTemplateId(key == null ? undefined : String(key))
+            onChange={(templateId) => {
+              setSelectedTemplateId(templateId)
               setSettingsChanged(true)
             }}
             size="small"
             isDisabled={areFieldsDisabled}
-            isRequired
-            validationBehavior="aria"
-            isInvalid={Boolean(displayedTemplateError)}
             errorMessage={displayedTemplateError}
           />
 
