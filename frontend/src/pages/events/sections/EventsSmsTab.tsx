@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { SubmitEvent } from 'react'
-import { Button, Callout, TextArea, TextField } from '@bcgov/design-system-react-components'
-import { parsePhoneNumberFromString } from 'libphonenumber-js/min'
+import { Button, TextField } from '@bcgov/design-system-react-components'
 import EventsAdditionalRecipients from '../components/EventsAdditionalRecipients'
 import ConfirmDeactivateDialog from '../components/ConfirmDeactivateDialog'
 import ChannelActiveSwitch from '../components/ChannelActiveSwitch'
@@ -14,62 +13,15 @@ import UnsavedChanges from '@/components/UnsavedChanges'
 import { NotificationChannel } from '@/api/templates.api'
 import { useChannelTemplates } from '@/hooks/useChannelTemplates'
 import { sameAddresses } from '@/utils/recipients'
+import { duplicatePhoneNumbers, isInternationalPhone, isValidPhone } from '@/utils/phoneNumbers'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import EventsSmsPreviewModal from './EventsSmsPreviewModal'
-import EventsSmsEstimate from '../components/EventsSmsEstimate'
+import EventsSmsSavedSettings from '../components/EventsSmsSavedSettings'
+import EventsSmsTemplatePreview from '../components/EventsSmsTemplatePreview'
 
 export const UNSAVED_SMS_CHANGES_MESSAGE =
   'You have unsaved changes to your SMS notification settings. If you leave this page, your changes will be lost.'
 export type SmsSettingsValues = { active: boolean; templateId: string | null; to: string[] }
-
-// Mirrors backend/src/api/notify/services/phone-number.service.ts's normalize/isValid logic, so
-// a number accepted here is accepted by the backend's IsNormalizablePhoneNumber validator too.
-const DEFAULT_PHONE_REGION = 'CA'
-const FORMATTING_CHARACTERS = /[\s\-().]/g
-
-// Returns the E.164 form, or null if `value` isn't a resolvable phone number.
-function normalizePhone(value: string): string | null {
-  const cleaned = value.replace(FORMATTING_CHARACTERS, '')
-
-  try {
-    const phoneNumber = parsePhoneNumberFromString(cleaned, DEFAULT_PHONE_REGION)
-    return phoneNumber && !phoneNumber.ext && phoneNumber.isValid() ? phoneNumber.number : null
-  } catch {
-    return null
-  }
-}
-
-function isValidPhone(value: string): boolean {
-  return normalizePhone(value) !== null
-}
-
-// Mirrors PhoneNumberService.isInternational: anything outside Canada, the US included. False for
-// a number that won't normalize, which isValidPhone already flags.
-function isInternationalPhone(value: string): boolean {
-  const normalized = normalizePhone(value)
-  return normalized !== null && parsePhoneNumberFromString(normalized)?.country !== 'CA'
-}
-
-// Differently formatted entries can normalize to the same E.164 number (e.g. "2505551234" and
-// "250-555-1234"); TagListField only catches exact-string repeats, so flag later entries whose
-// normalized form repeats an earlier one, the same way a malformed number is flagged, instead of
-// letting the form silently drop them.
-function duplicatePhoneNumbers(addresses: string[]): string[] {
-  const seen = new Set<string>()
-  const duplicates: string[] = []
-
-  for (const address of addresses) {
-    const normalized = normalizePhone(address)
-    if (normalized === null) continue
-    if (seen.has(normalized)) {
-      duplicates.push(address)
-    } else {
-      seen.add(normalized)
-    }
-  }
-
-  return duplicates
-}
 
 type EventsSmsTabProps = Readonly<{
   values: SmsSettingsValues
@@ -83,51 +35,6 @@ type EventsSmsTabProps = Readonly<{
   /** Whether the international_sms flag and the tenant's International SMS setting are both on. */
   internationalSmsAllowed?: boolean
 }>
-
-type EventsSmsSavedSettingsProps = Readonly<{
-  channelActive: boolean
-  selectedTemplate?: { body: string }
-  onEdit: () => void
-}>
-
-function EventsSmsSavedSettings({
-  channelActive,
-  selectedTemplate,
-  onEdit,
-}: EventsSmsSavedSettingsProps) {
-  return (
-    <>
-      <Callout
-        variant="lightGrey"
-        title={channelActive ? 'Ready to send?' : 'SMS settings saved'}
-        description={
-          channelActive
-            ? 'Your SMS settings are ready. Continue to select recipients and send a test notification to verify the content and formatting.'
-            : 'Your SMS settings are saved. Activate this channel when you are ready to send notifications.'
-        }
-      />
-      {selectedTemplate ? (
-        <div className="events__saved-preview">
-          <p className="events__template-preview-content">{selectedTemplate.body}</p>
-          <EventsSmsEstimate body={selectedTemplate.body} />
-        </div>
-      ) : (
-        <p className="events__help">
-          The saved template preview is unavailable. Open settings to select a template.
-        </p>
-      )}
-      <p className="events__help">Test notifications are not available yet.</p>
-      <StickyBar>
-        <Button type="button" variant="secondary" onPress={onEdit}>
-          Edit settings
-        </Button>
-        <Button type="button" variant="primary" isDisabled>
-          Continue to test notification
-        </Button>
-      </StickyBar>
-    </>
-  )
-}
 
 export default function EventsSmsTab({
   values,
@@ -319,19 +226,10 @@ export default function EventsSmsTab({
                 errorMessage={validationAttempted ? templateError : undefined}
               />
               {selectedTemplate && (
-                <div className="events__template-preview events__template-preview--auto-size">
-                  <TextArea
-                    label="Template Preview"
-                    value={selectedTemplate.body}
-                    isReadOnly
-                    isDisabled={fieldsDisabled}
-                  />
-                  <EventsSmsEstimate body={selectedTemplate.body} />
-                  <p className="events__help">
-                    Estimates change when template variables are replaced. Any tenant-name prefix
-                    added when sending is not included.
-                  </p>
-                </div>
+                <EventsSmsTemplatePreview
+                  body={selectedTemplate.body}
+                  isDisabled={fieldsDisabled}
+                />
               )}
             </>
           )}
