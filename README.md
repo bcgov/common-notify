@@ -4,6 +4,7 @@
 [![Analysis](https://github.com/bcgov/common-notify/actions/workflows/analysis.yml/badge.svg)](https://github.com/bcgov/common-notify/actions/workflows/analysis.yml)
 [![Scheduled](https://github.com/bcgov/common-notify/actions/workflows/scheduled.yml/badge.svg)](https://github.com/bcgov/common-notify/actions/workflows/scheduled.yml)
 [![License](https://img.shields.io/github/license/bcgov/common-notify)](LICENSE)
+
 [![Quality gate](https://sonarcloud.io/api/project_badges/quality_gate?project=bcgov_common-notify)](https://sonarcloud.io/summary/new_code?id=bcgov_common-notify)
 [![Duplicated Lines](https://sonarcloud.io/api/project_badges/measure?project=bcgov_common-notify&metric=duplicated_lines_density)](https://sonarcloud.io/component_measures?id=bcgov_common-notify&metric=duplicated_lines_density&view=list)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=bcgov_common-notify&metric=coverage)](https://sonarcloud.io/component_measures?id=bcgov_common-notify&metric=coverage&view=list)
