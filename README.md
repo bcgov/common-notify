@@ -5,6 +5,17 @@
 [![Scheduled](https://github.com/bcgov/common-notify/actions/workflows/scheduled.yml/badge.svg)](https://github.com/bcgov/common-notify/actions/workflows/scheduled.yml)
 [![License](https://img.shields.io/github/license/bcgov/common-notify)](LICENSE)
 
+[![Duplicated Lines](https://sonarcloud.io/api/project_badges/measure?project=bcgov_common-notify&metric=duplicated_lines_density)](https://sonarcloud.io/component_measures?id=bcgov_common-notify&metric=duplicated_lines_density&view=list)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=bcgov_common-notify&metric=coverage)](https://sonarcloud.io/component_measures?id=bcgov_common-notify&metric=coverage&view=list)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=bcgov_common-notify&metric=security_rating)](https://sonarcloud.io/component_measures?id=bcgov_common-notify&metric=security_rating&view=list)
+[![Security Issues](https://sonarcloud.io/api/project_badges/measure?project=bcgov_common-notify&metric=software_quality_security_issues)](https://sonarcloud.io/project/issues?id=bcgov_common-notify&impactSoftwareQualities=SECURITY&s=FILE_LINE&issueStatuses=OPEN)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=bcgov_common-notify&metric=reliability_rating)](https://sonarcloud.io/component_measures?id=bcgov_common-notify&metric=reliability_rating&view=list)
+[![Reliability Issues](https://sonarcloud.io/api/project_badges/measure?project=bcgov_common-notify&metric=software_quality_reliability_issues)](https://sonarcloud.io/project/issues?id=bcgov_common-notify&impactSoftwareQualities=RELIABILITY&s=FILE_LINE&issueStatuses=OPEN)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=bcgov_common-notify&metric=sqale_rating)](https://sonarcloud.io/component_measures?id=bcgov_common-notify&metric=sqale_rating&view=list)
+[![Maintainability Issues](https://sonarcloud.io/api/project_badges/measure?project=bcgov_common-notify&metric=software_quality_maintainability_issues)](https://sonarcloud.io/project/issues?id=bcgov_common-notify&impactSoftwareQualities=MAINTAINABILITY&s=FILE_LINE&issueStatuses=OPEN)
+
+[![Quality gate](https://sonarcloud.io/api/project_badges/quality_gate?project=bcgov_common-notify)](https://sonarcloud.io/summary/new_code?id=bcgov_common-notify)
+
 **_View and test live Swagger API Spec [here](https://notify.digital.gov.bc.ca/api/docs)_**
 
 **_Download OpenApi YAML [here](https://notify.digital.gov.bc.ca/api/docs-yaml)_**
