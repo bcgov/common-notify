@@ -147,12 +147,23 @@ jobs:
             fi
 
             # Deploy Redis (async - let Kubernetes manage pod startup)
+            # Bitnami refuses to upgrade without the existing password and would
+            # otherwise regenerate one, breaking the backend's secretKeyRef.
+            REDIS_PASSWORD=$(oc get secret ${RELEASE_NAME} \
+              -o jsonpath='{.data.redis-password}' 2>/dev/null | base64 -d || true)
+            PASSWORD_ARG=""
+            if [ -n "${REDIS_PASSWORD}" ]; then
+              echo "::add-mask::${REDIS_PASSWORD}"
+              PASSWORD_ARG="--set global.redis.password=${REDIS_PASSWORD}"
+            fi
+
             helm upgrade --install \
               ${RELEASE_NAME} \
               bitnami/redis \
               --version 25.4.1 \
               -f ${VALUES_FILE} \
               ${VALUES_OVERRIDE} \
+              ${PASSWORD_ARG} \
               --timeout 5m
 
             echo "✓ Redis deployment initiated successfully"
