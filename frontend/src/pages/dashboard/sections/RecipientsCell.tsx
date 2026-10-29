@@ -12,7 +12,7 @@ const recipientList = (recipients?: NotificationRequest['recipients']): string[]
 /**
  * Notification Status table recipients cell
  * fixed width, hovering brings up a popover with up to 5 recipients listed
- * view all dialogue brings up the old modal for now
+ * view all opens the request status page
  */
 export const RecipientsCell: FC<{
   recipients?: NonNullable<NotificationRequest['recipients']>
