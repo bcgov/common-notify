@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FC } from 'react'
-import { Button, ToggleButton, ToggleButtonGroup } from '@bcgov/design-system-react-components'
+import { Button } from '@bcgov/design-system-react-components'
 import NotificationPreviewModal from '@/components/NotificationPreviewModal'
+import TabBar from '@/components/TabBar'
 import type { TemplateEngine } from '@/api/templates.api'
 import { previewTemplateBody, NotificationChannel } from '@/api/templates.api'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
@@ -156,26 +157,15 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
         ) : undefined
       }
       outputHeader={
-        <ToggleButtonGroup
-          aria-label="Preview mode"
-          selectionMode="single"
-          disallowEmptySelection
-          selectedKeys={[activeTab]}
-          size="small"
-          onSelectionChange={(keys) => {
-            const [selected] = keys
-            if (selected != null) {
-              setActiveTab(selected as 'rendered' | 'raw')
-            }
-          }}
-        >
-          <ToggleButton id="rendered" size="small">
-            Rendered Preview
-          </ToggleButton>
-          <ToggleButton id="raw" size="small">
-            Raw Template
-          </ToggleButton>
-        </ToggleButtonGroup>
+        <TabBar
+          label="Preview mode"
+          items={[
+            { id: 'rendered', label: 'Rendered Preview' },
+            { id: 'raw', label: 'Raw Template' },
+          ]}
+          selected={activeTab}
+          onSelect={setActiveTab}
+        />
       }
       isLoading={loading && activeTab === 'rendered'}
       error={activeTab === 'rendered' ? error : null}
