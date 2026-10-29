@@ -55,6 +55,7 @@
     "pg": "^8.13.1",
     "prom-client": "^15.1.3",
     "reflect-metadata": "^0.2.2",
+    "request-filtering-agent": "^3.2.1",
     "rxjs": "^7.8.1",
     "sanitize-html": "^2.17.7",
     "swagger-ui-express": "^5.0.1",
