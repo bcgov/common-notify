@@ -25,6 +25,7 @@ import StickyBar from '@/components/StickyBar'
 import UnsavedChanges from '@/components/UnsavedChanges'
 import { NotificationChannel } from '@/api/templates.api'
 import { useChannelTemplates } from '@/hooks/useChannelTemplates'
+import { isValidEmail } from '@/utils/email'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import type { ApprovedEmailLogo } from '@/interfaces/tenant-settings.interface'
 import type { CstarGroup } from '@/api/cstar.api'
@@ -68,13 +69,6 @@ export type EmailSettingsValues = {
   useCustomHeader: boolean
   headerLogoId: string | null
   headerTitle: string
-}
-
-const EMAIL_PATTERN =
-  /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i
-
-function isValidEmail(value: string): boolean {
-  return value.length <= 254 && !value.includes('..') && EMAIL_PATTERN.test(value)
 }
 
 /** Empty string when the address is usable as a sender; otherwise why it isn't. */

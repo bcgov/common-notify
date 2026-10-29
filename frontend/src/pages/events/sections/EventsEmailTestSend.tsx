@@ -37,6 +37,7 @@ import {
   MAX_FILE_BYTES,
 } from '@/utils/bulkNotificationsCsv'
 import type { ParsedCsv, RowIssue } from '@/utils/bulkNotificationsCsv'
+import { isValidEmail } from '@/utils/email'
 import { useAppSelector } from '@/redux/hooks'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import '@/scss/components/events.scss'
@@ -55,13 +56,6 @@ type AddRecipients = 'one' | 'many'
  * the upload control promises.
  */
 const MAX_TEST_RECIPIENTS = 5
-
-const EMAIL_PATTERN =
-  /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i
-
-function isValidEmail(value: string): boolean {
-  return value.length <= 254 && !value.includes('..') && EMAIL_PATTERN.test(value)
-}
 
 /**
  * The one address a test goes to, or null on the paths that do not have one: both single
