@@ -18,16 +18,12 @@
     color: $text-secondary;
   }
 
-  // The DS modal caps itself at the viewport but never scrolls, so a long history pushed the
-  // Close button off-screen. 20rem leaves room for the title bar, scope line and footer.
+  // The DS modal caps itself at the viewport but never scrolls, so on a short screen even one page
+  // pushes the Close button off-screen. 20rem leaves room for the title bar, scope line and footer.
+  // Not focusable: tabbing to the pagination buttons at the bottom scrolls it.
   &__table {
     max-height: max(10rem, calc(100vh - 20rem));
     overflow-y: auto;
-
-    &:focus-visible {
-      outline: 2px solid $border-active;
-      outline-offset: 2px;
-    }
 
     .data-table {
       margin: 0;
