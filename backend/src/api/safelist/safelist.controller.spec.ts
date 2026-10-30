@@ -60,6 +60,7 @@ describe('SafelistController', () => {
       const result = await controller.list(request, 'EMAIL')
 
       expect(safelistService.listByTenant).toHaveBeenCalledWith('tenant-1', 'EMAIL')
+      expect(safelistService.getMaxEntries).toHaveBeenCalledWith('tenant-1')
       expect(result).toEqual({ entries: [], enforced: true, maxEntries: 50 })
     })
 
