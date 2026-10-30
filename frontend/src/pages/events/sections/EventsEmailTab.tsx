@@ -270,6 +270,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
               isOpen={previewOpen}
               onClose={() => setPreviewOpen(false)}
               template={selectedTemplate}
+              header={header.submitted}
               senderEmail={trimmedSenderEmail}
               toAddresses={submittedRecipients.to}
               ccAddresses={submittedRecipients.cc}

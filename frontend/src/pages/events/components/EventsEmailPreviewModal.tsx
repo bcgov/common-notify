@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { FC } from 'react'
-import { Button } from '@bcgov/design-system-react-components'
+import type { ComponentProps, FC } from 'react'
+import { Button, InlineAlert } from '@bcgov/design-system-react-components'
 import { previewTemplate } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
+import EmailBodyFrame from '@/components/EmailBodyFrame'
 import NotificationPreviewModal from '@/components/NotificationPreviewModal'
 import { detectVariables } from '@/utils/templateVariables'
+import EventsEmailHeader from './EventsEmailHeader'
 
 interface EventsEmailPreviewModalProps {
   isOpen: boolean
   onClose: () => void
   template: TemplateResponse
+  /** The tab's header settings, shown above the body as the email will carry them. */
+  header: ComponentProps<typeof EventsEmailHeader>['emailSettings']
   /** The tab's sender email, shown as the From address it is being configured to send from. */
   senderEmail: string
   /** The tab's recipients, each list shown as its own envelope line. */
@@ -28,12 +32,14 @@ const EventsEmailPreviewModal: FC<EventsEmailPreviewModalProps> = ({
   isOpen,
   onClose,
   template,
+  header,
   senderEmail,
   toAddresses,
   ccAddresses,
   bccAddresses,
 }) => {
   const [values, setValues] = useState<Record<string, string>>({})
+  const [isNoticeVisible, setNoticeVisible] = useState(true)
   const [subject, setSubject] = useState('')
   const [bodyHtml, setBodyHtml] = useState<string | undefined>()
   const [bodyText, setBodyText] = useState('')
@@ -86,6 +92,7 @@ const EventsEmailPreviewModal: FC<EventsEmailPreviewModalProps> = ({
       initial[variable.name] = variable.type === 'boolean' ? 'true' : ''
     })
     setValues(initial)
+    setNoticeVisible(true)
     void runPreview(initial)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, runPreview])
@@ -95,12 +102,22 @@ const EventsEmailPreviewModal: FC<EventsEmailPreviewModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Email Notification Preview"
+      notice={
+        isNoticeVisible ? (
+          <InlineAlert
+            variant="info"
+            description="Preview values are generated from your API payload and notification event settings."
+            isCloseable
+            onClose={() => setNoticeVisible(false)}
+          />
+        ) : undefined
+      }
       variables={variables.map((variable) => ({
         name: variable.name,
         value: values[variable.name] ?? '',
         type: variable.type,
       }))}
-      variablesIntro="Enter sample values to see how this template will be rendered."
+      variablesIntro="Provide values for all variables in your template."
       isEditable
       onVariableChange={(name, value) => setValues((prev) => ({ ...prev, [name]: value }))}
       variablesFooter={
@@ -118,6 +135,14 @@ const EventsEmailPreviewModal: FC<EventsEmailPreviewModalProps> = ({
       cc={ccAddresses.join(', ') || undefined}
       bcc={bccAddresses.join(', ') || undefined}
       subject={subject}
+      outputHeader={<EventsEmailHeader emailSettings={header} />}
+      // The same frame as the test send preview. Only once a render has succeeded, so the
+      // modal's own loading and error states still show.
+      bodyOverride={
+        !loading && !error && bodyHtml !== undefined ? (
+          <EmailBodyFrame html={bodyHtml} />
+        ) : undefined
+      }
       bodyHtml={bodyHtml}
       bodyText={bodyText}
       isLoading={loading}

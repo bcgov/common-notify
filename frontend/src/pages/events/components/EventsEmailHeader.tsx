@@ -6,7 +6,8 @@ import { fetchApprovedEmailLogos, fetchSettings } from '@/redux/thunks/settings.
 import { DEFAULT_EMAIL_HEADER_TITLE, resolveEmailHeaderTitle } from '@/utils/emailHeaderTitle'
 
 interface EventsEmailHeaderProps {
-  emailSettings: EventEmailSettings
+  /** Only the header fields, so a tab can preview header settings it hasn't saved yet. */
+  emailSettings: Pick<EventEmailSettings, 'useCustomHeader' | 'headerLogoId' | 'headerTitle'>
 }
 
 /**
