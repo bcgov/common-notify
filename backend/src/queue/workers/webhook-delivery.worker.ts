@@ -10,6 +10,13 @@ import { WebhookDeliveryLogRepository } from '../../api/webhook/webhook-delivery
 import { QueueName } from '../../enum/queue-name.enum'
 import { QueueProcessor } from './queue-processor'
 import { maxAttempts, retryDelay } from '../job-options'
+import { allowedWebhookHeaders } from '../../api/webhook/webhook-headers'
+import {
+  WEBHOOK_LOGGED_BODY_CHARS,
+  isBlockedAddressError,
+  isOversizeResponseError,
+  webhookRequestConfig,
+} from './webhook-request'
 
 /**
  * Webhook Delivery Worker
@@ -22,7 +29,7 @@ import { maxAttempts, retryDelay } from '../job-options'
  * 5. Logs each delivery attempt to webhook_delivery_log
  *
  * Retry strategy:
- * - 4xx responses: treated as permanent failures (bad client config), no retry
+ * - 3xx/4xx responses, internal addresses, oversize responses: permanent failures, no retry
  * - 5xx responses / network errors: 3 attempts, retried after 5s then 15s (WEBHOOK_JOB_OPTIONS)
  *
  * Idempotency: Job key is webhook_{webhookId}_{notificationId}_{status}
@@ -70,7 +77,7 @@ export class WebhookDeliveryWorker implements QueueProcessor<WebhookJobPayload> 
 
     const requestHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...webhookConfig.headers,
+      ...allowedWebhookHeaders(webhookConfig.headers),
     }
     // HMAC-SHA256 sign the raw JSON body if a secret is configured
     if (webhookConfig.secret) {
@@ -80,8 +87,8 @@ export class WebhookDeliveryWorker implements QueueProcessor<WebhookJobPayload> 
 
     try {
       const response = await axios.post(webhookConfig.url, postBody, {
+        ...webhookRequestConfig(),
         headers: requestHeaders,
-        timeout: 30_000,
       })
       const httpStatusCode = response.status
       await this.logAttempt(job, {
@@ -111,14 +118,15 @@ export class WebhookDeliveryWorker implements QueueProcessor<WebhookJobPayload> 
   }
 
   /**
-   * A 4xx is the tenant's configuration (a bad URL, a rejected credential): logged and not
-   * retried. Anything else - a 5xx, a network error - is rethrown for the queue to retry.
+   * A 3xx/4xx, an internal address or an oversize response is the tenant's configuration (a
+   * redirect, a bad URL, a rejected credential): logged and not retried. Anything else - a
+   * 5xx, a network error - is rethrown for the queue to retry.
    */
   private async handleDeliveryError(
     job: Job<WebhookJobPayload>,
     url: string,
     error: unknown,
-  ): Promise<{ success: false; statusCode: number }> {
+  ): Promise<{ success: false; statusCode?: number }> {
     const { notificationId, webhookId } = job.data
     const attemptNumber = (job.attemptsMade ?? 0) + 1
     const isLastAttempt = attemptNumber >= maxAttempts(job)
@@ -126,15 +134,23 @@ export class WebhookDeliveryWorker implements QueueProcessor<WebhookJobPayload> 
     const httpStatusCode = response?.status
     const responseBody = response ? responseText(response.data) : undefined
 
-    if (httpStatusCode && httpStatusCode >= 400 && httpStatusCode < 500) {
+    if (httpStatusCode && httpStatusCode >= 300 && httpStatusCode < 500) {
       await this.logAttempt(job, { httpStatusCode, responseBody, status: 'FAILED' })
       this.logger.warn(
-        `[${notificationId}] Webhook ${webhookId} returned ${httpStatusCode} (4xx) — not retrying`,
+        `[${notificationId}] Webhook ${webhookId} returned ${httpStatusCode} — not retrying`,
       )
       return { success: false, statusCode: httpStatusCode }
     }
 
     const errorMessage = describeError(error)
+    if (isBlockedAddressError(error) || isOversizeResponseError(error)) {
+      await this.logAttempt(job, { responseBody: errorMessage, status: 'FAILED' })
+      this.logger.warn(
+        `[${notificationId}] Webhook ${webhookId} refused: ${errorMessage} — not retrying`,
+      )
+      return { success: false }
+    }
+
     await this.logAttempt(job, {
       httpStatusCode,
       responseBody: responseBody ?? errorMessage,
@@ -167,6 +183,7 @@ export class WebhookDeliveryWorker implements QueueProcessor<WebhookJobPayload> 
       eventType: event,
       attemptNumber: (job.attemptsMade || 0) + 1,
       ...attempt,
+      responseBody: attempt.responseBody?.slice(0, WEBHOOK_LOGGED_BODY_CHARS),
     })
   }
 }
