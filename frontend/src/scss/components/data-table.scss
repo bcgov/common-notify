@@ -299,9 +299,10 @@ $table-header-bg: #f1f8fe; // Table header / footer color
     }
   }
 
-  &__dropdown-icon {
+  // Scoped under the button so it outranks the font size MUI's own class gives the icon.
+  &__dropdown-btn &__dropdown-icon {
     display: block;
-    font-size: 1.2rem !important;
+    font-size: 1.2rem;
     opacity: 0.7;
   }
 
