@@ -121,6 +121,19 @@ describe('EventsEmailPreviewModal', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('handles a template and a response without a subject', async () => {
+    vi.mocked(previewTemplate).mockResolvedValue({
+      body: 'Approved',
+      templateId: 'template',
+      bodyType: 'text',
+      channelCode: NotificationChannel.EMAIL,
+    })
+    renderModal({ template: { ...template, subject: undefined } })
+
+    expect(await screen.findByText('Approved')).toBeVisible()
+    expect(previewTemplate).toHaveBeenCalledWith('template', { approved: 'true' })
+  })
+
   it('does not render a preview while closed', () => {
     renderModal({ isOpen: false })
 

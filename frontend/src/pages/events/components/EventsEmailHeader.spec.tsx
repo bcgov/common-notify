@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import EventsEmailHeader from './EventsEmailHeader'
@@ -7,6 +7,15 @@ import emailSettingsReducer from '@/redux/slices/emailSettings.slice'
 import tenantReducer from '@/redux/slices/tenant.slice'
 import type { EventEmailSettings } from '@/api/events.api'
 import type { ApprovedEmailLogo } from '@/interfaces/tenant-settings.interface'
+import type { Tenant } from '@/interfaces/CstarTenant'
+import { getApprovedEmailLogos } from '@/api/settings.api'
+import type * as SettingsApi from '@/api/settings.api'
+
+vi.mock('@/api/settings.api', async (importOriginal) => ({
+  ...(await importOriginal<typeof SettingsApi>()),
+  getSettings: vi.fn().mockResolvedValue({}),
+  getApprovedEmailLogos: vi.fn().mockResolvedValue([]),
+}))
 
 const defaultLogo: ApprovedEmailLogo = {
   id: 'logo-default',
@@ -45,10 +54,16 @@ const emailSettings: EventEmailSettings = {
   headerTitle: null,
 }
 
-// No tenant is selected, so the header reads the store as given and fetches nothing.
+// Unless a tenant is given, none is selected, so the header reads the store as given and fetches
+// nothing.
 function renderHeader(
   overrides: Partial<EventEmailSettings> = {},
-  tenant: { emailLogoId?: string | null; useCustomEmailHeader?: boolean } = {},
+  tenant: {
+    emailLogoId?: string | null
+    useCustomEmailHeader?: boolean
+    approvedLogos?: ApprovedEmailLogo[]
+    selectedTenant?: Tenant
+  } = {},
 ) {
   const store = configureStore({
     reducer: { emailSettings: emailSettingsReducer, tenant: tenantReducer },
@@ -57,8 +72,9 @@ function renderHeader(
         ...emailSettingsReducer(undefined, { type: 'init' }),
         emailLogoId: tenant.emailLogoId ?? null,
         useCustomEmailHeader: tenant.useCustomEmailHeader ?? false,
-        approvedLogos: [defaultLogo, tenantLogo, eventLogo],
+        approvedLogos: tenant.approvedLogos ?? [defaultLogo, tenantLogo, eventLogo],
       },
+      tenant: { selectedTenant: tenant.selectedTenant ?? null, showTenantModal: false },
     },
   })
 
@@ -143,5 +159,25 @@ describe('EventsEmailHeader', () => {
 
       expect(screen.queryByText('Wildfire Service')).not.toBeInTheDocument()
     })
+
+    it('shows its title alone when there are no logos', () => {
+      renderHeader({ useCustomHeader: true, headerTitle: 'Permits' }, { approvedLogos: [] })
+
+      expect(screen.getByText('Permits')).toBeInTheDocument()
+      expect(logo()).toBeNull()
+    })
+  })
+
+  it('renders nothing without a logo or a title', () => {
+    const { container } = renderHeader({ useCustomHeader: true }, { approvedLogos: [] })
+
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  // Only the logos are checked: fetchSettings also reads API key usage, which this store leaves out.
+  it("loads the tenant's logos once a tenant is selected", async () => {
+    renderHeader({}, { selectedTenant: { id: 'tenant-1', name: 'Forests' } as Tenant })
+
+    await waitFor(() => expect(getApprovedEmailLogos).toHaveBeenCalled())
   })
 })
