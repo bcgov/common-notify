@@ -16,7 +16,6 @@ import { sameAddresses } from '@/utils/recipients'
 import { duplicatePhoneNumbers, isInternationalPhone, isValidPhone } from '@/utils/phoneNumbers'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import EventsSmsPreviewModal from './EventsSmsPreviewModal'
-import EventsSmsSavedSettings from '../components/EventsSmsSavedSettings'
 import EventsSmsTemplatePreview from '../components/EventsSmsTemplatePreview'
 
 export const UNSAVED_SMS_CHANGES_MESSAGE =
@@ -59,7 +58,6 @@ export default function EventsSmsTab({
   const [saving, setSaving] = useState(false)
   const [validationAttempted, setValidationAttempted] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const [showSaved, setShowSaved] = useState(isConfigured && values.active)
   const [sampleValues, setSampleValues] = useState<Record<string, string>>({})
   const [recipientsResetKey, setRecipientsResetKey] = useState(0)
   const templates = useChannelTemplates(NotificationChannel.SMS)
@@ -96,11 +94,10 @@ export default function EventsSmsTab({
   const showFields = isConfigured || channelActive
   const fieldsDisabled = disabled || !channelActive
   const hasUnsavedChanges =
-    !showSaved &&
-    (channelActive !== values.active ||
-      (templateId ?? null) !== values.templateId ||
-      !sameAddresses(submittedTo, values.to) ||
-      selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) !== Boolean(values.to.length))
+    channelActive !== values.active ||
+    (templateId ?? null) !== values.templateId ||
+    !sameAddresses(submittedTo, values.to) ||
+    selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) !== Boolean(values.to.length)
 
   useEffect(() => {
     onUnsavedChangesChange?.(hasUnsavedChanges)
@@ -135,7 +132,6 @@ export default function EventsSmsTab({
         to: submittedTo,
       })
       setValidationAttempted(false)
-      setShowSaved(true)
       showSuccessToast(
         'Settings saved',
         channelActive
@@ -159,99 +155,88 @@ export default function EventsSmsTab({
         isSaving={saving}
         modalMessage={UNSAVED_SMS_CHANGES_MESSAGE}
       />
-      {showSaved ? (
-        <EventsSmsSavedSettings
-          channelActive={channelActive}
-          selectedTemplate={selectedTemplate}
-          onEdit={() => setShowSaved(false)}
+      <form className="events__form" onSubmit={handleSubmit} noValidate>
+        <ChannelActiveSwitch
+          isSelected={channelActive}
+          onChange={(next) => {
+            if (next) setChannelActive(true)
+            else if (values.active) requestDeactivate()
+            else setChannelActive(false)
+          }}
+          isDisabled={disabled || (!channelActive && smsNotificationsEnabled === false)}
         />
-      ) : (
-        <form className="events__form" onSubmit={handleSubmit} noValidate>
-          <ChannelActiveSwitch
-            isSelected={channelActive}
-            onChange={(next) => {
-              if (next) setChannelActive(true)
-              else if (values.active) requestDeactivate()
-              else setChannelActive(false)
-            }}
-            isDisabled={disabled || (!channelActive && smsNotificationsEnabled === false)}
-          />
-          {smsNotificationsEnabled === false && (
-            <p className="events__help">
-              SMS notifications are also turned off in tenant Settings. An administrator must enable
-              them before SMS can be sent.
-            </p>
-          )}
-          {showFields && (
-            <>
-              <TextField
-                label="Sender phone number"
-                value={senderPhoneNumber ?? 'Not assigned'}
-                isRequired
-                validationBehavior="aria"
-                isInvalid={validationAttempted && Boolean(senderError)}
-                errorMessage={senderError}
-                size="medium"
-                isReadOnly
+        {smsNotificationsEnabled === false && (
+          <p className="events__help">
+            SMS notifications are also turned off in tenant Settings. An administrator must enable
+            them before SMS can be sent.
+          </p>
+        )}
+        {showFields && (
+          <>
+            <TextField
+              label="Sender phone number"
+              value={senderPhoneNumber ?? 'Not assigned'}
+              isRequired
+              validationBehavior="aria"
+              isInvalid={validationAttempted && Boolean(senderError)}
+              errorMessage={senderError}
+              size="medium"
+              isReadOnly
+              isDisabled={fieldsDisabled}
+              description="Your default phone number from your account (IDIR) will be used. The number must be registered before it can send notifications through this service."
+            />
+            <RecipientSourcesGroup
+              value={selectedRecipients}
+              onChange={setSelectedRecipients}
+              isDisabled={fieldsDisabled}
+              errorMessage={validationAttempted ? recipientError : undefined}
+              isCstarEnabled={false}
+            />
+            {selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) && (
+              <EventsAdditionalRecipients
+                key={recipientsResetKey}
+                values={{ to, cc: [], bcc: [] }}
+                onChange={(recipients) => setTo(recipients.to)}
+                invalidAddresses={{ to: invalid, cc: [], bcc: [] }}
+                internationalAddresses={international}
                 isDisabled={fieldsDisabled}
-                description="Your default phone number from your account (IDIR) will be used. The number must be registered before it can send notifications through this service."
+                variant="sms"
               />
-              <RecipientSourcesGroup
-                value={selectedRecipients}
-                onChange={setSelectedRecipients}
-                isDisabled={fieldsDisabled}
-                errorMessage={validationAttempted ? recipientError : undefined}
-                isCstarEnabled={false}
-              />
-              {selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) && (
-                <EventsAdditionalRecipients
-                  key={recipientsResetKey}
-                  values={{ to, cc: [], bcc: [] }}
-                  onChange={(recipients) => setTo(recipients.to)}
-                  invalidAddresses={{ to: invalid, cc: [], bcc: [] }}
-                  internationalAddresses={international}
-                  isDisabled={fieldsDisabled}
-                  variant="sms"
-                />
-              )}
-              <TemplateSelect
-                templates={templates}
-                value={templateId}
-                onChange={(nextTemplateId) => {
-                  setTemplateId(nextTemplateId)
-                  setSampleValues({})
-                }}
-                size="medium"
-                isDisabled={fieldsDisabled}
-                errorMessage={validationAttempted ? templateError : undefined}
-              />
-              {selectedTemplate && (
-                <EventsSmsTemplatePreview
-                  body={selectedTemplate.body}
-                  isDisabled={fieldsDisabled}
-                />
-              )}
-            </>
-          )}
-          {showFields && (
-            <StickyBar>
-              <Button
-                type="button"
-                variant="secondary"
-                isDisabled={fieldsDisabled}
-                onPress={() => {
-                  if (validate('Preview')) setPreviewOpen(true)
-                }}
-              >
-                Preview
-              </Button>
-              <Button type="submit" variant="primary" isDisabled={fieldsDisabled}>
-                {saving ? 'Saving...' : 'Save'}
-              </Button>
-            </StickyBar>
-          )}
-        </form>
-      )}
+            )}
+            <TemplateSelect
+              templates={templates}
+              value={templateId}
+              onChange={(nextTemplateId) => {
+                setTemplateId(nextTemplateId)
+                setSampleValues({})
+              }}
+              size="medium"
+              isDisabled={fieldsDisabled}
+              errorMessage={validationAttempted ? templateError : undefined}
+            />
+            {selectedTemplate && (
+              <EventsSmsTemplatePreview body={selectedTemplate.body} isDisabled={fieldsDisabled} />
+            )}
+          </>
+        )}
+        {showFields && (
+          <StickyBar>
+            <Button
+              type="button"
+              variant="secondary"
+              isDisabled={fieldsDisabled}
+              onPress={() => {
+                if (validate('Preview')) setPreviewOpen(true)
+              }}
+            >
+              Preview
+            </Button>
+            <Button type="submit" variant="primary" isDisabled={fieldsDisabled}>
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+          </StickyBar>
+        )}
+      </form>
       <ConfirmDeactivateDialog
         description="This will stop notifications from being sent through this channel. Your previously saved settings will be preserved and can be reactivated at any time. Unsaved changes will be discarded. Previously sent notifications and their records will not be affected."
         isOpen={isConfirmOpen}

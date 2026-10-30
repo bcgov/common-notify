@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import EventsSmsTab from './EventsSmsTab'
 import { NotificationChannel, TemplateEngine } from '@/api/templates.api'
-import { showErrorToast } from '@/redux/utils/toastUtils'
+import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 
 vi.mock('@tanstack/react-router', () => ({ useBlocker: () => ({ status: 'idle' }) }))
 vi.mock('@/redux/utils/toastUtils', () => ({ showErrorToast: vi.fn(), showSuccessToast: vi.fn() }))
@@ -96,7 +96,7 @@ describe('SMS event MVP', () => {
     expect(screen.getByText('Select a template')).toBeVisible()
   })
 
-  it('returns to the saved summary and confirms deactivation before disabling retained fields', async () => {
+  it('confirms deactivation before disabling retained fields', async () => {
     render(
       <EventsSmsTab
         values={{ ...configured, active: true }}
@@ -106,8 +106,6 @@ describe('SMS event MVP', () => {
         onDeactivate={onDeactivate}
       />,
     )
-    expect(screen.getByText('Ready to send?')).toBeVisible()
-    await userEvent.click(screen.getByRole('button', { name: 'Edit settings' }))
     await userEvent.click(screen.getByRole('switch', { name: 'Activate channel' }))
     expect(onDeactivate).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
@@ -139,14 +137,14 @@ describe('SMS event MVP', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('saves an unchanged complete configuration and displays the saved summary', async () => {
+  it('saves an unchanged complete configuration and confirms it', async () => {
     setup()
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(configured))
-    expect(await screen.findByText('Ready to send?')).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Continue to test notification' })).toBeDisabled()
-    await userEvent.click(screen.getByRole('button', { name: 'Edit settings' }))
-    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(showSuccessToast).toHaveBeenCalledWith(
+      'Settings saved',
+      'SMS notification settings were updated successfully.',
+    )
   })
 
   it('does not submit hidden phone numbers after deselecting recipients', async () => {
@@ -174,7 +172,6 @@ describe('SMS event MVP', () => {
       expect(showErrorToast).toHaveBeenCalledWith('Unable to save settings', 'Unavailable'),
     )
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
-    expect(screen.queryByText('Ready to send?')).not.toBeInTheDocument()
   })
 
   it('blocks US and other international numbers unless International SMS is allowed', async () => {
