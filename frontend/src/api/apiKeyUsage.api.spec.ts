@@ -121,4 +121,12 @@ describe('apiKeyUsage API', () => {
       expect.objectContaining({ params: { page: '1', limit: '15' } }),
     )
   })
+  it("surfaces the server's message for any other failure", async () => {
+    vi.mocked(get).mockRejectedValue(
+      Object.assign(new Error('Request failed with status code 500'), {
+        response: { status: 500, data: { message: 'database is down' } },
+      }),
+    )
+    await expect(api.getApiKeyUsage()).rejects.toThrow('Failed to load usage: database is down')
+  })
 })

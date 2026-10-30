@@ -1,4 +1,6 @@
+import type { AxiosError } from 'axios'
 import { post, get, generateApiParameters } from '@/common/api'
+import { getApiResponseMessage } from '@/utils/apiErrorMessage'
 import type { AuthUser } from '@/interfaces/AuthUser'
 import type { UpsertUserResponse, GetAllUsersResponse } from '@/interfaces/User'
 
@@ -34,13 +36,15 @@ export const userApi = {
         data: dtoPayload,
       })
     } catch (error) {
-      const responseData = (error as any)?.response?.data
-      const validationErrors = responseData?.message || responseData?.error || ''
-      const fieldErrors = responseData?.fieldErrors || {}
+      const validationErrors = getApiResponseMessage(error) || ''
+      // ValidationExceptionFilter sends a field's single error as a string, several as an array.
+      const fieldErrors =
+        (error as AxiosError<{ fieldErrors?: Record<string, string | string[]> }>)?.response?.data
+          ?.fieldErrors || {}
 
       // Extract specific field errors for display
       const fieldErrorMessages = Object.entries(fieldErrors)
-        .map(([field, errors]: [string, any]) => `${field}: ${errors.join(', ')}`)
+        .map(([field, errors]) => `${field}: ${[errors].flat().join(', ')}`)
         .join('\n')
 
       throw new Error(`Failed to upsert user:\n${fieldErrorMessages || validationErrors}`)

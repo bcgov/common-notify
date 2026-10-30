@@ -71,6 +71,18 @@ describe('user.api', () => {
       )
     })
 
+    it('lists a field error sent as a single string', async () => {
+      vi.mocked(post).mockRejectedValue({
+        response: {
+          data: { message: 'Validation failed', fieldErrors: { email: 'must be an email' } },
+        },
+      })
+
+      await expect(userApi.upsertCurrentUser(authUser)).rejects.toThrow(
+        'Failed to upsert user:\nemail: must be an email',
+      )
+    })
+
     it('falls back to the response message when there are no field errors', async () => {
       vi.mocked(post).mockRejectedValue({ response: { data: { message: 'user is locked' } } })
 

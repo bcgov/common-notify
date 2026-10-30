@@ -162,6 +162,19 @@ describe('API interceptors', () => {
     expect(showErrorToast).toHaveBeenCalledTimes(toast ? 1 : 0)
     expect(trackRequestEnd).toHaveBeenCalledTimes(1)
   })
+  it("shows a 401's tenant message", async () => {
+    const error = {
+      config: { url: '/api/v1/frontend/events' },
+      response: { status: 401, data: { message: 'No tenant selected' } },
+    }
+    await expect(responseFailure(error)).rejects.toBe(error)
+    expect(showErrorToast).toHaveBeenCalledWith('Authorization failed: No tenant selected')
+  })
+  it('stays quiet for a 401 without a body', async () => {
+    const error = { config: { url: '/api/v1/frontend/events' }, response: { status: 401 } }
+    await expect(responseFailure(error)).rejects.toBe(error)
+    expect(showErrorToast).not.toHaveBeenCalled()
+  })
   it('suppresses permission toasts on the authorization page and skips background loading', async () => {
     window.history.replaceState({}, '', '/not-authorized')
     for (const status of [401, 403]) {
