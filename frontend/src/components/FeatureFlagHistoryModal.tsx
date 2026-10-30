@@ -116,7 +116,9 @@ const FeatureFlagHistoryTable: FC<{ flagId: string; flagName: string }> = ({
         columns={columns}
         data={entries}
         keyExtractor={(entry) => entry.id}
-        isLoading={isLoading}
+        // First load only. Between pages the current rows stay until the next arrive; swapping
+        // them for a one-row "Loading..." collapses the table and the centred modal with it.
+        isLoading={isLoading && entries.length === 0}
         label={`${flagName} change history`}
         size="sm"
         currentPage={page}

@@ -194,6 +194,25 @@ describe('FeatureFlagAdmin', () => {
       // Still a history with entries, not the empty card, while page 2 loads and after.
       expect(screen.queryByText('No changes recorded yet.')).not.toBeInTheDocument()
     })
+    it('keeps the current page on screen while the next one loads', async () => {
+      let resolvePage2: (value: ReturnType<typeof pageOf>) => void = () => {}
+      vi.mocked(getFeatureFlagHistory)
+        .mockResolvedValueOnce(pageOf([entry('h12', false)], 12))
+        .mockReturnValueOnce(new Promise((resolve) => (resolvePage2 = resolve)))
+      setup()
+      await openHistory()
+      const table = await screen.findByRole('table', { name: 'SMS notifications change history' })
+      await within(table).findByText('Disabled')
+
+      await userEvent.click(screen.getByRole('button', { name: 'Next page' }))
+
+      // A one-row "Loading..." in its place collapses the table, and the modal with it.
+      expect(within(table).getByText('Disabled')).toBeInTheDocument()
+      expect(within(table).queryByText('Loading...')).not.toBeInTheDocument()
+
+      resolvePage2(pageOf([entry('h2', true)], 12, 2))
+      expect(await within(table).findByText('Enabled')).toBeInTheDocument()
+    })
     it('shows the error when history fails to load', async () => {
       vi.mocked(getFeatureFlagHistory).mockRejectedValue(new Error('History unavailable'))
       setup()
