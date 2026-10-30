@@ -233,17 +233,20 @@ describe('FeatureFlagController', () => {
           createdAt: new Date(),
         },
       ]
+      const response = { data: history, count: 1, page: 2, limit: 5, totalPages: 1 }
       mockFeatureFlagService.getById.mockResolvedValue({ id })
-      mockFeatureFlagService.getHistory.mockResolvedValue(history)
+      mockFeatureFlagService.getHistory.mockResolvedValue(response)
 
-      await expect(controller.getHistory(id)).resolves.toEqual(history)
-      expect(mockFeatureFlagService.getHistory).toHaveBeenCalledWith(id)
+      await expect(controller.getHistory(id, { page: 2, limit: 5 })).resolves.toEqual(response)
+      expect(mockFeatureFlagService.getHistory).toHaveBeenCalledWith(id, 2, 5)
     })
 
     it('throws NotFoundException when the flag does not exist', async () => {
       mockFeatureFlagService.getById.mockResolvedValue(null)
 
-      await expect(controller.getHistory(id)).rejects.toThrow(NotFoundException)
+      await expect(controller.getHistory(id, { page: 1, limit: 10 })).rejects.toThrow(
+        NotFoundException,
+      )
       expect(mockFeatureFlagService.getHistory).not.toHaveBeenCalled()
     })
   })

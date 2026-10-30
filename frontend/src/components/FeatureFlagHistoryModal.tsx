@@ -7,6 +7,7 @@ import { DataTable } from './DataTable/DataTable'
 import type { TableColumn } from './DataTable/DataTable'
 import { StatusBadge } from './StatusBadge'
 import Alert from './Alert'
+import NoDataCard from './NoDataCard'
 import '@/scss/components/feature-flag-history-modal.scss'
 
 type FeatureFlagHistoryModalProps = {
@@ -18,6 +19,8 @@ type FeatureFlagHistoryModalProps = {
   scope: string
   onClose: () => void
 }
+
+const HISTORY_PAGE_SIZE = 10
 
 function formatChangedAt(value: string): string {
   const date = new Date(value)
@@ -63,17 +66,22 @@ const FeatureFlagHistoryTable: FC<{ flagId: string; flagName: string }> = ({
   flagId,
   flagName,
 }) => {
+  const [page, setPage] = useState(1)
   const [entries, setEntries] = useState<FeatureFlagHistoryEntry[]>([])
+  const [totalCount, setTotalCount] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Dropped if the modal closes before the response lands.
+    // Dropped if the modal closes, or the page changes, before the response lands.
     let isCurrent = true
 
-    getFeatureFlagHistory(flagId)
+    getFeatureFlagHistory(flagId, page, HISTORY_PAGE_SIZE)
       .then((history) => {
-        if (isCurrent) setEntries(history)
+        if (isCurrent) {
+          setEntries(history.data)
+          setTotalCount(history.count)
+        }
       })
       .catch((err: unknown) => {
         if (isCurrent) {
@@ -87,21 +95,44 @@ const FeatureFlagHistoryTable: FC<{ flagId: string; flagName: string }> = ({
     return () => {
       isCurrent = false
     }
-  }, [flagId])
+  }, [flagId, page])
 
   if (error) return <Alert variant="danger">{error}</Alert>
 
+  // Every flag that predates V77 starts here: history was not backfilled. totalCount rather than
+  // entries, so moving between pages never flashes this card.
+  if (!isLoading && totalCount === 0) {
+    return (
+      <NoDataCard
+        title="No changes recorded yet."
+        message="This flag has not been enabled or disabled since change history began. Earlier changes were not recorded."
+      />
+    )
+  }
+
   return (
-    <DataTable<FeatureFlagHistoryEntry>
-      columns={columns}
-      data={entries}
-      keyExtractor={(entry) => entry.id}
-      isLoading={isLoading}
-      isEmpty={entries.length === 0}
-      emptyMessage="No changes have been recorded for this flag yet."
-      label={`${flagName} change history`}
-      size="sm"
-    />
+    // Focusable so a keyboard user can scroll a long history without a mouse.
+    <section
+      className="feature-flag-history__table"
+      tabIndex={0}
+      aria-label={`${flagName} change history, scrollable`}
+    >
+      <DataTable<FeatureFlagHistoryEntry>
+        columns={columns}
+        data={entries}
+        keyExtractor={(entry) => entry.id}
+        isLoading={isLoading}
+        label={`${flagName} change history`}
+        size="sm"
+        currentPage={page}
+        pageSize={HISTORY_PAGE_SIZE}
+        totalCount={totalCount}
+        onPageChange={(nextPage) => {
+          setIsLoading(true)
+          setPage(nextPage)
+        }}
+      />
+    </section>
   )
 }
 

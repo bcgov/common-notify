@@ -5,6 +5,7 @@ import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import { createFeatureFlag, updateFeatureFlag } from '@/redux/slices/featureFlags.slice'
 import type * as FeatureFlagsModule from '@/redux/slices/featureFlags.slice'
 import { getFeatureFlagHistory } from '@/api/featureFlags.api'
+import type { FeatureFlagHistoryEntry } from '@/interfaces/feature-flag.interface'
 
 const mocks = vi.hoisted(() => ({
   state: {} as Record<string, unknown>,
@@ -109,41 +110,60 @@ describe('FeatureFlagAdmin', () => {
     await waitFor(() => expect(showErrorToast).toHaveBeenCalledWith('Toggle failed'))
   })
   describe('history', () => {
+    const entry = (id: string, enabled: boolean): FeatureFlagHistoryEntry => ({
+      id,
+      featureFlagId: 'flag',
+      code: 'sms',
+      tenantId: null,
+      enabled,
+      createdBy: 'guid@azureidir',
+      createdByName: 'Falk, Barrett',
+      createdAt: '2026-10-29T18:30:00Z',
+    })
+    const pageOf = (data: FeatureFlagHistoryEntry[], count = data.length, page = 1) => ({
+      data,
+      count,
+      page,
+      limit: 10,
+      totalPages: Math.ceil(count / 10),
+    })
     const openHistory = () =>
       userEvent.click(
         screen.getByRole('button', { name: 'View history for SMS notifications (All Tenants)' }),
       )
 
     it('lists who changed the flag and when, newest first', async () => {
-      vi.mocked(getFeatureFlagHistory).mockResolvedValue([
-        {
-          id: 'h2',
-          featureFlagId: 'flag',
-          code: 'sms',
-          tenantId: null,
-          enabled: false,
-          createdBy: 'guid@azureidir',
-          createdByName: 'Falk, Barrett',
-          createdAt: '2026-10-29T18:30:00Z',
-        },
-        {
-          id: 'h1',
-          featureFlagId: 'flag',
-          code: 'sms',
-          tenantId: null,
-          enabled: true,
-          createdBy: 'migration',
-          createdByName: null,
-          createdAt: '2026-01-01T00:00:00Z',
-        },
-      ])
+      vi.mocked(getFeatureFlagHistory).mockResolvedValue(
+        pageOf([
+          {
+            id: 'h2',
+            featureFlagId: 'flag',
+            code: 'sms',
+            tenantId: null,
+            enabled: false,
+            createdBy: 'guid@azureidir',
+            createdByName: 'Falk, Barrett',
+            createdAt: '2026-10-29T18:30:00Z',
+          },
+          {
+            id: 'h1',
+            featureFlagId: 'flag',
+            code: 'sms',
+            tenantId: null,
+            enabled: true,
+            createdBy: 'migration',
+            createdByName: null,
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ]),
+      )
       setup()
       await openHistory()
 
       expect(screen.getByRole('dialog', { name: 'SMS notifications history' })).toHaveTextContent(
         'Applies to: All Tenants',
       )
-      expect(getFeatureFlagHistory).toHaveBeenCalledWith('flag')
+      expect(getFeatureFlagHistory).toHaveBeenCalledWith('flag', 1, 10)
       const table = await screen.findByRole('table', { name: 'SMS notifications change history' })
       const rows = (await within(table).findAllByRole('row')).slice(1)
       expect(rows[0]).toHaveTextContent('Disabled')
@@ -153,12 +173,26 @@ describe('FeatureFlagAdmin', () => {
       expect(rows[1]).toHaveTextContent('migration')
     })
     it('shows an empty state when nothing has been recorded', async () => {
-      vi.mocked(getFeatureFlagHistory).mockResolvedValue([])
+      vi.mocked(getFeatureFlagHistory).mockResolvedValue(pageOf([]))
       setup()
       await openHistory()
-      expect(
-        (await screen.findAllByText('No changes have been recorded for this flag yet.'))[0],
-      ).toBeInTheDocument()
+      expect(await screen.findByText('No changes recorded yet.')).toBeInTheDocument()
+      expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    })
+    it('pages through a long history', async () => {
+      vi.mocked(getFeatureFlagHistory)
+        .mockResolvedValueOnce(pageOf([entry('h12', false)], 12))
+        .mockResolvedValueOnce(pageOf([entry('h2', true)], 12, 2))
+      setup()
+      await openHistory()
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Next page' }))
+
+      expect(getFeatureFlagHistory).toHaveBeenLastCalledWith('flag', 2, 10)
+      const table = await screen.findByRole('table', { name: 'SMS notifications change history' })
+      await waitFor(() => expect(within(table).getAllByRole('row')[1]).toHaveTextContent('Enabled'))
+      // Still a history with entries, not the empty card, while page 2 loads and after.
+      expect(screen.queryByText('No changes recorded yet.')).not.toBeInTheDocument()
     })
     it('shows the error when history fails to load', async () => {
       vi.mocked(getFeatureFlagHistory).mockRejectedValue(new Error('History unavailable'))

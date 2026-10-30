@@ -17,4 +17,27 @@
     margin: 0;
     color: $text-secondary;
   }
+
+  // The DS modal caps itself at the viewport but never scrolls, so a long history pushed the
+  // Close button off-screen. 20rem leaves room for the title bar, scope line and footer.
+  &__table {
+    max-height: max(10rem, calc(100vh - 20rem));
+    overflow-y: auto;
+
+    &:focus-visible {
+      outline: 2px solid $border-active;
+      outline-offset: 2px;
+    }
+
+    .data-table {
+      margin: 0;
+    }
+
+    // Sticky on thead rather than th: thead carries the header background, th is transparent.
+    thead {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+  }
 }

@@ -26,7 +26,7 @@ describe('FeatureFlagService', () => {
   }
 
   const mockHistoryRepository = {
-    find: vi.fn(),
+    findAndCount: vi.fn(),
   }
 
   const mockFeatureFlagRepository = {
@@ -302,14 +302,32 @@ describe('FeatureFlagService', () => {
   })
 
   describe('getHistory', () => {
-    it('returns the flag history newest first', async () => {
-      const history = [{ id: 'h1' }]
-      mockHistoryRepository.find.mockResolvedValue(history)
+    it('returns one page of the flag history, newest first', async () => {
+      const history = [{ id: 'h11' }, { id: 'h12' }]
+      mockHistoryRepository.findAndCount.mockResolvedValue([history, 12])
 
-      await expect(service.getHistory('1')).resolves.toBe(history)
-      expect(mockHistoryRepository.find).toHaveBeenCalledWith({
+      await expect(service.getHistory('1', 2, 10)).resolves.toEqual({
+        data: history,
+        count: 12,
+        page: 2,
+        limit: 10,
+        totalPages: 2,
+      })
+      expect(mockHistoryRepository.findAndCount).toHaveBeenCalledWith({
         where: { featureFlagId: '1' },
-        order: { createdAt: 'DESC' },
+        order: { createdAt: 'DESC', id: 'DESC' },
+        skip: 10,
+        take: 10,
+      })
+    })
+
+    it('reports zero pages when nothing has been recorded', async () => {
+      mockHistoryRepository.findAndCount.mockResolvedValue([[], 0])
+
+      await expect(service.getHistory('1', 1, 10)).resolves.toMatchObject({
+        data: [],
+        count: 0,
+        totalPages: 0,
       })
     })
   })

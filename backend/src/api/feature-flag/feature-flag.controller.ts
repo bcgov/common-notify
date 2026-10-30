@@ -15,13 +15,15 @@ import {
   HttpStatus,
   Version,
   ParseUUIDPipe,
+  Query,
 } from '@nestjs/common'
 import type { Request } from 'express'
 import { FeatureFlagService, FeatureFlagActor } from './feature-flag.service'
 import { CreateFeatureFlagDto } from './schemas/create-feature-flag.dto'
 import { UpdateFeatureFlagDto } from './schemas/update-feature-flag.dto'
 import { FeatureFlag } from './entities/feature-flag.entity'
-import { FeatureFlagHistory } from './entities/feature-flag-history.entity'
+import { FeatureFlagHistoryQueryDto } from './schemas/feature-flag-history-query.dto'
+import { PaginatedFeatureFlagHistoryResponse } from './schemas/paginated-feature-flag-history-response'
 import { NotifyAdminGuard } from '../../common/guards/notify-admin.guard'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
@@ -144,18 +146,21 @@ export class FeatureFlagController {
   }
 
   /**
-   * Get the change history for a feature flag, newest first
+   * Get one page of the change history for a feature flag, newest first
    * ADMIN ONLY - requires NOTIFY_ADMIN role
    */
   @Version('1')
   @Roles(SsoRole.NOTIFY_ADMIN)
   @Get(':id/history')
-  async getHistory(@Param('id', ParseUUIDPipe) id: string): Promise<FeatureFlagHistory[]> {
+  async getHistory(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: FeatureFlagHistoryQueryDto,
+  ): Promise<PaginatedFeatureFlagHistoryResponse> {
     const flag = await this.featureFlagService.getById(id)
     if (!flag) {
       throw new NotFoundException(`Feature flag with ID "${id}" not found`)
     }
-    return this.featureFlagService.getHistory(id)
+    return this.featureFlagService.getHistory(id, query.page, query.limit)
   }
 
   /**

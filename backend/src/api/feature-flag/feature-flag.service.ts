@@ -5,6 +5,7 @@ import { FeatureFlag } from './entities/feature-flag.entity'
 import { FeatureFlagHistory } from './entities/feature-flag-history.entity'
 import { CreateFeatureFlagDto } from './schemas/create-feature-flag.dto'
 import { UpdateFeatureFlagDto } from './schemas/update-feature-flag.dto'
+import { PaginatedFeatureFlagHistoryResponse } from './schemas/paginated-feature-flag-history-response'
 
 /**
  * Feature Flag Service
@@ -196,14 +197,25 @@ export class FeatureFlagService {
   }
 
   /**
-   * Get the change history for a feature flag, newest first
+   * Get one page of the change history for a feature flag, newest first
    * @param featureFlagId - Feature flag UUID
+   * @param page - 1-indexed page number
+   * @param limit - Rows per page
    */
-  getHistory(featureFlagId: string): Promise<FeatureFlagHistory[]> {
-    return this.historyRepository.find({
+  async getHistory(
+    featureFlagId: string,
+    page: number,
+    limit: number,
+  ): Promise<PaginatedFeatureFlagHistoryResponse> {
+    const [data, count] = await this.historyRepository.findAndCount({
       where: { featureFlagId },
-      order: { createdAt: 'DESC' },
+      // id breaks createdAt ties so a row cannot appear on two pages, or on neither.
+      order: { createdAt: 'DESC', id: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     })
+
+    return { data, count, page, limit, totalPages: Math.ceil(count / limit) }
   }
 
   /**
