@@ -198,7 +198,7 @@ export function readFileWithProgress(
     }
     reader.onload = () => {
       onProgress(100)
-      resolve(String(reader.result ?? ''))
+      resolve(typeof reader.result === 'string' ? reader.result : '')
     }
     reader.onerror = () => reject(reader.error ?? new Error('Could not read the file'))
 
