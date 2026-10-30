@@ -1,5 +1,5 @@
 import type { FC } from 'react'
-import { AlertDialog, Button, Modal } from '@bcgov/design-system-react-components'
+import ConfirmDialog from '@/components/ConfirmDialog'
 
 type ConfirmDeactivateDialogProps = {
   isOpen: boolean
@@ -21,34 +21,17 @@ const ConfirmDeactivateDialog: FC<ConfirmDeactivateDialogProps> = ({
   onConfirm,
   description = 'This will stop notifications from being sent through this channel. Your settings will be saved and can be reactivated at any time.',
 }) => (
-  <Modal
+  <ConfirmDialog
     isOpen={isOpen}
-    isDismissable={!isBusy}
-    onOpenChange={(open) => {
-      if (!open) onCancel()
-    }}
+    isBusy={isBusy}
+    title="Deactivate this channel?"
+    confirmLabel="Deactivate"
+    danger
+    onCancel={onCancel}
+    onConfirm={onConfirm}
   >
-    <AlertDialog
-      variant="confirmation"
-      isIconHidden
-      title="Deactivate this channel?"
-      // AlertDialog renders `title` as a plain div rather than a <Heading slot="title">, so
-      // the underlying Dialog needs an explicit label.
-      aria-label="Deactivate this channel?"
-      buttons={
-        <>
-          <Button variant="tertiary" onPress={onCancel} isDisabled={isBusy}>
-            Cancel
-          </Button>
-          <Button variant="secondary" danger onPress={onConfirm} isDisabled={isBusy}>
-            Deactivate
-          </Button>
-        </>
-      }
-    >
-      {description}
-    </AlertDialog>
-  </Modal>
+    {description}
+  </ConfirmDialog>
 )
 
 export default ConfirmDeactivateDialog

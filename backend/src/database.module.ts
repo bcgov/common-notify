@@ -15,6 +15,7 @@ import { MimeTypeCode } from './api/notification/entities/mime-type-code.entity'
 import { NotifyConfiguration } from './api/notification/entities/configuration.entity'
 import { FeatureFlag } from './api/feature-flag/entities/feature-flag.entity'
 import { FeatureFlagCode } from './api/feature-flag/entities/feature-flag-code.entity'
+import { FeatureFlagHistory } from './api/feature-flag/entities/feature-flag-history.entity'
 import { WebhookConfig } from './api/webhook/entities/webhook-config.entity'
 import { WebhookDeliveryLog } from './api/webhook/entities/webhook-delivery-log.entity'
 import { WebhookTypeCode } from './api/webhook/entities/webhook-type.entity'
@@ -67,6 +68,7 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         TemplateEngineCode,
         FeatureFlag,
         FeatureFlagCode,
+        FeatureFlagHistory,
         WebhookConfig,
         WebhookDeliveryLog,
         WebhookTypeCode,

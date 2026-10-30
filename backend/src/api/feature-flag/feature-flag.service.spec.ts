@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { FeatureFlagService } from './feature-flag.service'
 import { FeatureFlag } from './entities/feature-flag.entity'
+import { FeatureFlagHistory } from './entities/feature-flag-history.entity'
 
 describe('FeatureFlagService', () => {
   let service: FeatureFlagService
@@ -17,7 +18,23 @@ describe('FeatureFlagService', () => {
     getMany: vi.fn(),
   }
 
+  // Stands in for the EntityManager handed to a transaction callback.
+  const mockManager = {
+    create: vi.fn((_entity: unknown, data: object) => ({ ...data })),
+    save: vi.fn(async (entity: object) => entity),
+    findOneOrFail: vi.fn(),
+  }
+
+  const mockHistoryRepository = {
+    find: vi.fn(),
+  }
+
   const mockFeatureFlagRepository = {
+    manager: {
+      transaction: vi.fn(async (work: (manager: typeof mockManager) => unknown) =>
+        work(mockManager),
+      ),
+    },
     findOne: vi.fn(),
     find: vi.fn(),
     create: vi.fn(),
@@ -34,6 +51,10 @@ describe('FeatureFlagService', () => {
         {
           provide: getRepositoryToken(FeatureFlag),
           useValue: mockFeatureFlagRepository,
+        },
+        {
+          provide: getRepositoryToken(FeatureFlagHistory),
+          useValue: mockHistoryRepository,
         },
       ],
     }).compile()
@@ -211,66 +232,85 @@ describe('FeatureFlagService', () => {
   })
 
   describe('create', () => {
-    it('should create a new feature flag', async () => {
-      const dto = {
+    const actor = { id: 'user-123', name: 'Test User' }
+
+    it('creates the flag and records its creation in the same transaction', async () => {
+      const dto = { code: 'new_feature', enabled: true, tenantId: null }
+      mockManager.save.mockImplementationOnce(async (entity: object) => ({
+        id: 'flag-1',
+        ...entity,
+      }))
+
+      const result = await service.create(dto, actor)
+
+      expect(result).toEqual({ id: 'flag-1', ...dto, createdBy: 'user-123', updatedBy: 'user-123' })
+      expect(mockFeatureFlagRepository.manager.transaction).toHaveBeenCalledTimes(1)
+      expect(mockManager.create).toHaveBeenCalledWith(FeatureFlagHistory, {
+        featureFlagId: 'flag-1',
         code: 'new_feature',
-        enabled: true,
         tenantId: null,
-      }
-
-      const created: FeatureFlag = {
-        id: '1',
-        ...dto,
-        createdAt: new Date(),
+        enabled: true,
         createdBy: 'user-123',
-        updatedAt: new Date(),
-        updatedBy: 'user-123',
-      }
-
-      mockFeatureFlagRepository.create.mockReturnValue(created)
-      mockFeatureFlagRepository.save.mockResolvedValue(created)
-
-      const result = await service.create(dto, 'user-123')
-
-      expect(result).toEqual(created)
-      expect(mockFeatureFlagRepository.create).toHaveBeenCalledWith({
-        ...dto,
-        createdBy: 'user-123',
-        updatedBy: 'user-123',
+        createdByName: 'Test User',
       })
-      expect(mockFeatureFlagRepository.save).toHaveBeenCalledWith(created)
+      expect(mockManager.save).toHaveBeenCalledTimes(2)
     })
   })
 
   describe('update', () => {
-    it('should update a feature flag', async () => {
-      const id = '1'
-      const dto = { enabled: false }
-      const existing: FeatureFlag = {
-        id,
-        code: 'sms_notifications',
-        enabled: true,
-        tenantId: null,
-        createdAt: new Date(),
-        createdBy: 'user-123',
-        updatedAt: new Date(),
-        updatedBy: 'user-123',
-      }
+    const actor = { id: 'user-456', name: 'Other User' }
+    const existing = (): FeatureFlag => ({
+      id: '1',
+      code: 'sms_notifications',
+      enabled: true,
+      tenantId: null,
+      createdAt: new Date(),
+      createdBy: 'user-123',
+      updatedAt: new Date(),
+      updatedBy: 'user-123',
+    })
 
-      const updated: FeatureFlag = {
-        ...existing,
-        enabled: false,
-        updatedBy: 'user-456',
-        updatedAt: new Date(),
-      }
+    it('updates the flag under a row lock and records the change', async () => {
+      mockManager.findOneOrFail.mockResolvedValue(existing())
 
-      mockFeatureFlagRepository.findOneOrFail.mockResolvedValue(existing)
-      mockFeatureFlagRepository.save.mockResolvedValue(updated)
-
-      const result = await service.update(id, dto, 'user-456')
+      const result = await service.update('1', { enabled: false }, actor)
 
       expect(result.enabled).toBe(false)
       expect(result.updatedBy).toBe('user-456')
+      expect(mockManager.findOneOrFail).toHaveBeenCalledWith(FeatureFlag, {
+        where: { id: '1' },
+        lock: { mode: 'pessimistic_write' },
+      })
+      expect(mockManager.create).toHaveBeenCalledWith(FeatureFlagHistory, {
+        featureFlagId: '1',
+        code: 'sms_notifications',
+        tenantId: null,
+        enabled: false,
+        createdBy: 'user-456',
+        createdByName: 'Other User',
+      })
+    })
+
+    it('records nothing when the value does not change', async () => {
+      mockManager.findOneOrFail.mockResolvedValue(existing())
+
+      await service.update('1', { enabled: true }, actor)
+
+      expect(mockManager.save).toHaveBeenCalledTimes(1)
+      expect(mockManager.create).not.toHaveBeenCalledWith(FeatureFlagHistory, expect.anything())
+    })
+  })
+
+  describe('getHistory', () => {
+    it('returns the flag history newest first', async () => {
+      const history = [{ id: 'h1' }]
+      mockHistoryRepository.find.mockResolvedValue(history)
+
+      await expect(service.getHistory('1')).resolves.toBe(history)
+      expect(mockHistoryRepository.find).toHaveBeenCalledWith({
+        where: { featureFlagId: '1' },
+        order: { createdAt: 'DESC' },
+      })
     })
   })
 

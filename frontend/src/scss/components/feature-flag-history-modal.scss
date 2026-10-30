@@ -1,0 +1,20 @@
+/* Feature Flag History Modal */
+
+@import '../variables';
+
+// The DS modal is sized for a sentence of text; a three-column table needs more room.
+.bcds-react-aria-Modal:has(.feature-flag-history) {
+  width: 640px;
+  max-width: calc(100vw - #{$spacing-xl});
+}
+
+.feature-flag-history {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+
+  &__scope {
+    margin: 0;
+    color: $text-secondary;
+  }
+}

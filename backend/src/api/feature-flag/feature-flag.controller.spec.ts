@@ -13,7 +13,9 @@ describe('FeatureFlagController', () => {
   let controller: FeatureFlagController
 
   const username = 'a1b2c3@azureidir'
-  const token = `header.${Buffer.from(JSON.stringify({ preferred_username: username })).toString('base64')}.signature`
+  const displayName = 'Falk, Barrett CITZ:EX'
+  const token = `header.${Buffer.from(JSON.stringify({ preferred_username: username, display_name: displayName })).toString('base64')}.signature`
+  const actor = { id: username, name: displayName }
   const mockReq = { headers: { authorization: `Bearer ${token}` } } as any
 
   const mockFeatureFlagService = {
@@ -24,6 +26,7 @@ describe('FeatureFlagController', () => {
     getById: vi.fn(),
     getByCodeAndTenant: vi.fn(),
     getFlagsForTenant: vi.fn(),
+    getHistory: vi.fn(),
   }
 
   beforeEach(async () => {
@@ -72,7 +75,7 @@ describe('FeatureFlagController', () => {
       const result = await controller.create(dto, mockReq)
 
       expect(result).toEqual(created)
-      expect(mockFeatureFlagService.create).toHaveBeenCalledWith(dto, username)
+      expect(mockFeatureFlagService.create).toHaveBeenCalledWith(dto, actor)
     })
 
     it('should throw BadRequestException for empty code', async () => {
@@ -195,7 +198,7 @@ describe('FeatureFlagController', () => {
       const result = await controller.update(id, dto, mockReq)
 
       expect(result).toEqual(updated)
-      expect(mockFeatureFlagService.update).toHaveBeenCalledWith(id, dto, username)
+      expect(mockFeatureFlagService.update).toHaveBeenCalledWith(id, dto, actor)
     })
 
     it('should throw BadRequestException for empty ID', async () => {
@@ -211,6 +214,37 @@ describe('FeatureFlagController', () => {
       mockFeatureFlagService.getById.mockResolvedValue(null)
 
       await expect(controller.update(id, dto, mockReq)).rejects.toThrow(NotFoundException)
+    })
+  })
+
+  describe('GET getHistory', () => {
+    const id = '550e8400-e29b-41d4-a716-446655440000'
+
+    it('returns the history of an existing flag', async () => {
+      const history = [
+        {
+          id: 'h1',
+          featureFlagId: id,
+          code: 'sms_notifications',
+          tenantId: null,
+          enabled: false,
+          createdBy: username,
+          createdByName: displayName,
+          createdAt: new Date(),
+        },
+      ]
+      mockFeatureFlagService.getById.mockResolvedValue({ id })
+      mockFeatureFlagService.getHistory.mockResolvedValue(history)
+
+      await expect(controller.getHistory(id)).resolves.toEqual(history)
+      expect(mockFeatureFlagService.getHistory).toHaveBeenCalledWith(id)
+    })
+
+    it('throws NotFoundException when the flag does not exist', async () => {
+      mockFeatureFlagService.getById.mockResolvedValue(null)
+
+      await expect(controller.getHistory(id)).rejects.toThrow(NotFoundException)
+      expect(mockFeatureFlagService.getHistory).not.toHaveBeenCalled()
     })
   })
 
