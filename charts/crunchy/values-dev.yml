@@ -40,7 +40,7 @@ crunchy: # enable it for TEST and PROD, for PR based pipelines simply use single
 
     requests:
       cpu: 250m
-      memory: 4Gi
+      memory: 3Gi
     replicaCertCopy:
       requests:
         cpu: 10m
@@ -79,7 +79,7 @@ crunchy: # enable it for TEST and PROD, for PR based pipelines simply use single
     repoHost:
       requests:
         cpu: 100m
-        memory: 512Mi
+        memory: 192Mi
     sidecars:
       requests:
         cpu: 10m
@@ -111,7 +111,7 @@ crunchy: # enable it for TEST and PROD, for PR based pipelines simply use single
       replicas: 2
       requests:
         cpu: 50m
-        memory: 128Mi
+        memory: 64Mi
       maxConnections: 100 # make sure less than postgres max connections
       poolMode: 'transaction'
 
