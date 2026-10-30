@@ -34,9 +34,14 @@ export interface CsvUpload {
  * `placeholders` are the columns the template requires; they come from the API rather than from
  * parsing the template in the browser, so a file is always checked against what the server will
  * actually ask for. `channel` decides what the recipient column is called and how its values are
- * checked - an email address or a phone number.
+ * checked - an email address or a phone number. `internationalSmsAllowed` lets SMS recipients
+ * outside Canada through.
  */
-export function useCsvUpload(placeholders: string[], channel: BulkChannel): CsvUpload {
+export function useCsvUpload(
+  placeholders: string[],
+  channel: BulkChannel,
+  internationalSmsAllowed = false,
+): CsvUpload {
   const uploadVersion = useRef(0)
   const [file, setFile] = useState<File | null>(null)
   const [readProgress, setReadProgress] = useState<number | null>(null)
@@ -78,6 +83,7 @@ export function useCsvUpload(placeholders: string[], channel: BulkChannel): CsvU
         nextParsed,
         placeholders,
         channel,
+        internationalSmsAllowed,
       )
 
       if (nextFileIssue) {
