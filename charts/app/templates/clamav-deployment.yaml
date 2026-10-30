@@ -142,7 +142,9 @@ spec:
           resources:
             requests:
               cpu: 200m
-              memory: 768Mi
+              # clamd holds the whole signature DB in RAM; measured ~1007Mi per
+              # pod. Below that it exceeds its request and is evicted first.
+              memory: 1Gi
             limits:
               cpu: 2
               memory: 2Gi
