@@ -11,6 +11,7 @@ import { FeatureFlagService } from '../feature-flag/feature-flag.service'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { NotifyUser } from '../admin/users/entities/notify-user.entity'
+import { TenantSettings } from '../tenant-settings/entities/tenant-settings.entity'
 import { RecipientSafelist } from './entities/recipient-safelist.entity'
 import { CreateSafelistEntryDto } from './schemas/create-safelist-entry.dto'
 import { SafelistEntryDto } from './schemas/safelist-entry.dto'
@@ -53,6 +54,8 @@ export class SafelistService {
     private readonly safelistRepository: Repository<RecipientSafelist>,
     @InjectRepository(NotifyConfiguration)
     private readonly configurationRepository: Repository<NotifyConfiguration>,
+    @InjectRepository(TenantSettings)
+    private readonly tenantSettingsRepository: Repository<TenantSettings>,
     private readonly featureFlagService: FeatureFlagService,
   ) {}
 
@@ -222,7 +225,7 @@ export class SafelistService {
       )
     }
 
-    const maxEntries = await this.getMaxEntries()
+    const maxEntries = await this.getMaxEntries(tenantId)
     const currentCount = await this.safelistRepository.count({
       where: { tenantId, isDeleted: false },
     })
@@ -271,15 +274,25 @@ export class SafelistService {
     this.logger.log(`Safelist entry removed (tenant=${tenantId}, id=${id})`)
   }
 
-  /** Per-tenant cap, falling back to the global notify.configuration value. */
-  async getMaxEntries(): Promise<number> {
+  /**
+   * The tenant's tenant_settings.safelist_max_entries when set, otherwise the global
+   * notify.configuration value. The override is operator-set in SQL; no API writes it.
+   */
+  async getMaxEntries(tenantId: string): Promise<number> {
     try {
+      const settings = await this.tenantSettingsRepository.findOne({
+        where: { tenantId, isDeleted: false },
+        select: { id: true, safelistMaxEntries: true },
+      })
+      const override = Number(settings?.safelistMaxEntries)
+      if (Number.isFinite(override) && override > 0) return override
+
       const row = await this.configurationRepository.findOne({ where: { key: MAX_ENTRIES_KEY } })
       const value = Number(row?.config?.value)
       return Number.isFinite(value) && value > 0 ? value : DEFAULT_MAX_ENTRIES
     } catch (error) {
       this.logger.warn(
-        `Failed to read ${MAX_ENTRIES_KEY} configuration, using default ${DEFAULT_MAX_ENTRIES}: ${
+        `Failed to read safelist cap for tenant ${tenantId}, using default ${DEFAULT_MAX_ENTRIES}: ${
           error instanceof Error ? error.message : String(error)
         }`,
       )
