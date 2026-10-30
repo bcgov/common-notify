@@ -94,6 +94,19 @@
   }
 }
 
+// csv issues + preview pane have no max width
+.events__test-send
+  > *:not(.sticky-bar):not(.bulk-notifications__issues):not(.events__preview-card) {
+  max-width: 572px;
+}
+
+// The same spacing the bulk notifications page gives its warning and table.
+.events__test-send > .bulk-notifications__issues {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-lg;
+}
+
 .events__test-send-recipients .bcds-react-aria-RadioGroup--label {
   font-weight: 700;
 }

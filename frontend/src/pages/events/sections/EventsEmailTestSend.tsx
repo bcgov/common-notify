@@ -39,7 +39,7 @@ const EventsEmailTestSend: FC<EventsEmailTestSendProps> = ({ eventId }) => {
         ]}
       />
 
-      <section className="events__section">{content}</section>
+      <section className="events__section events__test-send">{content}</section>
     </div>
   )
 }
