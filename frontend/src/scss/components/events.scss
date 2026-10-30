@@ -49,6 +49,15 @@
     max-width: 418px;
   }
 
+  // The recipient lists and previews get more room than the single fields. The CSTAR groups
+  // fieldset has no class of its own, so it is found by the div inside it.
+  > .events__additional-recipients,
+  > fieldset:has(> .events__cstar-groups),
+  > .events__template-preview,
+  > .events__header-preview {
+    max-width: 500px;
+  }
+
   .bcds-react-aria-Button {
     align-self: flex-start;
   }
