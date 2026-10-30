@@ -140,16 +140,6 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     onUnsavedChangesChange?.(hasUnsavedChanges)
   }, [hasUnsavedChanges, onUnsavedChangesChange])
 
-  // Turning the channel on only unlocks the fields - it isn't persisted until the settings it
-  // depends on are applied. Turning it off takes effect immediately, so it asks first.
-  function handleSwitchChange(next: boolean) {
-    if (next) {
-      setChannelActive(true)
-    } else {
-      requestDeactivate()
-    }
-  }
-
   async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -192,7 +182,12 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
     <form className="events__form" onSubmit={handleSubmit}>
       <EventsChannelActiveSwitch
         isSelected={channelActive}
-        onChange={handleSwitchChange}
+        // Turning the channel on only unlocks the fields - it isn't persisted until the settings
+        // it depends on are applied. Turning it off takes effect immediately, so it asks first.
+        onChange={(next) => {
+          if (next) setChannelActive(true)
+          else requestDeactivate()
+        }}
         isDisabled={isFormDisabled}
       />
 

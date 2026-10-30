@@ -59,7 +59,7 @@ const EventsEmailPreviewModal: FC<EventsEmailPreviewModalProps> = ({
         const raw = vals[variable.name] ?? ''
         // A boolean set to False must render as falsy so the else/inverted branch shows; an empty
         // string is falsy in every engine the editor previews with.
-        params[variable.name] = variable.type === 'boolean' ? (raw === 'true' ? 'true' : '') : raw
+        params[variable.name] = variable.type === 'boolean' && raw !== 'true' ? '' : raw
       })
 
       setLoading(true)
