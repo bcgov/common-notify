@@ -13,12 +13,12 @@ vi.mock('@/redux/hooks', () => ({
 vi.mock('@/components/PageHeading', () => ({
   default: ({ title }: { title: string }) => <h1>{title}</h1>,
 }))
-vi.mock('../components/EventTabs', () => ({
+vi.mock('../components/EventsTabBar', () => ({
   default: ({ onSelect }: { onSelect: (tab: string) => void }) => (
     <button onClick={() => onSelect('settings')}>Settings tab</button>
   ),
 }))
-vi.mock('../components/EventEmailPreview', () => ({ default: () => <div>Email preview</div> }))
+vi.mock('../components/EventsEmailPreview', () => ({ default: () => <div>Email preview</div> }))
 vi.mock('@/api/events.api', () => ({ getEventById: vi.fn() }))
 vi.mock('@/api/templates.api', () => ({ getTemplateById: vi.fn() }))
 

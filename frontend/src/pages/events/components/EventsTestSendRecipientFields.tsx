@@ -2,7 +2,7 @@ import type { FC } from 'react'
 import { Radio, RadioGroup, TextField } from '@bcgov/design-system-react-components'
 import type { AddRecipients, Recipient } from '../utils/testSend'
 
-interface TestSendRecipientFieldsProps {
+interface EventsTestSendRecipientFieldsProps {
   recipient: Recipient | null
   onRecipientChange: (recipient: Recipient) => void
   addRecipients: AddRecipients | null
@@ -15,7 +15,7 @@ interface TestSendRecipientFieldsProps {
 }
 
 /** Who a test goes to: the signed-in user, one typed address, or the rows of an upload. */
-const TestSendRecipientFields: FC<TestSendRecipientFieldsProps> = ({
+const EventsTestSendRecipientFields: FC<EventsTestSendRecipientFieldsProps> = ({
   recipient,
   onRecipientChange,
   addRecipients,
@@ -72,4 +72,4 @@ const TestSendRecipientFields: FC<TestSendRecipientFieldsProps> = ({
   </>
 )
 
-export default TestSendRecipientFields
+export default EventsTestSendRecipientFields

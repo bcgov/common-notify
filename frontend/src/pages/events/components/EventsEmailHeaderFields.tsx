@@ -3,7 +3,7 @@ import { Radio, RadioGroup, Select, TextField } from '@bcgov/design-system-react
 import { HEADER_CUSTOM_ID, HEADER_TENANT_DEFAULT_ID } from '../hooks/useEmailHeader'
 import type { EmailHeader } from '../hooks/useEmailHeader'
 
-type EmailHeaderFieldsProps = {
+type EventsEmailHeaderFieldsProps = {
   header: EmailHeader
   isDisabled: boolean
   /** Called after any header field is edited. */
@@ -11,7 +11,11 @@ type EmailHeaderFieldsProps = {
 }
 
 /** The email notification header choice, its custom logo and title, and a preview of it. */
-const EmailHeaderFields: FC<EmailHeaderFieldsProps> = ({ header, isDisabled, onChange }) => (
+const EventsEmailHeaderFields: FC<EventsEmailHeaderFieldsProps> = ({
+  header,
+  isDisabled,
+  onChange,
+}) => (
   <>
     <RadioGroup
       label="Email notification header"
@@ -76,4 +80,4 @@ const EmailHeaderFields: FC<EmailHeaderFieldsProps> = ({ header, isDisabled, onC
   </>
 )
 
-export default EmailHeaderFields
+export default EventsEmailHeaderFields

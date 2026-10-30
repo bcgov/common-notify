@@ -8,8 +8,8 @@ import type { TemplateResponse } from '@/api/templates.api'
 import type { EventEmailSettings } from '@/api/events.api'
 import { detectVariables } from '@/utils/templateVariables'
 import type { DetectedVariable } from '@/utils/templateVariables'
-import EventEmailHeader from './EventEmailHeader'
-import type { RenderedNotification } from './EventEmailPreview'
+import EventsEmailHeader from './EventsEmailHeader'
+import type { RenderedNotification } from './EventsEmailPreview'
 
 export interface AppliedNotification {
   /** What the fields hold, so reopening the modal shows them as they were left. */
@@ -35,7 +35,7 @@ export function toTemplateParams(
   return params
 }
 
-interface EventEmailPreviewModalProps {
+interface EventsTestSendPreviewModalProps {
   isOpen: boolean
   onClose: () => void
   template: TemplateResponse
@@ -47,7 +47,7 @@ interface EventEmailPreviewModalProps {
   onApply: (applied: AppliedNotification) => void
 }
 
-const EventEmailPreviewModal: FC<EventEmailPreviewModalProps> = ({
+const EventsTestSendPreviewModal: FC<EventsTestSendPreviewModalProps> = ({
   isOpen,
   onClose,
   template,
@@ -160,7 +160,7 @@ const EventEmailPreviewModal: FC<EventEmailPreviewModalProps> = ({
       from={from || undefined}
       to={to || undefined}
       subject={subject}
-      outputHeader={<EventEmailHeader emailSettings={emailSettings} />}
+      outputHeader={<EventsEmailHeader emailSettings={emailSettings} />}
       // The same frame as the preview on the page. Only once a render has succeeded, so the
       // modal's own loading and error states still show.
       bodyOverride={
@@ -186,4 +186,4 @@ const EventEmailPreviewModal: FC<EventEmailPreviewModalProps> = ({
   )
 }
 
-export default EventEmailPreviewModal
+export default EventsTestSendPreviewModal

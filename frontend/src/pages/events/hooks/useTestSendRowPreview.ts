@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { previewTemplate } from '@/api/templates.api'
 import { rowParams } from '@/utils/bulkNotificationsCsv'
 import type { ParsedCsv } from '@/utils/bulkNotificationsCsv'
-import type { RenderedNotification } from '../components/EventEmailPreview'
+import type { RenderedNotification } from '../components/EventsEmailPreview'
 
 /** Which uploaded row the review is showing, and that row rendered. */
 export function useTestSendRowPreview(readyRows: ParsedCsv | null, templateId: string | null) {

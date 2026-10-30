@@ -58,7 +58,7 @@ vi.mock('@/api/templates.api', async () => {
 
 // The preview and its modal have specs of their own; here they only need to show what they were
 // handed, and the modal to hand back a set of applied values.
-vi.mock('../components/EventEmailPreview', () => ({
+vi.mock('../components/EventsEmailPreview', () => ({
   default: ({
     envelope,
     rendered,
@@ -73,7 +73,7 @@ vi.mock('../components/EventEmailPreview', () => ({
   ),
 }))
 
-vi.mock('../components/EventEmailPreviewModal', () => ({
+vi.mock('../components/EventsTestSendPreviewModal', () => ({
   default: ({ isOpen, onApply }: { isOpen: boolean; onApply: (applied: unknown) => void }) =>
     isOpen ? (
       <button

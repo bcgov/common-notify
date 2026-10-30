@@ -1,14 +1,14 @@
 import type { FC } from 'react'
 import { Switch } from '@bcgov/design-system-react-components'
 
-type ChannelActiveSwitchProps = {
+type EventsChannelActiveSwitchProps = {
   isSelected: boolean
   onChange?: (isSelected: boolean) => void
   isDisabled?: boolean
 }
 
 /** The "Activate channel" switch at the top of each channel tab. */
-const ChannelActiveSwitch: FC<ChannelActiveSwitchProps> = ({
+const EventsChannelActiveSwitch: FC<EventsChannelActiveSwitchProps> = ({
   isSelected,
   onChange,
   isDisabled,
@@ -27,4 +27,4 @@ const ChannelActiveSwitch: FC<ChannelActiveSwitchProps> = ({
   </div>
 )
 
-export default ChannelActiveSwitch
+export default EventsChannelActiveSwitch

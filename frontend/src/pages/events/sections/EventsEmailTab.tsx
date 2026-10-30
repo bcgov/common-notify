@@ -1,20 +1,20 @@
 import { useEffect, useState } from 'react'
 import type { FC, SubmitEvent } from 'react'
 import { Button, Select } from '@bcgov/design-system-react-components'
-import ConfirmDeactivateDialog from '../components/ConfirmDeactivateDialog'
-import ChannelActiveSwitch from '../components/ChannelActiveSwitch'
-import TemplateSelect from '../components/TemplateSelect'
-import SenderEmailField from '../components/SenderEmailField'
-import EmailRecipientFields from '../components/EmailRecipientFields'
-import EmailTemplatePreview from '../components/EmailTemplatePreview'
-import EmailHeaderFields from '../components/EmailHeaderFields'
+import EventsConfirmDeactivateDialog from '../components/EventsConfirmDeactivateDialog'
+import EventsChannelActiveSwitch from '../components/EventsChannelActiveSwitch'
+import EventsTemplateSelect from '../components/EventsTemplateSelect'
+import EventsEmailSenderField from '../components/EventsEmailSenderField'
+import EventsEmailRecipientFields from '../components/EventsEmailRecipientFields'
+import EventsEmailTemplatePreview from '../components/EventsEmailTemplatePreview'
+import EventsEmailHeaderFields from '../components/EventsEmailHeaderFields'
 import { useChannelDeactivation } from '../hooks/useChannelDeactivation'
 import { useEmailHeader } from '../hooks/useEmailHeader'
 import { useEmailRecipients } from '../hooks/useEmailRecipients'
 import { useSenderEmail } from '../hooks/useSenderEmail'
 import { validateEmailSettings } from '../utils/emailSettings'
 import type { EmailSettingsValues } from '../utils/emailSettings'
-import EventsEmailPreviewModal from './EventsEmailPreviewModal'
+import EventsEmailPreviewModal from '../components/EventsEmailPreviewModal'
 import StickyBar from '@/components/StickyBar'
 import UnsavedChanges from '@/components/UnsavedChanges'
 import { NotificationChannel } from '@/api/templates.api'
@@ -190,13 +190,13 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
 
   return (
     <form className="events__form" onSubmit={handleSubmit}>
-      <ChannelActiveSwitch
+      <EventsChannelActiveSwitch
         isSelected={channelActive}
         onChange={handleSwitchChange}
         isDisabled={isFormDisabled}
       />
 
-      <ConfirmDeactivateDialog
+      <EventsConfirmDeactivateDialog
         isOpen={isConfirmOpen}
         isBusy={isDeactivating}
         onCancel={cancelDeactivate}
@@ -212,7 +212,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
 
       {showFields && (
         <>
-          <SenderEmailField
+          <EventsEmailSenderField
             value={senderEmail}
             onChange={(value) => {
               editSenderEmail(value)
@@ -222,7 +222,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
             errorMessage={displayedSenderEmailError}
           />
 
-          <EmailRecipientFields
+          <EventsEmailRecipientFields
             recipients={recipients}
             invalidAddresses={invalidRecipients}
             cstarGroups={cstarGroups}
@@ -231,7 +231,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
             onChange={() => setSettingsChanged(true)}
           />
 
-          <TemplateSelect
+          <EventsTemplateSelect
             templates={templates}
             value={selectedTemplateId}
             onChange={(templateId) => {
@@ -244,14 +244,14 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
           />
 
           {selectedTemplate && (
-            <EmailTemplatePreview
+            <EventsEmailTemplatePreview
               subject={selectedTemplate.subject}
               body={selectedTemplate.body}
               isDisabled={areFieldsDisabled}
             />
           )}
 
-          <EmailHeaderFields
+          <EventsEmailHeaderFields
             header={header}
             isDisabled={areFieldsDisabled}
             onChange={() => setSettingsChanged(true)}

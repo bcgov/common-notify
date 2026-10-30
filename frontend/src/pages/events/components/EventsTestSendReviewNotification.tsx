@@ -5,16 +5,16 @@ import {
   SvgChevronLeftIcon,
   SvgChevronRightIcon,
 } from '@bcgov/design-system-react-components'
-import EventEmailPreview from './EventEmailPreview'
-import type { RenderedNotification } from './EventEmailPreview'
-import EventEmailPreviewModal from './EventEmailPreviewModal'
-import type { AppliedNotification } from './EventEmailPreviewModal'
+import EventsEmailPreview from './EventsEmailPreview'
+import type { RenderedNotification } from './EventsEmailPreview'
+import EventsTestSendPreviewModal from './EventsTestSendPreviewModal'
+import type { AppliedNotification } from './EventsTestSendPreviewModal'
 import type { EventEmailSettings } from '@/api/events.api'
 import type { TemplateResponse } from '@/api/templates.api'
 import { rowRecipient } from '@/utils/bulkNotificationsCsv'
 import type { ParsedCsv } from '@/utils/bulkNotificationsCsv'
 
-interface TestSendReviewNotificationProps {
+interface EventsTestSendReviewNotificationProps {
   emailSettings: EventEmailSettings
   template: TemplateResponse
   /** The one address a single recipient test goes to. */
@@ -30,7 +30,7 @@ interface TestSendReviewNotificationProps {
   onApply: (applied: AppliedNotification) => void
 }
 
-const TestSendReviewNotification: FC<TestSendReviewNotificationProps> = ({
+const EventsTestSendReviewNotification: FC<EventsTestSendReviewNotificationProps> = ({
   emailSettings,
   template,
   recipientEmail,
@@ -89,7 +89,7 @@ const TestSendReviewNotification: FC<TestSendReviewNotificationProps> = ({
       </div>
 
       <div className="events__preview-card">
-        <EventEmailPreview
+        <EventsEmailPreview
           emailSettings={emailSettings}
           template={template}
           envelope={{
@@ -101,7 +101,7 @@ const TestSendReviewNotification: FC<TestSendReviewNotificationProps> = ({
       </div>
 
       {!readyRows && (
-        <EventEmailPreviewModal
+        <EventsTestSendPreviewModal
           isOpen={isEditValuesOpen}
           onClose={() => setEditValuesOpen(false)}
           template={template}
@@ -119,4 +119,4 @@ const TestSendReviewNotification: FC<TestSendReviewNotificationProps> = ({
   )
 }
 
-export default TestSendReviewNotification
+export default EventsTestSendReviewNotification

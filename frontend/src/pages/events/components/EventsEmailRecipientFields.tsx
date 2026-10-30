@@ -1,13 +1,13 @@
 import type { FC } from 'react'
 import EventsAdditionalRecipients from './EventsAdditionalRecipients'
 import type { RecipientAddresses } from './EventsAdditionalRecipients'
-import EventsCstarGroups from './EventsCstarGroups'
-import RecipientSourcesGroup from './RecipientSourcesGroup'
+import EventsEmailCstarGroups from './EventsEmailCstarGroups'
+import EventsRecipientSourcesGroup from './EventsRecipientSourcesGroup'
 import { ADDITIONAL_RECIPIENTS_ID, CSTAR_GROUPS_ID } from '../constants'
 import type { EmailRecipients } from '../hooks/useEmailRecipients'
 import type { CstarGroup } from '@/api/cstar.api'
 
-type EmailRecipientFieldsProps = {
+type EventsEmailRecipientFieldsProps = {
   recipients: EmailRecipients
   /** Addresses in the additional recipient fields that are not valid email addresses. */
   invalidAddresses: RecipientAddresses
@@ -20,7 +20,7 @@ type EmailRecipientFieldsProps = {
 }
 
 /** The email tab's recipient sources, and the CSTAR group and address fields of those chosen. */
-const EmailRecipientFields: FC<EmailRecipientFieldsProps> = ({
+const EventsEmailRecipientFields: FC<EventsEmailRecipientFieldsProps> = ({
   recipients,
   invalidAddresses,
   cstarGroups,
@@ -29,7 +29,7 @@ const EmailRecipientFields: FC<EmailRecipientFieldsProps> = ({
   onChange,
 }) => (
   <>
-    <RecipientSourcesGroup
+    <EventsRecipientSourcesGroup
       value={recipients.sources}
       onChange={(value) => {
         recipients.setSources(value)
@@ -40,7 +40,7 @@ const EmailRecipientFields: FC<EmailRecipientFieldsProps> = ({
     />
 
     {recipients.sources.includes(CSTAR_GROUPS_ID) && (
-      <EventsCstarGroups
+      <EventsEmailCstarGroups
         values={recipients.groups}
         groups={cstarGroups}
         onChange={(value) => {
@@ -65,4 +65,4 @@ const EmailRecipientFields: FC<EmailRecipientFieldsProps> = ({
   </>
 )
 
-export default EmailRecipientFields
+export default EventsEmailRecipientFields

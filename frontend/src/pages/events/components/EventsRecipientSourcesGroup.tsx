@@ -2,7 +2,7 @@ import type { FC } from 'react'
 import { Checkbox, CheckboxGroup } from '@bcgov/design-system-react-components'
 import { ADDITIONAL_RECIPIENTS_ID, CSTAR_GROUPS_ID, SUBSCRIPTION_SERVICE_ID } from '../constants'
 
-type RecipientSourcesGroupProps = {
+type EventsRecipientSourcesGroupProps = {
   value: string[]
   onChange: (value: string[]) => void
   isDisabled?: boolean
@@ -13,7 +13,7 @@ type RecipientSourcesGroupProps = {
 }
 
 /** The "Recipient(s)" checkboxes that choose which recipient sources a channel sends to. */
-const RecipientSourcesGroup: FC<RecipientSourcesGroupProps> = ({
+const EventsRecipientSourcesGroup: FC<EventsRecipientSourcesGroupProps> = ({
   value,
   onChange,
   isDisabled,
@@ -42,4 +42,4 @@ const RecipientSourcesGroup: FC<RecipientSourcesGroupProps> = ({
   </CheckboxGroup>
 )
 
-export default RecipientSourcesGroup
+export default EventsRecipientSourcesGroup

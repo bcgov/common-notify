@@ -2,7 +2,7 @@ import type { FC } from 'react'
 import { Select } from '@bcgov/design-system-react-components'
 import type { TemplateResponse } from '@/api/templates.api'
 
-type TemplateSelectProps = {
+type EventsTemplateSelectProps = {
   templates: TemplateResponse[]
   value: string | undefined
   onChange: (templateId: string | undefined) => void
@@ -13,7 +13,7 @@ type TemplateSelectProps = {
 }
 
 /** The required "Template" picker on each channel tab. */
-const TemplateSelect: FC<TemplateSelectProps> = ({
+const EventsTemplateSelect: FC<EventsTemplateSelectProps> = ({
   templates,
   value,
   onChange,
@@ -36,4 +36,4 @@ const TemplateSelect: FC<TemplateSelectProps> = ({
   />
 )
 
-export default TemplateSelect
+export default EventsTemplateSelect

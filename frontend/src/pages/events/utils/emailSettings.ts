@@ -1,5 +1,5 @@
 import type { RecipientAddresses } from '../components/EventsAdditionalRecipients'
-import type { CstarGroupSelections } from '../components/EventsCstarGroups'
+import type { CstarGroupSelections } from '../components/EventsEmailCstarGroups'
 import { ADDITIONAL_RECIPIENTS_ID, CSTAR_GROUPS_ID } from '../constants'
 import { isValidEmail } from '@/utils/email'
 

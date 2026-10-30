@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import type { FC } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import PageHeading from '@/components/PageHeading'
-import EventTabs from './components/EventTabs'
-import type { EventTab } from './components/EventTabs'
+import EventsTabBar from './components/EventsTabBar'
+import type { EventsTabId } from './components/EventsTabBar'
 import EventsTab from './sections/EventsTab'
 import type { EventSettingsValues } from './sections/EventsTab'
 import EventsEmailTab, { UNSAVED_EMAIL_CHANGES_MESSAGE } from './sections/EventsEmailTab'
@@ -32,7 +32,7 @@ import '@/scss/components/events.scss'
 interface EditEventProps {
   eventId: string
   /** Tab to open on, e.g. when the saved page hands back to its channel's settings. */
-  initialTab?: EventTab
+  initialTab?: EventsTabId
   /** Opens an active channel on its form instead of handing off to the saved page. */
   editChannel?: boolean
 }
@@ -64,7 +64,7 @@ const EditEvent: FC<EditEventProps> = ({
   const internationalSmsEnabled = useAppSelector(
     (state) => state.smsSettings?.internationalSmsEnabled,
   )
-  const [requestedTab, setRequestedTab] = useState<EventTab>(initialTab)
+  const [requestedTab, setRequestedTab] = useState<EventsTabId>(initialTab)
   // Also guard direct tab entry and a flag being disabled while the page is open.
   const selectedTab = requestedTab === 'sms' && !smsFeatureEnabled ? 'settings' : requestedTab
   const [event, setEvent] = useState<EventResponse | null>(null)
@@ -74,7 +74,7 @@ const EditEvent: FC<EditEventProps> = ({
   // discard them waits here until it has been confirmed.
   const [emailHasUnsavedChanges, setEmailHasUnsavedChanges] = useState(false)
   const [smsHasUnsavedChanges, setSmsHasUnsavedChanges] = useState(false)
-  const [pendingTab, setPendingTab] = useState<EventTab | null>(null)
+  const [pendingTab, setPendingTab] = useState<EventsTabId | null>(null)
   // Only the saved page's "Edit settings" opens an active channel on its form; any other way
   // onto the channel's tab shows the saved settings, so leaving the tab drops this again.
   const [channelEditing, setChannelEditing] = useState(editChannel)
@@ -138,7 +138,7 @@ const EditEvent: FC<EditEventProps> = ({
     }
   }, [eventId, selectedTenantId])
 
-  function handleSelectTab(tab: EventTab) {
+  function handleSelectTab(tab: EventsTabId) {
     if (tab === 'sms' && !smsFeatureEnabled) return
     if (
       (selectedTab === 'email' && emailHasUnsavedChanges) ||
@@ -299,7 +299,7 @@ const EditEvent: FC<EditEventProps> = ({
         ]}
       />
 
-      <EventTabs selected={selectedTab} onSelect={handleSelectTab} />
+      <EventsTabBar selected={selectedTab} onSelect={handleSelectTab} />
 
       <UnsavedChanges
         isBlocked={pendingTab !== null}

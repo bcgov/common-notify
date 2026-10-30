@@ -1,7 +1,7 @@
 import type { FC } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import PageHeading from '@/components/PageHeading'
-import EventTabs from './components/EventTabs'
+import EventsTabBar from './components/EventsTabBar'
 import EventsTab from './sections/EventsTab'
 import type { EventSettingsValues } from './sections/EventsTab'
 import { createEvent } from '@/api/events.api'
@@ -44,7 +44,7 @@ const CreateEvent: FC = () => {
 
       {/* The notification tabs need an event to attach to, so they stay disabled until the
           event exists and the edit page takes over. */}
-      <EventTabs selected="settings" disabledTabs={['email', 'sms', 'third-party']} />
+      <EventsTabBar selected="settings" disabledTabs={['email', 'sms', 'third-party']} />
 
       <section className="events__section">
         <EventsTab values={EMPTY_EVENT} onSave={handleSave} isDisabled={!canEdit} />

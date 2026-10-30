@@ -1,13 +1,17 @@
 import type { FC } from 'react'
 
-type EmailTemplatePreviewProps = {
+type EventsEmailTemplatePreviewProps = {
   subject?: string | null
   body: string
   isDisabled: boolean
 }
 
 /** The selected template's subject line and body, as plain text. */
-const EmailTemplatePreview: FC<EmailTemplatePreviewProps> = ({ subject, body, isDisabled }) => (
+const EventsEmailTemplatePreview: FC<EventsEmailTemplatePreviewProps> = ({
+  subject,
+  body,
+  isDisabled,
+}) => (
   <div
     className={`events__template-preview${isDisabled ? ' events__template-preview--disabled' : ''}`}
   >
@@ -24,4 +28,4 @@ const EmailTemplatePreview: FC<EmailTemplatePreviewProps> = ({ subject, body, is
   </div>
 )
 
-export default EmailTemplatePreview
+export default EventsEmailTemplatePreview

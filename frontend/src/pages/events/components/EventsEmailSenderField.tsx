@@ -10,7 +10,7 @@ import {
 const SENDER_EMAIL_TOOLTIP =
   'Replies and bounce messages may be sent to this address, but the inbox is not monitored.'
 
-type SenderEmailFieldProps = {
+type EventsEmailSenderFieldProps = {
   value: string
   onChange: (value: string) => void
   isDisabled: boolean
@@ -19,7 +19,7 @@ type SenderEmailFieldProps = {
 }
 
 /** The email tab's required sender address, with a tooltip on how the address is used. */
-const SenderEmailField: FC<SenderEmailFieldProps> = ({
+const EventsEmailSenderField: FC<EventsEmailSenderFieldProps> = ({
   value,
   onChange,
   isDisabled,
@@ -59,4 +59,4 @@ const SenderEmailField: FC<SenderEmailFieldProps> = ({
   />
 )
 
-export default SenderEmailField
+export default EventsEmailSenderField

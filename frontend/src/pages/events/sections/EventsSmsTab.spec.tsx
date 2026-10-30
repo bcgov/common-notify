@@ -18,7 +18,9 @@ vi.mock('@/hooks/useChannelTemplates', () => ({
     },
   ],
 }))
-vi.mock('./EventsSmsPreviewModal', () => ({ default: () => <div role="dialog">SMS preview</div> }))
+vi.mock('../components/EventsSmsPreviewModal', () => ({
+  default: () => <div role="dialog">SMS preview</div>,
+}))
 const onSave = vi.fn()
 const onDeactivate = vi.fn()
 const configured = { active: true, templateId: 'sms-template', to: ['+12505551234'] }

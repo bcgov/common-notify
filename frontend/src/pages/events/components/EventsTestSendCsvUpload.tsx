@@ -7,7 +7,7 @@ import { MAX_FILE_BYTES } from '@/utils/bulkNotificationsCsv'
 import type { ParsedCsv, RowIssue } from '@/utils/bulkNotificationsCsv'
 import { MAX_TEST_RECIPIENTS } from '../utils/testSend'
 
-interface TestSendCsvUploadProps {
+interface EventsTestSendCsvUploadProps {
   csv: CsvUpload
   /** Only the first 5 rows of the csv are used */
   parsed: ParsedCsv | null
@@ -19,7 +19,7 @@ interface TestSendCsvUploadProps {
   onFileChange: (file: File | null) => void
 }
 
-const TestSendCsvUpload: FC<TestSendCsvUploadProps> = ({
+const EventsTestSendCsvUpload: FC<EventsTestSendCsvUploadProps> = ({
   csv,
   parsed,
   rowIssues,
@@ -69,4 +69,4 @@ const TestSendCsvUpload: FC<TestSendCsvUploadProps> = ({
   </>
 )
 
-export default TestSendCsvUpload
+export default EventsTestSendCsvUpload

@@ -3,9 +3,9 @@ import { useNavigate } from '@tanstack/react-router'
 import { Button, Callout } from '@bcgov/design-system-react-components'
 import PageHeading from '@/components/PageHeading'
 import StickyBar from '@/components/StickyBar'
-import EventTabs from '../components/EventTabs'
-import type { EventTab } from '../components/EventTabs'
-import EventEmailPreview from '../components/EventEmailPreview'
+import EventsTabBar from '../components/EventsTabBar'
+import type { EventsTabId } from '../components/EventsTabBar'
+import EventsEmailPreview from '../components/EventsEmailPreview'
 import EventsSmsEstimate from '../components/EventsSmsEstimate'
 import { useEvent } from '../hooks/useEvent'
 import { useTemplate } from '../hooks/useTemplate'
@@ -34,9 +34,8 @@ interface EventsSettingsSavedProps {
 }
 
 /**
- * Confirmation a channel tab hands off to once its settings are saved: the notification as it
- * will be sent, and the way on to a test send. Only email has a test send page so far, so SMS
- * shows the button disabled.
+ * Event saved page, currently shared by Email and SMS, SMS test send is  
+ * not yet implemented so the Continue button is disabled.
  */
 const EventsSettingsSaved: FC<EventsSettingsSavedProps> = ({ eventId, channel }) => {
   const navigate = useNavigate()
@@ -48,7 +47,7 @@ const EventsSettingsSaved: FC<EventsSettingsSavedProps> = ({ eventId, channel })
   // A saved but inactive SMS channel is told how to switch it on rather than asked to send.
   const isInactiveSms = isSms && settings?.active === false
 
-  function openTab(tab: EventTab) {
+  function openTab(tab: EventsTabId) {
     void navigate({ to: '/events/$eventId', params: { eventId }, search: { tab } })
   }
 
@@ -79,7 +78,7 @@ const EventsSettingsSaved: FC<EventsSettingsSavedProps> = ({ eventId, channel })
         ) : (
           template &&
           event.emailSettings && (
-            <EventEmailPreview emailSettings={event.emailSettings} template={template} />
+            <EventsEmailPreview emailSettings={event.emailSettings} template={template} />
           )
         )}
 
@@ -128,7 +127,7 @@ const EventsSettingsSaved: FC<EventsSettingsSavedProps> = ({ eventId, channel })
       />
 
       {/* This page only covers the saved channel; the other tabs go back to the event itself. */}
-      <EventTabs selected={channel} onSelect={openTab} />
+      <EventsTabBar selected={channel} onSelect={openTab} />
 
       <section className="events__section">{content}</section>
     </div>

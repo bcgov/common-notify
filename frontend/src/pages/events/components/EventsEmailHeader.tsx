@@ -5,7 +5,7 @@ import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchApprovedEmailLogos, fetchSettings } from '@/redux/thunks/settings.thunks'
 import { DEFAULT_EMAIL_HEADER_TITLE, resolveEmailHeaderTitle } from '@/utils/emailHeaderTitle'
 
-interface EventEmailHeaderProps {
+interface EventsEmailHeaderProps {
   emailSettings: EventEmailSettings
 }
 
@@ -15,7 +15,7 @@ interface EventEmailHeaderProps {
  * Its own component because the header appears in two previews - the card on the page and the
  * modal over it - and both need the same logo lookup.
  */
-const EventEmailHeader: FC<EventEmailHeaderProps> = ({ emailSettings }) => {
+const EventsEmailHeader: FC<EventsEmailHeaderProps> = ({ emailSettings }) => {
   const dispatch = useAppDispatch()
   const approvedLogos = useAppSelector((state) => state.emailSettings.approvedLogos)
   const tenantEmailLogoId = useAppSelector((state) => state.emailSettings.emailLogoId)
@@ -68,4 +68,4 @@ const EventEmailHeader: FC<EventEmailHeaderProps> = ({ emailSettings }) => {
   )
 }
 
-export default EventEmailHeader
+export default EventsEmailHeader

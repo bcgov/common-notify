@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react'
 import type { SubmitEvent } from 'react'
 import { Button, TextField } from '@bcgov/design-system-react-components'
 import EventsAdditionalRecipients from '../components/EventsAdditionalRecipients'
-import ConfirmDeactivateDialog from '../components/ConfirmDeactivateDialog'
-import ChannelActiveSwitch from '../components/ChannelActiveSwitch'
-import RecipientSourcesGroup from '../components/RecipientSourcesGroup'
-import TemplateSelect from '../components/TemplateSelect'
+import EventsConfirmDeactivateDialog from '../components/EventsConfirmDeactivateDialog'
+import EventsChannelActiveSwitch from '../components/EventsChannelActiveSwitch'
+import EventsRecipientSourcesGroup from '../components/EventsRecipientSourcesGroup'
+import EventsTemplateSelect from '../components/EventsTemplateSelect'
 import { ADDITIONAL_RECIPIENTS_ID } from '../constants'
 import { useChannelDeactivation } from '../hooks/useChannelDeactivation'
 import StickyBar from '@/components/StickyBar'
@@ -15,7 +15,7 @@ import { useChannelTemplates } from '@/hooks/useChannelTemplates'
 import { sameAddresses } from '@/utils/recipients'
 import { duplicatePhoneNumbers, isInternationalPhone, isValidPhone } from '@/utils/phoneNumbers'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
-import EventsSmsPreviewModal from './EventsSmsPreviewModal'
+import EventsSmsPreviewModal from '../components/EventsSmsPreviewModal'
 import EventsSmsTemplatePreview from '../components/EventsSmsTemplatePreview'
 
 export const UNSAVED_SMS_CHANGES_MESSAGE =
@@ -156,7 +156,7 @@ export default function EventsSmsTab({
         modalMessage={UNSAVED_SMS_CHANGES_MESSAGE}
       />
       <form className="events__form" onSubmit={handleSubmit} noValidate>
-        <ChannelActiveSwitch
+        <EventsChannelActiveSwitch
           isSelected={channelActive}
           onChange={(next) => {
             if (next) setChannelActive(true)
@@ -185,7 +185,7 @@ export default function EventsSmsTab({
               isDisabled={fieldsDisabled}
               description="Your default phone number from your account (IDIR) will be used. The number must be registered before it can send notifications through this service."
             />
-            <RecipientSourcesGroup
+            <EventsRecipientSourcesGroup
               value={selectedRecipients}
               onChange={setSelectedRecipients}
               isDisabled={fieldsDisabled}
@@ -203,7 +203,7 @@ export default function EventsSmsTab({
                 variant="sms"
               />
             )}
-            <TemplateSelect
+            <EventsTemplateSelect
               templates={templates}
               value={templateId}
               onChange={(nextTemplateId) => {
@@ -237,7 +237,7 @@ export default function EventsSmsTab({
           </StickyBar>
         )}
       </form>
-      <ConfirmDeactivateDialog
+      <EventsConfirmDeactivateDialog
         description="This will stop notifications from being sent through this channel. Your previously saved settings will be preserved and can be reactivated at any time. Unsaved changes will be discarded. Previously sent notifications and their records will not be affected."
         isOpen={isConfirmOpen}
         isBusy={isDeactivating}

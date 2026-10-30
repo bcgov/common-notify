@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import EventTabs from './EventTabs'
+import EventsTabBar from './EventsTabBar'
 
 vi.mock('@/config/featureFlags/useFeatureFlag', () => ({ useFeatureFlag: () => true }))
 vi.mock('@/redux/hooks', () => ({
@@ -16,15 +16,15 @@ const TAB_NAMES = [
   'Third-party Notification',
 ]
 
-describe('EventTabs', () => {
+describe('EventsTabBar', () => {
   it('offers every tab, in order', () => {
-    render(<EventTabs selected="settings" />)
+    render(<EventsTabBar selected="settings" />)
 
     expect(screen.getAllByRole('radio').map((tab) => tab.textContent)).toEqual(TAB_NAMES)
   })
 
   it('marks the selected tab as the chosen one', () => {
-    render(<EventTabs selected="email" />)
+    render(<EventsTabBar selected="email" />)
 
     expect(screen.getByRole('radio', { name: 'Email Notification' })).toBeChecked()
     expect(screen.getByRole('radio', { name: 'Event Settings' })).not.toBeChecked()
@@ -32,7 +32,7 @@ describe('EventTabs', () => {
 
   it('reports the tab that was chosen', async () => {
     const onSelect = vi.fn()
-    render(<EventTabs selected="settings" onSelect={onSelect} />)
+    render(<EventsTabBar selected="settings" onSelect={onSelect} />)
 
     await userEvent.click(screen.getByRole('radio', { name: 'SMS Notification' }))
 
@@ -41,7 +41,7 @@ describe('EventTabs', () => {
 
   it('does not report the tab that is already open', async () => {
     const onSelect = vi.fn()
-    render(<EventTabs selected="settings" onSelect={onSelect} />)
+    render(<EventsTabBar selected="settings" onSelect={onSelect} />)
 
     await userEvent.click(screen.getByRole('radio', { name: 'Event Settings' }))
 
@@ -51,7 +51,7 @@ describe('EventTabs', () => {
   it('disables the tabs it is told cannot be opened yet', async () => {
     const onSelect = vi.fn()
     render(
-      <EventTabs
+      <EventsTabBar
         selected="settings"
         onSelect={onSelect}
         disabledTabs={['email', 'sms', 'third-party']}
@@ -67,7 +67,7 @@ describe('EventTabs', () => {
   })
 
   it('still renders the tabs when there is nowhere to navigate to', () => {
-    render(<EventTabs selected="settings" />)
+    render(<EventsTabBar selected="settings" />)
 
     expect(screen.getAllByRole('radio')).toHaveLength(TAB_NAMES.length)
   })

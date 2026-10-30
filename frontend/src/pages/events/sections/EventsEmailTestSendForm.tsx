@@ -4,10 +4,10 @@ import { useNavigate } from '@tanstack/react-router'
 import { Button, Callout } from '@bcgov/design-system-react-components'
 import StickyBar from '@/components/StickyBar'
 import UnsavedChanges from '@/components/UnsavedChanges'
-import type { AppliedNotification } from '../components/EventEmailPreviewModal'
-import TestSendCsvUpload from '../components/TestSendCsvUpload'
-import TestSendRecipientFields from '../components/TestSendRecipientFields'
-import TestSendReviewNotification from '../components/TestSendReviewNotification'
+import type { AppliedNotification } from '../components/EventsTestSendPreviewModal'
+import EventsTestSendCsvUpload from '../components/EventsTestSendCsvUpload'
+import EventsTestSendRecipientFields from '../components/EventsTestSendRecipientFields'
+import EventsTestSendReviewNotification from '../components/EventsTestSendReviewNotification'
 import { useTemplate } from '../hooks/useTemplate'
 import { useTestSendRowPreview } from '../hooks/useTestSendRowPreview'
 import {
@@ -176,7 +176,7 @@ const EventsEmailTestSendForm: FC<EventsEmailTestSendFormProps> = ({ eventId, em
         description="You can only send notifications to team members."
       />
 
-      <TestSendRecipientFields
+      <EventsTestSendRecipientFields
         recipient={recipient}
         onRecipientChange={(value) => {
           setRecipient(value)
@@ -199,7 +199,7 @@ const EventsEmailTestSendForm: FC<EventsEmailTestSendFormProps> = ({ eventId, em
       />
 
       {isManyRecipients && template && (
-        <TestSendCsvUpload
+        <EventsTestSendCsvUpload
           csv={csv}
           parsed={parsed}
           rowIssues={rowIssues}
@@ -211,7 +211,7 @@ const EventsEmailTestSendForm: FC<EventsEmailTestSendFormProps> = ({ eventId, em
       )}
 
       {isReviewable && template && (
-        <TestSendReviewNotification
+        <EventsTestSendReviewNotification
           emailSettings={emailSettings}
           template={template}
           recipientEmail={recipientEmail}
