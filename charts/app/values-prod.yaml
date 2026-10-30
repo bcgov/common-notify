@@ -23,13 +23,14 @@ backend:
   deploymentStrategy: RollingUpdate
   autoscaling:
     enabled: true
-    minReplicas: 3
+    minReplicas: 5
     #-- above minReplicas so the HPA can actually scale; min == max makes the
     #-- HPA a fixed replica count and targetCPUUtilizationPercentage inert
-    maxReplicas: 5
+    maxReplicas: 7
   pdb:
     enabled: true
-    #-- stays strictly below minReplicas so drains still complete
+    #-- 2 keeps redundancy through a node drain while staying well below
+    #-- minReplicas (5) so drains still complete
     minAvailable: 2
 
   #-- CCP-5831: ClamAV sits in the send path for notifications with
@@ -50,8 +51,8 @@ frontend:
   deploymentStrategy: RollingUpdate
   autoscaling:
     enabled: true
-    minReplicas: 3
-    maxReplicas: 5
+    minReplicas: 5
+    maxReplicas: 7
   pdb:
     enabled: true
     minAvailable: 2
