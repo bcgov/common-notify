@@ -132,7 +132,7 @@ export class FeatureFlagService {
    * @param actor - Who is creating it
    * @returns Created feature flag entity
    */
-  async create(dto: CreateFeatureFlagDto, actor: FeatureFlagActor): Promise<FeatureFlag> {
+  create(dto: CreateFeatureFlagDto, actor: FeatureFlagActor): Promise<FeatureFlag> {
     return this.featureFlagRepository.manager.transaction(async (manager) => {
       const flag = await manager.save(
         manager.create(FeatureFlag, { ...dto, createdBy: actor.id, updatedBy: actor.id }),
@@ -158,11 +158,7 @@ export class FeatureFlagService {
    * @param actor - Who is making the change
    * @returns Updated feature flag entity
    */
-  async update(
-    id: string,
-    dto: UpdateFeatureFlagDto,
-    actor: FeatureFlagActor,
-  ): Promise<FeatureFlag> {
+  update(id: string, dto: UpdateFeatureFlagDto, actor: FeatureFlagActor): Promise<FeatureFlag> {
     return this.featureFlagRepository.manager.transaction(async (manager) => {
       // Row lock: two admins making the same change at once (on different pods) would otherwise
       // both read the old value and both record a change.
@@ -203,7 +199,7 @@ export class FeatureFlagService {
    * Get the change history for a feature flag, newest first
    * @param featureFlagId - Feature flag UUID
    */
-  async getHistory(featureFlagId: string): Promise<FeatureFlagHistory[]> {
+  getHistory(featureFlagId: string): Promise<FeatureFlagHistory[]> {
     return this.historyRepository.find({
       where: { featureFlagId },
       order: { createdAt: 'DESC' },
