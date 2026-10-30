@@ -114,6 +114,21 @@ describe('EventsTestSendPreviewModal', () => {
       )
     })
 
+    it('offers and sends a field for a variable used only in the subject', async () => {
+      renderModal({
+        template: { ...template, subject: 'Your {{permitType}} permit' },
+        values: { firstName: 'Molly', permitType: 'Fishing' },
+      })
+
+      expect(screen.getByLabelText(/^permitType/)).toHaveValue('Fishing')
+      await waitFor(() =>
+        expect(previewTemplateMock).toHaveBeenCalledWith(
+          'template-1',
+          expect.objectContaining({ permitType: 'Fishing' }),
+        ),
+      )
+    })
+
     it('shows the envelope, subject, header and body as the email will carry them', async () => {
       renderModal({ values: { firstName: 'Molly' } })
 

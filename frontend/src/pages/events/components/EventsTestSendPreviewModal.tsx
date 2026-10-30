@@ -57,9 +57,10 @@ const EventsTestSendPreviewModal: FC<EventsTestSendPreviewModalProps> = ({
   values,
   onApply,
 }) => {
+  // The subject can use variables too, and the preview fails without a value for every one.
   const variables = useMemo(
-    () => detectVariables(template.body, template.engineCode),
-    [template.body, template.engineCode],
+    () => detectVariables(`${template.subject ?? ''}\n${template.body}`, template.engineCode),
+    [template.subject, template.body, template.engineCode],
   )
 
   const [initialValues, setInitialValues] = useState<Record<string, string>>({})
