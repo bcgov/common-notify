@@ -111,12 +111,7 @@ const FeatureFlagHistoryTable: FC<{ flagId: string; flagName: string }> = ({
   }
 
   return (
-    // Focusable so a keyboard user can scroll a long history without a mouse.
-    <section
-      className="feature-flag-history__table"
-      tabIndex={0}
-      aria-label={`${flagName} change history, scrollable`}
-    >
+    <div className="feature-flag-history__table">
       <DataTable<FeatureFlagHistoryEntry>
         columns={columns}
         data={entries}
@@ -132,7 +127,7 @@ const FeatureFlagHistoryTable: FC<{ flagId: string; flagName: string }> = ({
           setPage(nextPage)
         }}
       />
-    </section>
+    </div>
   )
 }
 
