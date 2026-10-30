@@ -40,7 +40,11 @@ const EventsEmailPreviewModal: FC<EventsEmailPreviewModalProps> = ({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const variables = detectVariables(template.body, template.engineCode)
+  // The subject can use variables too, and the preview fails without a value for every one.
+  const variables = detectVariables(
+    `${template.subject ?? ''}\n${template.body}`,
+    template.engineCode,
+  )
 
   const runPreview = useCallback(
     async (vals: Record<string, string>) => {
