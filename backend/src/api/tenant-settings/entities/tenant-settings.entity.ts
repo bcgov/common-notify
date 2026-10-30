@@ -41,6 +41,11 @@ export class TenantSettings {
   @Column({ default: false, name: 'international_sms_enabled' })
   internationalSmsEnabled: boolean
 
+  // Operator-set override of the global safelist cap (V51). select: false keeps it out of the
+  // tenant settings API responses; SafelistService reads it explicitly.
+  @Column({ type: 'integer', nullable: true, name: 'safelist_max_entries', select: false })
+  safelistMaxEntries: number | null
+
   @Column({ name: 'created_at' })
   createdAt: Date
 
