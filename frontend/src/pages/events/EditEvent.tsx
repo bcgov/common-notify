@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react'
 import type { FC } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import PageHeading from '@/components/PageHeading'
-import EventTabs from './components/EventTabs'
-import type { EventTab } from './components/EventTabs'
+import EventsTabBar from './components/EventsTabBar'
+import type { EventsTabId } from './components/EventsTabBar'
 import EventsTab from './sections/EventsTab'
 import type { EventSettingsValues } from './sections/EventsTab'
 import EventsEmailTab, { UNSAVED_EMAIL_CHANGES_MESSAGE } from './sections/EventsEmailTab'
-import type { EmailSettingsValues } from './sections/EventsEmailTab'
+import type { EmailSettingsValues } from './utils/emailSettings'
 import EventsSmsTab, { UNSAVED_SMS_CHANGES_MESSAGE } from './sections/EventsSmsTab'
 import type { SmsSettingsValues } from './sections/EventsSmsTab'
 import EventsThirdPartyTab from './sections/EventsThirdPartyTab'
@@ -31,13 +31,17 @@ import '@/scss/components/events.scss'
 
 interface EditEventProps {
   eventId: string
-  /** Tab to open on, e.g. when the email saved page hands back to its own settings. */
-  initialTab?: EventTab
-  /** Opens an active email channel on its form instead of handing off to the saved page. */
-  editEmail?: boolean
+  /** Tab to open on, e.g. when the saved page hands back to its channel's settings. */
+  initialTab?: EventsTabId
+  /** Opens an active channel on its form instead of handing off to the saved page. */
+  editChannel?: boolean
 }
 
-const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings', editEmail = false }) => {
+const EditEvent: FC<EditEventProps> = ({
+  eventId,
+  initialTab = 'settings',
+  editChannel = false,
+}) => {
   const { canEdit } = useCstarRoles()
   // Fetched here rather than in the email tab, the same way the tenant's logos and default sender
   // are: the tab takes everything outside its own form as a prop.
@@ -60,7 +64,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings', editE
   const internationalSmsEnabled = useAppSelector(
     (state) => state.smsSettings?.internationalSmsEnabled,
   )
-  const [requestedTab, setRequestedTab] = useState<EventTab>(initialTab)
+  const [requestedTab, setRequestedTab] = useState<EventsTabId>(initialTab)
   // Also guard direct tab entry and a flag being disabled while the page is open.
   const selectedTab = requestedTab === 'sms' && !smsFeatureEnabled ? 'settings' : requestedTab
   const [event, setEvent] = useState<EventResponse | null>(null)
@@ -70,29 +74,36 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings', editE
   // discard them waits here until it has been confirmed.
   const [emailHasUnsavedChanges, setEmailHasUnsavedChanges] = useState(false)
   const [smsHasUnsavedChanges, setSmsHasUnsavedChanges] = useState(false)
-  const [pendingTab, setPendingTab] = useState<EventTab | null>(null)
-  // Only the saved page's "Edit settings" opens an active email channel on its form; any other
-  // way onto the email tab shows the saved settings, so leaving the tab drops this again.
-  const [emailEditing, setEmailEditing] = useState(editEmail)
-  const showEmailSaved =
-    selectedTab === 'email' && !emailEditing && event?.emailSettings?.active === true
+  const [pendingTab, setPendingTab] = useState<EventsTabId | null>(null)
+  // Only the saved page's "Edit settings" opens an active channel on its form; any other way
+  // onto the channel's tab shows the saved settings, so leaving the tab drops this again.
+  const [channelEditing, setChannelEditing] = useState(editChannel)
+  const savedChannel =
+    (selectedTab === 'email' && event?.emailSettings?.active === true) ||
+    (selectedTab === 'sms' && event?.smsSettings?.active === true)
+      ? selectedTab
+      : null
+  const showSaved = !channelEditing && savedChannel !== null
 
   // Replaced rather than pushed, so Back from the saved page does not land here and bounce.
   useEffect(() => {
-    if (showEmailSaved) {
-      navigate({ to: '/events/$eventId/saved', params: { eventId }, replace: true })
+    if (showSaved) {
+      void navigate({
+        to: '/events/$eventId/saved',
+        params: { eventId },
+        search: { channel: savedChannel },
+        replace: true,
+      })
     }
-  }, [showEmailSaved, eventId, navigate])
+  }, [showSaved, savedChannel, eventId, navigate])
 
-  // Placeholder only, for the email tab's sender field and custom header. Failures are not
-  // surfaced here since the page's own load state doesn't depend on either. Both thunks return
-  // early without a selected tenant, so they wait for one - on a refresh the tenant arrives
-  // after this page has mounted - and re-run when it changes.
+  // Tenant defaults for the email tab's sender field and header; failures aren't surfaced.
+  // Waits for a selected tenant (it can arrive after mount) and re-runs when it changes.
   useEffect(() => {
     if (!selectedTenantId) return
 
-    dispatch(fetchSettings())
-    dispatch(fetchApprovedEmailLogos())
+    void dispatch(fetchSettings())
+    void dispatch(fetchApprovedEmailLogos())
   }, [dispatch, selectedTenantId])
 
   // The page owns the single event fetch, so the title, breadcrumb and every tab read
@@ -127,7 +138,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings', editE
     }
   }, [eventId, selectedTenantId])
 
-  function handleSelectTab(tab: EventTab) {
+  function handleSelectTab(tab: EventsTabId) {
     if (tab === 'sms' && !smsFeatureEnabled) return
     if (
       (selectedTab === 'email' && emailHasUnsavedChanges) ||
@@ -137,12 +148,12 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings', editE
       return
     }
     setRequestedTab(tab)
-    setEmailEditing(false)
+    setChannelEditing(false)
   }
 
   function leavePendingTab() {
     if (pendingTab) setRequestedTab(pendingTab)
-    setEmailEditing(false)
+    setChannelEditing(false)
     setEmailHasUnsavedChanges(false)
     setSmsHasUnsavedChanges(false)
     setPendingTab(null)
@@ -178,9 +189,13 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings', editE
       headerTitle: values.headerTitle || null,
     })
     setEvent(updated)
-    // Saved email settings hand off to their own page, which confirms what was saved and
+    // Saved channel settings hand off to their own page, which confirms what was saved and
     // carries on to sending a test notification.
-    navigate({ to: '/events/$eventId/saved', params: { eventId } })
+    void navigate({
+      to: '/events/$eventId/saved',
+      params: { eventId },
+      search: { channel: 'email' },
+    })
   }
 
   async function handleDeactivateEmail() {
@@ -195,6 +210,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings', editE
       to: values.to,
     })
     setEvent(updated)
+    void navigate({ to: '/events/$eventId/saved', params: { eventId }, search: { channel: 'sms' } })
   }
 
   async function handleDeactivateSms() {
@@ -205,7 +221,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings', editE
   function renderTabContent() {
     if (loadError) return <div className="alert alert-danger">{loadError}</div>
 
-    if (!event || showEmailSaved) return <p className="events__help">Loading event...</p>
+    if (!event || showSaved) return <p className="events__help">Loading event...</p>
 
     if (selectedTab === 'settings')
       return (
@@ -283,7 +299,7 @@ const EditEvent: FC<EditEventProps> = ({ eventId, initialTab = 'settings', editE
         ]}
       />
 
-      <EventTabs selected={selectedTab} onSelect={handleSelectTab} />
+      <EventsTabBar selected={selectedTab} onSelect={handleSelectTab} />
 
       <UnsavedChanges
         isBlocked={pendingTab !== null}

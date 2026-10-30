@@ -57,7 +57,7 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
       const raw = vals[v.name] ?? ''
       // For a boolean toggle, "false" must render as falsy so the else/inverted
       // branch shows; an empty string is falsy in Handlebars and Mustache.
-      params[v.name] = v.type === 'boolean' ? (raw === 'true' ? 'true' : '') : raw
+      params[v.name] = v.type === 'boolean' && raw !== 'true' ? '' : raw
     })
 
     setLoading(true)

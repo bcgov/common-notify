@@ -1,81 +1,26 @@
 import { useEffect, useState } from 'react'
 import type { SubmitEvent } from 'react'
-import {
-  Button,
-  Callout,
-  Checkbox,
-  CheckboxGroup,
-  Select,
-  Switch,
-  TextArea,
-  TextField,
-} from '@bcgov/design-system-react-components'
-import { parsePhoneNumberFromString } from 'libphonenumber-js/min'
+import { Button, TextField } from '@bcgov/design-system-react-components'
 import EventsAdditionalRecipients from '../components/EventsAdditionalRecipients'
-import ConfirmDeactivateDialog from '../components/ConfirmDeactivateDialog'
+import EventsConfirmDeactivateDialog from '../components/EventsConfirmDeactivateDialog'
+import EventsChannelActiveSwitch from '../components/EventsChannelActiveSwitch'
+import EventsRecipientSourcesGroup from '../components/EventsRecipientSourcesGroup'
+import EventsTemplateSelect from '../components/EventsTemplateSelect'
+import { ADDITIONAL_RECIPIENTS_ID } from '../constants'
 import { useChannelDeactivation } from '../hooks/useChannelDeactivation'
 import StickyBar from '@/components/StickyBar'
 import UnsavedChanges from '@/components/UnsavedChanges'
 import { NotificationChannel } from '@/api/templates.api'
 import { useChannelTemplates } from '@/hooks/useChannelTemplates'
 import { sameAddresses } from '@/utils/recipients'
+import { duplicatePhoneNumbers, isInternationalPhone, isValidPhone } from '@/utils/phoneNumbers'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
-import EventsSmsPreviewModal from './EventsSmsPreviewModal'
-import EventsSmsEstimate from '../components/EventsSmsEstimate'
+import EventsSmsPreviewModal from '../components/EventsSmsPreviewModal'
+import EventsSmsTemplatePreview from '../components/EventsSmsTemplatePreview'
 
 export const UNSAVED_SMS_CHANGES_MESSAGE =
   'You have unsaved changes to your SMS notification settings. If you leave this page, your changes will be lost.'
 export type SmsSettingsValues = { active: boolean; templateId: string | null; to: string[] }
-const ADDITIONAL_RECIPIENTS_ID = 'additional-recipients'
-
-// Mirrors backend/src/api/notify/services/phone-number.service.ts's normalize/isValid logic, so
-// a number accepted here is accepted by the backend's IsNormalizablePhoneNumber validator too.
-const DEFAULT_PHONE_REGION = 'CA'
-const FORMATTING_CHARACTERS = /[\s\-().]/g
-
-// Returns the E.164 form, or null if `value` isn't a resolvable phone number.
-function normalizePhone(value: string): string | null {
-  const cleaned = value.replace(FORMATTING_CHARACTERS, '')
-
-  try {
-    const phoneNumber = parsePhoneNumberFromString(cleaned, DEFAULT_PHONE_REGION)
-    return phoneNumber && !phoneNumber.ext && phoneNumber.isValid() ? phoneNumber.number : null
-  } catch {
-    return null
-  }
-}
-
-function isValidPhone(value: string): boolean {
-  return normalizePhone(value) !== null
-}
-
-// Mirrors PhoneNumberService.isInternational: anything outside Canada, the US included. False for
-// a number that won't normalize, which isValidPhone already flags.
-function isInternationalPhone(value: string): boolean {
-  const normalized = normalizePhone(value)
-  return normalized !== null && parsePhoneNumberFromString(normalized)?.country !== 'CA'
-}
-
-// Differently formatted entries can normalize to the same E.164 number (e.g. "2505551234" and
-// "250-555-1234"); TagListField only catches exact-string repeats, so flag later entries whose
-// normalized form repeats an earlier one, the same way a malformed number is flagged, instead of
-// letting the form silently drop them.
-function duplicatePhoneNumbers(addresses: string[]): string[] {
-  const seen = new Set<string>()
-  const duplicates: string[] = []
-
-  for (const address of addresses) {
-    const normalized = normalizePhone(address)
-    if (normalized === null) continue
-    if (seen.has(normalized)) {
-      duplicates.push(address)
-    } else {
-      seen.add(normalized)
-    }
-  }
-
-  return duplicates
-}
 
 type EventsSmsTabProps = Readonly<{
   values: SmsSettingsValues
@@ -89,51 +34,6 @@ type EventsSmsTabProps = Readonly<{
   /** Whether the international_sms flag and the tenant's International SMS setting are both on. */
   internationalSmsAllowed?: boolean
 }>
-
-type EventsSmsSavedSettingsProps = Readonly<{
-  channelActive: boolean
-  selectedTemplate?: { body: string }
-  onEdit: () => void
-}>
-
-function EventsSmsSavedSettings({
-  channelActive,
-  selectedTemplate,
-  onEdit,
-}: EventsSmsSavedSettingsProps) {
-  return (
-    <>
-      <Callout
-        variant="lightGrey"
-        title={channelActive ? 'Ready to send?' : 'SMS settings saved'}
-        description={
-          channelActive
-            ? 'Your SMS settings are ready. Continue to select recipients and send a test notification to verify the content and formatting.'
-            : 'Your SMS settings are saved. Activate this channel when you are ready to send notifications.'
-        }
-      />
-      {selectedTemplate ? (
-        <div className="events__saved-preview">
-          <p className="events__template-preview-content">{selectedTemplate.body}</p>
-          <EventsSmsEstimate body={selectedTemplate.body} />
-        </div>
-      ) : (
-        <p className="events__help">
-          The saved template preview is unavailable. Open settings to select a template.
-        </p>
-      )}
-      <p className="events__help">Test notifications are not available yet.</p>
-      <StickyBar>
-        <Button type="button" variant="secondary" onPress={onEdit}>
-          Edit settings
-        </Button>
-        <Button type="button" variant="primary" isDisabled>
-          Continue to test notification
-        </Button>
-      </StickyBar>
-    </>
-  )
-}
 
 export default function EventsSmsTab({
   values,
@@ -158,7 +58,6 @@ export default function EventsSmsTab({
   const [saving, setSaving] = useState(false)
   const [validationAttempted, setValidationAttempted] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const [showSaved, setShowSaved] = useState(isConfigured && values.active)
   const [sampleValues, setSampleValues] = useState<Record<string, string>>({})
   const [recipientsResetKey, setRecipientsResetKey] = useState(0)
   const templates = useChannelTemplates(NotificationChannel.SMS)
@@ -195,11 +94,10 @@ export default function EventsSmsTab({
   const showFields = isConfigured || channelActive
   const fieldsDisabled = disabled || !channelActive
   const hasUnsavedChanges =
-    !showSaved &&
-    (channelActive !== values.active ||
-      (templateId ?? null) !== values.templateId ||
-      !sameAddresses(submittedTo, values.to) ||
-      selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) !== Boolean(values.to.length))
+    channelActive !== values.active ||
+    (templateId ?? null) !== values.templateId ||
+    !sameAddresses(submittedTo, values.to) ||
+    selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) !== Boolean(values.to.length)
 
   useEffect(() => {
     onUnsavedChangesChange?.(hasUnsavedChanges)
@@ -234,7 +132,6 @@ export default function EventsSmsTab({
         to: submittedTo,
       })
       setValidationAttempted(false)
-      setShowSaved(true)
       showSuccessToast(
         'Settings saved',
         channelActive
@@ -258,132 +155,89 @@ export default function EventsSmsTab({
         isSaving={saving}
         modalMessage={UNSAVED_SMS_CHANGES_MESSAGE}
       />
-      {showSaved ? (
-        <EventsSmsSavedSettings
-          channelActive={channelActive}
-          selectedTemplate={selectedTemplate}
-          onEdit={() => setShowSaved(false)}
+      <form className="events__form" onSubmit={handleSubmit} noValidate>
+        <EventsChannelActiveSwitch
+          isSelected={channelActive}
+          onChange={(next) => {
+            if (next) setChannelActive(true)
+            else if (values.active) requestDeactivate()
+            else setChannelActive(false)
+          }}
+          isDisabled={disabled || (!channelActive && smsNotificationsEnabled === false)}
         />
-      ) : (
-        <form className="events__form" onSubmit={handleSubmit} noValidate>
-          <div className="events__switch-field">
-            <span className="events__field-label">Activate channel</span>
-            <Switch
-              labelPosition="right"
-              aria-label="Activate channel"
-              isSelected={channelActive}
-              onChange={(next) => {
-                if (next) setChannelActive(true)
-                else if (values.active) requestDeactivate()
-                else setChannelActive(false)
+        {smsNotificationsEnabled === false && (
+          <p className="events__help">
+            SMS notifications are also turned off in tenant Settings. An administrator must enable
+            them before SMS can be sent.
+          </p>
+        )}
+        {showFields && (
+          <>
+            <TextField
+              label="Sender phone number"
+              value={senderPhoneNumber ?? 'Not assigned'}
+              isRequired
+              validationBehavior="aria"
+              isInvalid={validationAttempted && Boolean(senderError)}
+              errorMessage={senderError}
+              size="medium"
+              isReadOnly
+              isDisabled={fieldsDisabled}
+              description="Your default phone number from your account (IDIR) will be used. The number must be registered before it can send notifications through this service."
+            />
+            <EventsRecipientSourcesGroup
+              value={selectedRecipients}
+              onChange={setSelectedRecipients}
+              isDisabled={fieldsDisabled}
+              errorMessage={validationAttempted ? recipientError : undefined}
+              isCstarEnabled={false}
+            />
+            {selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) && (
+              <EventsAdditionalRecipients
+                key={recipientsResetKey}
+                values={{ to, cc: [], bcc: [] }}
+                onChange={(recipients) => setTo(recipients.to)}
+                invalidAddresses={{ to: invalid, cc: [], bcc: [] }}
+                internationalAddresses={international}
+                isDisabled={fieldsDisabled}
+                variant="sms"
+              />
+            )}
+            <EventsTemplateSelect
+              templates={templates}
+              value={templateId}
+              onChange={(nextTemplateId) => {
+                setTemplateId(nextTemplateId)
+                setSampleValues({})
               }}
-              isDisabled={disabled || (!channelActive && smsNotificationsEnabled === false)}
+              size="medium"
+              isDisabled={fieldsDisabled}
+              errorMessage={validationAttempted ? templateError : undefined}
+            />
+            {selectedTemplate && (
+              <EventsSmsTemplatePreview body={selectedTemplate.body} isDisabled={fieldsDisabled} />
+            )}
+          </>
+        )}
+        {showFields && (
+          <StickyBar>
+            <Button
+              type="button"
+              variant="secondary"
+              isDisabled={fieldsDisabled}
+              onPress={() => {
+                if (validate('Preview')) setPreviewOpen(true)
+              }}
             >
-              {channelActive ? 'On' : 'Off'}
-            </Switch>
-          </div>
-          {smsNotificationsEnabled === false && (
-            <p className="events__help">
-              SMS notifications are also turned off in tenant Settings. An administrator must enable
-              them before SMS can be sent.
-            </p>
-          )}
-          {showFields && (
-            <>
-              <TextField
-                label="Sender phone number"
-                value={senderPhoneNumber ?? 'Not assigned'}
-                isRequired
-                validationBehavior="aria"
-                isInvalid={validationAttempted && Boolean(senderError)}
-                errorMessage={senderError}
-                size="medium"
-                isReadOnly
-                isDisabled={fieldsDisabled}
-                description="Your default phone number from your account (IDIR) will be used. The number must be registered before it can send notifications through this service."
-              />
-              <CheckboxGroup
-                label="Recipient(s)"
-                value={selectedRecipients}
-                onChange={setSelectedRecipients}
-                isDisabled={fieldsDisabled}
-                isRequired
-                validationBehavior="aria"
-                isInvalid={validationAttempted && Boolean(recipientError)}
-                errorMessage={recipientError}
-              >
-                <Checkbox value="subscription-service" isDisabled>
-                  Subscription Service
-                </Checkbox>
-                <Checkbox value="cstar-groups" isDisabled>
-                  CSTAR Group(s)
-                </Checkbox>
-                <Checkbox value={ADDITIONAL_RECIPIENTS_ID}>Additional recipient(s)</Checkbox>
-              </CheckboxGroup>
-              {selectedRecipients.includes(ADDITIONAL_RECIPIENTS_ID) && (
-                <EventsAdditionalRecipients
-                  key={recipientsResetKey}
-                  values={{ to, cc: [], bcc: [] }}
-                  onChange={(recipients) => setTo(recipients.to)}
-                  invalidAddresses={{ to: invalid, cc: [], bcc: [] }}
-                  internationalAddresses={international}
-                  isDisabled={fieldsDisabled}
-                  variant="sms"
-                />
-              )}
-              <Select
-                label="Template"
-                placeholder="Select a template..."
-                items={templates.map((template) => ({ id: template.id, label: template.name }))}
-                value={templateId}
-                onChange={(key) => {
-                  setTemplateId(key == null ? undefined : String(key))
-                  setSampleValues({})
-                }}
-                size="medium"
-                isDisabled={fieldsDisabled}
-                isRequired
-                validationBehavior="aria"
-                isInvalid={validationAttempted && Boolean(templateError)}
-                errorMessage={templateError}
-              />
-              {selectedTemplate && (
-                <div className="events__template-preview events__template-preview--auto-size">
-                  <TextArea
-                    label="Template Preview"
-                    value={selectedTemplate.body}
-                    isReadOnly
-                    isDisabled={fieldsDisabled}
-                  />
-                  <EventsSmsEstimate body={selectedTemplate.body} />
-                  <p className="events__help">
-                    Estimates change when template variables are replaced. Any tenant-name prefix
-                    added when sending is not included.
-                  </p>
-                </div>
-              )}
-            </>
-          )}
-          {showFields && (
-            <StickyBar>
-              <Button
-                type="button"
-                variant="secondary"
-                isDisabled={fieldsDisabled}
-                onPress={() => {
-                  if (validate('Preview')) setPreviewOpen(true)
-                }}
-              >
-                Preview
-              </Button>
-              <Button type="submit" variant="primary" isDisabled={fieldsDisabled}>
-                {saving ? 'Saving...' : 'Save'}
-              </Button>
-            </StickyBar>
-          )}
-        </form>
-      )}
-      <ConfirmDeactivateDialog
+              Preview
+            </Button>
+            <Button type="submit" variant="primary" isDisabled={fieldsDisabled}>
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+          </StickyBar>
+        )}
+      </form>
+      <EventsConfirmDeactivateDialog
         description="This will stop notifications from being sent through this channel. Your previously saved settings will be preserved and can be reactivated at any time. Unsaved changes will be discarded. Previously sent notifications and their records will not be affected."
         isOpen={isConfirmOpen}
         isBusy={isDeactivating}

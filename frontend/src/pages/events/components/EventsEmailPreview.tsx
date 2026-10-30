@@ -2,7 +2,7 @@ import type { FC, ReactNode } from 'react'
 import type { EventEmailSettings } from '@/api/events.api'
 import type { TemplateResponse } from '@/api/templates.api'
 import EmailBodyFrame from '@/components/EmailBodyFrame'
-import EventEmailHeader from './EventEmailHeader'
+import EventsEmailHeader from './EventsEmailHeader'
 
 /** A template rendered with a set of values, as the preview endpoint returns it. */
 export interface RenderedNotification {
@@ -12,7 +12,7 @@ export interface RenderedNotification {
   bodyText: string
 }
 
-interface EventEmailPreviewProps {
+interface EventsEmailPreviewProps {
   emailSettings: EventEmailSettings
   template: TemplateResponse
   /** Envelope lines, shown where the preview is of a send to a known address. */
@@ -27,7 +27,7 @@ interface EventEmailPreviewProps {
  *
  * Shared by the saved page and the test send page so the two show the same notification.
  */
-const EventEmailPreview: FC<EventEmailPreviewProps> = ({
+const EventsEmailPreview: FC<EventsEmailPreviewProps> = ({
   emailSettings,
   template,
   envelope,
@@ -60,10 +60,10 @@ const EventEmailPreview: FC<EventEmailPreviewProps> = ({
         <strong>Subject line:</strong> {rendered ? rendered.subject : template.subject}
       </p>
 
-      <EventEmailHeader emailSettings={emailSettings} />
+      <EventsEmailHeader emailSettings={emailSettings} />
       {body}
     </div>
   )
 }
 
-export default EventEmailPreview
+export default EventsEmailPreview

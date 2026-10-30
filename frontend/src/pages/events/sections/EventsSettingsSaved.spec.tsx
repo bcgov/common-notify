@@ -2,7 +2,7 @@ import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { render, screen, userEvent, waitFor } from '@/test-utils'
 import { getEventById } from '@/api/events.api'
 import { getTemplateById } from '@/api/templates.api'
-import EventsEmailSaved from './EventsEmailSaved'
+import EventsSettingsSaved from './EventsSettingsSaved'
 
 const mocks = vi.hoisted(() => ({ navigate: vi.fn(), tenant: 'tenant' as string | undefined }))
 vi.mock('@tanstack/react-router', () => ({ useNavigate: () => mocks.navigate }))
@@ -13,23 +13,23 @@ vi.mock('@/redux/hooks', () => ({
 vi.mock('@/components/PageHeading', () => ({
   default: ({ title }: { title: string }) => <h1>{title}</h1>,
 }))
-vi.mock('../components/EventTabs', () => ({
+vi.mock('../components/EventsTabBar', () => ({
   default: ({ onSelect }: { onSelect: (tab: string) => void }) => (
     <button onClick={() => onSelect('settings')}>Settings tab</button>
   ),
 }))
-vi.mock('../components/EventEmailPreview', () => ({ default: () => <div>Email preview</div> }))
+vi.mock('../components/EventsEmailPreview', () => ({ default: () => <div>Email preview</div> }))
 vi.mock('@/api/events.api', () => ({ getEventById: vi.fn() }))
 vi.mock('@/api/templates.api', () => ({ getTemplateById: vi.fn() }))
 
-describe('EventsEmailSaved', () => {
+describe('EventsSettingsSaved', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.tenant = 'tenant'
   })
   it('waits for tenant selection before fetching', () => {
     mocks.tenant = undefined
-    render(<EventsEmailSaved eventId="event" />)
+    render(<EventsSettingsSaved eventId="event" channel="email" />)
     expect(screen.getByText('Loading event...')).toBeInTheDocument()
     expect(getEventById).not.toHaveBeenCalled()
   })
@@ -37,7 +37,7 @@ describe('EventsEmailSaved', () => {
     vi.mocked(getEventById).mockResolvedValue({ name: 'Renewal' } as Awaited<
       ReturnType<typeof getEventById>
     >)
-    render(<EventsEmailSaved eventId="event" />)
+    render(<EventsSettingsSaved eventId="event" channel="email" />)
     expect(screen.getByText('Loading event...')).toBeInTheDocument()
     expect(
       await screen.findByText('This event has no saved email notification settings yet.'),
@@ -45,7 +45,7 @@ describe('EventsEmailSaved', () => {
   })
   it.each([new Error('Unavailable'), 'failure'])('shows load errors: %s', async (error) => {
     vi.mocked(getEventById).mockRejectedValue(error)
-    render(<EventsEmailSaved eventId="event" />)
+    render(<EventsSettingsSaved eventId="event" channel="email" />)
     expect(
       await screen.findByText(error instanceof Error ? error.message : 'Failed to load event'),
     ).toBeInTheDocument()
@@ -62,7 +62,7 @@ describe('EventsEmailSaved', () => {
         vi.mocked(getTemplateById).mockResolvedValue({ id: 'template' } as Awaited<
           ReturnType<typeof getTemplateById>
         >)
-      render(<EventsEmailSaved eventId="event" />)
+      render(<EventsSettingsSaved eventId="event" channel="email" />)
       await userEvent.click(
         await screen.findByRole('button', { name: 'Continue to test notification' }),
       )
@@ -86,4 +86,47 @@ describe('EventsEmailSaved', () => {
       if (!fails) expect(await screen.findByText('Email preview')).toBeInTheDocument()
     },
   )
+
+  describe('for SMS', () => {
+    function loadSms(active: boolean) {
+      vi.mocked(getEventById).mockResolvedValue({
+        name: 'Renewal',
+        smsSettings: { active, templateId: 'sms-template', to: [] },
+      } as unknown as Awaited<ReturnType<typeof getEventById>>)
+      vi.mocked(getTemplateById).mockResolvedValue({
+        id: 'sms-template',
+        body: 'Your permit expires soon',
+      } as Awaited<ReturnType<typeof getTemplateById>>)
+    }
+
+    it('shows the template and edits the SMS settings, with no test send yet', async () => {
+      loadSms(true)
+      render(<EventsSettingsSaved eventId="event" channel="sms" />)
+      expect(await screen.findByText('Ready to send?')).toBeInTheDocument()
+      expect(await screen.findByText('Your permit expires soon')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Continue to test notification' })).toBeDisabled()
+      await userEvent.click(screen.getByRole('button', { name: 'Edit settings' }))
+      expect(mocks.navigate).toHaveBeenCalledWith({
+        to: '/events/$eventId',
+        params: { eventId: 'event' },
+        search: { tab: 'sms', edit: true },
+      })
+    })
+
+    it('asks for an inactive channel to be activated', async () => {
+      loadSms(false)
+      render(<EventsSettingsSaved eventId="event" channel="sms" />)
+      expect(await screen.findByText('SMS settings saved')).toBeInTheDocument()
+    })
+
+    it('shows missing SMS settings', async () => {
+      vi.mocked(getEventById).mockResolvedValue({ name: 'Renewal' } as Awaited<
+        ReturnType<typeof getEventById>
+      >)
+      render(<EventsSettingsSaved eventId="event" channel="sms" />)
+      expect(
+        await screen.findByText('This event has no saved SMS notification settings yet.'),
+      ).toBeInTheDocument()
+    })
+  })
 })

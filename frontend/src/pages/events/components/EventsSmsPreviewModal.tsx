@@ -4,7 +4,7 @@ import NotificationPreviewModal from '@/components/NotificationPreviewModal'
 import { previewTemplate } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
 import { detectVariables } from '@/utils/templateVariables'
-import EventsSmsEstimate from '../components/EventsSmsEstimate'
+import EventsSmsEstimate from './EventsSmsEstimate'
 
 interface Props {
   template: TemplateResponse
