@@ -25,7 +25,7 @@ const CreateEvent: FC = () => {
       showSuccessToast('Event created successfully')
       // The create page has no id of its own; hand off to the edit page for the new event
       // so the notification tabs can be configured.
-      navigate({ to: '/events/$eventId', params: { eventId: event.id } })
+      void navigate({ to: '/events/$eventId', params: { eventId: event.id } })
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : 'Failed to create event')
     }

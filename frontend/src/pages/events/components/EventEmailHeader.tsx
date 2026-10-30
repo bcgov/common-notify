@@ -29,8 +29,8 @@ const EventEmailHeader: FC<EventEmailHeaderProps> = ({ emailSettings }) => {
   useEffect(() => {
     if (!selectedTenantId) return
 
-    dispatch(fetchSettings())
-    dispatch(fetchApprovedEmailLogos())
+    void dispatch(fetchSettings())
+    void dispatch(fetchApprovedEmailLogos())
   }, [dispatch, selectedTenantId])
 
   // Resolved as the backend resolves it at send time: a custom header without a logo inherits
