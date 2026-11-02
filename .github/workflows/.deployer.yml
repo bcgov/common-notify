@@ -104,13 +104,13 @@ jobs:
           oc_server: ${{ inputs.oc_server }}
           environment: ${{ inputs.environment }}
           values_file: ${{ inputs.environment == 'PROD' && 'charts/crunchy/values-prod.yml' || inputs.environment == 'DEV' && 'charts/crunchy/values-dev.yml' || 'charts/crunchy/values.yml' }}
-          # action-crunchy enables the S3 repo only when all four are non-empty,
-          # so PROD gets an offsite repo and other environments keep the PVC repo
-          # alone. Credentials stay in secrets and never reach the chart.
-          s3_access_key: ${{ inputs.environment == 'PROD' && secrets.S3_ACCESS_KEY_PROD || '' }}
-          s3_secret_key: ${{ inputs.environment == 'PROD' && secrets.S3_SECRET_KEY_PROD || '' }}
-          s3_bucket: ${{ inputs.environment == 'PROD' && 'notify-crunchydb-prod' || '' }}
-          s3_endpoint: ${{ inputs.environment == 'PROD' && 'commonservices.objectstore.gov.bc.ca' || '' }}
+          # action-crunchy enables the S3 repo only when all four are non-empty, so an
+          # environment without a bucket and credentials keeps the PVC repo alone.
+          # Credentials come from environment secrets and never reach the chart.
+          s3_access_key: ${{ inputs.environment == 'PROD' && secrets.S3_ACCESS_KEY_PROD || inputs.environment == 'TEST' && secrets.S3_ACCESS_KEY_TEST || '' }}
+          s3_secret_key: ${{ inputs.environment == 'PROD' && secrets.S3_SECRET_KEY_PROD || inputs.environment == 'TEST' && secrets.S3_SECRET_KEY_TEST || '' }}
+          s3_bucket: ${{ inputs.environment == 'PROD' && 'notify-crunchydb-prod' || inputs.environment == 'TEST' && 'notify-crunchydb-test' || '' }}
+          s3_endpoint: commonservices.objectstore.gov.bc.ca
           triggers: ${{ inputs.db_triggers }}
 
       - uses: actions/checkout@v7
