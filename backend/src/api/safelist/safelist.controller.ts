@@ -69,7 +69,7 @@ export class SafelistController {
     const [entries, enforced, maxEntries] = await Promise.all([
       this.safelistService.listByTenant(tenant.id, channel),
       this.safelistService.isEnforced(),
-      this.safelistService.getMaxEntries(),
+      this.safelistService.getMaxEntries(tenant.id),
     ])
     return { entries, enforced, maxEntries }
   }
