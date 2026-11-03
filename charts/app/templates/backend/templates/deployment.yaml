@@ -33,6 +33,8 @@ spec:
       labels:
         {{- include "backend.labels" . | nindent 8 }}
     spec:
+      # Nothing here calls the API server, so do not mount a token.
+      automountServiceAccountToken: false
       # Time for queue workers to finish in-flight jobs on shutdown (QueueModule
       # beforeApplicationShutdown). QUEUE_SHUTDOWN_DRAIN_MS below stops waiting 15s short of it.
       terminationGracePeriodSeconds: {{ .Values.backend.terminationGracePeriodSeconds | default 120 }}
