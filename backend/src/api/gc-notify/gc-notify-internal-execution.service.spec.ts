@@ -696,6 +696,7 @@ describe('GcNotifyInternalExecutionService', () => {
         id: 'tpl-bulk',
         version: 2,
         channelCode: NotificationChannel.EMAIL,
+        engineCode: TemplateEngine.LEGACY_GC_NOTIFY,
       })
       acceptMerge.mockResolvedValue({
         notifyId: ORIGINAL_ID,
@@ -721,6 +722,7 @@ describe('GcNotifyInternalExecutionService', () => {
       id: 'tpl-bulk',
       version: 2,
       channelCode: NotificationChannel.EMAIL,
+      engineCode: TemplateEngine.LEGACY_GC_NOTIFY,
     }
 
     const accepted = {
@@ -825,6 +827,121 @@ describe('GcNotifyInternalExecutionService', () => {
           TENANT_ID,
         ),
       ).rejects.toMatchObject({ status: 400 })
+      expect(acceptMerge).not.toHaveBeenCalled()
+    })
+
+    it.each([TemplateEngine.HANDLEBARS, TemplateEngine.MUSTACHE, TemplateEngine.MJML])(
+      'rejects a %s template, whose ((placeholders)) the merge workers would not fill',
+      async (engineCode) => {
+        mockTemplatesRepository.findById.mockResolvedValue({ ...TEMPLATE, engineCode })
+
+        await expect(service.sendBulk(bulkBody, TENANT_ID)).rejects.toMatchObject({
+          status: 400,
+          response: { errors: [{ error: 'ValidationError' }] },
+        })
+        expect(acceptMerge).not.toHaveBeenCalled()
+      },
+    )
+
+    it('moves a recipient column from any position to the front, keeping each value with its header', async () => {
+      await service.sendBulk(
+        {
+          ...bulkBody,
+          rows: [
+            ['first_name', 'email address', 'city'],
+            ['Alice', 'alice@example.com', 'Victoria'],
+            ['Bob', 'bob@example.com', 'Nanaimo'],
+          ],
+        },
+        TENANT_ID,
+      )
+
+      const { mergeArray } = (acceptMerge.mock.calls[0][0].dto as any).email.recipients
+      expect(mergeArray).toEqual([
+        ['to', 'first_name', 'city'],
+        ['alice@example.com', 'Alice', 'Victoria'],
+        ['bob@example.com', 'Bob', 'Nanaimo'],
+      ])
+      // The real parser, because the point is what each recipient's template receives.
+      expect(NotificationService.prototype.parseMailMergeRecipients.call({}, mergeArray)).toEqual([
+        { address: 'alice@example.com', params: { first_name: 'Alice', city: 'Victoria' } },
+        { address: 'bob@example.com', params: { first_name: 'Bob', city: 'Nanaimo' } },
+      ])
+    })
+
+    it('moves the recipient column of a csv body too', async () => {
+      await service.sendBulk(
+        {
+          template_id: 'tpl-bulk',
+          name: 'From CSV',
+          csv: 'first_name,email address\nAlice,alice@example.com\n',
+        } as any,
+        TENANT_ID,
+      )
+
+      const dto = acceptMerge.mock.calls[0][0].dto as any
+      expect(dto.email.recipients.mergeArray).toEqual([
+        ['to', 'first_name'],
+        ['alice@example.com', 'Alice'],
+      ])
+    })
+
+    it('leaves a row missing its recipient for the merge pipeline to report', async () => {
+      await service.sendBulk(
+        {
+          ...bulkBody,
+          rows: [['first_name', 'email address'], ['Alice']],
+        },
+        TENANT_ID,
+      )
+
+      const dto = acceptMerge.mock.calls[0][0].dto as any
+      expect(dto.email.recipients.mergeArray[1]).toEqual([undefined, 'Alice'])
+    })
+
+    it.each([
+      ['Email Address', NotificationChannel.EMAIL],
+      ['email_address', NotificationChannel.EMAIL],
+      ['EMAIL-ADDRESS', NotificationChannel.EMAIL],
+      ['adresse courriel', NotificationChannel.EMAIL],
+      ['Phone_Number', NotificationChannel.SMS],
+      ['numéro de téléphone', NotificationChannel.SMS],
+    ])('recognises %s as the %s recipient column', async (column, channelCode) => {
+      mockTemplatesRepository.findById.mockResolvedValue({ ...TEMPLATE, channelCode })
+
+      await service.sendBulk({ ...bulkBody, rows: [[column], ['recipient']] }, TENANT_ID)
+
+      const dto = acceptMerge.mock.calls[0][0].dto as any
+      const channel = channelCode === NotificationChannel.SMS ? dto.sms : dto.email
+      expect(channel.recipients.mergeArray[0]).toEqual(['to'])
+    })
+
+    it('picks the recipient column the template channel names when both are present', async () => {
+      await service.sendBulk(
+        {
+          ...bulkBody,
+          rows: [
+            ['phone number', 'email address'],
+            ['+12505551234', 'alice@example.com'],
+          ],
+        },
+        TENANT_ID,
+      )
+
+      const dto = acceptMerge.mock.calls[0][0].dto as any
+      expect(dto.email.recipients.mergeArray).toEqual([
+        ['to', 'phone number'],
+        ['alice@example.com', '+12505551234'],
+      ])
+    })
+
+    it('rejects an SMS template whose header only names an email recipient', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({
+        ...TEMPLATE,
+        channelCode: NotificationChannel.SMS,
+      })
+
+      await expect(service.sendBulk(bulkBody, TENANT_ID)).rejects.toMatchObject({ status: 400 })
       expect(acceptMerge).not.toHaveBeenCalled()
     })
 

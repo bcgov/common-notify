@@ -36,7 +36,10 @@ import type { FileAttachment } from './schemas/file-attachment'
 import Papa from 'papaparse'
 import { PostBulkRequest } from './schemas/post-bulk-request'
 import { PostBulkResponse } from './schemas/post-bulk-response'
-import { GcNotifyBulkValidationService } from './gc-notify-bulk-validation.service'
+import {
+  findRecipientColumn,
+  GcNotifyBulkValidationService,
+} from './gc-notify-bulk-validation.service'
 import { AttachmentValidationService } from '../notify/services/attachment-validation.service'
 import { AttachmentProcessingService } from '../notify/services/attachment-processing.service'
 import { NotifySubmissionService } from '../notify/services/notify-submission.service'
@@ -347,6 +350,18 @@ export class GcNotifyInternalExecutionService {
     requestRoute?: string,
   ): Promise<PostBulkResponse> {
     const template = await this.requireTemplate(tenantId, body.template_id)
+    // The merge workers render each recipient with the template's stored engine, not the override
+    // the single-send routes apply, so any other engine would deliver ((placeholders)) unfilled.
+    if (template.engineCode !== TemplateEngine.LEGACY_GC_NOTIFY) {
+      throw new BadRequestException({
+        errors: [
+          {
+            error: 'ValidationError',
+            message: `Bulk sends require a template using the GC Notify (legacy) engine, but template '${template.id}' uses '${template.engineCode}'. Change the template's engine to legacy_gc_notify.`,
+          },
+        ],
+      })
+    }
     const channel = template.channelCode as NotificationChannel
     const rows = this.resolveBulkRows(body)
 
@@ -362,7 +377,7 @@ export class GcNotifyInternalExecutionService {
       })
     }
 
-    const mergeArray = this.toMergeArray(rows)
+    const mergeArray = this.toMergeArray(rows, channel)
     const channelPayload = {
       recipients: { mergeArray },
       content: { templateId: template.id },
@@ -433,33 +448,32 @@ export class GcNotifyInternalExecutionService {
   }
 
   /**
-   * GC Notify names the recipient column `email address` or `phone number`; the merge pipeline
-   * requires it to be called `to`. Every other column is personalisation and passes through as-is.
+   * GC Notify finds the recipient column by name, in any position; the merge pipeline requires it
+   * to be the first column and called `to`. Every other column is personalisation and keeps its
+   * name and relative order. The template's channel picks the column, so a file holding both an
+   * address and a phone number sends to the one the template is for.
    */
-  private toMergeArray(rows: string[][]): string[][] {
+  private toMergeArray(rows: string[][], channel: NotificationChannel): string[][] {
     const [header, ...dataRows] = rows
-    const recipientColumn = header.findIndex((column) =>
-      ['email address', 'phone number'].includes(
-        String(column ?? '')
-          .trim()
-          .toLowerCase(),
-      ),
-    )
+    const recipientColumn = findRecipientColumn(header, channel)
 
     if (recipientColumn === -1) {
+      const columnName = channel === NotificationChannel.SMS ? 'phone number' : 'email address'
       throw new BadRequestException({
         errors: [
           {
             error: 'ValidationError',
-            message:
-              'The header row must contain an "email address" or "phone number" column naming the recipient',
+            message: `The header row must contain a "${columnName}" column naming the recipient`,
           },
         ],
       })
     }
 
-    const mappedHeader = header.map((column, index) => (index === recipientColumn ? 'to' : column))
-    return [mappedHeader, ...dataRows]
+    const personalisation = (row: string[]) => row.filter((_, index) => index !== recipientColumn)
+    return [
+      ['to', ...personalisation(header)],
+      ...dataRows.map((row) => [row[recipientColumn], ...personalisation(row)]),
+    ]
   }
 
   private async requireTemplate(
