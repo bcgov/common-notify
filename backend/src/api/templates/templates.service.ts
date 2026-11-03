@@ -197,7 +197,6 @@ export class TemplatesService {
 
     // Update the template
     const nextEngineCode = updateDto.engineCode || template.engineCode
-    template.name = updateDto.name || template.name
     template.description = updateDto.description ?? template.description
     template.subject = updateDto.subject ?? template.subject
     template.body = updateDto.body || template.body
