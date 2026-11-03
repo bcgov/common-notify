@@ -179,9 +179,8 @@ export class TemplatesService {
       throw new NotFoundException(`Template ${templateId} not found`)
     }
 
-    // Validate channel-specific required fields if channel is being changed
-    const channelCode = updateDto.channelCode || template.channelCode
-    if (channelCode === NotificationChannel.EMAIL) {
+    // The channel is fixed at creation; validate against the stored channel.
+    if (template.channelCode === NotificationChannel.EMAIL) {
       const subject = updateDto.subject || template.subject
       if (!subject) {
         throw new BadRequestException('Email templates require a subject')
@@ -200,7 +199,6 @@ export class TemplatesService {
     const nextEngineCode = updateDto.engineCode || template.engineCode
     template.name = updateDto.name || template.name
     template.description = updateDto.description ?? template.description
-    template.channelCode = updateDto.channelCode || template.channelCode
     template.subject = updateDto.subject ?? template.subject
     template.body = updateDto.body || template.body
     template.engineCode = nextEngineCode

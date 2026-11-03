@@ -906,6 +906,35 @@ describe('TemplatesService', () => {
   })
 
   describe('updateTemplate', () => {
+    it.each([
+      [NotificationChannel.EMAIL, NotificationChannel.SMS, 'markdown' as const],
+      [NotificationChannel.SMS, NotificationChannel.EMAIL, 'text' as const],
+    ])(
+      'should preserve the stored %s channel when an update requests %s',
+      async (channelCode, requestedChannel, bodyType) => {
+        const template = {
+          ...mockTemplate,
+          channelCode,
+          bodyType,
+          subject: channelCode === NotificationChannel.EMAIL ? 'Email subject' : undefined,
+        }
+        mockRepository.findById.mockResolvedValue(template)
+        mockRepository.update.mockImplementationOnce(async (updated: Template) => updated)
+
+        const result = await service.updateTemplate(
+          'tenant-123',
+          'template-123',
+          { channelCode: requestedChannel, body: 'Updated body' },
+          'user-123',
+        )
+
+        expect(mockRepository.update).toHaveBeenCalledWith(
+          expect.objectContaining({ channelCode, bodyType, body: 'Updated body' }),
+        )
+        expect(result.channelCode).toBe(channelCode)
+      },
+    )
+
     it('should update bodyType field', async () => {
       const updateDto = {
         bodyType: 'markdown' as const,
