@@ -17,4 +17,6 @@ export enum FeatureFlagCode {
   // SMS to numbers outside Canada. When enabled, each tenant's own International SMS
   // setting decides; when disabled, those numbers are rejected for every tenant.
   INTERNATIONAL_SMS = 'international_sms',
+  // Controls access to the MCP server endpoint. Disabled globally by default.
+  MCP_API = 'mcp_api',
 }
