@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { FeatureFlag } from './entities/feature-flag.entity'
 import { FeatureFlagCode } from './entities/feature-flag-code.entity'
+import { FeatureFlagHistory } from './entities/feature-flag-history.entity'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { FeatureFlagService } from './feature-flag.service'
 import { ApiKeysModule } from '../api-keys/api-keys.module'
@@ -18,7 +19,7 @@ import { NotifyServiceGuard } from '../../common/guards/notify-service.guard'
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([FeatureFlag, FeatureFlagCode, Tenant]),
+    TypeOrmModule.forFeature([FeatureFlag, FeatureFlagCode, FeatureFlagHistory, Tenant]),
     TenantsModule,
     CstarModule,
     // Mutually recursive with ApiKeysModule; see the note there.
