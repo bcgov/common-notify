@@ -35,6 +35,8 @@ spec:
         app.kubernetes.io/name: clamav
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      # clamd does not call the API server.
+      automountServiceAccountToken: false
       securityContext: {}
       {{- if gt (int (.Values.backend.clamav.replicas | default 1)) 1 }}
       # Spread the replicas across nodes, so losing one node does not take the

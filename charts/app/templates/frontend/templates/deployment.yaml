@@ -29,6 +29,8 @@ spec:
       labels:
         {{- include "frontend.labels" . | nindent 8 }}
     spec:
+      # Neither caddy nor the promtail sidecar calls the API server.
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
       containers:
