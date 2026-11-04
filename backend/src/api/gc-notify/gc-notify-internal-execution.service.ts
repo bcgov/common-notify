@@ -26,7 +26,11 @@ import type { QueryableFieldsConfig } from '../../common/query/list-query.types'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
-import { toGcNotifyEmailHtml, toGcNotifySubject } from '../../services/rendering/gc-notify-markdown'
+import {
+  toGcNotifyDeliverySubject,
+  toGcNotifyEmailHtml,
+  toGcNotifySubject,
+} from '../../services/rendering/gc-notify-markdown'
 import { analyseTemplatePersonalisation } from '../../services/rendering/template-personalisation-validation'
 import { QueueName } from '../../enum/queue-name.enum'
 import { IngestionJobPayload } from '../../queue/queue.types'
@@ -227,7 +231,7 @@ export class GcNotifyInternalExecutionService {
         recipients: { to: [body.email_address] },
         params: personalisation,
         content: {
-          subject: content.subject,
+          subject: content.deliverySubject,
           body: content.deliveryBody,
           // Already GC Notify's HTML, so delivery must pass it through rather than run the
           // CommonMark converter over it - that would escape every tag into visible markup.
@@ -259,7 +263,7 @@ export class GcNotifyInternalExecutionService {
       content: {
         from_email: fromEmail,
         body: content.responseBody,
-        subject: content.subject,
+        subject: content.responseSubject,
       },
       uri: `/gcnotify/v2/notifications/${id}`,
       template: {
@@ -571,17 +575,20 @@ export class GcNotifyInternalExecutionService {
    * caller-HTML sanitiser does not apply and must not: it would strip the inline styles GC Notify
    * puts on headings and links.
    *
-   * The 201 response keeps the unrendered body, which is the form GC Notify reports.
+   * The 201 response keeps the unrendered body and the escaped subject, which are the forms GC
+   * Notify reports. The subject delivered is not escaped: a mail subject is plain text.
    */
   private renderGcNotifyEmailContent(rendered: { subject?: string; body: string }): {
     responseBody: string
     deliveryBody: string
-    subject: string
+    responseSubject: string
+    deliverySubject: string
   } {
     return {
       responseBody: rendered.body,
       deliveryBody: toGcNotifyEmailHtml(rendered.body),
-      subject: toGcNotifySubject(rendered.subject ?? ''),
+      responseSubject: toGcNotifySubject(rendered.subject ?? ''),
+      deliverySubject: toGcNotifyDeliverySubject(rendered.subject ?? ''),
     }
   }
 

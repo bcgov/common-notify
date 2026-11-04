@@ -253,6 +253,30 @@ describe('GcNotifyInternalExecutionService', () => {
       expect(content.body).not.toContain('# Heading')
     })
 
+    it('delivers a plain-text subject while the response keeps the escaped form GC Notify returns', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'tpl-1',
+        version: 1,
+        channelCode: NotificationChannel.EMAIL,
+      })
+      mockTemplatesService.renderTemplateContent.mockResolvedValue({
+        subject: 'Q&A session',
+        body: 'b',
+        bodyType: 'markdown',
+      })
+      mockNotificationService.create.mockResolvedValue({
+        id: 'notif-subject',
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+      })
+
+      const result = await service.sendEmail(body, TENANT_ID)
+
+      await flushMicrotasks()
+      const [[, jobPayload]] = mockIngestionQueue.add.mock.calls
+      expect(jobPayload.request.email.content.subject).toBe('Q&A session')
+      expect((result.content as any).subject).toBe('Q&amp;A session')
+    })
+
     it('reports the tenant sender delivery will use, not a separate configured value', async () => {
       mockTemplatesRepository.findById.mockResolvedValue({
         id: 'tpl-1',
