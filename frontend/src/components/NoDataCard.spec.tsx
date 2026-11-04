@@ -39,6 +39,13 @@ describe('NoDataCard', () => {
     expect(navigateMock).toHaveBeenCalledWith({ to: '/template-create' })
   })
 
+  it('renders without an action when none is given', () => {
+    render(<NoDataCard title="No changes recorded yet." message="Nothing to show." />)
+
+    expect(screen.getByText('No changes recorded yet.')).toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
   it('disables the action when asked', () => {
     renderCard(true)
 
