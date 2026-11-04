@@ -92,7 +92,7 @@ export class GcNotifyController {
     @Query('older_than') olderThan?: string,
     @Query('include_jobs') includeJobs?: boolean,
   ) {
-    const statusArray = Array.isArray(status) ? status : status ? [status] : undefined
+    const statusArray = status ? [status].flat() : undefined
     const query = {
       template_type: templateType,
       status: statusArray,
