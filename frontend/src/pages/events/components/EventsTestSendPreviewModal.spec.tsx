@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import EventEmailPreviewModal from './EventEmailPreviewModal'
+import EventsTestSendPreviewModal from './EventsTestSendPreviewModal'
 import { NotificationChannel, TemplateEngine } from '@/api/templates.api'
 import type * as TemplatesApi from '@/api/templates.api'
 import type { EventEmailSettings } from '@/api/events.api'
@@ -16,7 +16,7 @@ vi.mock('@/api/templates.api', async () => {
 })
 
 // The header looks its logo up in the store; here it only needs to show it was placed.
-vi.mock('./EventEmailHeader', () => ({
+vi.mock('./EventsEmailHeader', () => ({
   default: () => <div>Email header</div>,
 }))
 
@@ -50,7 +50,7 @@ const emailSettings: EventEmailSettings = {
   headerTitle: null,
 }
 
-type Props = Parameters<typeof EventEmailPreviewModal>[0]
+type Props = Parameters<typeof EventsTestSendPreviewModal>[0]
 
 function renderModal(overrides: Partial<Props> = {}) {
   const props: Props = {
@@ -64,7 +64,7 @@ function renderModal(overrides: Partial<Props> = {}) {
     onApply: vi.fn(),
     ...overrides,
   }
-  const view = render(<EventEmailPreviewModal {...props} />)
+  const view = render(<EventsTestSendPreviewModal {...props} />)
   return { ...view, props }
 }
 
@@ -72,7 +72,7 @@ function renderModal(overrides: Partial<Props> = {}) {
 const firstNameField = () => screen.getByLabelText(/^firstName/)
 const applyButton = () => screen.getByRole('button', { name: 'Apply to test notification' })
 
-describe('EventEmailPreviewModal', () => {
+describe('EventsTestSendPreviewModal', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     previewTemplateMock.mockImplementation(
@@ -114,6 +114,21 @@ describe('EventEmailPreviewModal', () => {
       )
     })
 
+    it('offers and sends a field for a variable used only in the subject', async () => {
+      renderModal({
+        template: { ...template, subject: 'Your {{permitType}} permit' },
+        values: { firstName: 'Molly', permitType: 'Fishing' },
+      })
+
+      expect(screen.getByLabelText(/^permitType/)).toHaveValue('Fishing')
+      await waitFor(() =>
+        expect(previewTemplateMock).toHaveBeenCalledWith(
+          'template-1',
+          expect.objectContaining({ permitType: 'Fishing' }),
+        ),
+      )
+    })
+
     it('shows the envelope, subject, header and body as the email will carry them', async () => {
       renderModal({ values: { firstName: 'Molly' } })
 
@@ -139,8 +154,8 @@ describe('EventEmailPreviewModal', () => {
       await userEvent.type(firstNameField(), '!')
       expect(firstNameField()).toHaveValue('Molly!')
 
-      rerender(<EventEmailPreviewModal {...props} isOpen={false} />)
-      rerender(<EventEmailPreviewModal {...props} isOpen />)
+      rerender(<EventsTestSendPreviewModal {...props} isOpen={false} />)
+      rerender(<EventsTestSendPreviewModal {...props} isOpen />)
 
       await waitFor(() => expect(firstNameField()).toHaveValue('Molly'))
     })

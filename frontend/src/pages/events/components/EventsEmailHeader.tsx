@@ -5,8 +5,9 @@ import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchApprovedEmailLogos, fetchSettings } from '@/redux/thunks/settings.thunks'
 import { DEFAULT_EMAIL_HEADER_TITLE, resolveEmailHeaderTitle } from '@/utils/emailHeaderTitle'
 
-interface EventEmailHeaderProps {
-  emailSettings: EventEmailSettings
+interface EventsEmailHeaderProps {
+  /** Only the header fields, so a tab can preview header settings it hasn't saved yet. */
+  emailSettings: Pick<EventEmailSettings, 'useCustomHeader' | 'headerLogoId' | 'headerTitle'>
 }
 
 /**
@@ -15,7 +16,7 @@ interface EventEmailHeaderProps {
  * Its own component because the header appears in two previews - the card on the page and the
  * modal over it - and both need the same logo lookup.
  */
-const EventEmailHeader: FC<EventEmailHeaderProps> = ({ emailSettings }) => {
+const EventsEmailHeader: FC<EventsEmailHeaderProps> = ({ emailSettings }) => {
   const dispatch = useAppDispatch()
   const approvedLogos = useAppSelector((state) => state.emailSettings.approvedLogos)
   const tenantEmailLogoId = useAppSelector((state) => state.emailSettings.emailLogoId)
@@ -29,8 +30,8 @@ const EventEmailHeader: FC<EventEmailHeaderProps> = ({ emailSettings }) => {
   useEffect(() => {
     if (!selectedTenantId) return
 
-    dispatch(fetchSettings())
-    dispatch(fetchApprovedEmailLogos())
+    void dispatch(fetchSettings())
+    void dispatch(fetchApprovedEmailLogos())
   }, [dispatch, selectedTenantId])
 
   // Resolved as the backend resolves it at send time: a custom header without a logo inherits
@@ -68,4 +69,4 @@ const EventEmailHeader: FC<EventEmailHeaderProps> = ({ emailSettings }) => {
   )
 }
 
-export default EventEmailHeader
+export default EventsEmailHeader
