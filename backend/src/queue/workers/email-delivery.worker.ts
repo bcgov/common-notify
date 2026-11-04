@@ -12,7 +12,13 @@ import { TemplatesRepository } from '../../api/templates/templates.repository'
 import { TemplatesService } from '../../api/templates/templates.service'
 import { TenantSettingsService } from '../../api/tenant-settings/tenant-settings.service'
 import { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
+import {
+  toGcNotifyDeliverySubject,
+  toGcNotifyEmailHtml,
+} from '../../services/rendering/gc-notify-markdown'
 import { NotificationStatus } from '../../enum/notification-status.enum'
+import { TemplateEngine } from '../../enum/template-engine.enum'
+import type { Template } from '../../api/templates/entities/template.entity'
 import { NotifyEmailChannel } from '../../api/notify/schemas/notify-email-channel'
 import { ProcessedNotifyEmailChannel } from '../../api/notify/schemas/stored-notify-attachment'
 import { AttachmentResolverService } from '../../api/notify/services/attachment-resolver.service'
@@ -20,7 +26,10 @@ import {
   EventEmailSendSettings,
   EventNotificationResolver,
 } from '../../api/events/event-notification.resolver'
-import type { EmailHeaderOverride } from '../../api/templates/email-template-layout.service'
+import type {
+  EmailHeaderOverride,
+  RenderedEmailContent,
+} from '../../api/templates/email-template-layout.service'
 import { EMAIL_ADAPTER, IEmailTransport } from '../../adapters'
 import { SendEmailOptions } from '../../adapters/interfaces/delivery/email.interface'
 import { StructuredLoggerService } from '../../common/logger'
@@ -159,7 +168,10 @@ export class EmailDeliveryWorker extends DeliveryWorker {
         const content = template
           ? await this.templatesService.applyEmailLayout(
               template,
-              await this.templatesService.renderTemplateContent(template, params),
+              this.applyGcNotifyEmailRendering(
+                template,
+                await this.templatesService.renderTemplateContent(template, params),
+              ),
               settings.headerOverride,
             )
           : await this.templatesService.applyEmailLayout(
@@ -179,6 +191,25 @@ export class EmailDeliveryWorker extends DeliveryWorker {
         )
         return result.externalId
       },
+    }
+  }
+
+  /**
+   * A GC Notify bulk send's rendered email, otherwise the rendering as is. The GC Notify engine's
+   * output is GC Notify's markdown, so it goes to HTML here, as a GC Notify single send's does
+   * before it is queued. Only that engine's: it removes block markers from personalisation values,
+   * so a value cannot get markup past toGcNotifyEmailHtml.
+   */
+  private applyGcNotifyEmailRendering(
+    template: Template,
+    rendered: RenderedEmailContent,
+  ): RenderedEmailContent {
+    if (template.engineCode !== TemplateEngine.GC_NOTIFY_NATIVE) return rendered
+
+    return {
+      subject: toGcNotifyDeliverySubject(rendered.subject ?? ''),
+      body: toGcNotifyEmailHtml(rendered.body),
+      bodyType: 'html',
     }
   }
 

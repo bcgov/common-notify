@@ -783,7 +783,7 @@ describe('GcNotifyInternalExecutionService', () => {
         ['alice@example.com', 'Alice'],
         ['bob@example.com', 'Bob'],
       ])
-      expect(dto.email.content).toEqual({ templateId: 'tpl-bulk' })
+      expect(dto.email.content).toEqual({ templateId: 'tpl-bulk', gcNotifyRendering: true })
     })
 
     it('returns a GC Notify job shape, omitting fields we have no honest value for', async () => {

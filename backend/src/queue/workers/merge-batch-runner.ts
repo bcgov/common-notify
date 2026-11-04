@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
 import { describeError } from '../../common/utils/describe-error'
 import type { Job } from 'bullmq'
 import { DeliveryJobPayload, MailMergeJobData } from '../queue.types'
+import { applyGcNotifyMergeRendering } from '../merge-batch-builder'
 import { batchProgressReporter } from '../batch-progress'
 import { loadBatchRecipients } from './merge-batch-recipients'
 import { capitalize, DeliveryChannel } from './delivery-channel'
@@ -192,7 +193,7 @@ export class MergeBatchRunner {
     if (template.channelCode !== templateCode) {
       throw new Error(`Template '${templateId}' is not an ${templateCode} template`)
     }
-    return { template }
+    return { template: applyGcNotifyMergeRendering(template, content) }
   }
 
   /** Send to one recipient and record the outcome; false when that recipient failed. */

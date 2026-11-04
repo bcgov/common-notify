@@ -359,8 +359,9 @@ export class GcNotifyInternalExecutionService {
     requestRoute?: string,
   ): Promise<PostBulkResponse> {
     const template = await this.requireTemplate(tenantId, body.template_id)
-    // The merge workers render each recipient with the template's stored engine, not the override
-    // the single-send routes apply, so any other engine would deliver ((placeholders)) unfilled.
+    // Rendered by GC Notify's rules whatever the stored engine, so a {{placeholder}} would be sent
+    // literally. assertPersonalisationSupplied also reads placeholders by the stored engine, and
+    // only this engine's are the ((placeholders)) those rules fill.
     if (template.engineCode !== TemplateEngine.LEGACY_GC_NOTIFY) {
       throw new BadRequestException({
         errors: [
@@ -390,7 +391,9 @@ export class GcNotifyInternalExecutionService {
     this.assertPersonalisationSupplied(template, mergeArray)
     const channelPayload = {
       recipients: { mergeArray },
-      content: { templateId: template.id },
+      // The workers render a merge's template per recipient, so this tells them to do it by GC
+      // Notify's rules, as the single-send routes do before queueing.
+      content: { templateId: template.id, gcNotifyRendering: true },
       ...(body.scheduled_for && { delayedSend: body.scheduled_for }),
     }
     const notifyRequest = (channel === NotificationChannel.SMS
