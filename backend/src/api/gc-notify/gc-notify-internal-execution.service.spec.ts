@@ -5,7 +5,11 @@ import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest'
 import { GcNotifyInternalExecutionService } from './gc-notify-internal-execution.service'
 import { TemplatesRepository } from '../templates/templates.repository'
 import { TemplatesService } from '../templates/templates.service'
-import { NotificationService } from '../notification/notification.service'
+import {
+  MAIL_MERGE_ERRORS_OMITTED,
+  NotificationService,
+} from '../notification/notification.service'
+import { MAIL_MERGE_MAX_REPORTED_ERRORS } from '../notify/schemas/mail-merge.constants'
 import { NotificationRequestDetailService } from '../notification/notification-request-detail.service'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { AttachmentValidationService } from '../notify/services/attachment-validation.service'
@@ -943,6 +947,148 @@ describe('GcNotifyInternalExecutionService', () => {
 
       await expect(service.sendBulk(bulkBody, TENANT_ID)).rejects.toMatchObject({ status: 400 })
       expect(acceptMerge).not.toHaveBeenCalled()
+    })
+
+    describe('template personalisation', () => {
+      const withTemplate = (template: Record<string, unknown>) =>
+        mockTemplatesRepository.findById.mockResolvedValue({ ...TEMPLATE, ...template })
+
+      const rejection = async (rows: string[][]) => {
+        const error: any = await service.sendBulk({ ...bulkBody, rows }, TENANT_ID).catch((e) => e)
+        expect(acceptMerge).not.toHaveBeenCalled()
+        expect(error.status).toBe(400)
+        return error.response.errors
+      }
+
+      it('rejects a printed placeholder with no column, naming every missing column', async () => {
+        withTemplate({ subject: 'For ((account))', body: 'Hi ((first_name)) ((city))' })
+
+        await expect(
+          rejection([
+            ['email address', 'first_name'],
+            ['alice@example.com', 'Alice'],
+          ]),
+        ).resolves.toEqual([
+          { error: 'ValidationError', message: 'Missing column headers: account, city' },
+        ])
+      })
+
+      it('rejects a conditional placeholder with no column', async () => {
+        withTemplate({ body: 'Hi((vip?? VIP))' })
+
+        await expect(rejection([['email address'], ['alice@example.com']])).resolves.toEqual([
+          { error: 'ValidationError', message: 'Missing column headers: vip' },
+        ])
+      })
+
+      it('matches column names exactly, as the delivery workers do', async () => {
+        withTemplate({ body: 'Hi ((first_name))' })
+
+        await expect(
+          rejection([
+            ['email address', 'First Name'],
+            ['alice@example.com', 'Alice'],
+          ]),
+        ).resolves.toEqual([
+          { error: 'ValidationError', message: 'Missing column headers: first_name' },
+        ])
+      })
+
+      it('reports each blank printed value by row, counting a short row and whitespace as blank', async () => {
+        withTemplate({ body: 'Hi ((first_name)) from ((city))' })
+
+        await expect(
+          rejection([
+            ['email address', 'first_name', 'city'],
+            ['alice@example.com', 'Alice', 'Victoria'],
+            ['bob@example.com', '   ', 'Nanaimo'],
+            ['carol@example.com', 'Carol'],
+          ]),
+        ).resolves.toEqual([
+          { error: 'ValidationError', message: 'Row 2 - first_name: Missing' },
+          { error: 'ValidationError', message: 'Row 3 - city: Missing' },
+        ])
+      })
+
+      it('reads values from the right column when the recipient was not first', async () => {
+        withTemplate({ body: 'Hi ((first_name)) from ((city))' })
+
+        await expect(
+          rejection([
+            ['first_name', 'email address', 'city'],
+            ['', 'alice@example.com', 'Victoria'],
+          ]),
+        ).resolves.toEqual([{ error: 'ValidationError', message: 'Row 1 - first_name: Missing' }])
+      })
+
+      it('caps the reported row errors so a large file cannot produce an unbounded response', async () => {
+        withTemplate({ body: 'Hi ((first_name))' })
+        const rows = [
+          ['email address', 'first_name'],
+          ...Array.from({ length: 150 }, (_, i) => [`user${i}@example.com`, '']),
+        ]
+
+        const errors = await rejection(rows)
+
+        expect(errors).toHaveLength(MAIL_MERGE_MAX_REPORTED_ERRORS + 1)
+        expect(errors[0].message).toBe('Row 1 - first_name: Missing')
+        expect(errors.at(-1).message).toBe(MAIL_MERGE_ERRORS_OMITTED)
+      })
+
+      it('accepts a blank value for a placeholder that is only tested', async () => {
+        withTemplate({ body: 'Hi((vip?? VIP))' })
+
+        await service.sendBulk(
+          {
+            ...bulkBody,
+            rows: [
+              ['email address', 'vip'],
+              ['alice@example.com', ''],
+            ],
+          },
+          TENANT_ID,
+        )
+
+        expect(acceptMerge).toHaveBeenCalledTimes(1)
+      })
+
+      it('accepts rows supplying every placeholder, ignoring columns the template does not use', async () => {
+        withTemplate({ subject: 'For ((first_name))', body: 'Hi ((first_name))' })
+
+        await service.sendBulk(
+          {
+            ...bulkBody,
+            rows: [
+              [' email address', ' first_name ', 'unused'],
+              ['alice@example.com', 'Alice', ''],
+            ],
+          },
+          TENANT_ID,
+        )
+
+        expect(acceptMerge).toHaveBeenCalledTimes(1)
+      })
+
+      it('ignores a stored subject on an SMS template, which is never rendered', async () => {
+        withTemplate({
+          channelCode: NotificationChannel.SMS,
+          subject: 'For ((account))',
+          body: 'Hi ((first_name))',
+        })
+
+        await service.sendBulk(
+          {
+            ...bulkBody,
+            rows: [
+              ['phone number', 'first_name'],
+              ['+12505551234', 'Alice'],
+            ],
+          },
+          TENANT_ID,
+        )
+
+        expect(acceptMerge).toHaveBeenCalledTimes(1)
+      })
     })
 
     it('rejects a header with no recipient column', async () => {

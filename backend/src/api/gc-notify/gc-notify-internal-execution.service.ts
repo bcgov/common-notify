@@ -12,7 +12,10 @@ import { TemplatesRepository } from '../templates/templates.repository'
 import { TemplatesService } from '../templates/templates.service'
 import { Template } from '../templates/entities/template.entity'
 import type { TemplateResponseDto } from '../templates/schemas/template-response.dto'
-import { NotificationService } from '../notification/notification.service'
+import {
+  MAIL_MERGE_ERRORS_OMITTED,
+  NotificationService,
+} from '../notification/notification.service'
 import { NotificationRequestDetailService } from '../notification/notification-request-detail.service'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { SafelistService } from '../safelist/safelist.service'
@@ -24,6 +27,7 @@ import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
 import { toGcNotifyEmailHtml, toGcNotifySubject } from '../../services/rendering/gc-notify-markdown'
+import { analyseTemplatePersonalisation } from '../../services/rendering/template-personalisation-validation'
 import { QueueName } from '../../enum/queue-name.enum'
 import { IngestionJobPayload } from '../../queue/queue.types'
 import { CreateEmailNotificationRequest } from './schemas/create-email-notification-request'
@@ -43,6 +47,7 @@ import {
 import { AttachmentValidationService } from '../notify/services/attachment-validation.service'
 import { AttachmentProcessingService } from '../notify/services/attachment-processing.service'
 import { NotifySubmissionService } from '../notify/services/notify-submission.service'
+import { MAIL_MERGE_MAX_REPORTED_ERRORS } from '../notify/schemas/mail-merge.constants'
 import type { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
 import type { NotifyEmailChannel } from '../notify/schemas/notify-email-channel'
 import type { NotifyAttachment } from '../notify/schemas/notify-attachment'
@@ -378,6 +383,7 @@ export class GcNotifyInternalExecutionService {
     }
 
     const mergeArray = this.toMergeArray(rows, channel)
+    this.assertPersonalisationSupplied(template, mergeArray)
     const channelPayload = {
       recipients: { mergeArray },
       content: { templateId: template.id },
@@ -474,6 +480,55 @@ export class GcNotifyInternalExecutionService {
       ['to', ...personalisation(header)],
       ...dataRows.map((row) => [row[recipientColumn], ...personalisation(row)]),
     ]
+  }
+
+  /**
+   * Reject up front what the delivery workers would otherwise fail one recipient at a time, after
+   * the request had already been accepted with a 201. The same rules as
+   * TemplatesService.validateTemplatePersonalisation, read from the columns as
+   * parseMailMergeRecipients does: trimmed names, the first of a repeated column, and column 0 is
+   * the recipient rather than personalisation. A placeholder that is only tested may be blank.
+   */
+  private assertPersonalisationSupplied(template: Template, mergeArray: string[][]): void {
+    const { required, printed } = analyseTemplatePersonalisation(template)
+    const [header, ...dataRows] = mergeArray
+    const columns = header.map((column) => (column ?? '').trim())
+
+    const missingColumns = required
+      .filter((key) => !columns.includes(key, 1))
+      .sort((a, b) => a.localeCompare(b))
+    if (missingColumns.length > 0) {
+      throw new BadRequestException({
+        errors: [
+          {
+            error: 'ValidationError',
+            message: `Missing column headers: ${missingColumns.join(', ')}`,
+          },
+        ],
+      })
+    }
+
+    const printedColumns = required
+      .filter((key) => printed.has(key))
+      .map((key) => ({ key, index: columns.indexOf(key, 1) }))
+    const messages: string[] = []
+    for (const [rowIndex, row] of dataRows.entries()) {
+      if (messages.length >= MAIL_MERGE_MAX_REPORTED_ERRORS) {
+        messages.push(MAIL_MERGE_ERRORS_OMITTED)
+        break
+      }
+      for (const { key, index } of printedColumns) {
+        if (!String(row[index] ?? '').trim()) {
+          messages.push(`Row ${rowIndex + 1} - ${key}: Missing`)
+        }
+      }
+    }
+
+    if (messages.length > 0) {
+      throw new BadRequestException({
+        errors: messages.map((message) => ({ error: 'ValidationError', message })),
+      })
+    }
   }
 
   private async requireTemplate(
