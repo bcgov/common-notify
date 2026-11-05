@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import EventsCstarGroups from './EventsCstarGroups'
-import type { CstarGroupSelections } from './EventsCstarGroups'
+import EventsEmailCstarGroups from './EventsEmailCstarGroups'
+import type { CstarGroupSelections } from './EventsEmailCstarGroups'
 import type { CstarGroup } from '@/api/cstar.api'
 
 vi.mock('@bcgov/design-system-react-components', () => ({
@@ -46,10 +46,10 @@ function optionNames(fieldLabel: string): string[] {
   return Array.from(select.querySelectorAll('option')).map((option) => option.textContent ?? '')
 }
 
-describe('EventsCstarGroups cross-field selection', () => {
+describe('EventsEmailCstarGroups cross-field selection', () => {
   it('offers a group to the other fields until one of them takes it', () => {
     render(
-      <EventsCstarGroups
+      <EventsEmailCstarGroups
         values={{ ...EMPTY, to: ['group-1'] }}
         groups={GROUPS}
         onChange={vi.fn()}
@@ -64,7 +64,7 @@ describe('EventsCstarGroups cross-field selection', () => {
 
   it('keeps listing a group a field already holds, so a duplicate can still be removed', () => {
     render(
-      <EventsCstarGroups
+      <EventsEmailCstarGroups
         values={{ ...EMPTY, to: ['group-1'], cc: ['group-1'] }}
         groups={GROUPS}
         onChange={vi.fn()}
@@ -77,7 +77,7 @@ describe('EventsCstarGroups cross-field selection', () => {
 
   it('frees a group up again once the field holding it is unchecked', () => {
     render(
-      <EventsCstarGroups
+      <EventsEmailCstarGroups
         values={{ ...EMPTY, to: ['group-1'] }}
         groups={GROUPS}
         onChange={vi.fn()}
@@ -94,7 +94,7 @@ describe('EventsCstarGroups cross-field selection', () => {
   it('does not restore a group another field claimed while this one was unchecked', () => {
     const onChange = vi.fn()
     render(
-      <EventsCstarGroups
+      <EventsEmailCstarGroups
         values={{ ...EMPTY, cc: ['group-1'] }}
         groups={GROUPS}
         onChange={onChange}

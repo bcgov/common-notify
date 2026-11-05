@@ -77,4 +77,90 @@ describe('SMS event preview', () => {
     })
     await waitFor(() => expect(screen.queryByText('Old response')).not.toBeInTheDocument())
   })
+
+  it('shows the error when the preview fails', async () => {
+    vi.mocked(previewTemplate).mockRejectedValue(new Error('Missing personalisation: name'))
+    render(
+      <EventsSmsPreviewModal
+        template={template}
+        to={[]}
+        initialValues={{ name: 'Alice' }}
+        onClose={vi.fn()}
+        onSaveValues={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByText('Missing personalisation: name')).toBeVisible()
+  })
+
+  it('falls back to a generic message for a non-Error failure', async () => {
+    vi.mocked(previewTemplate).mockRejectedValue('nope')
+    render(
+      <EventsSmsPreviewModal
+        template={template}
+        to={[]}
+        initialValues={{ name: 'Alice' }}
+        onClose={vi.fn()}
+        onSaveValues={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByText('Unable to render preview. Try again.')).toBeVisible()
+  })
+
+  it('defaults a boolean to true and sends False as an empty string', async () => {
+    const booleanTemplate = { ...template, body: '{{#if urgent}}Urgent{{/if}} {{name}}' }
+    render(
+      <EventsSmsPreviewModal
+        template={booleanTemplate}
+        to={[]}
+        initialValues={{ name: 'Alice' }}
+        onClose={vi.fn()}
+        onSaveValues={vi.fn()}
+      />,
+    )
+    await waitFor(() =>
+      expect(previewTemplate).toHaveBeenCalledWith('template', { urgent: 'true', name: 'Alice' }),
+    )
+
+    await userEvent.click(screen.getByRole('radio', { name: 'False' }))
+
+    await waitFor(() =>
+      expect(previewTemplate).toHaveBeenLastCalledWith('template', { urgent: '', name: 'Alice' }),
+    )
+  })
+
+  it('does not save while a value is missing', async () => {
+    const onSaveValues = vi.fn()
+    render(
+      <EventsSmsPreviewModal
+        template={template}
+        to={[]}
+        initialValues={{}}
+        onClose={vi.fn()}
+        onSaveValues={onSaveValues}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save notification values' }))
+
+    expect(onSaveValues).not.toHaveBeenCalled()
+    expect(await screen.findByText('Enter a value.')).toBeInTheDocument()
+  })
+
+  it('dismisses the info notice', async () => {
+    render(
+      <EventsSmsPreviewModal
+        template={template}
+        to={[]}
+        initialValues={{ name: 'Alice' }}
+        onClose={vi.fn()}
+        onSaveValues={vi.fn()}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close this alert' }))
+
+    expect(screen.queryByText(/Nothing is sent from this preview/)).not.toBeInTheDocument()
+  })
 })

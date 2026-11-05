@@ -1,7 +1,7 @@
 import type { FC } from 'react'
 import ConfirmDialog from '@/components/ConfirmDialog'
 
-type ConfirmDeactivateDialogProps = {
+type EventsConfirmDeactivateDialogProps = {
   isOpen: boolean
   /** True while the deactivation is being persisted; both buttons wait for it. */
   isBusy: boolean
@@ -14,7 +14,7 @@ type ConfirmDeactivateDialogProps = {
  * Asks before switching a channel off. Turning a channel off takes effect immediately, unlike
  * every other setting on the tabs, which is why it asks at all.
  */
-const ConfirmDeactivateDialog: FC<ConfirmDeactivateDialogProps> = ({
+const EventsConfirmDeactivateDialog: FC<EventsConfirmDeactivateDialogProps> = ({
   isOpen,
   isBusy,
   onCancel,
@@ -34,4 +34,4 @@ const ConfirmDeactivateDialog: FC<ConfirmDeactivateDialogProps> = ({
   </ConfirmDialog>
 )
 
-export default ConfirmDeactivateDialog
+export default EventsConfirmDeactivateDialog

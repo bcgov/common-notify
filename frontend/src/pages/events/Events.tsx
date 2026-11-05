@@ -102,7 +102,7 @@ const Events: FC = () => {
 
   useEffect(() => {
     if (selectedTenant) {
-      dispatch(fetchEvents())
+      void dispatch(fetchEvents())
     }
   }, [page, limit, search, sortBy, sortOrder, filters, selectedTenant, dispatch])
 
@@ -119,7 +119,7 @@ const Events: FC = () => {
     // retry path (after a failed load), so that is the only case that dispatches directly -
     // doing both would fire two requests for every search.
     if (searchInput === search) {
-      dispatch(fetchEvents())
+      void dispatch(fetchEvents())
     } else {
       dispatch(setSearch(searchInput))
     }

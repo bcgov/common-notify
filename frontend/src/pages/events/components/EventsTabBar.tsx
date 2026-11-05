@@ -3,31 +3,31 @@ import { ToggleButton, ToggleButtonGroup } from '@bcgov/design-system-react-comp
 import { useFeatureFlag } from '@/config/featureFlags/useFeatureFlag'
 import { useAppSelector } from '@/redux/hooks'
 
-export type EventTab = 'settings' | 'email' | 'sms' | 'third-party'
+export type EventsTabId = 'settings' | 'email' | 'sms' | 'third-party'
 
-const TABS: { id: EventTab; label: string }[] = [
+const TABS: { id: EventsTabId; label: string }[] = [
   { id: 'settings', label: 'Event Settings' },
   { id: 'email', label: 'Email Notification' },
   { id: 'sms', label: 'SMS Notification' },
   { id: 'third-party', label: 'Third-party Notification' },
 ]
 
-type EventTabsProps = {
-  selected: EventTab
+type EventsTabBarProps = {
+  selected: EventsTabId
   /**
    * Omitted where the other tabs cannot be opened, e.g. the create page before the event has
    * an id to attach settings to.
    */
-  onSelect?: (tab: EventTab) => void
+  onSelect?: (tab: EventsTabId) => void
   /** Tabs that exist but cannot be opened yet. */
-  disabledTabs?: EventTab[]
+  disabledTabs?: EventsTabId[]
 }
 
 /**
  * The event pages' tab bar. Shared so the create, edit and saved pages offer the same tabs in
  * the same order - they were three copies, and had already drifted apart.
  */
-const EventTabs: FC<EventTabsProps> = ({ selected, onSelect, disabledTabs = [] }) => {
+const EventsTabBar: FC<EventsTabBarProps> = ({ selected, onSelect, disabledTabs = [] }) => {
   const tenantId = useAppSelector((state) => state.tenant.selectedTenant?.id)
   const smsEnabled = useFeatureFlag('sms_notifications', tenantId)
   return (
@@ -40,7 +40,7 @@ const EventTabs: FC<EventTabsProps> = ({ selected, onSelect, disabledTabs = [] }
         onSelectionChange={(keys) => {
           const [key] = [...keys]
           if (key && key !== selected) {
-            onSelect?.(key as EventTab)
+            onSelect?.(key as EventsTabId)
           }
         }}
         disallowEmptySelection
@@ -55,4 +55,4 @@ const EventTabs: FC<EventTabsProps> = ({ selected, onSelect, disabledTabs = [] }
   )
 }
 
-export default EventTabs
+export default EventsTabBar
