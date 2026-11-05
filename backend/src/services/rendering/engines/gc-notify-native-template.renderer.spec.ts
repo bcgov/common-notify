@@ -128,6 +128,47 @@ describe('GcNotifyNativeTemplateRenderer', () => {
     })
   })
 
+  describe('values with no text form', () => {
+    it('leaves a placeholder in place when its value is an object', async () => {
+      const out = await email('Hello ((name))', { name: { first: 'Ann' } })
+
+      expect(out.body).toBe('Hello ((name))')
+    })
+
+    it('drops object items from a list, keeping the rest', async () => {
+      const out = await email('Items:((items))', { items: ['a', { b: 1 }, ['c'], 0, false] })
+
+      expect(out.body).toBe('Items:\n\n* a\n* 0\n* false')
+    })
+
+    it('leaves a placeholder in place when its list holds only objects', async () => {
+      const out = await email('Items:((items))', { items: [{ a: 1 }] })
+
+      expect(out.body).toBe('Items:((items))')
+    })
+
+    it.each([[{ a: 1 }], [[{ a: 1 }]]])(
+      'leaves a link URL placeholder in place for %j',
+      async (url) => {
+        const out = await email('[Click](((url)))', { url })
+
+        expect(out.body).toBe('[Click](((url)))')
+      },
+    )
+
+    it('writes a list in a link URL comma-joined rather than as bullets', async () => {
+      const out = await email('[Click](((url)))', { url: ['a', { b: 1 }, 'c'] })
+
+      expect(out.body).toBe('[Click](a,c)')
+    })
+
+    it('treats an object or a list of only objects as false in a conditional', async () => {
+      const out = await email('((a??A))((b??B))', { a: { x: 1 }, b: [{ x: 1 }] })
+
+      expect(out.body).toBe('')
+    })
+  })
+
   it('strips a block marker a caller put in the template, so only ours can be decoded', async () => {
     const smuggled =
       '@@GCNOTIFYBLOCK:' + Buffer.from('<script>x</script>').toString('base64') + '@@'

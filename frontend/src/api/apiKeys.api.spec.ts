@@ -105,10 +105,17 @@ describe('apiKeys API', () => {
     )
   })
   it.each([
-    [409, 'This tenant already has an API key'],
-    [503, 'The API gateway is unavailable right now. Please try again shortly.'],
-  ])('provides a fallback message for status %s', async (status, message) => {
-    vi.mocked(get).mockRejectedValue({ response: { status } })
-    await expect(api.getApiKeys()).rejects.toThrow(String(message))
+    [503, { message: 'gateway down' }, 'gateway down'],
+    [503, undefined, 'The API gateway is unavailable right now. Please try again shortly.'],
+    [409, { message: 'key exists' }, 'key exists'],
+    [409, undefined, 'This tenant already has an API key'],
+    [500, { message: 'database is down' }, 'Failed to load the API key: database is down'],
+  ])('explains a %i', async (status, data, message) => {
+    vi.mocked(get).mockRejectedValue(
+      Object.assign(new Error(`Request failed with status code ${status}`), {
+        response: { status, data },
+      }),
+    )
+    await expect(api.getApiKeys()).rejects.toThrow(message)
   })
 })

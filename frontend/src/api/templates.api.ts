@@ -1,4 +1,5 @@
 import type { AxiosError } from 'axios'
+import { getApiErrorMessage } from '@/utils/apiErrorMessage'
 import { get, post, deleteMethod, generateApiParameters, STATUS_CODES } from '@/common/api'
 import type { PaginatedTemplateResponse } from '@/interfaces/PaginatedNotificationResponse'
 
@@ -83,7 +84,6 @@ export async function getTemplates(
     return await get<PaginatedTemplateResponse>(params)
   } catch (error) {
     const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as any) || {}
 
     if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
       throw new Error('You are not authorized to view templates')
@@ -92,11 +92,7 @@ export async function getTemplates(
       throw new Error('You do not have permission to view templates')
     }
 
-    throw new Error(
-      `Failed to fetch templates: ${
-        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
-      }`,
-    )
+    throw new Error(`Failed to fetch templates: ${getApiErrorMessage(error)}`)
   }
 }
 
@@ -211,17 +207,12 @@ export async function previewTemplateBody(
     return await post<PreviewTemplateBodyResponse>({ ...params, data })
   } catch (error) {
     const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as any) || {}
 
     if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
       throw new Error('You are not authorized to preview templates')
     }
 
-    throw new Error(
-      `Failed to preview template: ${
-        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
-      }`,
-    )
+    throw new Error(`Failed to preview template: ${getApiErrorMessage(error)}`)
   }
 }
 
@@ -247,7 +238,6 @@ export async function createTemplate(data: CreateTemplateData): Promise<Template
     return await post<TemplateResponse>({ ...params, data })
   } catch (error) {
     const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as any) || {}
 
     if (axiosError.response?.status === STATUS_CODES.Conflict) {
       throw Object.assign(new Error('A template with this name already exists'), {
@@ -261,11 +251,7 @@ export async function createTemplate(data: CreateTemplateData): Promise<Template
       throw new Error('You do not have permission to create templates')
     }
 
-    throw new Error(
-      `Failed to create template: ${
-        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
-      }`,
-    )
+    throw new Error(`Failed to create template: ${getApiErrorMessage(error)}`)
   }
 }
 
@@ -283,7 +269,6 @@ export async function updateTemplate(templateId: string, updateData: Partial<Tem
     return await post<TemplateResponse>({ ...params, data: updateData })
   } catch (error) {
     const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as any) || {}
 
     if (axiosError.response?.status === STATUS_CODES.NotFound) {
       throw new Error('Template not found')
@@ -300,11 +285,7 @@ export async function updateTemplate(templateId: string, updateData: Partial<Tem
       throw new Error('You do not have permission to update this template')
     }
 
-    throw new Error(
-      `Failed to update template: ${
-        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
-      }`,
-    )
+    throw new Error(`Failed to update template: ${getApiErrorMessage(error)}`)
   }
 }
 
@@ -360,7 +341,6 @@ export async function deleteTemplate(templateId: string): Promise<void> {
     await deleteMethod<void>(params)
   } catch (error) {
     const axiosError = error as AxiosError
-    const responseData = (axiosError.response?.data as any) || {}
 
     if (axiosError.response?.status === STATUS_CODES.NotFound) {
       throw new Error('Template not found')
@@ -375,10 +355,6 @@ export async function deleteTemplate(templateId: string): Promise<void> {
       throw new Error('This template is in use by an event and cannot be deleted')
     }
 
-    throw new Error(
-      `Failed to delete template: ${
-        responseData.message || (error instanceof Error ? error.message : 'Unknown error')
-      }`,
-    )
+    throw new Error(`Failed to delete template: ${getApiErrorMessage(error)}`)
   }
 }
