@@ -19,6 +19,7 @@ import type { NotifyContent } from '../notify/schemas/notify-content'
 import { TemplateResponseDto } from './schemas/template-response.dto'
 import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
 import { TemplateUsageResponseDto } from './schemas/template-usage-response.dto'
+import { TemplateVersionResponseDto } from './schemas/template-version-response.dto'
 import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from '../../services/rendering/tokens'
 import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { TemplateDefinition } from '../../adapters/interfaces'
@@ -101,6 +102,38 @@ export class TemplatesService {
     // Only the single-template read carries the placeholder report: it is what the bulk-send screen
     // builds its spreadsheet columns from, and parsing every template in a list would be wasted work.
     return { ...this.toResponseDto(template), placeholders: describeTemplatePlaceholders(template) }
+  }
+
+  /**
+   * Get the version a template had before its current one
+   * The template is looked up first because version rows carry no tenant: this is what stops one
+   * tenant reading another's history.
+   */
+  async getPreviousVersion(
+    tenantId: string,
+    templateId: string,
+  ): Promise<TemplateVersionResponseDto> {
+    const template = await this.templatesRepository.findById(tenantId, templateId)
+    if (!template) {
+      throw new NotFoundException(`Template ${templateId} not found`)
+    }
+
+    const previous = await this.templatesRepository.findPreviousVersion(
+      templateId,
+      template.version,
+    )
+    if (!previous) {
+      throw new NotFoundException(`Template ${templateId} has no previous version`)
+    }
+
+    return {
+      version: previous.version,
+      name: previous.name,
+      subject: previous.subject,
+      body: previous.body,
+      createdByName: previous.createdByName,
+      createdAt: previous.createdAt,
+    }
   }
 
   /**
@@ -541,6 +574,7 @@ export class TemplatesService {
       createdBy: template.createdBy,
       createdAt: template.createdAt,
       updatedBy: template.updatedBy,
+      updatedByName: template.updatedByName,
       updatedAt: template.updatedAt,
     }
   }

@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
+import { LessThan } from 'typeorm'
 import { vi } from 'vitest'
 import { TemplatesRepository } from './templates.repository'
 import { Template } from './entities/template.entity'
@@ -644,6 +645,20 @@ describe('TemplatesRepository', () => {
       expect(result).toEqual(mockTemplateVersion)
       expect(mockVersionRepository.create).toHaveBeenCalledWith(versionData)
       expect(mockVersionRepository.save).toHaveBeenCalledWith(mockTemplateVersion)
+    })
+  })
+
+  describe('findPreviousVersion', () => {
+    it('should find the newest version older than the given one', async () => {
+      mockVersionRepository.findOne.mockResolvedValue(mockTemplateVersion)
+
+      const result = await repository.findPreviousVersion('template-123', 4)
+
+      expect(result).toEqual(mockTemplateVersion)
+      expect(mockVersionRepository.findOne).toHaveBeenCalledWith({
+        where: { templateId: 'template-123', version: LessThan(4) },
+        order: { version: 'DESC' },
+      })
     })
   })
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { EntityManager, Repository } from 'typeorm'
+import { EntityManager, LessThan, Repository } from 'typeorm'
 import { Template } from './entities/template.entity'
 import { TemplateVersion } from './entities/template-version.entity'
 import { EventChannelSetting } from '../events/entities/event-channel-setting.entity'
@@ -293,6 +293,17 @@ export class TemplatesRepository {
   async createVersion(version: Partial<TemplateVersion>): Promise<TemplateVersion> {
     const newVersion = this.templateVersionRepository.create(version)
     return this.templateVersionRepository.save(newVersion)
+  }
+
+  /**
+   * Find the newest version older than the given one. Not simply version - 1, because version
+   * numbers are not guaranteed to be contiguous.
+   */
+  async findPreviousVersion(templateId: string, version: number): Promise<TemplateVersion | null> {
+    return this.templateVersionRepository.findOne({
+      where: { templateId, version: LessThan(version) },
+      order: { version: 'DESC' },
+    })
   }
 
   /**
