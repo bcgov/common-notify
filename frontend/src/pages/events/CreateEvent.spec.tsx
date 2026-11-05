@@ -7,7 +7,7 @@ import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 const state = vi.hoisted(() => ({ canEdit: true, navigate: vi.fn() }))
 vi.mock('@tanstack/react-router', () => ({ useNavigate: () => state.navigate }))
 vi.mock('@/hooks/useCstarRoles', () => ({ useCstarRoles: () => state }))
-vi.mock('./components/EventTabs', () => ({ default: () => <div>Event tabs</div> }))
+vi.mock('./components/EventsTabBar', () => ({ default: () => <div>Event tabs</div> }))
 vi.mock('@/components/PageHeading', () => ({ default: () => <h1>Create New Event</h1> }))
 vi.mock('@/api/events.api', () => ({ createEvent: vi.fn() }))
 vi.mock('@/redux/utils/toastUtils', () => ({ showErrorToast: vi.fn(), showSuccessToast: vi.fn() }))

@@ -51,7 +51,7 @@ function groupIdsUsedByOtherFields(
   )
 }
 
-type EventsCstarGroupsProps = {
+type EventsEmailCstarGroupsProps = {
   /** Saved group IDs per field, seeded once at mount the same way EventsEmailTab seeds its fields. */
   values: CstarGroupSelections
   /** The tenant's CSTAR groups, used to label the selections and populate the pickers. */
@@ -68,7 +68,7 @@ type EventsCstarGroupsProps = {
  * Only the group IDs are held here; the members behind a group are resolved from CSTAR when the
  * notification is sent, so a group gaining or losing people needs no change to the event.
  */
-const EventsCstarGroups: FC<EventsCstarGroupsProps> = ({
+const EventsEmailCstarGroups: FC<EventsEmailCstarGroupsProps> = ({
   values,
   groups,
   onChange,
@@ -146,4 +146,4 @@ const EventsCstarGroups: FC<EventsCstarGroupsProps> = ({
   )
 }
 
-export default EventsCstarGroups
+export default EventsEmailCstarGroups
