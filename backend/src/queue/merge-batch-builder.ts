@@ -1,5 +1,7 @@
 import { NotificationChannel } from '../enum/notification-channel.enum'
+import { TemplateEngine } from '../enum/template-engine.enum'
 import type { NotifySimpleRequest } from '../api/notify/schemas/notify-simple-request'
+import type { Template } from '../api/templates/entities/template.entity'
 import type { IngestionJobPayload, MailMergeJobData } from './queue.types'
 
 /** NotificationService.parseMailMergeRecipients, passed in so this stays a plain function. */
@@ -18,6 +20,16 @@ export function mergeRequestChannel(payload: unknown): NotificationChannel | nul
   if (Array.isArray(request?.email?.recipients?.mergeArray)) return NotificationChannel.EMAIL
   if (Array.isArray(request?.sms?.recipients?.mergeArray)) return NotificationChannel.SMS
   return null
+}
+
+/**
+ * The template as a merge renders it: on GC Notify's engine for a GC Notify bulk send, otherwise
+ * as stored. One definition, so the segments billed at acceptance match the body sent at delivery.
+ */
+export function applyGcNotifyMergeRendering(template: Template, content: unknown): Template {
+  return (content as MailMergeJobData['content'])?.gcNotifyRendering
+    ? { ...template, engineCode: TemplateEngine.GC_NOTIFY_NATIVE }
+    : template
 }
 
 /**

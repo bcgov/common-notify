@@ -21,8 +21,13 @@ import {
  */
 type ListStyle = 'bullet' | 'inline'
 
+/** A value with a text form. An object has none: `String()` would print "[object Object]". */
+const isScalar = (value: unknown): value is string | number | boolean =>
+  typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+
 /** Empty items are dropped; `0` and `false` are kept, because a caller who sends them means them. */
-const hasContent = (item: unknown): boolean => item !== null && item !== undefined && item !== ''
+const hasContent = (item: unknown): item is string | number | boolean =>
+  isScalar(item) && item !== ''
 
 /** The leading blank line terminates the preceding paragraph so the list parses as a list. */
 const bulletList = (items: string[]): string => '\n\n' + items.map((item) => `* ${item}`).join('\n')
@@ -118,11 +123,13 @@ export class GcNotifyNativeTemplateRenderer implements ITemplateRenderer {
     // URL placeholders first: substituted bare, with no list handling and no block rendering.
     result = result.replace(LINK_URL_PLACEHOLDER, (match, key: string) => {
       const value = values[key]
-      if (value === undefined || value === null) {
+      // A URL has no list form, and a placeholder left here would be written out as one below.
+      const url = Array.isArray(value) ? value.filter(hasContent).join(',') || undefined : value
+      if (!isScalar(url)) {
         this.logger.warn(`No personalisation value for link URL placeholder: ${key}`)
         return match
       }
-      return `](${stripGcNotifyBlockMarkers(String(value))})`
+      return `](${stripGcNotifyBlockMarkers(String(url))})`
     })
 
     result = result.replace(PLACEHOLDER, (match, key: string, conditionalBody?: string) => {
@@ -142,7 +149,7 @@ export class GcNotifyNativeTemplateRenderer implements ITemplateRenderer {
         if (items.length > 0) {
           return listStyle === 'bullet' ? bulletList(items) : inlineList(items)
         }
-      } else if (value !== undefined && value !== null) {
+      } else if (isScalar(value)) {
         return stripGcNotifyBlockMarkers(String(value))
       }
 
@@ -173,15 +180,11 @@ export class GcNotifyNativeTemplateRenderer implements ITemplateRenderer {
    * JSON boolean `true` and the string `"true"` agree.
    */
   private isTruthy(value: unknown): boolean {
-    if (value === undefined || value === null) {
-      return false
-    }
-
     // A list is a condition in so far as it has something to print; `Boolean([])` is true.
     if (Array.isArray(value)) {
       return value.some(hasContent)
     }
 
-    return TRUTHY_VALUES.has(String(value).toLowerCase())
+    return isScalar(value) && TRUTHY_VALUES.has(String(value).toLowerCase())
   }
 }
