@@ -108,11 +108,13 @@ export class TemplatesService {
    * @param tenantId The tenant ID
    * @param createDto Template creation data
    * @param userId User creating the template (for audit trail)
+   * @param userName Display name of that user, if their token carried one
    */
   async createTemplate(
     tenantId: string,
     createDto: CreateTemplateDto,
     userId: string = 'system',
+    userName: string | null = null,
   ): Promise<TemplateResponseDto> {
     // Validate channel-specific required fields
     if (createDto.channelCode === NotificationChannel.EMAIL && !createDto.subject) {
@@ -141,7 +143,9 @@ export class TemplatesService {
       version: 1,
       active: true,
       createdBy: userId,
+      createdByName: userName,
       updatedBy: userId,
+      updatedByName: userName,
     })
 
     // Create a version record
@@ -156,6 +160,7 @@ export class TemplatesService {
       engineCode: template.engineCode,
       bodyType: template.bodyType,
       createdBy: userId,
+      createdByName: userName,
     })
 
     return this.toResponseDto(template)
@@ -167,12 +172,14 @@ export class TemplatesService {
    * @param templateId The template ID
    * @param updateDto Template update data
    * @param userId User updating the template (for audit trail)
+   * @param userName Display name of that user, if their token carried one
    */
   async updateTemplate(
     tenantId: string,
     templateId: string,
     updateDto: UpdateTemplateDto,
     userId: string = 'system',
+    userName: string | null = null,
   ): Promise<TemplateResponseDto> {
     const template = await this.templatesRepository.findById(tenantId, templateId)
     if (!template) {
@@ -213,6 +220,8 @@ export class TemplatesService {
       template.bodyType = updateDto.bodyType ?? template.bodyType ?? 'markdown'
     }
     template.updatedBy = userId
+    // Null clears the previous editor's name, so the new version is not credited to them.
+    template.updatedByName = userName
 
     const updated = await this.templatesRepository.update(template)
 

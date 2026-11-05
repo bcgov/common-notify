@@ -460,10 +460,23 @@ describe('TemplatesRepository', () => {
           engineCode: TemplateEngine.MUSTACHE,
           bodyType: updatedTemplate.bodyType,
           updatedBy: updatedTemplate.updatedBy,
+          updatedByName: updatedTemplate.updatedByName,
         },
       )
       expect(result.engineCode).toBe(TemplateEngine.MUSTACHE)
       expect(result.engine.engineCode).toBe(TemplateEngine.MUSTACHE)
+    })
+
+    it('should write a null updatedByName rather than skip the column', async () => {
+      mockTemplateRepository.update.mockResolvedValue({ affected: 1 })
+      mockTemplateRepository.findOne.mockResolvedValue(mockTemplate)
+
+      await repository.update({ ...mockTemplate, updatedByName: null } as Template)
+
+      expect(mockTemplateRepository.update).toHaveBeenCalledWith(
+        { id: 'template-123', tenantId: 'tenant-123', active: true },
+        expect.objectContaining({ updatedByName: null }),
+      )
     })
 
     it('should fail when the tenant-owned active template was not updated', async () => {

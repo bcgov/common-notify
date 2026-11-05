@@ -132,6 +132,13 @@ export class Template {
   createdBy: string
 
   /**
+   * Display name of the user who created this template, from their JWT.
+   * createdBy is the stable identifier; for IDIR it is an opaque GUID.
+   */
+  @Column({ type: 'varchar', length: 200, nullable: true, name: 'created_by_name' })
+  createdByName?: string | null
+
+  /**
    * Timestamp when the template was created
    */
   @CreateDateColumn({ name: 'created_at' })
@@ -142,6 +149,13 @@ export class Template {
    */
   @Column({ name: 'updated_by', length: 200 })
   updatedBy: string
+
+  /**
+   * Display name of the user who last updated this template, from their JWT.
+   * The version trigger copies it to template_version.created_by_name.
+   */
+  @Column({ type: 'varchar', length: 200, nullable: true, name: 'updated_by_name' })
+  updatedByName?: string | null
 
   /**
    * Timestamp when the template was last updated

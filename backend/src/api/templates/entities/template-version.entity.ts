@@ -116,6 +116,13 @@ export class TemplateVersion {
   createdBy: string
 
   /**
+   * Display name of the user who made this version, from their JWT.
+   * createdBy is the stable identifier; for IDIR it is an opaque GUID.
+   */
+  @Column({ type: 'varchar', length: 200, nullable: true, name: 'created_by_name' })
+  createdByName?: string | null
+
+  /**
    * Timestamp when this version was created
    */
   @CreateDateColumn({ name: 'created_at' })

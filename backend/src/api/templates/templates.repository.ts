@@ -214,6 +214,7 @@ export class TemplatesRepository {
         engineCode: template.engineCode,
         bodyType: template.bodyType,
         updatedBy: template.updatedBy,
+        updatedByName: template.updatedByName,
       },
     )
 

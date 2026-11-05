@@ -845,6 +845,32 @@ describe('TemplatesService', () => {
       )
     })
 
+    it('should store the display name on the template and its first version', async () => {
+      const createDto = {
+        name: 'Test Template',
+        channelCode: NotificationChannel.EMAIL,
+        subject: 'Subject',
+        body: 'Body',
+      }
+
+      mockRepository.findByName.mockResolvedValue(null)
+      mockRepository.create.mockResolvedValue({ ...mockTemplate, ...createDto })
+      mockRepository.createVersion.mockResolvedValue({})
+
+      await service.createTemplate('tenant-123', createDto, 'user-123', 'Falk, Barrett')
+
+      expect(mockRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          createdBy: 'user-123',
+          createdByName: 'Falk, Barrett',
+          updatedByName: 'Falk, Barrett',
+        }),
+      )
+      expect(mockRepository.createVersion).toHaveBeenCalledWith(
+        expect.objectContaining({ createdBy: 'user-123', createdByName: 'Falk, Barrett' }),
+      )
+    })
+
     it('should default bodyType to markdown if not provided', async () => {
       const createDto = {
         name: 'Test Template',
@@ -906,6 +932,34 @@ describe('TemplatesService', () => {
   })
 
   describe('updateTemplate', () => {
+    it('should save the display name for the version trigger to copy', async () => {
+      mockRepository.findById.mockResolvedValue({ ...mockTemplate })
+      mockRepository.update.mockResolvedValue({ ...mockTemplate })
+
+      await service.updateTemplate(
+        'tenant-123',
+        'template-123',
+        { name: 'Renamed' },
+        'user-123',
+        'Falk, Barrett',
+      )
+
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        expect.objectContaining({ updatedBy: 'user-123', updatedByName: 'Falk, Barrett' }),
+      )
+    })
+
+    it("should clear the previous editor's name when the token carried none", async () => {
+      mockRepository.findById.mockResolvedValue({ ...mockTemplate, updatedByName: 'Someone Else' })
+      mockRepository.update.mockResolvedValue({ ...mockTemplate })
+
+      await service.updateTemplate('tenant-123', 'template-123', { name: 'Renamed' }, 'user-123')
+
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        expect.objectContaining({ updatedBy: 'user-123', updatedByName: null }),
+      )
+    })
+
     it('should update bodyType field', async () => {
       const updateDto = {
         bodyType: 'markdown' as const,

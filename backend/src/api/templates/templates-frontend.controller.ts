@@ -257,7 +257,8 @@ export class TemplatesFrontendController {
   ): Promise<TemplateResponseDto> {
     const tenant = await this.requireTenantContext(req)
     const user = JwtUserExtractor.extractUser(req)
-    return this.templatesService.createTemplate(tenant.id, createTemplateDto, user)
+    const userName = JwtUserExtractor.extractDisplayName(req)
+    return this.templatesService.createTemplate(tenant.id, createTemplateDto, user, userName)
   }
 
   /**
@@ -303,7 +304,14 @@ export class TemplatesFrontendController {
   ): Promise<TemplateResponseDto> {
     const tenant = await this.requireTenantContext(req)
     const user = JwtUserExtractor.extractUser(req)
-    return this.templatesService.updateTemplate(tenant.id, templateId, updateTemplateDto, user)
+    const userName = JwtUserExtractor.extractDisplayName(req)
+    return this.templatesService.updateTemplate(
+      tenant.id,
+      templateId,
+      updateTemplateDto,
+      user,
+      userName,
+    )
   }
 
   /**
