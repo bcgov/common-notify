@@ -14,7 +14,8 @@ import {
   sendBulkNotifications,
   BulkNotificationsValidationError,
 } from '@/api/bulkNotifications.api'
-import { useAppSelector } from '@/redux/hooks'
+import { useAppDispatch, useAppSelector } from '@/redux/hooks'
+import { fetchSettings } from '@/redux/thunks/settings.thunks'
 import { showErrorToast, showInfoToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
 import FileUpload from '@/components/FileUpload'
@@ -44,6 +45,12 @@ const BulkNotifications: FC = () => {
   // frontend notifysimple endpoint. `canEdit` is exactly that pair.
   const { canEdit: canSend } = useCstarRoles()
   const smsEnabled = useFeatureFlag('sms_notifications', selectedTenant?.id)
+  const dispatch = useAppDispatch()
+  const internationalSmsFlag = useFeatureFlag('international_sms', selectedTenant?.id)
+  const internationalSmsEnabled = useAppSelector(
+    (state) => state.smsSettings?.internationalSmsEnabled,
+  )
+  const internationalSmsAllowed = internationalSmsFlag && internationalSmsEnabled === true
 
   const [channel, setChannel] = useState<Channel | null>(null)
   const [templates, setTemplates] = useState<TemplateResponse[]>([])
@@ -59,8 +66,15 @@ const BulkNotifications: FC = () => {
   const unsupported = templateDetail?.placeholders?.unsupported ?? []
 
   // Email until a channel is chosen; nothing downstream is reachable before that.
-  const csv = useCsvUpload(placeholders, channel ?? 'email')
+  const csv = useCsvUpload(placeholders, channel ?? 'email', internationalSmsAllowed)
   const { reset: resetCsv } = csv
+
+  // The tenant's International SMS setting, for the file checks above. Loaded per tenant, the same
+  // way EditEvent does for the event SMS tab.
+  useEffect(() => {
+    if (!selectedTenant) return
+    dispatch(fetchSettings())
+  }, [dispatch, selectedTenant])
 
   // Fetched here rather than read from the templates slice: that slice holds the Templates page's
   // paginated, filtered query, and reusing it would mean rewriting its filters on every visit.
