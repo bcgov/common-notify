@@ -4,7 +4,7 @@ export const MB = 1024 * 1024
 export const generatedAt = '2026-10-01T18:00:00.000Z'
 export const now = new Date(generatedAt).getTime()
 
-const series = (value: number) => Array<number>(60).fill(value)
+const series = (value: number) => new Array<number>(60).fill(value)
 
 /** A healthy snapshot with one of everything, for the monitoring page specs. */
 export function snapshot(overrides: Partial<QueueMonitoringData> = {}): QueueMonitoringData {
