@@ -56,6 +56,13 @@ export interface MailMergeJobData {
     body?: string
     bodyType?: 'text' | 'markdown' | 'html'
     renderer?: 'handlebars' | 'mustache' | 'legacy_gc_notify' | 'mjml'
+    /**
+     * Needed for GC Notify API bulk route as we need to use the native engine and
+     * templates can only be stored as legacy. Set only by
+     * the GC Notify bulk route. Kept on `content` so it is stored with the request and survives a
+     * job rebuilt from it; the public API's schema rejects the field.
+     */
+    gcNotifyRendering?: boolean
   }
   params?: Record<string, unknown>
   /**

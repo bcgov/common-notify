@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, userEvent, waitFor, fireEvent } from '@/test-utils'
-import reducer from '@/redux/slices/apiKeyUsage.slice'
+import reducer, { setAdminFilter, setAdminSearch } from '@/redux/slices/apiKeyUsage.slice'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import AdminUsage from './AdminUsage'
 import { updateTenantLimits } from '@/redux/thunks/apiKeyUsage.thunks'
@@ -106,6 +106,39 @@ describe('AdminUsage', () => {
       ),
     )
     expect(screen.getByRole('spinbutton', { name: 'Daily maximum' })).toBeInTheDocument()
+  })
+  it('commits a trimmed tenant search when Search is pressed', async () => {
+    setup({ adminRows: [row], adminCount: 1 })
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search tenants' }), '  Parks ')
+    await userEvent.click(screen.getByRole('button', { name: 'Search' }))
+    expect(mocks.dispatch).toHaveBeenCalledWith(setAdminSearch('Parks'))
+  })
+  it('offers to clear a search that matches no tenants', async () => {
+    setup({ adminSearch: 'nothing' })
+    expect(
+      screen.getByRole('cell', { name: /^No results found. Try a different search./ }),
+    ).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Clear search' }))
+    expect(mocks.dispatch).toHaveBeenCalledWith(setAdminSearch(''))
+    expect(screen.getByRole('searchbox', { name: 'Search tenants' })).toHaveValue('')
+  })
+  it('filters by channel from the Channel column', async () => {
+    setup({ adminRows: [row], adminCount: 1 })
+    await userEvent.click(screen.getByRole('button', { name: 'Column options for Channel' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: /Filter by/ }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'SMS' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }))
+    expect(mocks.dispatch).toHaveBeenCalledWith(
+      setAdminFilter({ field: 'channel', values: ['SMS'] }),
+    )
+  })
+  it('offers to clear a channel filter that matches no tenants', async () => {
+    setup({ adminFilters: { channel: ['EMAIL'] } })
+    expect(
+      screen.getByRole('cell', { name: /^No data match the filters applied./ }),
+    ).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
+    expect(mocks.dispatch).toHaveBeenCalledWith(setAdminFilter({ field: 'channel', values: [] }))
   })
   it('denies users without the administrator role and does not fetch', () => {
     mocks.admin = false

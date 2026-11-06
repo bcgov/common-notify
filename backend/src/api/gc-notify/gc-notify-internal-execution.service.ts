@@ -12,7 +12,10 @@ import { TemplatesRepository } from '../templates/templates.repository'
 import { TemplatesService } from '../templates/templates.service'
 import { Template } from '../templates/entities/template.entity'
 import type { TemplateResponseDto } from '../templates/schemas/template-response.dto'
-import { NotificationService } from '../notification/notification.service'
+import {
+  MAIL_MERGE_ERRORS_OMITTED,
+  NotificationService,
+} from '../notification/notification.service'
 import { NotificationRequestDetailService } from '../notification/notification-request-detail.service'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { SafelistService } from '../safelist/safelist.service'
@@ -23,7 +26,12 @@ import type { QueryableFieldsConfig } from '../../common/query/list-query.types'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
-import { toGcNotifyEmailHtml, toGcNotifySubject } from '../../services/rendering/gc-notify-markdown'
+import {
+  toGcNotifyDeliverySubject,
+  toGcNotifyEmailHtml,
+  toGcNotifySubject,
+} from '../../services/rendering/gc-notify-markdown'
+import { analyseTemplatePersonalisation } from '../../services/rendering/template-personalisation-validation'
 import { QueueName } from '../../enum/queue-name.enum'
 import { IngestionJobPayload } from '../../queue/queue.types'
 import { CreateEmailNotificationRequest } from './schemas/create-email-notification-request'
@@ -36,10 +44,14 @@ import type { FileAttachment } from './schemas/file-attachment'
 import Papa from 'papaparse'
 import { PostBulkRequest } from './schemas/post-bulk-request'
 import { PostBulkResponse } from './schemas/post-bulk-response'
-import { GcNotifyBulkValidationService } from './gc-notify-bulk-validation.service'
+import {
+  findRecipientColumn,
+  GcNotifyBulkValidationService,
+} from './gc-notify-bulk-validation.service'
 import { AttachmentValidationService } from '../notify/services/attachment-validation.service'
 import { AttachmentProcessingService } from '../notify/services/attachment-processing.service'
 import { NotifySubmissionService } from '../notify/services/notify-submission.service'
+import { MAIL_MERGE_MAX_REPORTED_ERRORS } from '../notify/schemas/mail-merge.constants'
 import type { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
 import type { NotifyEmailChannel } from '../notify/schemas/notify-email-channel'
 import type { NotifyAttachment } from '../notify/schemas/notify-attachment'
@@ -219,7 +231,7 @@ export class GcNotifyInternalExecutionService {
         recipients: { to: [body.email_address] },
         params: personalisation,
         content: {
-          subject: content.subject,
+          subject: content.deliverySubject,
           body: content.deliveryBody,
           // Already GC Notify's HTML, so delivery must pass it through rather than run the
           // CommonMark converter over it - that would escape every tag into visible markup.
@@ -251,7 +263,7 @@ export class GcNotifyInternalExecutionService {
       content: {
         from_email: fromEmail,
         body: content.responseBody,
-        subject: content.subject,
+        subject: content.responseSubject,
       },
       uri: `/gcnotify/v2/notifications/${id}`,
       template: {
@@ -347,6 +359,19 @@ export class GcNotifyInternalExecutionService {
     requestRoute?: string,
   ): Promise<PostBulkResponse> {
     const template = await this.requireTemplate(tenantId, body.template_id)
+    // Rendered by GC Notify's rules whatever the stored engine, so a {{placeholder}} would be sent
+    // literally. assertPersonalisationSupplied also reads placeholders by the stored engine, and
+    // only this engine's are the ((placeholders)) those rules fill.
+    if (template.engineCode !== TemplateEngine.LEGACY_GC_NOTIFY) {
+      throw new BadRequestException({
+        errors: [
+          {
+            error: 'ValidationError',
+            message: `Bulk sends require a template using the GC Notify (legacy) engine, but template '${template.id}' uses '${template.engineCode}'. Change the template's engine to legacy_gc_notify.`,
+          },
+        ],
+      })
+    }
     const channel = template.channelCode as NotificationChannel
     const rows = this.resolveBulkRows(body)
 
@@ -362,10 +387,13 @@ export class GcNotifyInternalExecutionService {
       })
     }
 
-    const mergeArray = this.toMergeArray(rows)
+    const mergeArray = this.toMergeArray(rows, channel)
+    this.assertPersonalisationSupplied(template, mergeArray)
     const channelPayload = {
       recipients: { mergeArray },
-      content: { templateId: template.id },
+      // The workers render a merge's template per recipient, so this tells them to do it by GC
+      // Notify's rules, as the single-send routes do before queueing.
+      content: { templateId: template.id, gcNotifyRendering: true },
       ...(body.scheduled_for && { delayedSend: body.scheduled_for }),
     }
     const notifyRequest = (channel === NotificationChannel.SMS
@@ -433,33 +461,81 @@ export class GcNotifyInternalExecutionService {
   }
 
   /**
-   * GC Notify names the recipient column `email address` or `phone number`; the merge pipeline
-   * requires it to be called `to`. Every other column is personalisation and passes through as-is.
+   * GC Notify finds the recipient column by name, in any position; the merge pipeline requires it
+   * to be the first column and called `to`. Every other column is personalisation and keeps its
+   * name and relative order. The template's channel picks the column, so a file holding both an
+   * address and a phone number sends to the one the template is for.
    */
-  private toMergeArray(rows: string[][]): string[][] {
+  private toMergeArray(rows: string[][], channel: NotificationChannel): string[][] {
     const [header, ...dataRows] = rows
-    const recipientColumn = header.findIndex((column) =>
-      ['email address', 'phone number'].includes(
-        String(column ?? '')
-          .trim()
-          .toLowerCase(),
-      ),
-    )
+    const recipientColumn = findRecipientColumn(header, channel)
 
     if (recipientColumn === -1) {
+      const columnName = channel === NotificationChannel.SMS ? 'phone number' : 'email address'
       throw new BadRequestException({
         errors: [
           {
             error: 'ValidationError',
-            message:
-              'The header row must contain an "email address" or "phone number" column naming the recipient',
+            message: `The header row must contain a "${columnName}" column naming the recipient`,
           },
         ],
       })
     }
 
-    const mappedHeader = header.map((column, index) => (index === recipientColumn ? 'to' : column))
-    return [mappedHeader, ...dataRows]
+    const personalisation = (row: string[]) => row.filter((_, index) => index !== recipientColumn)
+    return [
+      ['to', ...personalisation(header)],
+      ...dataRows.map((row) => [row[recipientColumn], ...personalisation(row)]),
+    ]
+  }
+
+  /**
+   * Reject up front what the delivery workers would otherwise fail one recipient at a time, after
+   * the request had already been accepted with a 201. The same rules as
+   * TemplatesService.validateTemplatePersonalisation, read from the columns as
+   * parseMailMergeRecipients does: trimmed names, the first of a repeated column, and column 0 is
+   * the recipient rather than personalisation. A placeholder that is only tested may be blank.
+   */
+  private assertPersonalisationSupplied(template: Template, mergeArray: string[][]): void {
+    const { required, printed } = analyseTemplatePersonalisation(template)
+    const [header, ...dataRows] = mergeArray
+    const columns = header.map((column) => (column ?? '').trim())
+
+    const missingColumns = required
+      .filter((key) => !columns.includes(key, 1))
+      .sort((a, b) => a.localeCompare(b))
+    if (missingColumns.length > 0) {
+      throw new BadRequestException({
+        errors: [
+          {
+            error: 'ValidationError',
+            message: `Missing column headers: ${missingColumns.join(', ')}`,
+          },
+        ],
+      })
+    }
+
+    const printedColumns = required
+      .filter((key) => printed.has(key))
+      .map((key) => ({ key, index: columns.indexOf(key, 1) }))
+    const messages: string[] = []
+    for (const [rowIndex, row] of dataRows.entries()) {
+      if (messages.length >= MAIL_MERGE_MAX_REPORTED_ERRORS) {
+        messages.push(MAIL_MERGE_ERRORS_OMITTED)
+        break
+      }
+      for (const { key, index } of printedColumns) {
+        if (!String(row[index] ?? '').trim()) {
+          messages.push(`Row ${rowIndex + 1} - ${key}: Missing`)
+        }
+      }
+    }
+
+    if (messages.length > 0) {
+      throw new BadRequestException({
+        errors: messages.map((message) => ({ error: 'ValidationError', message })),
+      })
+    }
   }
 
   private async requireTemplate(
@@ -502,17 +578,20 @@ export class GcNotifyInternalExecutionService {
    * caller-HTML sanitiser does not apply and must not: it would strip the inline styles GC Notify
    * puts on headings and links.
    *
-   * The 201 response keeps the unrendered body, which is the form GC Notify reports.
+   * The 201 response keeps the unrendered body and the escaped subject, which are the forms GC
+   * Notify reports. The subject delivered is not escaped: a mail subject is plain text.
    */
   private renderGcNotifyEmailContent(rendered: { subject?: string; body: string }): {
     responseBody: string
     deliveryBody: string
-    subject: string
+    responseSubject: string
+    deliverySubject: string
   } {
     return {
       responseBody: rendered.body,
       deliveryBody: toGcNotifyEmailHtml(rendered.body),
-      subject: toGcNotifySubject(rendered.subject ?? ''),
+      responseSubject: toGcNotifySubject(rendered.subject ?? ''),
+      deliverySubject: toGcNotifyDeliverySubject(rendered.subject ?? ''),
     }
   }
 

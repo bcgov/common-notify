@@ -4,6 +4,7 @@ import { TemplatesService } from '../../templates/templates.service'
 import { InlineRenderingService } from '../../../services/rendering/inline-rendering.service'
 import { countSmsSegments } from '../../../common/utils/sms-segments'
 import { describeError } from '../../../common/utils/describe-error'
+import { applyGcNotifyMergeRendering } from '../../../queue/merge-batch-builder'
 import type { NotifySimpleRequest } from '../schemas/notify-simple-request'
 import type { ProcessedNotifySimpleRequest } from '../schemas/stored-notify-attachment'
 
@@ -97,9 +98,10 @@ export class SmsSegmentService {
         return fixed(failOpen(error))
       }
       if (template?.channelCode !== 'SMS') return fixed(content.body)
+      const renderTemplate = applyGcNotifyMergeRendering(template, content)
       return guarded(
         async (params) =>
-          (await this.templatesService.renderTemplateContent(template, params)).body,
+          (await this.templatesService.renderTemplateContent(renderTemplate, params)).body,
       )
     }
 

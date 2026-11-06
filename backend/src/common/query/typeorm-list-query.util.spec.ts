@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { applyParsedListQueryToQueryBuilder } from './typeorm-list-query.util'
+import {
+  applyListQueryFilters,
+  applyParsedListQueryToQueryBuilder,
+} from './typeorm-list-query.util'
 import type { ParsedListQuery, QueryableFieldsConfig } from './list-query.types'
 
 const queryConfig: QueryableFieldsConfig = {
@@ -116,5 +119,25 @@ describe('applyParsedListQueryToQueryBuilder', () => {
     expect(qb.andWhere).toHaveBeenCalledWith("notification.createdBy ILIKE :filter_0 ESCAPE '\\'", {
       filter_0: '%100\\%\\_\\\\ops%',
     })
+  })
+})
+
+describe('applyListQueryFilters', () => {
+  it('applies the filters without sorting or paging', () => {
+    const qb = createQueryBuilder()
+
+    const result = applyListQueryFilters(
+      qb as any,
+      [{ field: 'channelCode', operator: 'in', value: ['EMAIL', 'SMS'] }],
+      queryConfig,
+    )
+
+    expect(qb.andWhere).toHaveBeenCalledWith('LOWER(notification.channelCode) IN (:...filter_0)', {
+      filter_0: ['email', 'sms'],
+    })
+    expect(qb.addOrderBy).not.toHaveBeenCalled()
+    expect(qb.skip).not.toHaveBeenCalled()
+    expect(qb.take).not.toHaveBeenCalled()
+    expect(result).toBe(qb)
   })
 })
