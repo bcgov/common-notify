@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
@@ -11,12 +11,15 @@ import featureFlagsReducer from '@/redux/slices/featureFlags.slice'
 import UserService from '@/service/user-service'
 import Sidebar from './Sidebar'
 
+const location = vi.hoisted(() => ({ pathname: '/' }))
+
 vi.mock('@tanstack/react-router', () => ({
-  Link: ({ children, to, className, _activeProps, ...rest }: any) => (
+  Link: ({ children, to, className, activeProps: _activeProps, ...rest }: any) => (
     <a href={to} className={className} {...rest}>
       {children}
     </a>
   ),
+  useLocation: () => location,
 }))
 
 vi.mock('@/service/user-service', () => ({
@@ -99,6 +102,7 @@ describe('Sidebar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(UserService.hasRole).mockReturnValue(false)
+    location.pathname = '/'
   })
 
   it('renders primary nav items when user has CSTAR roles', () => {
@@ -205,6 +209,75 @@ describe('Sidebar', () => {
     renderSidebar()
 
     expect(screen.queryByRole('link', { name: 'Monitoring' })).not.toBeInTheDocument()
+  })
+
+  describe('admin menu', () => {
+    beforeEach(() => vi.mocked(UserService.hasRole).mockReturnValue(true))
+
+    it('groups the admin pages under Monitor, Report and Manage', async () => {
+      const user = userEvent.setup()
+      renderSidebar()
+      await user.click(screen.getByRole('button', { name: 'Admin' }))
+
+      const linksIn = (group: string) =>
+        within(screen.getByRole('group', { name: group }))
+          .getAllByRole('link')
+          .map((link) => [link.textContent, link.getAttribute('href')])
+
+      expect(linksIn('Monitor')).toEqual([['Monitoring', '/admin/monitoring']])
+      expect(linksIn('Report')).toEqual([['Usage & Limits', '/admin/usage']])
+      expect(linksIn('Manage')).toEqual([['Feature Flags', '/admin/feature-flags']])
+    })
+
+    it('starts closed away from the admin pages, and reports its state', async () => {
+      const user = userEvent.setup()
+      renderSidebar()
+      const toggle = screen.getByRole('button', { name: 'Admin' })
+
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.queryByRole('group', { name: 'Monitor' })).not.toBeInTheDocument()
+
+      await user.click(toggle)
+
+      expect(toggle).toHaveAttribute('aria-expanded', 'true')
+      const menuId = toggle.getAttribute('aria-controls')
+      expect(menuId).toBeTruthy()
+      expect(document.getElementById(menuId!)).toContainElement(
+        screen.getByRole('link', { name: 'Monitoring' }),
+      )
+    })
+
+    it.each(['/admin', '/admin/usage'])('opens on its own on %s', (pathname) => {
+      location.pathname = pathname
+      renderSidebar()
+
+      expect(screen.getByRole('button', { name: 'Admin' })).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getByRole('link', { name: 'Usage & Limits' })).toBeInTheDocument()
+    })
+
+    it('stays closed on an admin page once the user closes it', async () => {
+      const user = userEvent.setup()
+      location.pathname = '/admin/usage'
+      renderSidebar()
+
+      await user.click(screen.getByRole('button', { name: 'Admin' }))
+
+      expect(screen.getByRole('button', { name: 'Admin' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      )
+      expect(screen.queryByRole('link', { name: 'Usage & Limits' })).not.toBeInTheDocument()
+    })
+
+    it('does not open for a page that only starts with the word admin', () => {
+      location.pathname = '/administration'
+      renderSidebar()
+
+      expect(screen.getByRole('button', { name: 'Admin' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      )
+    })
   })
 
   it('renders the logged-in user display name', () => {

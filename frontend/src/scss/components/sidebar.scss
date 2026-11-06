@@ -221,8 +221,22 @@
   &__submenu {
     display: flex;
     flex-direction: column;
-    gap: $spacing-xs;
+    gap: $spacing-sm;
     padding: $spacing-xs 0;
+  }
+
+  &__group {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+  }
+
+  // Lines up with the sub-item text below it.
+  &__group-label {
+    padding: $spacing-xs $spacing-md 0 calc($spacing-md + 40px);
+    font-size: $font-size-sm;
+    font-weight: 700;
+    color: $dark-text;
   }
 
   &__subitem {
