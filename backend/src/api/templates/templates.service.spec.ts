@@ -92,6 +92,7 @@ describe('TemplatesService', () => {
     findEventsUsingTemplate: vi.fn(),
     softDelete: vi.fn(),
     createVersion: vi.fn(),
+    findPreviousVersion: vi.fn(),
   }
 
   const mockTenantsService = {
@@ -812,6 +813,56 @@ describe('TemplatesService', () => {
     })
   })
 
+  describe('getPreviousVersion', () => {
+    it('should return the version before the current one', async () => {
+      const createdAt = new Date('2026-06-12T12:00:00Z')
+      mockRepository.findById.mockResolvedValue({ ...mockTemplate, version: 4 })
+      mockRepository.findPreviousVersion.mockResolvedValue({
+        id: 'version-3',
+        templateId: 'template-123',
+        version: 3,
+        name: 'New Order Ready',
+        subject: 'Pizza Pizza',
+        body: 'Hello {{name}}',
+        createdBy: 'guid@azureidir',
+        createdByName: 'Isabella Samantha',
+        createdAt,
+      })
+
+      const result = await service.getPreviousVersion('tenant-123', 'template-123')
+
+      expect(mockRepository.findPreviousVersion).toHaveBeenCalledWith('template-123', 4)
+      expect(result).toEqual({
+        version: 3,
+        name: 'New Order Ready',
+        subject: 'Pizza Pizza',
+        body: 'Hello {{name}}',
+        createdByName: 'Isabella Samantha',
+        createdAt,
+      })
+    })
+
+    it("should not read another tenant's history", async () => {
+      mockRepository.findById.mockResolvedValue(null)
+
+      await expect(service.getPreviousVersion('other-tenant', 'template-123')).rejects.toThrow(
+        NotFoundException,
+      )
+
+      expect(mockRepository.findById).toHaveBeenCalledWith('other-tenant', 'template-123')
+      expect(mockRepository.findPreviousVersion).not.toHaveBeenCalled()
+    })
+
+    it('should 404 when the template has no earlier version', async () => {
+      mockRepository.findById.mockResolvedValue({ ...mockTemplate, version: 1 })
+      mockRepository.findPreviousVersion.mockResolvedValue(null)
+
+      await expect(service.getPreviousVersion('tenant-123', 'template-123')).rejects.toThrow(
+        'has no previous version',
+      )
+    })
+  })
+
   describe('createTemplate', () => {
     it('should create template with bodyType field', async () => {
       const createDto = {
@@ -842,6 +893,32 @@ describe('TemplatesService', () => {
         expect.objectContaining({
           bodyType: 'markdown',
         }),
+      )
+    })
+
+    it('should store the display name on the template and its first version', async () => {
+      const createDto = {
+        name: 'Test Template',
+        channelCode: NotificationChannel.EMAIL,
+        subject: 'Subject',
+        body: 'Body',
+      }
+
+      mockRepository.findByName.mockResolvedValue(null)
+      mockRepository.create.mockResolvedValue({ ...mockTemplate, ...createDto })
+      mockRepository.createVersion.mockResolvedValue({})
+
+      await service.createTemplate('tenant-123', createDto, 'user-123', 'Falk, Barrett')
+
+      expect(mockRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          createdBy: 'user-123',
+          createdByName: 'Falk, Barrett',
+          updatedByName: 'Falk, Barrett',
+        }),
+      )
+      expect(mockRepository.createVersion).toHaveBeenCalledWith(
+        expect.objectContaining({ createdBy: 'user-123', createdByName: 'Falk, Barrett' }),
       )
     })
 
@@ -906,6 +983,49 @@ describe('TemplatesService', () => {
   })
 
   describe('updateTemplate', () => {
+    it('should save the display name for the version trigger to copy', async () => {
+      mockRepository.findById.mockResolvedValue({ ...mockTemplate })
+      mockRepository.update.mockResolvedValue({ ...mockTemplate })
+
+      await service.updateTemplate(
+        'tenant-123',
+        'template-123',
+        { name: 'Renamed' },
+        'user-123',
+        'Falk, Barrett',
+      )
+
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        expect.objectContaining({ updatedBy: 'user-123', updatedByName: 'Falk, Barrett' }),
+      )
+    })
+
+    it('should return the display name in the response', async () => {
+      mockRepository.findById.mockResolvedValue({ ...mockTemplate })
+      mockRepository.update.mockResolvedValue({ ...mockTemplate, updatedByName: 'Falk, Barrett' })
+
+      const result = await service.updateTemplate(
+        'tenant-123',
+        'template-123',
+        { name: 'Renamed' },
+        'user-123',
+        'Falk, Barrett',
+      )
+
+      expect(result.updatedByName).toBe('Falk, Barrett')
+    })
+
+    it("should clear the previous editor's name when the token carried none", async () => {
+      mockRepository.findById.mockResolvedValue({ ...mockTemplate, updatedByName: 'Someone Else' })
+      mockRepository.update.mockResolvedValue({ ...mockTemplate })
+
+      await service.updateTemplate('tenant-123', 'template-123', { name: 'Renamed' }, 'user-123')
+
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        expect.objectContaining({ updatedBy: 'user-123', updatedByName: null }),
+      )
+    })
+
     it('should update bodyType field', async () => {
       const updateDto = {
         bodyType: 'markdown' as const,

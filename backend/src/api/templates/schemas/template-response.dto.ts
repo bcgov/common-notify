@@ -139,6 +139,18 @@ export class TemplateResponseDto {
   updatedBy: string
 
   /**
+   * Display name of the user who last updated this template
+   * @example "Falk, Barrett"
+   */
+  @ApiPropertyOptional({
+    description: 'Display name of the user who last updated this template, if one was recorded.',
+    type: String,
+    nullable: true,
+    example: 'Falk, Barrett',
+  })
+  updatedByName?: string | null
+
+  /**
    * Timestamp when template was last updated
    * @example "2024-05-01T12:30:00Z"
    */

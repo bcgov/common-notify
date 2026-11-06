@@ -67,10 +67,15 @@ describe('TemplatesController', () => {
   }
 
   // Helper to create a mock request with tenant
-  const createMockRequest = () =>
+  const createMockRequest = (headers: Record<string, string> = {}) =>
     ({
       tenant: mockTenant,
+      headers,
     }) as any
+
+  const bearerWithClaims = (claims: Record<string, unknown>) => ({
+    authorization: `Bearer h.${Buffer.from(JSON.stringify(claims)).toString('base64')}.s`,
+  })
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -311,6 +316,7 @@ describe('TemplatesController', () => {
         'tenant-123',
         createDto,
         'system',
+        null,
       )
     })
 
@@ -331,6 +337,7 @@ describe('TemplatesController', () => {
         'tenant-123',
         createDto,
         'system',
+        null,
       )
     })
 
@@ -344,12 +351,18 @@ describe('TemplatesController', () => {
 
       mockTemplatesService.createTemplate.mockResolvedValue(mockTemplate)
 
-      await controller.createTemplate(createMockRequest(), createDto)
+      await controller.createTemplate(
+        createMockRequest(
+          bearerWithClaims({ preferred_username: 'guid@azureidir', display_name: 'Falk, Barrett' }),
+        ),
+        createDto,
+      )
 
       expect(mockTemplatesService.createTemplate).toHaveBeenCalledWith(
         'tenant-123',
         createDto,
-        expect.anything(),
+        'guid@azureidir',
+        'Falk, Barrett',
       )
     })
 
@@ -388,6 +401,7 @@ describe('TemplatesController', () => {
         'template-123',
         updateDto,
         'system',
+        null,
       )
     })
 
@@ -406,6 +420,7 @@ describe('TemplatesController', () => {
         'template-456',
         updateDto,
         'system',
+        null,
       )
     })
 
@@ -416,13 +431,20 @@ describe('TemplatesController', () => {
 
       mockTemplatesService.updateTemplate.mockResolvedValue(mockTemplate)
 
-      await controller.updateTemplate(createMockRequest(), 'template-123', updateDto)
+      await controller.updateTemplate(
+        createMockRequest(
+          bearerWithClaims({ preferred_username: 'guid@azureidir', display_name: 'Falk, Barrett' }),
+        ),
+        'template-123',
+        updateDto,
+      )
 
       expect(mockTemplatesService.updateTemplate).toHaveBeenCalledWith(
         'tenant-123',
         'template-123',
         updateDto,
-        expect.anything(),
+        'guid@azureidir',
+        'Falk, Barrett',
       )
     })
 
