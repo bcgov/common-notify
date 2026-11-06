@@ -9,6 +9,12 @@ import { lowestLimitsByChannel, lowestThresholdsByChannel } from './tenant-limit
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
+import { applyListQueryFilters } from '../../common/query/typeorm-list-query.util'
+import type {
+  ListQueryFilter,
+  ParsedListQuery,
+  QueryableFieldsConfig,
+} from '../../common/query/list-query.types'
 import {
   AdminTenantUsageRowDto,
   ChannelUsageDto,
@@ -21,6 +27,18 @@ const FISCAL_YEAR_START_KEY = 'fiscal_year_start'
 const DEFAULT_FISCAL_MONTH = 4 // April
 const DEFAULT_FISCAL_DAY = 1
 const DEFAULT_WARN_THRESHOLD_PERCENT = 80
+
+/**
+ * What the admin all-tenants usage table can be filtered on. Columns are on the `l`
+ * (api_key_limit) alias that each of its queries starts from. Tenants are always ordered by
+ * name, so there is nothing to sort on.
+ */
+export const adminUsageListQueryConfig: QueryableFieldsConfig = {
+  sortableFields: {},
+  filterableFields: {
+    channel: { column: 'l.channel_code', valueType: 'string', operators: ['eq', 'in'] },
+  },
+}
 
 export interface RecordedUsageResult {
   periodTypeCode: UsagePeriodType.DAY | UsagePeriodType.YEAR
@@ -231,24 +249,23 @@ export class ApiKeyUsageService {
   /**
    * Usage vs limits for every tenant, one row per (tenant, channel). For the
    * NOTIFY_ADMIN all-tenants view. Values are aggregated across each tenant's API keys.
+   * A channel filter keeps only tenants with a limit on that channel, and only those rows.
    */
-  async getAllTenantsUsage(options: {
-    page?: number
-    limit?: number
-    search?: string
-  }): Promise<PaginatedAdminUsageResponseDto> {
-    const page = Math.max(1, options.page ?? 1)
-    const limit = Math.min(100, Math.max(1, options.limit ?? 15))
-    const search = options.search?.trim()
-    const offset = (page - 1) * limit
+  async getAllTenantsUsage(
+    parsedQuery: ParsedListQuery,
+    search?: string,
+  ): Promise<PaginatedAdminUsageResponseDto> {
+    const { page, limit, skip, filters } = parsedQuery
+    const term = search?.trim()
 
-    // Count distinct tenants (that have configured limits) matching the search.
+    // Count distinct tenants (that have configured limits) matching the search and filters.
     const countQb = this.apiKeyLimitRepository
       .createQueryBuilder('l')
       .innerJoin(ApiKeyConsumer, 'c', 'c.id = l.api_key_consumer_id')
       .innerJoin(Tenant, 't', 't.id = c.tenant_id')
       .select('COUNT(DISTINCT t.id)', 'count')
-    if (search) countQb.andWhere('t.name ILIKE :search', { search: `%${search}%` })
+    if (term) countQb.andWhere('t.name ILIKE :search', { search: `%${term}%` })
+    applyListQueryFilters(countQb, filters, adminUsageListQueryConfig)
     const countRaw = await countQb.getRawOne<{ count: string }>()
     const count = Number(countRaw?.count ?? 0)
     const totalPages = Math.ceil(count / limit)
@@ -258,7 +275,8 @@ export class ApiKeyUsageService {
     }
 
     // The page of tenants, ordered by name. Pagination is by TENANT so a tenant's
-    // per-channel rows always stay together on the same page.
+    // per-channel rows always stay together on the same page; the filters, not the shared
+    // paging, apply here for that reason.
     const tenantQb = this.apiKeyLimitRepository
       .createQueryBuilder('l')
       .innerJoin(ApiKeyConsumer, 'c', 'c.id = l.api_key_consumer_id')
@@ -268,25 +286,32 @@ export class ApiKeyUsageService {
       .groupBy('t.id')
       .addGroupBy('t.name')
       .orderBy('t.name', 'ASC')
-      .offset(offset)
+      .offset(skip)
       .limit(limit)
-    if (search) tenantQb.andWhere('t.name ILIKE :search', { search: `%${search}%` })
+    if (term) tenantQb.andWhere('t.name ILIKE :search', { search: `%${term}%` })
+    applyListQueryFilters(tenantQb, filters, adminUsageListQueryConfig)
     const tenantRows = await tenantQb.getRawMany<{ tenantId: string; tenantName: string }>()
 
-    const data = await this.buildUsageRows(tenantRows.map((t) => t.tenantId))
+    const data = await this.buildUsageRows(
+      tenantRows.map((t) => t.tenantId),
+      filters,
+    )
     return { data, count, page, limit, totalPages }
   }
 
   /**
    * Build usage-vs-limits rows (one per tenant, channel) for the given tenant ids.
-   * Values are aggregated across each tenant's API keys.
+   * Values are aggregated across each tenant's API keys. `filters` are admin usage list filters.
    */
-  private async buildUsageRows(tenantIds: string[]): Promise<AdminTenantUsageRowDto[]> {
+  private async buildUsageRows(
+    tenantIds: string[],
+    filters: ListQueryFilter[] = [],
+  ): Promise<AdminTenantUsageRowDto[]> {
     if (tenantIds.length === 0) return []
     const fiscalYearStart = await this.getFiscalYearStart()
 
     // Limits per (tenant, channel): the lowest configured across the tenant's keys.
-    const limitRows = await this.apiKeyLimitRepository
+    const limitQb = this.apiKeyLimitRepository
       .createQueryBuilder('l')
       .innerJoin(ApiKeyConsumer, 'c', 'c.id = l.api_key_consumer_id')
       .innerJoin(Tenant, 't', 't.id = c.tenant_id')
@@ -306,15 +331,16 @@ export class ApiKeyUsageService {
       .groupBy('t.id')
       .addGroupBy('t.name')
       .addGroupBy('l.channel_code')
-      .getRawMany<{
-        tenantId: string
-        tenantName: string
-        channelCode: string
-        rateLimitPerMinute: string
-        dailyLimit: string
-        annualLimit: string
-        warnThresholdPercent: string
-      }>()
+    applyListQueryFilters(limitQb, filters, adminUsageListQueryConfig)
+    const limitRows = await limitQb.getRawMany<{
+      tenantId: string
+      tenantName: string
+      channelCode: string
+      rateLimitPerMinute: string
+      dailyLimit: string
+      annualLimit: string
+      warnThresholdPercent: string
+    }>()
 
     // Current-window usage per (tenant, channel, period), summed across the tenant's keys.
     const usageRows = await this.apiKeyUsageRepository

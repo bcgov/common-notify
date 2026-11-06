@@ -1,7 +1,7 @@
 // Sidebar.tsx
-import { useState } from 'react'
-import type { FC } from 'react'
-import { Link } from '@tanstack/react-router'
+import { useId, useState } from 'react'
+import type { FC, ReactNode } from 'react'
+import { Link, useLocation } from '@tanstack/react-router'
 import '@/scss/components/sidebar.scss'
 import { useAppSelector } from '@/redux/hooks'
 import UserService from '@/service/user-service'
@@ -26,6 +26,8 @@ import WorkspacesOutlinedIcon from '@mui/icons-material/WorkspacesOutlined'
 import { CSTAR_ROLE_DISPLAY } from '@/enum/cstar-role.enum'
 import { Button, Tooltip, SvgInfoIcon } from '@bcgov/design-system-react-components'
 import TooltipTrigger from '@/components/TooltipTrigger'
+import SidebarNavGroup from '@/components/SidebarNavGroup'
+import type { SidebarNavGroupProps } from '@/components/SidebarNavGroup'
 
 const navItems = [
   {
@@ -65,28 +67,45 @@ const navItems = [
   },
 ]
 
+// Grouped by what an admin is there to do. These links need no role check of their own: the
+// whole menu is NOTIFY_ADMIN only, and routes/admin/route.tsx guards every /admin/* path.
 const adminItems = {
   label: 'Admin',
   icon: <AdminPanelSettingsOutlinedIcon />,
-  subItems: [
+  groups: [
     {
-      label: 'Feature Flags',
-      to: '/admin/feature-flags',
+      label: 'Monitor',
+      links: [{ label: 'Monitoring', to: '/admin/monitoring' }],
     },
     {
-      label: 'Usage & Limits',
-      to: '/admin/usage',
+      label: 'Report',
+      links: [{ label: 'Usage & Limits', to: '/admin/usage' }],
     },
     {
-      label: 'Monitoring',
-      to: '/admin/monitoring',
+      label: 'Manage',
+      links: [{ label: 'Feature Flags', to: '/admin/feature-flags' }],
     },
   ],
-} as const
+} as const satisfies {
+  label: string
+  icon: ReactNode
+  groups: readonly SidebarNavGroupProps[]
+}
 
 const Sidebar: FC = () => {
   const [collapsed, setCollapsed] = useState(false)
-  const [adminExpanded, setAdminExpanded] = useState(false)
+  const adminMenuId = useId()
+  const { pathname } = useLocation()
+  const onAdminPage = pathname === '/admin' || pathname.startsWith('/admin/')
+  // Open on arrival at an admin page so the current page's link is visible, but leave it to
+  // the user after that: closing it on an admin page keeps it closed until they leave and
+  // come back. Adjusted during render rather than in an effect, so there is no closed flash.
+  const [adminExpanded, setAdminExpanded] = useState(onAdminPage)
+  const [wasOnAdminPage, setWasOnAdminPage] = useState(onAdminPage)
+  if (onAdminPage !== wasOnAdminPage) {
+    setWasOnAdminPage(onAdminPage)
+    if (onAdminPage) setAdminExpanded(true)
+  }
   // Get user from Redux store (populated from JWT token)
   const user = useAppSelector((state) => state.auth.user)
   const cstarTenants = useAppSelector((state) => state.cstar.tenants)
@@ -172,6 +191,7 @@ const Sidebar: FC = () => {
               className="sidebar__item"
               aria-label={collapsed ? adminItems.label : undefined}
               aria-expanded={!collapsed && adminExpanded}
+              aria-controls={adminExpanded && !collapsed ? adminMenuId : undefined}
               onPress={() => {
                 if (collapsed) {
                   setCollapsed(false)
@@ -195,34 +215,10 @@ const Sidebar: FC = () => {
               )}
             </Button>
             {adminExpanded && !collapsed && (
-              <div className="sidebar__submenu">
-                {isAdmin && (
-                  <Link
-                    to="/admin/feature-flags"
-                    className="sidebar__subitem"
-                    activeProps={{ className: 'active' }}
-                  >
-                    <span className="sidebar__label">Feature Flags</span>
-                  </Link>
-                )}
-                {isAdmin && (
-                  <Link
-                    to="/admin/usage"
-                    className="sidebar__subitem"
-                    activeProps={{ className: 'active' }}
-                  >
-                    <span className="sidebar__label">Usage &amp; Limits</span>
-                  </Link>
-                )}
-                {isAdmin && (
-                  <Link
-                    to="/admin/monitoring"
-                    className="sidebar__subitem"
-                    activeProps={{ className: 'active' }}
-                  >
-                    <span className="sidebar__label">Monitoring</span>
-                  </Link>
-                )}
+              <div id={adminMenuId} className="sidebar__submenu">
+                {adminItems.groups.map((group) => (
+                  <SidebarNavGroup key={group.label} label={group.label} links={group.links} />
+                ))}
               </div>
             )}
           </div>
