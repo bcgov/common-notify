@@ -57,21 +57,22 @@ interface FilterCondition {
   params?: Record<string, unknown>
 }
 
-type FilterValue = ListQueryFilter['value']
+/** One value, as the parser produces for every operator but `in` and `isnull`. */
+type FilterScalar = string | number | boolean | Date
 
 function filterCondition(filter: ListQueryFilter, target: FilterTarget): FilterCondition {
   const { column, param } = target
   switch (filter.operator) {
     case 'eq':
-      return comparison('=', filter.value, target)
+      return comparison('=', filter.value as FilterScalar, target)
     case 'ne':
-      return comparison('!=', filter.value, target)
+      return comparison('!=', filter.value as FilterScalar, target)
     case 'in':
-      return inList(filter.value, target)
+      return inList(filter.value as FilterScalar[], target)
     case 'like':
       return {
         where: String.raw`${column} ILIKE :${param} ESCAPE '\'`,
-        params: { [param]: `%${escapeLikePattern(String(filter.value))}%` },
+        params: { [param]: `%${escapeLikePattern(String(filter.value as FilterScalar))}%` },
       }
     case 'gte':
       return { where: `${column} >= :${param}`, params: { [param]: filter.value } }
@@ -84,7 +85,7 @@ function filterCondition(filter: ListQueryFilter, target: FilterTarget): FilterC
 
 function comparison(
   operator: '=' | '!=',
-  value: FilterValue,
+  value: FilterScalar,
   { column, param, isString }: FilterTarget,
 ): FilterCondition {
   return isString
@@ -92,13 +93,15 @@ function comparison(
     : { where: `${column} ${operator} :${param}`, params: { [param]: value } }
 }
 
-function inList(value: FilterValue, { column, param, isString }: FilterTarget): FilterCondition {
-  const values = value as Array<string | number | boolean | Date>
+function inList(
+  values: FilterScalar[],
+  { column, param, isString }: FilterTarget,
+): FilterCondition {
   return isString
     ? { where: `LOWER(${column}) IN (:...${param})`, params: { [param]: values.map(lower) } }
     : { where: `${column} IN (:...${param})`, params: { [param]: values } }
 }
 
-function lower(value: unknown): string {
+function lower(value: FilterScalar): string {
   return String(value).toLowerCase()
 }
