@@ -5,7 +5,11 @@ import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest'
 import { GcNotifyInternalExecutionService } from './gc-notify-internal-execution.service'
 import { TemplatesRepository } from '../templates/templates.repository'
 import { TemplatesService } from '../templates/templates.service'
-import { NotificationService } from '../notification/notification.service'
+import {
+  MAIL_MERGE_ERRORS_OMITTED,
+  NotificationService,
+} from '../notification/notification.service'
+import { MAIL_MERGE_MAX_REPORTED_ERRORS } from '../notify/schemas/mail-merge.constants'
 import { NotificationRequestDetailService } from '../notification/notification-request-detail.service'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { AttachmentValidationService } from '../notify/services/attachment-validation.service'
@@ -247,6 +251,30 @@ describe('GcNotifyInternalExecutionService', () => {
       expect(content.body).toContain('<h2')
       expect(content.body).toContain('<strong>Bold</strong>')
       expect(content.body).not.toContain('# Heading')
+    })
+
+    it('delivers a plain-text subject while the response keeps the escaped form GC Notify returns', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'tpl-1',
+        version: 1,
+        channelCode: NotificationChannel.EMAIL,
+      })
+      mockTemplatesService.renderTemplateContent.mockResolvedValue({
+        subject: 'Q&A session',
+        body: 'b',
+        bodyType: 'markdown',
+      })
+      mockNotificationService.create.mockResolvedValue({
+        id: 'notif-subject',
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+      })
+
+      const result = await service.sendEmail(body, TENANT_ID)
+
+      await flushMicrotasks()
+      const [[, jobPayload]] = mockIngestionQueue.add.mock.calls
+      expect(jobPayload.request.email.content.subject).toBe('Q&A session')
+      expect((result.content as any).subject).toBe('Q&amp;A session')
     })
 
     it('reports the tenant sender delivery will use, not a separate configured value', async () => {
@@ -696,6 +724,7 @@ describe('GcNotifyInternalExecutionService', () => {
         id: 'tpl-bulk',
         version: 2,
         channelCode: NotificationChannel.EMAIL,
+        engineCode: TemplateEngine.LEGACY_GC_NOTIFY,
       })
       acceptMerge.mockResolvedValue({
         notifyId: ORIGINAL_ID,
@@ -721,6 +750,7 @@ describe('GcNotifyInternalExecutionService', () => {
       id: 'tpl-bulk',
       version: 2,
       channelCode: NotificationChannel.EMAIL,
+      engineCode: TemplateEngine.LEGACY_GC_NOTIFY,
     }
 
     const accepted = {
@@ -753,7 +783,7 @@ describe('GcNotifyInternalExecutionService', () => {
         ['alice@example.com', 'Alice'],
         ['bob@example.com', 'Bob'],
       ])
-      expect(dto.email.content).toEqual({ templateId: 'tpl-bulk' })
+      expect(dto.email.content).toEqual({ templateId: 'tpl-bulk', gcNotifyRendering: true })
     })
 
     it('returns a GC Notify job shape, omitting fields we have no honest value for', async () => {
@@ -826,6 +856,263 @@ describe('GcNotifyInternalExecutionService', () => {
         ),
       ).rejects.toMatchObject({ status: 400 })
       expect(acceptMerge).not.toHaveBeenCalled()
+    })
+
+    it.each([TemplateEngine.HANDLEBARS, TemplateEngine.MUSTACHE, TemplateEngine.MJML])(
+      'rejects a %s template, whose ((placeholders)) the merge workers would not fill',
+      async (engineCode) => {
+        mockTemplatesRepository.findById.mockResolvedValue({ ...TEMPLATE, engineCode })
+
+        await expect(service.sendBulk(bulkBody, TENANT_ID)).rejects.toMatchObject({
+          status: 400,
+          response: { errors: [{ error: 'ValidationError' }] },
+        })
+        expect(acceptMerge).not.toHaveBeenCalled()
+      },
+    )
+
+    it('moves a recipient column from any position to the front, keeping each value with its header', async () => {
+      await service.sendBulk(
+        {
+          ...bulkBody,
+          rows: [
+            ['first_name', 'email address', 'city'],
+            ['Alice', 'alice@example.com', 'Victoria'],
+            ['Bob', 'bob@example.com', 'Nanaimo'],
+          ],
+        },
+        TENANT_ID,
+      )
+
+      const { mergeArray } = (acceptMerge.mock.calls[0][0].dto as any).email.recipients
+      expect(mergeArray).toEqual([
+        ['to', 'first_name', 'city'],
+        ['alice@example.com', 'Alice', 'Victoria'],
+        ['bob@example.com', 'Bob', 'Nanaimo'],
+      ])
+      // The real parser, because the point is what each recipient's template receives.
+      expect(NotificationService.prototype.parseMailMergeRecipients.call({}, mergeArray)).toEqual([
+        { address: 'alice@example.com', params: { first_name: 'Alice', city: 'Victoria' } },
+        { address: 'bob@example.com', params: { first_name: 'Bob', city: 'Nanaimo' } },
+      ])
+    })
+
+    it('moves the recipient column of a csv body too', async () => {
+      await service.sendBulk(
+        {
+          template_id: 'tpl-bulk',
+          name: 'From CSV',
+          csv: 'first_name,email address\nAlice,alice@example.com\n',
+        } as any,
+        TENANT_ID,
+      )
+
+      const dto = acceptMerge.mock.calls[0][0].dto as any
+      expect(dto.email.recipients.mergeArray).toEqual([
+        ['to', 'first_name'],
+        ['alice@example.com', 'Alice'],
+      ])
+    })
+
+    it('leaves a row missing its recipient for the merge pipeline to report', async () => {
+      await service.sendBulk(
+        {
+          ...bulkBody,
+          rows: [['first_name', 'email address'], ['Alice']],
+        },
+        TENANT_ID,
+      )
+
+      const dto = acceptMerge.mock.calls[0][0].dto as any
+      expect(dto.email.recipients.mergeArray[1]).toEqual([undefined, 'Alice'])
+    })
+
+    it.each([
+      ['Email Address', NotificationChannel.EMAIL],
+      ['email_address', NotificationChannel.EMAIL],
+      ['EMAIL-ADDRESS', NotificationChannel.EMAIL],
+      ['adresse courriel', NotificationChannel.EMAIL],
+      ['Phone_Number', NotificationChannel.SMS],
+      ['numéro de téléphone', NotificationChannel.SMS],
+    ])('recognises %s as the %s recipient column', async (column, channelCode) => {
+      mockTemplatesRepository.findById.mockResolvedValue({ ...TEMPLATE, channelCode })
+
+      await service.sendBulk({ ...bulkBody, rows: [[column], ['recipient']] }, TENANT_ID)
+
+      const dto = acceptMerge.mock.calls[0][0].dto as any
+      const channel = channelCode === NotificationChannel.SMS ? dto.sms : dto.email
+      expect(channel.recipients.mergeArray[0]).toEqual(['to'])
+    })
+
+    it('picks the recipient column the template channel names when both are present', async () => {
+      await service.sendBulk(
+        {
+          ...bulkBody,
+          rows: [
+            ['phone number', 'email address'],
+            ['+12505551234', 'alice@example.com'],
+          ],
+        },
+        TENANT_ID,
+      )
+
+      const dto = acceptMerge.mock.calls[0][0].dto as any
+      expect(dto.email.recipients.mergeArray).toEqual([
+        ['to', 'phone number'],
+        ['alice@example.com', '+12505551234'],
+      ])
+    })
+
+    it('rejects an SMS template whose header only names an email recipient', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({
+        ...TEMPLATE,
+        channelCode: NotificationChannel.SMS,
+      })
+
+      await expect(service.sendBulk(bulkBody, TENANT_ID)).rejects.toMatchObject({ status: 400 })
+      expect(acceptMerge).not.toHaveBeenCalled()
+    })
+
+    describe('template personalisation', () => {
+      const withTemplate = (template: Record<string, unknown>) =>
+        mockTemplatesRepository.findById.mockResolvedValue({ ...TEMPLATE, ...template })
+
+      const rejection = async (rows: string[][]) => {
+        const error: any = await service.sendBulk({ ...bulkBody, rows }, TENANT_ID).catch((e) => e)
+        expect(acceptMerge).not.toHaveBeenCalled()
+        expect(error.status).toBe(400)
+        return error.response.errors
+      }
+
+      it('rejects a printed placeholder with no column, naming every missing column', async () => {
+        withTemplate({ subject: 'For ((account))', body: 'Hi ((first_name)) ((city))' })
+
+        await expect(
+          rejection([
+            ['email address', 'first_name'],
+            ['alice@example.com', 'Alice'],
+          ]),
+        ).resolves.toEqual([
+          { error: 'ValidationError', message: 'Missing column headers: account, city' },
+        ])
+      })
+
+      it('rejects a conditional placeholder with no column', async () => {
+        withTemplate({ body: 'Hi((vip?? VIP))' })
+
+        await expect(rejection([['email address'], ['alice@example.com']])).resolves.toEqual([
+          { error: 'ValidationError', message: 'Missing column headers: vip' },
+        ])
+      })
+
+      it('matches column names exactly, as the delivery workers do', async () => {
+        withTemplate({ body: 'Hi ((first_name))' })
+
+        await expect(
+          rejection([
+            ['email address', 'First Name'],
+            ['alice@example.com', 'Alice'],
+          ]),
+        ).resolves.toEqual([
+          { error: 'ValidationError', message: 'Missing column headers: first_name' },
+        ])
+      })
+
+      it('reports each blank printed value by row, counting a short row and whitespace as blank', async () => {
+        withTemplate({ body: 'Hi ((first_name)) from ((city))' })
+
+        await expect(
+          rejection([
+            ['email address', 'first_name', 'city'],
+            ['alice@example.com', 'Alice', 'Victoria'],
+            ['bob@example.com', '   ', 'Nanaimo'],
+            ['carol@example.com', 'Carol'],
+          ]),
+        ).resolves.toEqual([
+          { error: 'ValidationError', message: 'Row 2 - first_name: Missing' },
+          { error: 'ValidationError', message: 'Row 3 - city: Missing' },
+        ])
+      })
+
+      it('reads values from the right column when the recipient was not first', async () => {
+        withTemplate({ body: 'Hi ((first_name)) from ((city))' })
+
+        await expect(
+          rejection([
+            ['first_name', 'email address', 'city'],
+            ['', 'alice@example.com', 'Victoria'],
+          ]),
+        ).resolves.toEqual([{ error: 'ValidationError', message: 'Row 1 - first_name: Missing' }])
+      })
+
+      it('caps the reported row errors so a large file cannot produce an unbounded response', async () => {
+        withTemplate({ body: 'Hi ((first_name))' })
+        const rows = [
+          ['email address', 'first_name'],
+          ...Array.from({ length: 150 }, (_, i) => [`user${i}@example.com`, '']),
+        ]
+
+        const errors = await rejection(rows)
+
+        expect(errors).toHaveLength(MAIL_MERGE_MAX_REPORTED_ERRORS + 1)
+        expect(errors[0].message).toBe('Row 1 - first_name: Missing')
+        expect(errors.at(-1).message).toBe(MAIL_MERGE_ERRORS_OMITTED)
+      })
+
+      it('accepts a blank value for a placeholder that is only tested', async () => {
+        withTemplate({ body: 'Hi((vip?? VIP))' })
+
+        await service.sendBulk(
+          {
+            ...bulkBody,
+            rows: [
+              ['email address', 'vip'],
+              ['alice@example.com', ''],
+            ],
+          },
+          TENANT_ID,
+        )
+
+        expect(acceptMerge).toHaveBeenCalledTimes(1)
+      })
+
+      it('accepts rows supplying every placeholder, ignoring columns the template does not use', async () => {
+        withTemplate({ subject: 'For ((first_name))', body: 'Hi ((first_name))' })
+
+        await service.sendBulk(
+          {
+            ...bulkBody,
+            rows: [
+              [' email address', ' first_name ', 'unused'],
+              ['alice@example.com', 'Alice', ''],
+            ],
+          },
+          TENANT_ID,
+        )
+
+        expect(acceptMerge).toHaveBeenCalledTimes(1)
+      })
+
+      it('ignores a stored subject on an SMS template, which is never rendered', async () => {
+        withTemplate({
+          channelCode: NotificationChannel.SMS,
+          subject: 'For ((account))',
+          body: 'Hi ((first_name))',
+        })
+
+        await service.sendBulk(
+          {
+            ...bulkBody,
+            rows: [
+              ['phone number', 'first_name'],
+              ['+12505551234', 'Alice'],
+            ],
+          },
+          TENANT_ID,
+        )
+
+        expect(acceptMerge).toHaveBeenCalledTimes(1)
+      })
     })
 
     it('rejects a header with no recipient column', async () => {
