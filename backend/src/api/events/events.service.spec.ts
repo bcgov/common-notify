@@ -17,7 +17,7 @@ import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { EmailLogoService } from '../email-logo/email-logo.service'
 import { PhoneNumberService } from '../notify/services/phone-number.service'
 import { TemplatesRepository } from '../templates/templates.repository'
-import { CstarApiClient } from '../../services/cstar/cstar-api.client'
+import { McpGroupsService } from '../../services/mcp/mcp-groups.service'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import type { ParsedListQuery } from '../../common/query/list-query.types'
 
@@ -135,7 +135,7 @@ describe('EventsService', () => {
     findById: vi.fn(),
   }
 
-  const mockCstarApiClient = {
+  const mockMcpGroupsService = {
     getTenantGroups: vi.fn(),
   }
 
@@ -190,7 +190,7 @@ describe('EventsService', () => {
           useValue: mockConfigurationRepository,
         },
         { provide: TemplatesRepository, useValue: mockTemplatesRepository },
-        { provide: CstarApiClient, useValue: mockCstarApiClient },
+        { provide: McpGroupsService, useValue: mockMcpGroupsService },
         { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile()
@@ -1213,7 +1213,7 @@ describe('EventsService', () => {
   describe('CSTAR group sync', () => {
     const GROUP_ONE = 'group-1'
     const GROUP_TWO = 'group-2'
-    const cstar = { tenantId: 'cstar-tenant-guid', authHeader: 'Bearer token' }
+    const cstar = { tenantId: 'cstar-tenant-guid' }
 
     const emailSetting = () =>
       ({
@@ -1245,7 +1245,7 @@ describe('EventsService', () => {
 
     beforeEach(() => {
       mockEventRepository.findOne.mockResolvedValue(buildEvent([emailSetting()]))
-      mockCstarApiClient.getTenantGroups.mockResolvedValue([
+      mockMcpGroupsService.getTenantGroups.mockResolvedValue([
         { id: GROUP_ONE, name: 'CSTAR Group 1' },
         { id: GROUP_TWO, name: 'CSTAR Group 2' },
       ])
@@ -1379,7 +1379,7 @@ describe('EventsService', () => {
         cstar,
       )
 
-      expect(mockCstarApiClient.getTenantGroups).not.toHaveBeenCalled()
+      expect(mockMcpGroupsService.getTenantGroups).not.toHaveBeenCalled()
     })
 
     it('activates the channel on a TO group alone, with no typed-in address', async () => {

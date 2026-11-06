@@ -300,3 +300,10 @@ pgbackrestHistoryPrune:
   retentionDays: 14
   #-- in-cluster imagestream, so no Docker Hub pull
   image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+
+# Enable after publishing the image and provisioning the service-account secret.
+cstarMcp:
+  enabled: false
+  image: ""
+  secretName: cstar-mcp-secrets
+  replicaCount: 1

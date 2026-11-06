@@ -31,7 +31,7 @@ import { TemplatesRepository } from '../templates/templates.repository'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
 import type { ParsedListQuery, QueryableFieldsConfig } from '../../common/query/list-query.types'
-import { CstarApiClient } from '../../services/cstar/cstar-api.client'
+import { McpGroupsService } from '../../services/mcp/mcp-groups.service'
 import { CstarGroupListResponseDto } from './schemas/cstar-group-response.dto'
 import { FeatureFlagService } from '../feature-flag/feature-flag.service'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
@@ -61,15 +61,13 @@ interface DesiredCstarGroup {
 }
 
 /**
- * The CSTAR tenant the caller is acting in, and the token to reach CSTAR with. Needed to check
+ * The authenticated CSTAR tenant the caller is acting in. Needed to check
  * that the CSTAR group IDs an event is being pointed at actually belong to that tenant, since
  * groups live in CSTAR and cannot be constrained by a foreign key here.
  */
 export interface CstarRequestContext {
   /** The CSTAR tenant ID, i.e. notify's tenant.externalId. */
   tenantId: string
-  /** The caller's Authorization header, passed through to CSTAR. */
-  authHeader?: string
 }
 
 export const eventListQueryConfig: QueryableFieldsConfig = {
@@ -123,7 +121,7 @@ export class EventsService {
     private readonly emailLogoService: EmailLogoService,
     private readonly templatesRepository: TemplatesRepository,
     private readonly configService: ConfigService,
-    private readonly cstarApiClient: CstarApiClient,
+    private readonly mcpGroups: McpGroupsService,
     @InjectRepository(ProvisionedPhoneNumber)
     private readonly provisionedPhoneNumberRepository: Repository<ProvisionedPhoneNumber>,
     private readonly featureFlagService: FeatureFlagService,
@@ -319,10 +317,10 @@ export class EventsService {
    *
    * The same list is what updateEmailChannelSetting below validates saved group IDs against.
    *
-   * @param cstar CSTAR tenant and token to look the groups up with
+   * @param cstar Authenticated tenant context; credentials are owned by the MCP adapter
    */
   async listCstarGroups(cstar: CstarRequestContext): Promise<CstarGroupListResponseDto> {
-    const groups = await this.cstarApiClient.getTenantGroups(cstar.tenantId, cstar.authHeader)
+    const groups = await this.mcpGroups.getTenantGroups(cstar.tenantId)
 
     return {
       groups: groups.map((group) => ({
@@ -964,7 +962,7 @@ export class EventsService {
       )
     }
 
-    const tenantGroups = await this.cstarApiClient.getTenantGroups(cstar.tenantId, cstar.authHeader)
+    const tenantGroups = await this.mcpGroups.getTenantGroups(cstar.tenantId)
     const permitted = new Set(tenantGroups.map((group) => group.id))
     const unknown = [
       ...new Set(

@@ -17,4 +17,6 @@ export enum FeatureFlagCode {
   // SMS to numbers outside Canada. When enabled, each tenant's own International SMS
   // setting decides; when disabled, those numbers are rejected for every tenant.
   INTERNATIONAL_SMS = 'international_sms',
+  // Retired Notify-hosted MCP prototype flag. Kept for the historical V77 seed.
+  MCP_API = 'mcp_api',
 }

@@ -62,3 +62,10 @@ frontend:
   #-- have no data for this environment.
   promtail:
     enabled: true
+
+# Enable after publishing the image and provisioning the service-account secret.
+cstarMcp:
+  enabled: false
+  image: ""
+  secretName: cstar-mcp-secrets
+  replicaCount: 2

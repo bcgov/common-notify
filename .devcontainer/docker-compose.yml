@@ -115,9 +115,27 @@ services:
         condition: service_completed_successfully
     volumes: ["./output:/output"]
 
+  cstar-mcp:
+    build: ../mcp-servers/cstar
+    ports: ["3101:3101"]
+    environment:
+      MCP_API_KEY: ${CSTAR_MCP_API_KEY:-local-cstar-mcp-key-change-before-deployment}
+      CSTAR_API_URL: ${CSTAR_API_URL:-}
+      CSTAR_TOKEN_URL: ${CSTAR_TOKEN_URL:-}
+      CSTAR_CLIENT_ID: ${CSTAR_CLIENT_ID:-}
+      CSTAR_CLIENT_SECRET: ${CSTAR_CLIENT_SECRET:-}
+      CSTAR_SCOPE: ${CSTAR_SCOPE:-}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3101/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
   backend:
     container_name: backend
     depends_on:
+      cstar-mcp:
+        condition: service_healthy
       migrations:
         condition: service_started
       redis:
@@ -136,6 +154,7 @@ services:
     environment:
       <<: *postgres-vars
       NODE_ENV: development
+      CSTAR_MCP_API_KEY: ${CSTAR_MCP_API_KEY:-local-cstar-mcp-key-change-before-deployment}
       KONG_ADMIN_URL: http://kong:8001
       GC_NOTIFY_BASE_URL: ${GC_NOTIFY_BASE_URL:-https://api.notification.canada.ca}
       REDIS_HOST: redis
@@ -282,6 +301,7 @@ services:
       PORT: 3002
       # The APS Credential Issuer mock provisions into this Kong. Kept in step with the
       # backend's APS_* defaults above so both agree on gateway and environment ids.
+      CSTAR_MCP_API_KEY: ${CSTAR_MCP_API_KEY:-local-cstar-mcp-key-change-before-deployment}
       KONG_ADMIN_URL: http://kong:8001
       APS_GATEWAY_ID: ${APS_GATEWAY_ID:-gw-local}
       APS_ENVIRONMENT_APP_ID: ${APS_ENVIRONMENT_APP_ID:-LOCAL001}

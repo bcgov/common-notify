@@ -253,6 +253,13 @@ spec:
                 secretKeyRef:
                   name: app-api-secrets
                   key: NOTIFY_CLIENT_ID
+            {{- if .Values.cstarMcp.enabled }}
+            - name: CSTAR_MCP_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.cstarMcp.secretName }}
+                  key: MCP_API_KEY
+            {{- end }}
             - name: CSTAR_API_URL
               valueFrom:
                 secretKeyRef:
