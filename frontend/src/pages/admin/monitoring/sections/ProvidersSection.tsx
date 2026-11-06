@@ -3,17 +3,12 @@ import PageSubHeading from '@/components/PageSubHeading'
 import { StatusBadge } from '@/components/StatusBadge'
 import StatTile from '@/components/StatTile'
 import type { ProviderStats } from '@/interfaces/queueMonitoring.interface'
-import { HEALTH_LABELS, formatMessageChannel } from '@/utils/monitoring'
+import { HEALTH_LABELS, providerLabel } from '@/utils/monitoring'
 
 const CIRCUIT_LABELS: Record<NonNullable<ProviderStats['circuit']>, string> = {
   closed: 'Sending',
   open: 'Paused: provider failing',
   'half-open': 'Testing recovery',
-}
-
-/** "CHES (Email)". */
-export function providerLabel(provider: ProviderStats): string {
-  return `${provider.name} (${formatMessageChannel(provider.channel)})`
 }
 
 function inFlightText(provider: ProviderStats): string | null {

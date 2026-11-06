@@ -75,7 +75,11 @@ const adminItems = {
   groups: [
     {
       label: 'Monitor',
-      links: [{ label: 'Monitoring', to: '/admin/monitoring' }],
+      links: [
+        { label: 'Overview', to: '/admin', exact: true },
+        { label: 'Service health', to: '/admin/health' },
+        { label: 'Queues & processing', to: '/admin/monitoring' },
+      ],
     },
     {
       label: 'Report',

@@ -1,4 +1,11 @@
-import type { HealthStatus } from '@/interfaces/queueMonitoring.interface'
+import type { HealthWarning, HealthWarningPage } from '@/components/HealthBanner'
+import type { ComponentStatus } from '@/components/ComponentStatusList'
+import type {
+  HealthStatus,
+  MessageChannelStats,
+  ProviderStats,
+  QueueMonitoring,
+} from '@/interfaces/queueMonitoring.interface'
 
 const QUEUE_LABELS: Record<string, string> = {
   'notification-ingestion': 'Ingestion',
@@ -59,4 +66,82 @@ export function formatAgo(iso: string | null, now: number): string {
 
 export function formatRate(perMinute: number): string {
   return `${perMinute.toLocaleString(undefined, { maximumFractionDigits: 1 })}/min`
+}
+
+/** "CHES (Email)". */
+export function providerLabel(provider: ProviderStats): string {
+  return `${provider.name} (${formatMessageChannel(provider.channel)})`
+}
+
+/** The admin monitoring pages, and which part of the snapshot each one details. */
+export const MONITORING_PAGES = {
+  overview: { label: 'Overview', to: '/admin' },
+  health: { label: 'Service health', to: '/admin/health' },
+  queues: { label: 'Queues & processing', to: '/admin/monitoring' },
+} as const satisfies Record<string, HealthWarningPage>
+
+/** Every warning in the snapshot, each pointing at the page that explains it. */
+export function monitoringWarnings(data: QueueMonitoring): HealthWarning[] {
+  const { health, queues } = MONITORING_PAGES
+  return [
+    ...data.redis.reasons.map((reason) => ({ message: `Redis: ${reason}`, page: health })),
+    ...data.providers.flatMap((provider) =>
+      provider.reasons.map((reason) => ({
+        message: `${providerLabel(provider)}: ${reason}`,
+        page: health,
+      })),
+    ),
+    ...data.queues.flatMap((queue) =>
+      queue.reasons.map((reason) => ({
+        message: `${formatQueueName(queue.name)}: ${reason}`,
+        page: queues,
+      })),
+    ),
+    ...data.reconciler.reasons.map((reason) => ({
+      message: `Delivery recovery: ${reason}`,
+      page: queues,
+    })),
+  ]
+}
+
+/** Each part of the service with a status of its own, for the Overview's at-a-glance list. */
+export function componentStatuses(data: QueueMonitoring): ComponentStatus[] {
+  const { health, queues } = MONITORING_PAGES
+  const entry = (name: string, status: HealthStatus, to: HealthWarningPage['to']) => ({
+    name,
+    status,
+    statusLabel: HEALTH_LABELS[status],
+    to,
+  })
+  return [
+    ...data.providers.map((provider) => entry(providerLabel(provider), provider.status, health.to)),
+    entry('Redis', data.redis.status, health.to),
+    ...data.queues.map((queue) => entry(formatQueueName(queue.name), queue.status, queues.to)),
+    entry('Delivery recovery', data.reconciler.status, queues.to),
+  ]
+}
+
+export interface BacklogSummary {
+  /** Messages accepted and not yet sent or failed, across channels. */
+  pending: number
+  oldestPendingAgeMs: number | null
+  /** The slowest channel's estimate; null when nothing is pending or nothing is sending. */
+  clearsInMinutes: number | null
+  /** Something is pending on a channel that isn't sending at all. */
+  stuck: boolean
+}
+
+export function backlogSummary(messages: MessageChannelStats[]): BacklogSummary {
+  const ages = messages.flatMap((m) =>
+    m.oldestPendingAgeMs === null ? [] : [m.oldestPendingAgeMs],
+  )
+  const estimates = messages.flatMap((m) =>
+    m.estimatedClearMinutes ? [m.estimatedClearMinutes] : [],
+  )
+  return {
+    pending: messages.reduce((sum, m) => sum + m.pending, 0),
+    oldestPendingAgeMs: ages.length > 0 ? Math.max(...ages) : null,
+    clearsInMinutes: estimates.length > 0 ? Math.max(...estimates) : null,
+    stuck: messages.some((m) => m.pending > 0 && m.estimatedClearMinutes === null),
+  }
 }

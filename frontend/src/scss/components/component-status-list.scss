@@ -1,0 +1,22 @@
+@import '../variables';
+
+.component-status-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: $spacing-sm $spacing-lg;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.component-status-list__item {
+  @include flex-between;
+  gap: $spacing-sm;
+  padding: $spacing-sm $spacing-md;
+  border: 1px solid $border-default;
+  border-radius: 4px;
+}
+
+.component-status-list__name {
+  font-weight: 700;
+}

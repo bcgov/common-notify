@@ -7,7 +7,7 @@ import type {
   MonitoringOverview,
   RedisStats,
 } from '@/interfaces/queueMonitoring.interface'
-import { HEALTH_LABELS, formatBytes, formatDuration } from '@/utils/monitoring'
+import { HEALTH_LABELS, backlogSummary, formatBytes, formatDuration } from '@/utils/monitoring'
 
 interface OverviewCardsProps {
   overview: MonitoringOverview
@@ -15,7 +15,6 @@ interface OverviewCardsProps {
   redis: RedisStats
 }
 
-/** The four headline numbers: how fast, how much, how far behind, and how close to full. */
 /** What the backlog card says under its count: nothing waiting, stalled, or an estimate. */
 function backlogLabel(pending: number, stuck: boolean, clears: number | null): string {
   if (pending === 0) return 'Nothing waiting'
@@ -23,17 +22,14 @@ function backlogLabel(pending: number, stuck: boolean, clears: number | null): s
   return `Clears in ~${(clears ?? 0).toLocaleString()} min`
 }
 
+/** The four headline numbers: how fast, how much, how far behind, and how close to full. */
 const OverviewCards: FC<OverviewCardsProps> = ({ overview, messages, redis }) => {
-  const pending = messages.reduce((sum, m) => sum + m.pending, 0)
-  const oldest = messages.reduce<number | null>(
-    (max, m) => (m.oldestPendingAgeMs === null ? max : Math.max(max ?? 0, m.oldestPendingAgeMs)),
-    null,
-  )
-  const clears = messages.reduce<number | null>((max, m) => {
-    if (m.estimatedClearMinutes === null || m.estimatedClearMinutes === 0) return max
-    return Math.max(max ?? 0, m.estimatedClearMinutes)
-  }, null)
-  const stuck = messages.some((m) => m.pending > 0 && m.estimatedClearMinutes === null)
+  const {
+    pending,
+    oldestPendingAgeMs: oldest,
+    clearsInMinutes: clears,
+    stuck,
+  } = backlogSummary(messages)
   const memoryText =
     redis.maxMemoryBytes === null
       ? `${formatBytes(redis.usedMemoryBytes)} used, no cap set`
