@@ -109,23 +109,22 @@ export async function updateApiKeyThreshold(
 
 /**
  * Get a paginated page of usage vs limits across tenants (one row per tenant × channel),
- * optionally filtered by tenant name and channel. Pagination is by tenant. Requires
- * NOTIFY_ADMIN. Backed by /api/v1/frontend/admin/api-key-usage.
+ * optionally filtered by tenant name and `field:in:values` filters. Pagination is by tenant.
+ * Requires NOTIFY_ADMIN. Backed by /api/v1/frontend/admin/api-key-usage.
  */
 export async function getAllTenantsUsage(
   page: number = 1,
   limit: number = 15,
   search?: string,
-  channels?: string[],
+  filter?: string[],
 ): Promise<PaginatedAdminUsageResponse> {
   try {
-    const params = generateApiParameters('/api/v1/frontend/admin/api-key-usage', {
-      page: String(page),
-      limit: String(limit),
-      ...(search ? { search } : {}),
-      // Comma-separated: axios would send an array as `channel[]=`, which the API does not read.
-      ...(channels && channels.length > 0 ? { channel: channels.join(',') } : {}),
-    })
+    const qs = new URLSearchParams()
+    qs.set('page', String(page))
+    qs.set('limit', String(limit))
+    if (search) qs.set('search', search)
+    filter?.forEach((f) => qs.append('filter', f))
+    const params = generateApiParameters(`/api/v1/frontend/admin/api-key-usage?${qs.toString()}`)
     return await get<PaginatedAdminUsageResponse>(params)
   } catch (error) {
     throw toReadableError(error, 'tenant usage')

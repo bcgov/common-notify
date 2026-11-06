@@ -140,6 +140,6 @@ describe('apiKeyUsage thunks', () => {
       }),
       undefined,
     )
-    expect(api.getAllTenantsUsage).toHaveBeenCalledWith(2, 30, 'Ministry', ['SMS'])
+    expect(api.getAllTenantsUsage).toHaveBeenCalledWith(2, 30, 'Ministry', ['channel:in:SMS'])
   })
 })

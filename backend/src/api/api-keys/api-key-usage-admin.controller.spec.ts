@@ -9,8 +9,7 @@ import { NotifyAdminGuard } from '../../common/guards/notify-admin.guard'
 
 /**
  * Driven over HTTP, through the global ValidationPipe as app.ts installs it, because the query
- * string is what is under test: `channel` arrives as a string or, repeated, as an array, and the
- * DTO's transforms only run inside that pipe.
+ * string is what is under test and the DTO's transforms only run inside that pipe.
  */
 describe('ApiKeyUsageAdminController GET /frontend/admin/api-key-usage', () => {
   let app: INestApplication
@@ -43,48 +42,34 @@ describe('ApiKeyUsageAdminController GET /frontend/admin/api-key-usage', () => {
 
   const url = '/v1/frontend/admin/api-key-usage'
 
-  it('passes no channels when the parameter is absent', async () => {
-    await request(app.getHttpServer()).get(url).query({ page: '2', search: 'parks' }).expect(200)
-
-    expect(getAllTenantsUsage).toHaveBeenCalledWith({
-      page: 2,
-      limit: undefined,
-      search: 'parks',
-      channels: undefined,
-    })
-  })
-
-  it('accepts a single channel, in any case', async () => {
-    await request(app.getHttpServer()).get(`${url}?channel=sms`).expect(200)
-
-    expect(getAllTenantsUsage).toHaveBeenCalledWith(expect.objectContaining({ channels: ['SMS'] }))
-  })
-
-  it('accepts comma-separated channels', async () => {
-    await request(app.getHttpServer()).get(`${url}?channel=EMAIL,SMS`).expect(200)
+  it('passes the page, search and no filters when none are given', async () => {
+    await request(app.getHttpServer())
+      .get(url)
+      .query({ page: '2', limit: '30', search: 'parks' })
+      .expect(200)
 
     expect(getAllTenantsUsage).toHaveBeenCalledWith(
-      expect.objectContaining({ channels: ['EMAIL', 'SMS'] }),
+      { page: 2, limit: 30, skip: 30, filters: [], sorts: [] },
+      'parks',
     )
   })
 
-  it('accepts a repeated channel parameter', async () => {
-    await request(app.getHttpServer()).get(`${url}?channel=EMAIL&channel=SMS`).expect(200)
+  it('parses a channel filter in the shared field:operator:value form', async () => {
+    await request(app.getHttpServer()).get(`${url}?filter=channel:in:EMAIL|SMS`).expect(200)
 
     expect(getAllTenantsUsage).toHaveBeenCalledWith(
-      expect.objectContaining({ channels: ['EMAIL', 'SMS'] }),
+      expect.objectContaining({
+        filters: [{ field: 'channel', operator: 'in', value: ['EMAIL', 'SMS'] }],
+      }),
+      undefined,
     )
   })
 
-  it('rejects an unknown channel instead of returning every channel', async () => {
-    const response = await request(app.getHttpServer()).get(`${url}?channel=EMAIL,FAX`).expect(400)
-
-    expect(JSON.stringify(response.body.message)).toContain('channel')
-    expect(getAllTenantsUsage).not.toHaveBeenCalled()
-  })
-
-  it('rejects a channel it cannot read as a list', async () => {
-    await request(app.getHttpServer()).get(`${url}?channel[a]=EMAIL`).expect(400)
+  it.each([
+    ['a field that cannot be filtered on', 'tenantName:eq:Parks'],
+    ['an operator the field does not allow', 'channel:like:SMS'],
+  ])('rejects %s', async (_, filter) => {
+    await request(app.getHttpServer()).get(url).query({ filter }).expect(400)
 
     expect(getAllTenantsUsage).not.toHaveBeenCalled()
   })

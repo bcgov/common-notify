@@ -19,7 +19,8 @@ import {
 import { NotifyAdminGuard } from '../../common/guards/notify-admin.guard'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { SsoRole } from '../../enum/sso-role.enum'
-import { ApiKeyUsageService } from './api-key-usage.service'
+import { ApiKeyUsageService, adminUsageListQueryConfig } from './api-key-usage.service'
+import { parseListQuery } from '../../common/query/list-query.parser'
 import {
   AdminTenantUsageRowDto,
   PaginatedAdminUsageResponseDto,
@@ -49,12 +50,8 @@ export class ApiKeyUsageAdminController {
   @ApiOperation({ summary: 'Get notification usage vs limits for every tenant (admin only)' })
   @ApiOkResponse({ type: PaginatedAdminUsageResponseDto })
   getAllTenantsUsage(@Query() query: AdminUsageQueryDto): Promise<PaginatedAdminUsageResponseDto> {
-    return this.apiKeyUsageService.getAllTenantsUsage({
-      page: query.page,
-      limit: query.limit,
-      search: query.search,
-      channels: query.channel,
-    })
+    const parsedQuery = parseListQuery(query, adminUsageListQueryConfig)
+    return this.apiKeyUsageService.getAllTenantsUsage(parsedQuery, query.search)
   }
 
   @Version('1')

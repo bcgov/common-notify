@@ -7,6 +7,7 @@ import { ApiKeyLimit } from './entities/api-key-limit.entity'
 import { ApiKeyLimitAlert } from './entities/api-key-limit-alert.entity'
 import { ApiKeyUsage } from './entities/api-key-usage.entity'
 import { ApiKeyUsageService } from './api-key-usage.service'
+import type { ParsedListQuery } from '../../common/query/list-query.types'
 
 describe('ApiKeyUsageService.recordUsage', () => {
   const apiKeyUsageRepository = {
@@ -273,16 +274,24 @@ describe('ApiKeyUsageService.getAllTenantsUsage', () => {
     return { service, count, tenants, limits }
   }
 
-  const channelClause = 'l.channel_code IN (:...channels)'
+  const channelClause = 'LOWER(l.channel_code) IN (:...filter_0)'
+  const parsed = (filters: ParsedListQuery['filters'] = []): ParsedListQuery => ({
+    page: 1,
+    limit: 15,
+    skip: 0,
+    sorts: [],
+    filters,
+  })
+  const smsOnly = [{ field: 'channel', operator: 'in' as const, value: ['SMS'] }]
 
   it('narrows the tenant count, the page of tenants and their rows to the chosen channels', async () => {
     const { service, count, tenants, limits } = setup()
 
-    const result = await service.getAllTenantsUsage({ channels: ['SMS'] })
+    const result = await service.getAllTenantsUsage(parsed(smsOnly))
 
     // The count has to agree with the page, or paging shows short pages.
     for (const { andWhere } of [count, tenants, limits]) {
-      expect(andWhere).toContainEqual([channelClause, { channels: ['SMS'] }])
+      expect(andWhere).toContainEqual([channelClause, { filter_0: ['sms'] }])
     }
     expect(result.count).toBe(1)
     expect(result.data.map((row) => row.channel)).toEqual(['SMS'])
@@ -291,21 +300,21 @@ describe('ApiKeyUsageService.getAllTenantsUsage', () => {
   it('applies no channel condition when none is given', async () => {
     const { service, count, tenants, limits } = setup()
 
-    await service.getAllTenantsUsage({ channels: [] })
+    await service.getAllTenantsUsage(parsed())
 
     for (const { andWhere } of [count, tenants, limits]) {
-      expect(andWhere.map(([clause]) => clause)).not.toContain(channelClause)
+      expect(andWhere).toEqual([])
     }
   })
 
-  it('combines the channel filter with a tenant name search', async () => {
+  it('combines the channel filter with a trimmed tenant name search', async () => {
     const { service, count } = setup()
 
-    await service.getAllTenantsUsage({ search: ' parks ', channels: ['EMAIL', 'SMS'] })
+    await service.getAllTenantsUsage(parsed(smsOnly), ' parks ')
 
     expect(count.andWhere).toEqual([
       ['t.name ILIKE :search', { search: '%parks%' }],
-      [channelClause, { channels: ['EMAIL', 'SMS'] }],
+      [channelClause, { filter_0: ['sms'] }],
     ])
   })
 })

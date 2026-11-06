@@ -1,5 +1,5 @@
 import type { SelectQueryBuilder } from 'typeorm'
-import type { ParsedListQuery, QueryableFieldsConfig } from './list-query.types'
+import type { ListQueryFilter, ParsedListQuery, QueryableFieldsConfig } from './list-query.types'
 
 function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, String.raw`\$&`)
@@ -10,9 +10,30 @@ export function applyParsedListQueryToQueryBuilder<T>(
   parsedQuery: ParsedListQuery,
   config: QueryableFieldsConfig,
 ) {
+  applyListQueryFilters(qb, parsedQuery.filters, config)
+
+  for (const sort of parsedQuery.sorts) {
+    qb.addOrderBy(config.sortableFields[sort.field], sort.direction)
+  }
+
+  qb.skip(parsedQuery.skip)
+  qb.take(parsedQuery.limit)
+
+  return qb
+}
+
+/**
+ * The filters alone, without sorting or paging, for a query that pages differently from the
+ * rows it filters: a count, or a page of parents whose children are loaded separately.
+ */
+export function applyListQueryFilters<T>(
+  qb: SelectQueryBuilder<T>,
+  filters: ListQueryFilter[],
+  config: QueryableFieldsConfig,
+) {
   let paramIndex = 0
 
-  for (const filter of parsedQuery.filters) {
+  for (const filter of filters) {
     const fieldConfig = config.filterableFields[filter.field]
     const column = fieldConfig.column
     const paramName = `filter_${paramIndex++}`
@@ -74,13 +95,6 @@ export function applyParsedListQueryToQueryBuilder<T>(
       qb.andWhere(`${column} IS NULL`)
     }
   }
-
-  for (const sort of parsedQuery.sorts) {
-    qb.addOrderBy(config.sortableFields[sort.field], sort.direction)
-  }
-
-  qb.skip(parsedQuery.skip)
-  qb.take(parsedQuery.limit)
 
   return qb
 }
