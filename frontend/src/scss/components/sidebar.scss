@@ -231,6 +231,15 @@
     gap: $spacing-xs;
   }
 
+  &__group-list {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
   // Lines up with the sub-item text below it.
   &__group-label {
     padding: $spacing-xs $spacing-md 0 calc($spacing-md + 40px);

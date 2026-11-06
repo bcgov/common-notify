@@ -15,27 +15,26 @@ export interface SidebarNavGroupProps {
 }
 
 /**
- * A labelled set of sub-links inside an expandable sidebar item. The heading is a label, not a
- * link, so screen readers announce it as the group's name ("Monitor, group") on entering it.
+ * A labelled list of sub-links inside an expandable sidebar item. The heading is text, not a
+ * link; it names the list, so screen readers announce "Monitor, list, 3 items" on entering it.
  */
 const SidebarNavGroup: FC<SidebarNavGroupProps> = ({ label, links }) => {
   const labelId = useId()
 
   return (
-    <div className="sidebar__group" role="group" aria-labelledby={labelId}>
+    <div className="sidebar__group">
       <span id={labelId} className="sidebar__group-label">
         {label}
       </span>
-      {links.map((link) => (
-        <Link
-          key={link.to}
-          to={link.to}
-          className="sidebar__subitem"
-          activeProps={{ className: 'active' }}
-        >
-          <span className="sidebar__label">{link.label}</span>
-        </Link>
-      ))}
+      <ul className="sidebar__group-list" aria-labelledby={labelId}>
+        {links.map((link) => (
+          <li key={link.to}>
+            <Link to={link.to} className="sidebar__subitem" activeProps={{ className: 'active' }}>
+              <span className="sidebar__label">{link.label}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

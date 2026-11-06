@@ -220,7 +220,7 @@ describe('Sidebar', () => {
       await user.click(screen.getByRole('button', { name: 'Admin' }))
 
       const linksIn = (group: string) =>
-        within(screen.getByRole('group', { name: group }))
+        within(screen.getByRole('list', { name: group }))
           .getAllByRole('link')
           .map((link) => [link.textContent, link.getAttribute('href')])
 
@@ -235,7 +235,7 @@ describe('Sidebar', () => {
       const toggle = screen.getByRole('button', { name: 'Admin' })
 
       expect(toggle).toHaveAttribute('aria-expanded', 'false')
-      expect(screen.queryByRole('group', { name: 'Monitor' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('list', { name: 'Monitor' })).not.toBeInTheDocument()
 
       await user.click(toggle)
 

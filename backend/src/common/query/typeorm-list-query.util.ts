@@ -31,70 +31,74 @@ export function applyListQueryFilters<T>(
   filters: ListQueryFilter[],
   config: QueryableFieldsConfig,
 ) {
-  let paramIndex = 0
-
-  for (const filter of filters) {
+  filters.forEach((filter, index) => {
     const fieldConfig = config.filterableFields[filter.field]
-    const column = fieldConfig.column
-    const paramName = `filter_${paramIndex++}`
-    const isStringField = (fieldConfig.valueType ?? 'string') === 'string'
-
-    if (filter.operator === 'eq') {
-      if (isStringField) {
-        qb.andWhere(`LOWER(${column}) = :${paramName}`, {
-          [paramName]: String(filter.value).toLowerCase(),
-        })
-      } else {
-        qb.andWhere(`${column} = :${paramName}`, { [paramName]: filter.value })
-      }
-      continue
-    }
-
-    if (filter.operator === 'ne') {
-      if (isStringField) {
-        qb.andWhere(`LOWER(${column}) != :${paramName}`, {
-          [paramName]: String(filter.value).toLowerCase(),
-        })
-      } else {
-        qb.andWhere(`${column} != :${paramName}`, { [paramName]: filter.value })
-      }
-      continue
-    }
-
-    if (filter.operator === 'in') {
-      if (isStringField) {
-        const loweredValues = (filter.value as Array<string | number | boolean | Date>).map((v) =>
-          String(v).toLowerCase(),
-        )
-        qb.andWhere(`LOWER(${column}) IN (:...${paramName})`, { [paramName]: loweredValues })
-      } else {
-        qb.andWhere(`${column} IN (:...${paramName})`, { [paramName]: filter.value })
-      }
-      continue
-    }
-
-    if (filter.operator === 'like') {
-      const value = escapeLikePattern(String(filter.value))
-      qb.andWhere(String.raw`${column} ILIKE :${paramName} ESCAPE '\'`, {
-        [paramName]: `%${value}%`,
-      })
-      continue
-    }
-
-    if (filter.operator === 'gte') {
-      qb.andWhere(`${column} >= :${paramName}`, { [paramName]: filter.value })
-      continue
-    }
-
-    if (filter.operator === 'lte') {
-      qb.andWhere(`${column} <= :${paramName}`, { [paramName]: filter.value })
-      continue
-    }
-
-    if (filter.operator === 'isnull') {
-      qb.andWhere(`${column} IS NULL`)
-    }
-  }
+    const condition = filterCondition(filter, {
+      column: fieldConfig.column,
+      param: `filter_${index}`,
+      isString: (fieldConfig.valueType ?? 'string') === 'string',
+    })
+    if (condition.params) qb.andWhere(condition.where, condition.params)
+    else qb.andWhere(condition.where)
+  })
 
   return qb
+}
+
+interface FilterTarget {
+  column: string
+  param: string
+  /** Strings compare case-insensitively. */
+  isString: boolean
+}
+
+interface FilterCondition {
+  where: string
+  params?: Record<string, unknown>
+}
+
+type FilterValue = ListQueryFilter['value']
+
+function filterCondition(filter: ListQueryFilter, target: FilterTarget): FilterCondition {
+  const { column, param } = target
+  switch (filter.operator) {
+    case 'eq':
+      return comparison('=', filter.value, target)
+    case 'ne':
+      return comparison('!=', filter.value, target)
+    case 'in':
+      return inList(filter.value, target)
+    case 'like':
+      return {
+        where: String.raw`${column} ILIKE :${param} ESCAPE '\'`,
+        params: { [param]: `%${escapeLikePattern(String(filter.value))}%` },
+      }
+    case 'gte':
+      return { where: `${column} >= :${param}`, params: { [param]: filter.value } }
+    case 'lte':
+      return { where: `${column} <= :${param}`, params: { [param]: filter.value } }
+    case 'isnull':
+      return { where: `${column} IS NULL` }
+  }
+}
+
+function comparison(
+  operator: '=' | '!=',
+  value: FilterValue,
+  { column, param, isString }: FilterTarget,
+): FilterCondition {
+  return isString
+    ? { where: `LOWER(${column}) ${operator} :${param}`, params: { [param]: lower(value) } }
+    : { where: `${column} ${operator} :${param}`, params: { [param]: value } }
+}
+
+function inList(value: FilterValue, { column, param, isString }: FilterTarget): FilterCondition {
+  const values = value as Array<string | number | boolean | Date>
+  return isString
+    ? { where: `LOWER(${column}) IN (:...${param})`, params: { [param]: values.map(lower) } }
+    : { where: `${column} IN (:...${param})`, params: { [param]: values } }
+}
+
+function lower(value: unknown): string {
+  return String(value).toLowerCase()
 }
