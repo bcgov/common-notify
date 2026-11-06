@@ -1,19 +1,23 @@
 import type { FC } from 'react'
 import SummaryCard from '@/components/SummaryCard'
-import MeterBar from '@/components/MeterBar'
-import { StatusBadge } from '@/components/StatusBadge'
 import type {
   MessageChannelStats,
   MonitoringOverview,
-  RedisStats,
 } from '@/interfaces/queueMonitoring.interface'
-import { HEALTH_LABELS, backlogSummary, formatBytes, formatDuration } from '@/utils/monitoring'
+import { backlogSummary, formatAgo, formatDuration } from '@/utils/monitoring'
 
 interface OverviewCardsProps {
   overview: MonitoringOverview
   messages: MessageChannelStats[]
-  redis: RedisStats
+  now: number
 }
+
+/** The totals' day and month boundaries are Pacific, so the label is too. */
+const MONTH_DAY = new Intl.DateTimeFormat('en-CA', {
+  month: 'long',
+  day: 'numeric',
+  timeZone: 'America/Vancouver',
+})
 
 /** What the backlog card says under its count: nothing waiting, stalled, or an estimate. */
 function backlogLabel(pending: number, stuck: boolean, clears: number | null): string {
@@ -22,58 +26,24 @@ function backlogLabel(pending: number, stuck: boolean, clears: number | null): s
   return `Clears in ~${(clears ?? 0).toLocaleString()} min`
 }
 
-type TimeToSend = MonitoringOverview['timeToSend']
-
-/** A batch's rows queue behind each other, so it is described by its start and finish. */
-function batchLine(batch: NonNullable<TimeToSend['batch']>): string {
-  const finish =
-    batch.finishMedianMs === null
-      ? 'none finished yet'
-      : `finish in ~${formatDuration(batch.finishMedianMs)}`
-  return `Batches (${batch.batches.toLocaleString()}): start in ~${formatDuration(batch.startMedianMs)}, ${finish}`
+/** Failed as a share of everything that finished today, to one decimal place. */
+function failureShare(failed: number, sent: number): number {
+  const finished = failed + sent
+  return finished > 0 ? Math.round((failed / finished) * 1000) / 10 : 0
 }
 
-const TimeToSendDetail: FC<{ timeToSend: TimeToSend }> = ({ timeToSend: { single, batch } }) => {
-  if (!single && !batch) return <p>Nothing sent in the last hour</p>
-  return (
-    <>
-      {single && (
-        <p>
-          95% within {formatDuration(single.p95Ms)} · {single.requests.toLocaleString()} single
-          sends in the last hour
-        </p>
-      )}
-      {batch && <p>{batchLine(batch)}</p>}
-    </>
-  )
-}
-
-/** The four headline numbers: how fast, how much, how far behind, and how close to full. */
-const OverviewCards: FC<OverviewCardsProps> = ({ overview, messages, redis }) => {
+/** The headline numbers: the last hour, what is waiting, today and this month, and failures. */
+const OverviewCards: FC<OverviewCardsProps> = ({ overview, messages, now }) => {
   const {
     pending,
     oldestPendingAgeMs: oldest,
     clearsInMinutes: clears,
     stuck,
   } = backlogSummary(messages)
-  const memoryText =
-    redis.maxMemoryBytes === null
-      ? `${formatBytes(redis.usedMemoryBytes)} used, no cap set`
-      : `${formatBytes(redis.usedMemoryBytes)} of ${formatBytes(redis.maxMemoryBytes)}`
+  const { totals } = overview
 
   return (
     <div className="summary-card-grid">
-      <SummaryCard
-        title="Time to send"
-        value={
-          overview.timeToSend.single
-            ? `${formatDuration(overview.timeToSend.single.medianMs)} median`
-            : '—'
-        }
-      >
-        <TimeToSendDetail timeToSend={overview.timeToSend} />
-      </SummaryCard>
-
       <SummaryCard title="Last hour" value={`${overview.messagesSent.toLocaleString()} sent`}>
         <p>
           {overview.sendingRate
@@ -91,20 +61,22 @@ const OverviewCards: FC<OverviewCardsProps> = ({ overview, messages, redis }) =>
         <p>{backlogLabel(pending, stuck, clears)}</p>
       </SummaryCard>
 
-      <SummaryCard
-        title="Redis memory"
-        value={redis.usedMemoryPercent === null ? '—' : `${redis.usedMemoryPercent}%`}
-      >
-        {redis.usedMemoryPercent !== null && (
-          <MeterBar
-            label="Redis memory used"
-            percent={redis.usedMemoryPercent}
-            valueText={`${memoryText} (${redis.usedMemoryPercent}%)`}
-            status={redis.status}
-          />
-        )}
-        <p>{memoryText}</p>
-        <StatusBadge status={redis.status} statusLabel={HEALTH_LABELS[redis.status]} />
+      <SummaryCard title="Today" value={`${totals.sentToday.toLocaleString()} sent`}>
+        <p>Since midnight, Pacific time</p>
+      </SummaryCard>
+
+      <SummaryCard title="This month" value={`${totals.sentThisMonth.toLocaleString()} sent`}>
+        <p>Since {MONTH_DAY.format(new Date(totals.monthStart))}</p>
+      </SummaryCard>
+
+      <SummaryCard title="Failures" value={`${totals.failedToday.toLocaleString()} today`}>
+        <p>{failureShare(totals.failedToday, totals.sentToday)}% of today’s messages</p>
+        <p>{overview.messagesFailed.toLocaleString()} in the last hour</p>
+        <p>
+          {totals.lastFailureAt
+            ? `Last failure ${formatAgo(totals.lastFailureAt, now)}`
+            : 'None this month'}
+        </p>
       </SummaryCard>
     </div>
   )

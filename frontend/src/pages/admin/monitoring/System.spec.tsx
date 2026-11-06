@@ -184,16 +184,18 @@ describe('System', () => {
     expect(screen.queryByRole('heading', { name: 'Delivery providers' })).not.toBeInTheDocument()
   })
 
-  it('shows Redis details, without the internals only an operator would read', async () => {
+  it('shows Redis memory, status and details, without the internals only an operator would read', async () => {
     mockedGet.mockResolvedValue(snapshot())
     render(<System />)
 
     expect(await screen.findByText('4 idle workers listening')).toBeInTheDocument()
     expect(screen.getByText('Peak memory')).toBeInTheDocument()
-    // Memory used and status are on the Overview's Redis card.
     const redis = sectionTitled('Redis')
-    expect(within(redis).queryByRole('meter')).toBeNull()
-    expect(within(redis).queryByText('Healthy')).toBeNull()
+    expect(within(redis).getByRole('meter', { name: 'Redis memory used' })).toHaveAttribute(
+      'aria-valuetext',
+      '300 MB of 768 MB (39.1%)',
+    )
+    expect(within(redis).getByText('Healthy')).toBeInTheDocument()
     for (const removed of ['Fragmentation', 'Eviction policy', 'Evicted keys', 'noeviction']) {
       expect(screen.queryByText(removed)).not.toBeInTheDocument()
     }

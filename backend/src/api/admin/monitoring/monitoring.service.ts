@@ -28,6 +28,7 @@ import {
 import type { WorkerHeartbeatPayload } from '../../../queue/worker-heartbeat'
 import { readReconcileActivity } from '../../../queue/reconcile-activity'
 import { readCircuitState } from '../../../common/redis/circuit-breaker'
+import { redisKey } from '../../../common/redis/redis-namespace'
 import type { CircuitState } from '../../../common/redis/circuit-breaker'
 import {
   CHES_CIRCUIT_KEY,
@@ -60,6 +61,11 @@ const UNHELD_GRACE_MS = HEARTBEAT_INTERVAL_MS * 2
 const IN_FLIGHT_DETAIL_STATUSES = ['pending', 'queued', 'processing', 'sending']
 /** Older in-flight rows are abandoned, not backlog, and would pin "oldest pending" forever. */
 const PENDING_LOOKBACK_MS = 24 * 60 * 60 * 1000
+/** Day and month boundaries for the totals cards: Notify's users work in BC. */
+const REPORTING_TIME_ZONE = 'America/Vancouver'
+/** One small key with a TTL, so it is safe on the noeviction instance (AGENTS.md §5.1). */
+const SEND_TOTALS_KEY = redisKey('monitoring:send-totals')
+const SEND_TOTALS_TTL_SECONDS = 60
 /** A longer pause between consecutive sends is idle time, not part of how fast sending runs. */
 const IDLE_GAP_SECONDS = 30
 const MIN_RATE_MESSAGES = 10
@@ -451,51 +457,32 @@ export function sendingRateFrom(
   }
 }
 
-export interface TimeToSendRow {
-  single_median: string | null
-  single_p95: string | null
-  single_requests: string
-  batch_start_median: string | null
-  batch_finish_median: string | null
-  batches: string
-  batches_finished: string
+export interface SendTotalsRow {
+  day_start: Date | string
+  month_start: Date | string
+  sent_today: string
+  sent_month: string
+  failed_today: string
+  last_failure: Date | string | null
 }
 
-/** Milliseconds from a percentile, never negative: clock skew between pods can make it so. */
-function toMs(value: string | null): number | null {
-  return value === null ? null : Math.max(0, Math.round(Number(value)))
-}
+const iso = (value: Date | string) => new Date(value).toISOString()
 
-export function timeToSendFrom(
-  row: TimeToSendRow | undefined,
-): MonitoringOverviewDto['timeToSend'] {
-  const requests = Number(row?.single_requests ?? 0)
-  const batches = Number(row?.batches ?? 0)
-  const singleMedian = toMs(row?.single_median ?? null)
-  const singleP95 = toMs(row?.single_p95 ?? null)
-  const startMedian = toMs(row?.batch_start_median ?? null)
-
+export function sendTotalsFrom(row: SendTotalsRow): MonitoringOverviewDto['totals'] {
   return {
-    single:
-      requests > 0 && singleMedian !== null && singleP95 !== null
-        ? { medianMs: singleMedian, p95Ms: singleP95, requests }
-        : null,
-    batch:
-      batches > 0 && startMedian !== null
-        ? {
-            startMedianMs: startMedian,
-            finishMedianMs: toMs(row?.batch_finish_median ?? null),
-            batches,
-            finished: Number(row?.batches_finished ?? 0),
-          }
-        : null,
+    dayStart: iso(row.day_start),
+    monthStart: iso(row.month_start),
+    sentToday: Number(row.sent_today),
+    sentThisMonth: Number(row.sent_month),
+    failedToday: Number(row.failed_today),
+    lastFailureAt: row.last_failure ? iso(row.last_failure) : null,
   }
 }
 
 export function buildOverview(
   messages: MessageChannelStatsDto[],
   queues: QueueStatsDto[],
-  timeToSend: MonitoringOverviewDto['timeToSend'],
+  totals: MonitoringOverviewDto['totals'],
   sendingRate: MonitoringOverviewDto['sendingRate'],
 ): MonitoringOverviewDto {
   const sumSeries = (pick: (m: MessageChannelStatsDto) => number[]) =>
@@ -507,7 +494,7 @@ export function buildOverview(
 
   return {
     windowMinutes: MONITORING_WINDOW_MINUTES,
-    timeToSend,
+    totals,
     messagesSent,
     messagesFailed,
     sendingRate,
@@ -617,7 +604,7 @@ export class MonitoringService {
       messages,
       failedJobs,
       activeByQueue,
-      timeToSend,
+      totals,
       sendingRate,
       reconcileActivity,
       sendRows,
@@ -628,7 +615,7 @@ export class MonitoringService {
       this.getMessageStats(now),
       this.getRecentFailedJobs(),
       this.getActiveJobs(),
-      this.getTimeToSend(now),
+      this.getSendTotals(),
       this.getSendingRate(now),
       readReconcileActivity(this.redis, now, MONITORING_WINDOW_MINUTES),
       this.getSendsInProgress(now),
@@ -656,7 +643,7 @@ export class MonitoringService {
         ...providers.map((provider) => provider.status),
         ...queues.map((queue) => queue.status),
       ]),
-      overview: buildOverview(messages, queues, timeToSend, sendingRate),
+      overview: buildOverview(messages, queues, totals, sendingRate),
       redis,
       messages,
       queues,
@@ -803,55 +790,39 @@ export class MonitoringService {
   }
 
   /**
-   * Time to send, over requests that started sending in the last hour, timed from acceptance
-   * or from a scheduled send falling due. Single sends report accepted-to-sent. A merge's rows
-   * queue behind each other, so a per-row time would measure its size rather than Notify's speed;
-   * it reports when it started and, once the request is final, when it finished. A request that
-   * started before the window is left out, since its first send is not among the rows read.
+   * Sent and failed recipients since Pacific midnight and the 1st of the month, across every
+   * tenant and UI sends included. Cached in Redis because the page refetches on every change
+   * during a send, and a month's count is the heaviest read on it.
    */
-  private async getTimeToSend(now: number): Promise<MonitoringOverviewDto['timeToSend']> {
-    const since = new Date(now - MONITORING_WINDOW_MINUTES * 60_000)
-    const detail = this.detailRepository.metadata
-    const request =
-      detail.findRelationWithPropertyPath('notificationRequest')?.inverseEntityMetadata.tablePath
-    if (!request) return { single: null, batch: null }
+  private async getSendTotals(): Promise<MonitoringOverviewDto['totals']> {
+    const redis = this.redis as Redis
+    const cached = await redis.get(SEND_TOTALS_KEY).catch(() => null)
+    if (cached) return JSON.parse(cached) as MonitoringOverviewDto['totals']
 
-    const due = 'GREATEST(r.created_at, COALESCE(r.delayed_send_time, r.created_at))'
-    // The status filters repeat the partial index predicate (V72) so the planner uses it.
+    const table = this.detailRepository.metadata.tablePath
+    // The status filter repeats the partial index predicate (V72) so the planner uses it.
     const [row] = (await this.detailRepository.query(
-      `SELECT
-         percentile_cont(0.5) WITHIN GROUP (ORDER BY started_ms) FILTER (WHERE NOT is_batch) AS single_median,
-         percentile_cont(0.95) WITHIN GROUP (ORDER BY started_ms) FILTER (WHERE NOT is_batch) AS single_p95,
-         COUNT(started_ms) FILTER (WHERE NOT is_batch) AS single_requests,
-         percentile_cont(0.5) WITHIN GROUP (ORDER BY started_ms) FILTER (WHERE is_batch) AS batch_start_median,
-         percentile_cont(0.5) WITHIN GROUP (ORDER BY finished_ms) FILTER (WHERE is_batch) AS batch_finish_median,
-         COUNT(*) FILTER (WHERE is_batch) AS batches,
-         COUNT(finished_ms) FILTER (WHERE is_batch) AS batches_finished
-       FROM (
-         SELECT bool_or(d.batch_id IS NOT NULL) AS is_batch,
-                EXTRACT(EPOCH FROM (MIN(d.last_attempt_at) FILTER (WHERE d.status = 'sent')
-                  - ${due})) * 1000 AS started_ms,
-                CASE WHEN r.status IN ($2, $3, $4)
-                  THEN EXTRACT(EPOCH FROM (MAX(d.last_attempt_at) - ${due})) * 1000 END AS finished_ms
-           FROM ${detail.tablePath} d
-           JOIN ${request} r ON r.id = d.notification_request_id
-          WHERE d.status IN ('sent', 'failed') AND d.last_attempt_at >= $1
-            AND NOT EXISTS (
-              SELECT 1 FROM ${detail.tablePath} earlier
-               WHERE earlier.notification_request_id = d.notification_request_id
-                 AND earlier.status IN ('sent', 'failed') AND earlier.last_attempt_at < $1
-            )
-          GROUP BY r.id, r.created_at, r.delayed_send_time, r.status
-       ) starts`,
-      [
-        since,
-        NotificationStatus.COMPLETED,
-        NotificationStatus.PARTIALLY_COMPLETED,
-        NotificationStatus.FAILED,
-      ],
-    )) as TimeToSendRow[]
+      `WITH bounds AS (
+         SELECT date_trunc('day', now() AT TIME ZONE $1) AT TIME ZONE $1 AS day_start,
+                date_trunc('month', now() AT TIME ZONE $1) AT TIME ZONE $1 AS month_start
+       )
+       SELECT b.day_start, b.month_start,
+              COUNT(d.*) FILTER (WHERE d.status = 'sent' AND d.last_attempt_at >= b.day_start) AS sent_today,
+              COUNT(d.*) FILTER (WHERE d.status = 'sent') AS sent_month,
+              COUNT(d.*) FILTER (WHERE d.status = 'failed' AND d.last_attempt_at >= b.day_start) AS failed_today,
+              MAX(d.last_attempt_at) FILTER (WHERE d.status = 'failed') AS last_failure
+         FROM bounds b
+         LEFT JOIN ${table} d
+           ON d.status IN ('sent', 'failed') AND d.last_attempt_at >= b.month_start
+        GROUP BY b.day_start, b.month_start`,
+      [REPORTING_TIME_ZONE],
+    )) as SendTotalsRow[]
 
-    return timeToSendFrom(row)
+    const totals = sendTotalsFrom(row)
+    await redis
+      .set(SEND_TOTALS_KEY, JSON.stringify(totals), 'EX', SEND_TOTALS_TTL_SECONDS)
+      .catch(() => {})
+    return totals
   }
 
   /**

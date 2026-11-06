@@ -12,7 +12,7 @@ import {
   buildReconcilerStats,
   buildSendsInProgress,
   sendingRateFrom,
-  timeToSendFrom,
+  sendTotalsFrom,
   countUnheldActiveJobs,
   evaluateQueue,
   maskPersonalData,
@@ -274,6 +274,15 @@ describe('sendingRateFrom', () => {
 })
 
 describe('buildOverview', () => {
+  const totals = {
+    dayStart: '2026-11-06T08:00:00.000Z',
+    monthStart: '2026-11-01T07:00:00.000Z',
+    sentToday: 0,
+    sentThisMonth: 0,
+    failedToday: 0,
+    lastFailureAt: null,
+  }
+
   const channel = (sent: number, failed: number) => ({
     channel: 'EMAIL',
     pending: 0,
@@ -294,7 +303,7 @@ describe('buildOverview', () => {
     const overview = buildOverview(
       [channel(1200, 6), { ...channel(40, 2), channel: 'SMS' }],
       [evaluateQueue(ingestion)],
-      { single: null, batch: null },
+      totals,
       null,
     )
 
@@ -309,42 +318,42 @@ describe('buildOverview', () => {
   })
 
   it('reports a zero failure rate when nothing finished', () => {
-    expect(
-      buildOverview([channel(0, 0)], [], { single: null, batch: null }, null).failurePercent,
-    ).toBe(0)
+    expect(buildOverview([channel(0, 0)], [], totals, null).failurePercent).toBe(0)
   })
 })
 
-describe('timeToSendFrom', () => {
-  it('leaves the finish time empty while no batch has finished', () => {
+describe('sendTotalsFrom', () => {
+  it('reads counts and boundaries from the row', () => {
     expect(
-      timeToSendFrom({
-        single_median: null,
-        single_p95: null,
-        single_requests: '0',
-        batch_start_median: '1500',
-        batch_finish_median: null,
-        batches: '1',
-        batches_finished: '0',
+      sendTotalsFrom({
+        day_start: new Date('2026-11-06T08:00:00Z'),
+        month_start: '2026-11-01T07:00:00Z',
+        sent_today: '1497',
+        sent_month: '32950',
+        failed_today: '8',
+        last_failure: new Date('2026-11-06T21:48:00Z'),
       }),
     ).toEqual({
-      single: null,
-      batch: { startMedianMs: 1500, finishMedianMs: null, batches: 1, finished: 0 },
+      dayStart: '2026-11-06T08:00:00.000Z',
+      monthStart: '2026-11-01T07:00:00.000Z',
+      sentToday: 1497,
+      sentThisMonth: 32950,
+      failedToday: 8,
+      lastFailureAt: '2026-11-06T21:48:00.000Z',
     })
   })
 
-  it('never reports a negative time, which clock skew between pods can produce', () => {
+  it('has no last failure when nothing failed this month', () => {
     expect(
-      timeToSendFrom({
-        single_median: '-20',
-        single_p95: '10',
-        single_requests: '3',
-        batch_start_median: null,
-        batch_finish_median: null,
-        batches: '0',
-        batches_finished: '0',
-      }).single,
-    ).toEqual({ medianMs: 0, p95Ms: 10, requests: 3 })
+      sendTotalsFrom({
+        day_start: '2026-11-06T08:00:00Z',
+        month_start: '2026-11-01T07:00:00Z',
+        sent_today: '0',
+        sent_month: '0',
+        failed_today: '0',
+        last_failure: null,
+      }).lastFailureAt,
+    ).toBeNull()
   })
 })
 
@@ -437,6 +446,7 @@ describe('MonitoringService', () => {
     return {
       pipeline: vi.fn(() => pipeline),
       get: vi.fn().mockResolvedValue(null),
+      set: vi.fn().mockResolvedValue('OK'),
       exists: vi.fn().mockResolvedValue(0),
       zcount: vi.fn().mockResolvedValue(3),
       info: vi
@@ -461,14 +471,21 @@ describe('MonitoringService', () => {
   function fakeDetailRepository(
     pendingRows: object[] = [],
     finishedRows: object[] = [],
-    deliveryRow: object = { single_requests: '0', batches: '0' },
+    totalsRow: object = {
+      day_start: '2026-11-06T08:00:00Z',
+      month_start: '2026-11-01T07:00:00Z',
+      sent_today: '0',
+      sent_month: '0',
+      failed_today: '0',
+      last_failure: null,
+    },
     rateRow: object = { busy_messages: '0', busy_seconds: '0' },
     sendRows: object[] = [],
     channelRateRows: object[] = [],
   ) {
     const results: unknown[] = [pendingRows, finishedRows]
     const rawQuery = (sql: string) => {
-      if (sql.includes('started_ms')) return [deliveryRow]
+      if (sql.includes('sent_month')) return [totalsRow]
       if (sql.includes('PARTITION BY channel')) return channelRateRows
       return sql.includes('busy_messages') ? [rateRow] : sendRows
     }
@@ -800,31 +817,63 @@ describe('MonitoringService', () => {
     ])
   })
 
-  it('reports time to send for single sends and batches separately', async () => {
+  it('reports today and this month, and caches them for a minute', async () => {
+    const redis = fakeRedis([livePod])
     const service = new MonitoringService(
-      fakeRedis([livePod]),
+      redis,
       null,
       fakeQueue('email-delivery'),
       null,
       null,
       tenantRepository,
       fakeDetailRepository([], [], {
-        single_median: '4000.4',
-        single_p95: '12000',
-        single_requests: '87',
-        batch_start_median: '950',
-        batch_finish_median: '200000',
-        batches: '2',
-        batches_finished: '2',
+        day_start: '2026-11-06T08:00:00Z',
+        month_start: '2026-11-01T07:00:00Z',
+        sent_today: '1497',
+        sent_month: '32950',
+        failed_today: '8',
+        last_failure: null,
       }),
     )
 
     const { overview } = await service.getQueueMonitoring()
 
-    expect(overview.timeToSend).toEqual({
-      single: { medianMs: 4000, p95Ms: 12000, requests: 87 },
-      batch: { startMedianMs: 950, finishMedianMs: 200000, batches: 2, finished: 2 },
-    })
+    expect(overview.totals).toMatchObject({ sentToday: 1497, sentThisMonth: 32950, failedToday: 8 })
+    expect(redis.set).toHaveBeenCalledWith(
+      expect.stringContaining('monitoring:send-totals'),
+      JSON.stringify(overview.totals),
+      'EX',
+      60,
+    )
+  })
+
+  it('serves cached totals without querying the database', async () => {
+    const cached = {
+      dayStart: '2026-11-06T08:00:00.000Z',
+      monthStart: '2026-11-01T07:00:00.000Z',
+      sentToday: 5,
+      sentThisMonth: 50,
+      failedToday: 1,
+      lastFailureAt: null,
+    }
+    const redis = fakeRedis([livePod])
+    ;(redis.get as ReturnType<typeof vi.fn>).mockImplementation((key: string) =>
+      Promise.resolve(key.includes('monitoring:send-totals') ? JSON.stringify(cached) : null),
+    )
+    const detail = fakeDetailRepository()
+    const service = new MonitoringService(
+      redis,
+      null,
+      fakeQueue('email-delivery'),
+      null,
+      null,
+      tenantRepository,
+      detail,
+    )
+
+    expect((await service.getQueueMonitoring()).overview.totals).toEqual(cached)
+    const sql = (detail.query as ReturnType<typeof vi.fn>).mock.calls.map(([q]) => String(q))
+    expect(sql.some((q) => q.includes('sent_month'))).toBe(false)
   })
 
   it('reports the sustained sending speed from busy time', async () => {
@@ -841,23 +890,6 @@ describe('MonitoringService', () => {
     const { overview } = await service.getQueueMonitoring()
 
     expect(overview.sendingRate).toEqual({ perMinute: 36.1, messages: 28, busySeconds: 47 })
-  })
-
-  it('reports no time to send when nothing was sent in the last hour', async () => {
-    const service = new MonitoringService(
-      fakeRedis([livePod]),
-      null,
-      fakeQueue('email-delivery'),
-      null,
-      null,
-      tenantRepository,
-      fakeDetailRepository(),
-    )
-
-    expect((await service.getQueueMonitoring()).overview.timeToSend).toEqual({
-      single: null,
-      batch: null,
-    })
   })
 
   it('is unavailable when Redis is not configured', async () => {

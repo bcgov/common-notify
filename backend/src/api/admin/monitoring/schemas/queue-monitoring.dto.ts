@@ -141,19 +141,17 @@ export interface SendInProgressDto {
 export interface MonitoringOverviewDto {
   windowMinutes: number
   /**
-   * From a request being accepted (or a scheduled send falling due) to the provider accepting it,
-   * over requests that started sending in the window. Single sends report that directly. A
-   * batch's rows queue behind each other, so it reports when its first and last messages went.
+   * Recipients since Pacific midnight and the 1st of the month, across every tenant and UI sends
+   * included. Up to a minute stale: cached because the page refetches on every change.
    */
-  timeToSend: {
-    single: { medianMs: number; p95Ms: number; requests: number } | null
-    /** finishMedianMs is over finished batches only; null while none has finished. */
-    batch: {
-      startMedianMs: number
-      finishMedianMs: number | null
-      batches: number
-      finished: number
-    } | null
+  totals: {
+    dayStart: string
+    monthStart: string
+    sentToday: number
+    sentThisMonth: number
+    failedToday: number
+    /** The most recent failure this month; null when there has been none. */
+    lastFailureAt: string | null
   }
   messagesSent: number
   messagesFailed: number

@@ -20,31 +20,20 @@ import AdminOverview from './AdminOverview'
 describe('AdminOverview', () => {
   beforeEach(() => mockedGet.mockReset())
 
-  it('shows Redis memory against its cap', async () => {
+  it('leaves Redis memory to the System page', async () => {
     mockedGet.mockResolvedValue(snapshot())
     render(<AdminOverview />)
 
-    const meter = await screen.findByRole('meter', { name: 'Redis memory used' })
-    expect(meter).toHaveAttribute('aria-valuenow', '39.1')
-    expect(meter).toHaveAttribute('aria-valuetext', '300 MB of 768 MB (39.1%)')
-    // Redis internals belong on System, not the overview.
-    expect(screen.queryByText('noeviction')).not.toBeInTheDocument()
+    await screen.findByRole('region', { name: 'Last hour' })
+    expect(screen.queryByRole('meter', { name: 'Redis memory used' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Redis memory' })).not.toBeInTheDocument()
   })
 
-  it('summarises time to send, the last hour and the backlog in cards', async () => {
+  it('summarises the last hour, the backlog, today, this month and failures, in that order', async () => {
     mockedGet.mockResolvedValue(snapshot())
     render(<AdminOverview />)
 
-    const timeToSend = await screen.findByRole('region', { name: 'Time to send' })
-    expect(within(timeToSend).getByText('4s median')).toBeInTheDocument()
-    expect(
-      within(timeToSend).getByText('95% within 12s · 87 single sends in the last hour'),
-    ).toBeInTheDocument()
-    expect(
-      within(timeToSend).getByText('Batches (2): start in ~1s, finish in ~3m 20s'),
-    ).toBeInTheDocument()
-
-    const hour = screen.getByRole('region', { name: 'Last hour' })
+    const hour = await screen.findByRole('region', { name: 'Last hour' })
     expect(within(hour).getByText('1,240 sent')).toBeInTheDocument()
     expect(
       within(hour).getByText('Sends ~36.1/min (measured over 32m 42s of sending)'),
@@ -55,35 +44,45 @@ describe('AdminOverview', () => {
     const backlog = screen.getByRole('region', { name: 'Backlog' })
     expect(within(backlog).getByText('63 pending')).toBeInTheDocument()
     expect(within(backlog).getByText('Clears in ~3 min')).toBeInTheDocument()
+
+    const today = screen.getByRole('region', { name: 'Today' })
+    expect(within(today).getByText('1,497 sent')).toBeInTheDocument()
+    expect(within(today).getByText('Since midnight, Pacific time')).toBeInTheDocument()
+
+    const month = screen.getByRole('region', { name: 'This month' })
+    expect(within(month).getByText('1,497 sent')).toBeInTheDocument()
+    expect(within(month).getByText('Since October 1')).toBeInTheDocument()
+
+    const failures = screen.getByRole('region', { name: 'Failures' })
+    expect(within(failures).getByText('8 today')).toBeInTheDocument()
+    expect(within(failures).getByText('0.5% of today’s messages')).toBeInTheDocument()
+    expect(within(failures).getByText('8 in the last hour')).toBeInTheDocument()
+    expect(within(failures).getByText('Last failure 12m 0s ago')).toBeInTheDocument()
+
+    const cards = screen
+      .getAllByRole('region')
+      .map((region) => region.getAttribute('aria-label'))
+      .filter(
+        (label) =>
+          label && ['Last hour', 'Backlog', 'Today', 'This month', 'Failures'].includes(label),
+      )
+    expect(cards).toEqual(['Last hour', 'Backlog', 'Today', 'This month', 'Failures'])
   })
 
-  it('describes batches alone when there were no single sends', async () => {
+  it('says when nothing has failed this month', async () => {
     const data = snapshot()
     data.overview = {
       ...data.overview,
-      timeToSend: {
-        single: null,
-        batch: { startMedianMs: 2_000, finishMedianMs: null, batches: 1, finished: 0 },
-      },
+      messagesFailed: 0,
+      totals: { ...data.overview.totals, failedToday: 0, lastFailureAt: null },
     }
     mockedGet.mockResolvedValue(data)
     render(<AdminOverview />)
 
-    const timeToSend = await screen.findByRole('region', { name: 'Time to send' })
-    expect(within(timeToSend).getByText('—')).toBeInTheDocument()
-    expect(
-      within(timeToSend).getByText('Batches (1): start in ~2s, none finished yet'),
-    ).toBeInTheDocument()
-  })
-
-  it('says when nothing was sent in the last hour', async () => {
-    const data = snapshot()
-    data.overview = { ...data.overview, timeToSend: { single: null, batch: null } }
-    mockedGet.mockResolvedValue(data)
-    render(<AdminOverview />)
-
-    const timeToSend = await screen.findByRole('region', { name: 'Time to send' })
-    expect(within(timeToSend).getByText('Nothing sent in the last hour')).toBeInTheDocument()
+    const failures = await screen.findByRole('region', { name: 'Failures' })
+    expect(within(failures).getByText('0 today')).toBeInTheDocument()
+    expect(within(failures).getByText('0% of today’s messages')).toBeInTheDocument()
+    expect(within(failures).getByText('None this month')).toBeInTheDocument()
   })
 
   it('lists each component’s status under its group', async () => {
