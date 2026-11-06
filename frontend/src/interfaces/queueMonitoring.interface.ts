@@ -112,8 +112,17 @@ export interface SendInProgress {
 /** Totals over the last hour, for the summary cards. */
 export interface MonitoringOverview {
   windowMinutes: number
-  /** From the request being accepted (or a scheduled send falling due) to the provider accepting it. */
-  deliveryTime: { medianMs: number; p95Ms: number; messages: number } | null
+  /** From a request being accepted (or falling due) to the provider accepting it. */
+  timeToSend: {
+    single: { medianMs: number; p95Ms: number; requests: number } | null
+    /** When batches started and, over finished ones only, finished. */
+    batch: {
+      startMedianMs: number
+      finishMedianMs: number | null
+      batches: number
+      finished: number
+    } | null
+  }
   messagesSent: number
   messagesFailed: number
   /**

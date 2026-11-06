@@ -451,10 +451,51 @@ export function sendingRateFrom(
   }
 }
 
+export interface TimeToSendRow {
+  single_median: string | null
+  single_p95: string | null
+  single_requests: string
+  batch_start_median: string | null
+  batch_finish_median: string | null
+  batches: string
+  batches_finished: string
+}
+
+/** Milliseconds from a percentile, never negative: clock skew between pods can make it so. */
+function toMs(value: string | null): number | null {
+  return value === null ? null : Math.max(0, Math.round(Number(value)))
+}
+
+export function timeToSendFrom(
+  row: TimeToSendRow | undefined,
+): MonitoringOverviewDto['timeToSend'] {
+  const requests = Number(row?.single_requests ?? 0)
+  const batches = Number(row?.batches ?? 0)
+  const singleMedian = toMs(row?.single_median ?? null)
+  const singleP95 = toMs(row?.single_p95 ?? null)
+  const startMedian = toMs(row?.batch_start_median ?? null)
+
+  return {
+    single:
+      requests > 0 && singleMedian !== null && singleP95 !== null
+        ? { medianMs: singleMedian, p95Ms: singleP95, requests }
+        : null,
+    batch:
+      batches > 0 && startMedian !== null
+        ? {
+            startMedianMs: startMedian,
+            finishMedianMs: toMs(row?.batch_finish_median ?? null),
+            batches,
+            finished: Number(row?.batches_finished ?? 0),
+          }
+        : null,
+  }
+}
+
 export function buildOverview(
   messages: MessageChannelStatsDto[],
   queues: QueueStatsDto[],
-  deliveryTime: MonitoringOverviewDto['deliveryTime'],
+  timeToSend: MonitoringOverviewDto['timeToSend'],
   sendingRate: MonitoringOverviewDto['sendingRate'],
 ): MonitoringOverviewDto {
   const sumSeries = (pick: (m: MessageChannelStatsDto) => number[]) =>
@@ -466,7 +507,7 @@ export function buildOverview(
 
   return {
     windowMinutes: MONITORING_WINDOW_MINUTES,
-    deliveryTime,
+    timeToSend,
     messagesSent,
     messagesFailed,
     sendingRate,
@@ -576,7 +617,7 @@ export class MonitoringService {
       messages,
       failedJobs,
       activeByQueue,
-      deliveryTime,
+      timeToSend,
       sendingRate,
       reconcileActivity,
       sendRows,
@@ -587,7 +628,7 @@ export class MonitoringService {
       this.getMessageStats(now),
       this.getRecentFailedJobs(),
       this.getActiveJobs(),
-      this.getDeliveryTime(now),
+      this.getTimeToSend(now),
       this.getSendingRate(now),
       readReconcileActivity(this.redis, now, MONITORING_WINDOW_MINUTES),
       this.getSendsInProgress(now),
@@ -615,7 +656,7 @@ export class MonitoringService {
         ...providers.map((provider) => provider.status),
         ...queues.map((queue) => queue.status),
       ]),
-      overview: buildOverview(messages, queues, deliveryTime, sendingRate),
+      overview: buildOverview(messages, queues, timeToSend, sendingRate),
       redis,
       messages,
       queues,
@@ -762,34 +803,55 @@ export class MonitoringService {
   }
 
   /**
-   * Median and 95th percentile time to send, over recipients sent in the last hour. Timed from
-   * the parent request's acceptance rather than the detail row's creation, which for a merge
-   * send only happens once ingestion runs; a scheduled send is timed from when it fell due.
+   * Time to send, over requests that started sending in the last hour, timed from acceptance
+   * or from a scheduled send falling due. Single sends report accepted-to-sent. A merge's rows
+   * queue behind each other, so a per-row time would measure its size rather than Notify's speed;
+   * it reports when it started and, once the request is final, when it finished. A request that
+   * started before the window is left out, since its first send is not among the rows read.
    */
-  private async getDeliveryTime(now: number): Promise<MonitoringOverviewDto['deliveryTime']> {
+  private async getTimeToSend(now: number): Promise<MonitoringOverviewDto['timeToSend']> {
     const since = new Date(now - MONITORING_WINDOW_MINUTES * 60_000)
-    const elapsedMs =
-      'EXTRACT(EPOCH FROM (detail.last_attempt_at - GREATEST(request.created_at, ' +
-      'COALESCE(request.delayed_send_time, request.created_at)))) * 1000'
-    const row = await this.detailRepository
-      .createQueryBuilder('detail')
-      .innerJoin('detail.notificationRequest', 'request')
-      .select(`percentile_cont(0.5) WITHIN GROUP (ORDER BY ${elapsedMs})`, 'median')
-      .addSelect(`percentile_cont(0.95) WITHIN GROUP (ORDER BY ${elapsedMs})`, 'p95')
-      .addSelect('COUNT(*)', 'messages')
-      // Repeats the partial index predicate (V72) so the planner uses it, then narrows to sent.
-      .where("detail.status IN ('sent', 'failed')")
-      .andWhere("detail.status = 'sent'")
-      .andWhere('detail.last_attempt_at >= :since', { since })
-      .getRawOne<{ median: string | null; p95: string | null; messages: string }>()
+    const detail = this.detailRepository.metadata
+    const request =
+      detail.findRelationWithPropertyPath('notificationRequest')?.inverseEntityMetadata.tablePath
+    if (!request) return { single: null, batch: null }
 
-    const messages = Number(row?.messages ?? 0)
-    if (!row || messages === 0 || row.median === null || row.p95 === null) return null
-    return {
-      medianMs: Math.max(0, Math.round(Number(row.median))),
-      p95Ms: Math.max(0, Math.round(Number(row.p95))),
-      messages,
-    }
+    const due = 'GREATEST(r.created_at, COALESCE(r.delayed_send_time, r.created_at))'
+    // The status filters repeat the partial index predicate (V72) so the planner uses it.
+    const [row] = (await this.detailRepository.query(
+      `SELECT
+         percentile_cont(0.5) WITHIN GROUP (ORDER BY started_ms) FILTER (WHERE NOT is_batch) AS single_median,
+         percentile_cont(0.95) WITHIN GROUP (ORDER BY started_ms) FILTER (WHERE NOT is_batch) AS single_p95,
+         COUNT(started_ms) FILTER (WHERE NOT is_batch) AS single_requests,
+         percentile_cont(0.5) WITHIN GROUP (ORDER BY started_ms) FILTER (WHERE is_batch) AS batch_start_median,
+         percentile_cont(0.5) WITHIN GROUP (ORDER BY finished_ms) FILTER (WHERE is_batch) AS batch_finish_median,
+         COUNT(*) FILTER (WHERE is_batch) AS batches,
+         COUNT(finished_ms) FILTER (WHERE is_batch) AS batches_finished
+       FROM (
+         SELECT bool_or(d.batch_id IS NOT NULL) AS is_batch,
+                EXTRACT(EPOCH FROM (MIN(d.last_attempt_at) FILTER (WHERE d.status = 'sent')
+                  - ${due})) * 1000 AS started_ms,
+                CASE WHEN r.status IN ($2, $3, $4)
+                  THEN EXTRACT(EPOCH FROM (MAX(d.last_attempt_at) - ${due})) * 1000 END AS finished_ms
+           FROM ${detail.tablePath} d
+           JOIN ${request} r ON r.id = d.notification_request_id
+          WHERE d.status IN ('sent', 'failed') AND d.last_attempt_at >= $1
+            AND NOT EXISTS (
+              SELECT 1 FROM ${detail.tablePath} earlier
+               WHERE earlier.notification_request_id = d.notification_request_id
+                 AND earlier.status IN ('sent', 'failed') AND earlier.last_attempt_at < $1
+            )
+          GROUP BY r.id, r.created_at, r.delayed_send_time, r.status
+       ) starts`,
+      [
+        since,
+        NotificationStatus.COMPLETED,
+        NotificationStatus.PARTIALLY_COMPLETED,
+        NotificationStatus.FAILED,
+      ],
+    )) as TimeToSendRow[]
+
+    return timeToSendFrom(row)
   }
 
   /**
@@ -815,6 +877,35 @@ export class MonitoringService {
     )) as Array<{ busy_messages: string; busy_seconds: string }>
 
     return sendingRateFrom(Number(row?.busy_messages ?? 0), Number(row?.busy_seconds ?? 0))
+  }
+
+  /**
+   * Each channel's busy pace, measured like getSendingRate. Failures count too, since they
+   * leave the backlog as surely as sends. A channel without enough sends to measure is absent.
+   */
+  private async getChannelSendingRates(now: number): Promise<Map<string, number>> {
+    const since = new Date(now - MONITORING_WINDOW_MINUTES * 60_000)
+    const table = this.detailRepository.metadata.tablePath
+    const rows = (await this.detailRepository.query(
+      `SELECT channel,
+              COUNT(*) FILTER (WHERE gap <= $2) AS busy_messages,
+              COALESCE(SUM(gap) FILTER (WHERE gap <= $2), 0) AS busy_seconds
+         FROM (
+           SELECT channel, EXTRACT(EPOCH FROM last_attempt_at - lag(last_attempt_at)
+                    OVER (PARTITION BY channel ORDER BY last_attempt_at)) AS gap
+             FROM ${table}
+            WHERE status IN ('sent', 'failed') AND last_attempt_at >= $1
+         ) gaps
+        GROUP BY channel`,
+      [since, IDLE_GAP_SECONDS],
+    )) as Array<{ channel?: string; busy_messages: string; busy_seconds: string }>
+
+    const rates = new Map<string, number>()
+    for (const row of rows) {
+      const rate = sendingRateFrom(Number(row.busy_messages), Number(row.busy_seconds))
+      if (row.channel && rate) rates.set(row.channel, rate.perMinute)
+    }
+    return rates
   }
 
   /**
@@ -907,7 +998,7 @@ export class MonitoringService {
   private async getMessageStats(now: number): Promise<MessageChannelStatsDto[]> {
     const since = new Date((minuteOf(now) - (MONITORING_WINDOW_MINUTES - 1)) * 60_000)
 
-    const [pendingRows, finishedRows] = await Promise.all([
+    const [pendingRows, finishedRows, busyRates] = await Promise.all([
       this.detailRepository
         .createQueryBuilder('detail')
         .innerJoin('detail.notificationRequest', 'request')
@@ -933,6 +1024,7 @@ export class MonitoringService {
         .addGroupBy('detail.status')
         .addGroupBy('minute')
         .getRawMany<{ channel: string; status: string; minute: Date | string; count: string }>(),
+      this.getChannelSendingRates(now),
     ])
 
     const channels = new Set<string>(DEFAULT_MESSAGE_CHANNELS)
@@ -968,7 +1060,12 @@ export class MonitoringService {
         failed,
         sentPerMinute,
         failedPerMinute,
-        estimatedClearMinutes: estimateClearMinutes(pending, finishedPerMinute),
+        // The busy pace, not the per-minute average: a burst a minute old would otherwise be
+        // averaged with the idle minutes before it and read as many times slower than it is.
+        estimatedClearMinutes: estimateClearMinutes(
+          pending,
+          busyRates.get(channel) ?? finishedPerMinute,
+        ),
       }
     })
   }

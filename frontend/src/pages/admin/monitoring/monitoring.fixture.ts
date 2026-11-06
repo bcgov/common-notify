@@ -13,7 +13,10 @@ export function snapshot(overrides: Partial<QueueMonitoringData> = {}): QueueMon
     status: 'healthy',
     overview: {
       windowMinutes: 60,
-      deliveryTime: { medianMs: 42_000, p95Ms: 130_000, messages: 1240 },
+      timeToSend: {
+        single: { medianMs: 4_000, p95Ms: 12_000, requests: 87 },
+        batch: { startMedianMs: 1_000, finishMedianMs: 200_000, batches: 2, finished: 2 },
+      },
       messagesSent: 1240,
       messagesFailed: 8,
       sendingRate: { perMinute: 36.1, messages: 1180, busySeconds: 1962 },

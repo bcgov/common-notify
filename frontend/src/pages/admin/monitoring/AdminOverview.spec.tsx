@@ -31,13 +31,18 @@ describe('AdminOverview', () => {
     expect(screen.queryByText('noeviction')).not.toBeInTheDocument()
   })
 
-  it('summarises delivery time, the last hour and the backlog in cards', async () => {
+  it('summarises time to send, the last hour and the backlog in cards', async () => {
     mockedGet.mockResolvedValue(snapshot())
     render(<AdminOverview />)
 
-    const delivery = await screen.findByRole('region', { name: 'Delivery time' })
-    expect(within(delivery).getByText('42s median')).toBeInTheDocument()
-    expect(within(delivery).getByText('95% within 2m 10s')).toBeInTheDocument()
+    const timeToSend = await screen.findByRole('region', { name: 'Time to send' })
+    expect(within(timeToSend).getByText('4s median')).toBeInTheDocument()
+    expect(
+      within(timeToSend).getByText('95% within 12s · 87 single sends in the last hour'),
+    ).toBeInTheDocument()
+    expect(
+      within(timeToSend).getByText('Batches (2): start in ~1s, finish in ~3m 20s'),
+    ).toBeInTheDocument()
 
     const hour = screen.getByRole('region', { name: 'Last hour' })
     expect(within(hour).getByText('1,240 sent')).toBeInTheDocument()
@@ -52,14 +57,33 @@ describe('AdminOverview', () => {
     expect(within(backlog).getByText('Clears in ~3 min')).toBeInTheDocument()
   })
 
-  it('says when nothing was sent in the last hour', async () => {
+  it('describes batches alone when there were no single sends', async () => {
     const data = snapshot()
-    data.overview = { ...data.overview, deliveryTime: null }
+    data.overview = {
+      ...data.overview,
+      timeToSend: {
+        single: null,
+        batch: { startMedianMs: 2_000, finishMedianMs: null, batches: 1, finished: 0 },
+      },
+    }
     mockedGet.mockResolvedValue(data)
     render(<AdminOverview />)
 
-    const delivery = await screen.findByRole('region', { name: 'Delivery time' })
-    expect(within(delivery).getByText('Nothing sent in the last hour')).toBeInTheDocument()
+    const timeToSend = await screen.findByRole('region', { name: 'Time to send' })
+    expect(within(timeToSend).getByText('—')).toBeInTheDocument()
+    expect(
+      within(timeToSend).getByText('Batches (1): start in ~2s, none finished yet'),
+    ).toBeInTheDocument()
+  })
+
+  it('says when nothing was sent in the last hour', async () => {
+    const data = snapshot()
+    data.overview = { ...data.overview, timeToSend: { single: null, batch: null } }
+    mockedGet.mockResolvedValue(data)
+    render(<AdminOverview />)
+
+    const timeToSend = await screen.findByRole('region', { name: 'Time to send' })
+    expect(within(timeToSend).getByText('Nothing sent in the last hour')).toBeInTheDocument()
   })
 
   it('lists each component’s status under its group', async () => {

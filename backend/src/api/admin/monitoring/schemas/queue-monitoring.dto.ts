@@ -140,8 +140,21 @@ export interface SendInProgressDto {
 /** Totals over the last hour, for the summary cards. */
 export interface MonitoringOverviewDto {
   windowMinutes: number
-  /** From the request being accepted (or a scheduled send falling due) to the provider accepting the message. */
-  deliveryTime: { medianMs: number; p95Ms: number; messages: number } | null
+  /**
+   * From a request being accepted (or a scheduled send falling due) to the provider accepting it,
+   * over requests that started sending in the window. Single sends report that directly. A
+   * batch's rows queue behind each other, so it reports when its first and last messages went.
+   */
+  timeToSend: {
+    single: { medianMs: number; p95Ms: number; requests: number } | null
+    /** finishMedianMs is over finished batches only; null while none has finished. */
+    batch: {
+      startMedianMs: number
+      finishMedianMs: number | null
+      batches: number
+      finished: number
+    } | null
+  }
   messagesSent: number
   messagesFailed: number
   /**

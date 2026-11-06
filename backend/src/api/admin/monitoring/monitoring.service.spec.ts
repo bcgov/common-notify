@@ -12,6 +12,7 @@ import {
   buildReconcilerStats,
   buildSendsInProgress,
   sendingRateFrom,
+  timeToSendFrom,
   countUnheldActiveJobs,
   evaluateQueue,
   maskPersonalData,
@@ -293,7 +294,7 @@ describe('buildOverview', () => {
     const overview = buildOverview(
       [channel(1200, 6), { ...channel(40, 2), channel: 'SMS' }],
       [evaluateQueue(ingestion)],
-      null,
+      { single: null, batch: null },
       null,
     )
 
@@ -308,7 +309,42 @@ describe('buildOverview', () => {
   })
 
   it('reports a zero failure rate when nothing finished', () => {
-    expect(buildOverview([channel(0, 0)], [], null, null).failurePercent).toBe(0)
+    expect(
+      buildOverview([channel(0, 0)], [], { single: null, batch: null }, null).failurePercent,
+    ).toBe(0)
+  })
+})
+
+describe('timeToSendFrom', () => {
+  it('leaves the finish time empty while no batch has finished', () => {
+    expect(
+      timeToSendFrom({
+        single_median: null,
+        single_p95: null,
+        single_requests: '0',
+        batch_start_median: '1500',
+        batch_finish_median: null,
+        batches: '1',
+        batches_finished: '0',
+      }),
+    ).toEqual({
+      single: null,
+      batch: { startMedianMs: 1500, finishMedianMs: null, batches: 1, finished: 0 },
+    })
+  })
+
+  it('never reports a negative time, which clock skew between pods can produce', () => {
+    expect(
+      timeToSendFrom({
+        single_median: '-20',
+        single_p95: '10',
+        single_requests: '3',
+        batch_start_median: null,
+        batch_finish_median: null,
+        batches: '0',
+        batches_finished: '0',
+      }).single,
+    ).toEqual({ medianMs: 0, p95Ms: 10, requests: 3 })
   })
 })
 
@@ -425,11 +461,17 @@ describe('MonitoringService', () => {
   function fakeDetailRepository(
     pendingRows: object[] = [],
     finishedRows: object[] = [],
-    deliveryRow: object = { median: null, p95: null, messages: '0' },
+    deliveryRow: object = { single_requests: '0', batches: '0' },
     rateRow: object = { busy_messages: '0', busy_seconds: '0' },
     sendRows: object[] = [],
+    channelRateRows: object[] = [],
   ) {
-    const results: unknown[] = [pendingRows, finishedRows, deliveryRow]
+    const results: unknown[] = [pendingRows, finishedRows]
+    const rawQuery = (sql: string) => {
+      if (sql.includes('started_ms')) return [deliveryRow]
+      if (sql.includes('PARTITION BY channel')) return channelRateRows
+      return sql.includes('busy_messages') ? [rateRow] : sendRows
+    }
     return {
       metadata: {
         tablePath: 'notify.notification_request_detail',
@@ -437,9 +479,7 @@ describe('MonitoringService', () => {
           inverseEntityMetadata: { tablePath: 'notify.notification_request' },
         }),
       },
-      query: vi.fn((sql: string) =>
-        Promise.resolve(sql.includes('busy_messages') ? [rateRow] : sendRows),
-      ),
+      query: vi.fn((sql: string) => Promise.resolve(rawQuery(sql))),
       createQueryBuilder: vi.fn(() => {
         const rows = results.shift() ?? []
         const builder: Record<string, unknown> = {}
@@ -680,6 +720,35 @@ describe('MonitoringService', () => {
     expect(sms).toMatchObject({ pending: 0, oldestPendingAgeMs: null, estimatedClearMinutes: 0 })
   })
 
+  it('estimates the clear time from the busy pace, not idle minutes before a burst', async () => {
+    const minuteStart = (offsetMinutes: number) =>
+      new Date((Math.floor(now / 60_000) - offsetMinutes) * 60_000)
+    const service = new MonitoringService(
+      fakeRedis([livePod]),
+      null,
+      fakeQueue('email-delivery'),
+      null,
+      null,
+      tenantRepository,
+      fakeDetailRepository(
+        [{ channel: 'EMAIL', pending: '113', oldest: new Date(now - 83_000) }],
+        // A burst begun a minute ago: one whole minute of sends among five.
+        [{ channel: 'EMAIL', status: 'sent', minute: minuteStart(1), count: '30' }],
+        undefined,
+        undefined,
+        [],
+        // 87 sends in 83.5 busy seconds -> 62.5/min.
+        [{ channel: 'EMAIL', busy_messages: '87', busy_seconds: '83.5' }],
+      ),
+    )
+
+    const { messages } = await service.getQueueMonitoring()
+    const email = messages.find((m) => m.channel === 'EMAIL')!
+
+    // The per-minute average (6/min) would say 19 minutes.
+    expect(email.estimatedClearMinutes).toBe(2)
+  })
+
   it('rolls sends up per request, counting the merge batches being worked now', async () => {
     const batch = {
       id: 'req-1-EMAIL-0',
@@ -731,7 +800,7 @@ describe('MonitoringService', () => {
     ])
   })
 
-  it('reports delivery time percentiles for the last hour', async () => {
+  it('reports time to send for single sends and batches separately', async () => {
     const service = new MonitoringService(
       fakeRedis([livePod]),
       null,
@@ -739,12 +808,23 @@ describe('MonitoringService', () => {
       null,
       null,
       tenantRepository,
-      fakeDetailRepository([], [], { median: '42000.4', p95: '130000', messages: '1240' }),
+      fakeDetailRepository([], [], {
+        single_median: '4000.4',
+        single_p95: '12000',
+        single_requests: '87',
+        batch_start_median: '950',
+        batch_finish_median: '200000',
+        batches: '2',
+        batches_finished: '2',
+      }),
     )
 
     const { overview } = await service.getQueueMonitoring()
 
-    expect(overview.deliveryTime).toEqual({ medianMs: 42000, p95Ms: 130000, messages: 1240 })
+    expect(overview.timeToSend).toEqual({
+      single: { medianMs: 4000, p95Ms: 12000, requests: 87 },
+      batch: { startMedianMs: 950, finishMedianMs: 200000, batches: 2, finished: 2 },
+    })
   })
 
   it('reports the sustained sending speed from busy time', async () => {
@@ -763,7 +843,7 @@ describe('MonitoringService', () => {
     expect(overview.sendingRate).toEqual({ perMinute: 36.1, messages: 28, busySeconds: 47 })
   })
 
-  it('reports no delivery time when nothing was sent in the last hour', async () => {
+  it('reports no time to send when nothing was sent in the last hour', async () => {
     const service = new MonitoringService(
       fakeRedis([livePod]),
       null,
@@ -774,7 +854,10 @@ describe('MonitoringService', () => {
       fakeDetailRepository(),
     )
 
-    expect((await service.getQueueMonitoring()).overview.deliveryTime).toBeNull()
+    expect((await service.getQueueMonitoring()).overview.timeToSend).toEqual({
+      single: null,
+      batch: null,
+    })
   })
 
   it('is unavailable when Redis is not configured', async () => {
