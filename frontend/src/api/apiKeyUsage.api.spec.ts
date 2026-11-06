@@ -111,15 +111,29 @@ describe('apiKeyUsage API', () => {
       )
     }
   })
-  it('serializes admin pagination and includes only nonempty searches', async () => {
+  it('serializes admin pagination, nonempty searches and each filter', async () => {
+    const lastQuery = () => {
+      const { url } = vi.mocked(get).mock.lastCall![0] as { url: string }
+      return [...new URL(url, 'http://localhost').searchParams.entries()]
+    }
     await api.getAllTenantsUsage(2, 30, 'Ministry')
-    expect(get).toHaveBeenCalledWith(
-      expect.objectContaining({ params: { page: '2', limit: '30', search: 'Ministry' } }),
-    )
+    expect(lastQuery()).toEqual([
+      ['page', '2'],
+      ['limit', '30'],
+      ['search', 'Ministry'],
+    ])
     await api.getAllTenantsUsage()
-    expect(get).toHaveBeenLastCalledWith(
-      expect.objectContaining({ params: { page: '1', limit: '15' } }),
-    )
+    expect(lastQuery()).toEqual([
+      ['page', '1'],
+      ['limit', '15'],
+    ])
+    await api.getAllTenantsUsage(1, 15, undefined, ['channel:in:EMAIL|SMS', 'status:in:x'])
+    expect(lastQuery()).toEqual([
+      ['page', '1'],
+      ['limit', '15'],
+      ['filter', 'channel:in:EMAIL|SMS'],
+      ['filter', 'status:in:x'],
+    ])
   })
   it("surfaces the server's message for any other failure", async () => {
     vi.mocked(get).mockRejectedValue(

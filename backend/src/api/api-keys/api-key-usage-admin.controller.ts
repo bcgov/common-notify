@@ -13,19 +13,20 @@ import {
   ApiBearerAuth,
   ApiOkResponse,
   ApiOperation,
-  ApiQuery,
   ApiTags,
   ApiExcludeController,
 } from '@nestjs/swagger'
 import { NotifyAdminGuard } from '../../common/guards/notify-admin.guard'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { SsoRole } from '../../enum/sso-role.enum'
-import { ApiKeyUsageService } from './api-key-usage.service'
+import { ApiKeyUsageService, adminUsageListQueryConfig } from './api-key-usage.service'
+import { parseListQuery } from '../../common/query/list-query.parser'
 import {
   AdminTenantUsageRowDto,
   PaginatedAdminUsageResponseDto,
 } from './schemas/tenant-usage-response.dto'
 import { UpdateTenantLimitsDto } from './schemas/update-tenant-limits.dto'
+import { AdminUsageQueryDto } from './schemas/admin-usage-query.dto'
 
 /**
  * Admin API Controller for notification usage across all tenants.
@@ -47,25 +48,10 @@ export class ApiKeyUsageAdminController {
   @Get()
   @Roles(SsoRole.NOTIFY_ADMIN)
   @ApiOperation({ summary: 'Get notification usage vs limits for every tenant (admin only)' })
-  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
-  @ApiQuery({ name: 'limit', required: false, type: Number, example: 15 })
-  @ApiQuery({
-    name: 'search',
-    required: false,
-    type: String,
-    description: 'Filter tenants by name (case-insensitive substring)',
-  })
   @ApiOkResponse({ type: PaginatedAdminUsageResponseDto })
-  getAllTenantsUsage(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('search') search?: string,
-  ): Promise<PaginatedAdminUsageResponseDto> {
-    return this.apiKeyUsageService.getAllTenantsUsage({
-      page: page ? Number.parseInt(page, 10) : undefined,
-      limit: limit ? Number.parseInt(limit, 10) : undefined,
-      search,
-    })
+  getAllTenantsUsage(@Query() query: AdminUsageQueryDto): Promise<PaginatedAdminUsageResponseDto> {
+    const parsedQuery = parseListQuery(query, adminUsageListQueryConfig)
+    return this.apiKeyUsageService.getAllTenantsUsage(parsedQuery, query.search)
   }
 
   @Version('1')
