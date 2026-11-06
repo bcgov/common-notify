@@ -1,4 +1,5 @@
 import type { AxiosError } from 'axios'
+import { getApiErrorMessage } from '@/utils/apiErrorMessage'
 import { get, patch, generateApiParameters, STATUS_CODES } from '@/common/api'
 
 /**
@@ -109,20 +110,22 @@ export async function updateApiKeyThreshold(
 
 /**
  * Get a paginated page of usage vs limits across tenants (one row per tenant × channel),
- * optionally filtered by tenant name. Pagination is by tenant. Requires NOTIFY_ADMIN.
- * Backed by /api/v1/frontend/admin/api-key-usage.
+ * optionally filtered by tenant name and `field:in:values` filters. Pagination is by tenant.
+ * Requires NOTIFY_ADMIN. Backed by /api/v1/frontend/admin/api-key-usage.
  */
 export async function getAllTenantsUsage(
   page: number = 1,
   limit: number = 15,
   search?: string,
+  filter?: string[],
 ): Promise<PaginatedAdminUsageResponse> {
   try {
-    const params = generateApiParameters('/api/v1/frontend/admin/api-key-usage', {
-      page: String(page),
-      limit: String(limit),
-      ...(search ? { search } : {}),
-    })
+    const qs = new URLSearchParams()
+    qs.set('page', String(page))
+    qs.set('limit', String(limit))
+    if (search) qs.set('search', search)
+    filter?.forEach((f) => qs.append('filter', f))
+    const params = generateApiParameters(`/api/v1/frontend/admin/api-key-usage?${qs.toString()}`)
     return await get<PaginatedAdminUsageResponse>(params)
   } catch (error) {
     throw toReadableError(error, 'tenant usage')
@@ -146,7 +149,6 @@ export async function updateTenantLimits(
 
 function toReadableError(error: unknown, resource: string): Error {
   const axiosError = error as AxiosError
-  const responseData = (axiosError.response?.data as any) || {}
 
   if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
     return new Error(`You are not authorized to view ${resource}`)
@@ -155,9 +157,5 @@ function toReadableError(error: unknown, resource: string): Error {
     return new Error(`You do not have permission to modify the ${resource}`)
   }
 
-  return new Error(
-    `Failed to load ${resource}: ${
-      responseData.message || (error instanceof Error ? error.message : 'Unknown error')
-    }`,
-  )
+  return new Error(`Failed to load ${resource}: ${getApiErrorMessage(error)}`)
 }
