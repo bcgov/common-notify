@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteRouteImport } from './routes/admin/route'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as NotAuthorizedRouteImport } from './routes/not-authorized'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -31,6 +32,11 @@ import { Route as EventsEventIdSavedRouteImport } from './routes/events/$eventId
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRouteRoute = AdminRouteRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -64,19 +70,19 @@ const UsageRoute = UsageRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminFeatureFlagsRoute = AdminFeatureFlagsRouteImport.update({
-  id: '/admin/feature-flags',
-  path: '/admin/feature-flags',
-  getParentRoute: () => rootRouteImport,
+  id: '/feature-flags',
+  path: '/feature-flags',
+  getParentRoute: () => AdminRouteRoute,
 } as any)
 const AdminMonitoringRoute = AdminMonitoringRouteImport.update({
-  id: '/admin/monitoring',
-  path: '/admin/monitoring',
-  getParentRoute: () => rootRouteImport,
+  id: '/monitoring',
+  path: '/monitoring',
+  getParentRoute: () => AdminRouteRoute,
 } as any)
 const AdminUsageRoute = AdminUsageRouteImport.update({
-  id: '/admin/usage',
-  path: '/admin/usage',
-  getParentRoute: () => rootRouteImport,
+  id: '/usage',
+  path: '/usage',
+  getParentRoute: () => AdminRouteRoute,
 } as any)
 const BulkNotificationsIndexRoute = BulkNotificationsIndexRouteImport.update({
   id: '/bulk-notifications/',
@@ -123,6 +129,7 @@ const EventsEventIdSavedRoute = EventsEventIdSavedRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/not-authorized': typeof NotAuthorizedRoute
   '/settings': typeof SettingsRoute
@@ -143,6 +150,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/not-authorized': typeof NotAuthorizedRoute
   '/settings': typeof SettingsRoute
@@ -164,6 +172,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/not-authorized': typeof NotAuthorizedRoute
   '/settings': typeof SettingsRoute
@@ -186,6 +195,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/dashboard'
     | '/not-authorized'
     | '/settings'
@@ -206,6 +216,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/dashboard'
     | '/not-authorized'
     | '/settings'
@@ -226,6 +237,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/dashboard'
     | '/not-authorized'
     | '/settings'
@@ -247,15 +259,13 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRouteRoute: typeof AdminRouteRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   NotAuthorizedRoute: typeof NotAuthorizedRoute
   SettingsRoute: typeof SettingsRoute
   TemplateCreateRoute: typeof TemplateCreateRoute
   TemplatesRoute: typeof TemplatesRoute
   UsageRoute: typeof UsageRoute
-  AdminFeatureFlagsRoute: typeof AdminFeatureFlagsRoute
-  AdminMonitoringRoute: typeof AdminMonitoringRoute
-  AdminUsageRoute: typeof AdminUsageRoute
   EventsCreateRoute: typeof EventsCreateRoute
   RequestStatusNotificationRequestIdRoute: typeof RequestStatusNotificationRequestIdRoute
   TemplateEditTemplateIdRoute: typeof TemplateEditTemplateIdRoute
@@ -273,6 +283,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -319,24 +336,24 @@ declare module '@tanstack/react-router' {
     }
     '/admin/feature-flags': {
       id: '/admin/feature-flags'
-      path: '/admin/feature-flags'
+      path: '/feature-flags'
       fullPath: '/admin/feature-flags'
       preLoaderRoute: typeof AdminFeatureFlagsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRouteRoute
     }
     '/admin/monitoring': {
       id: '/admin/monitoring'
-      path: '/admin/monitoring'
+      path: '/monitoring'
       fullPath: '/admin/monitoring'
       preLoaderRoute: typeof AdminMonitoringRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRouteRoute
     }
     '/admin/usage': {
       id: '/admin/usage'
-      path: '/admin/usage'
+      path: '/usage'
       fullPath: '/admin/usage'
       preLoaderRoute: typeof AdminUsageRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRouteRoute
     }
     '/bulk-notifications/': {
       id: '/bulk-notifications/'
@@ -397,17 +414,31 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminRouteRouteChildren {
+  AdminFeatureFlagsRoute: typeof AdminFeatureFlagsRoute
+  AdminMonitoringRoute: typeof AdminMonitoringRoute
+  AdminUsageRoute: typeof AdminUsageRoute
+}
+
+const AdminRouteRouteChildren: AdminRouteRouteChildren = {
+  AdminFeatureFlagsRoute: AdminFeatureFlagsRoute,
+  AdminMonitoringRoute: AdminMonitoringRoute,
+  AdminUsageRoute: AdminUsageRoute,
+}
+
+const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
+  AdminRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRouteRoute: AdminRouteRouteWithChildren,
   DashboardRoute: DashboardRoute,
   NotAuthorizedRoute: NotAuthorizedRoute,
   SettingsRoute: SettingsRoute,
   TemplateCreateRoute: TemplateCreateRoute,
   TemplatesRoute: TemplatesRoute,
   UsageRoute: UsageRoute,
-  AdminFeatureFlagsRoute: AdminFeatureFlagsRoute,
-  AdminMonitoringRoute: AdminMonitoringRoute,
-  AdminUsageRoute: AdminUsageRoute,
   EventsCreateRoute: EventsCreateRoute,
   RequestStatusNotificationRequestIdRoute:
     RequestStatusNotificationRequestIdRoute,

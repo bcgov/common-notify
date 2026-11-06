@@ -92,7 +92,7 @@ export class GcNotifyController {
     @Query('older_than') olderThan?: string,
     @Query('include_jobs') includeJobs?: boolean,
   ) {
-    const statusArray = Array.isArray(status) ? status : status ? [status] : undefined
+    const statusArray = status ? [status].flat() : undefined
     const query = {
       template_type: templateType,
       status: statusArray,
@@ -166,7 +166,7 @@ export class GcNotifyController {
     description:
       'GC Notify-compatible bulk send: one template applied to many recipients, supplied as rows ' +
       'where the first row is the header. Accepted as a single request and delivered ' +
-      'asynchronously.',
+      'asynchronously. The template must use the GC Notify (legacy) engine.',
   })
   @ApiResponse({
     status: 201,

@@ -16,14 +16,9 @@ import { updateTenantSettings } from '@/redux/thunks/settings.thunks'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
 import { CstarRole } from '@/enum/cstar-role.enum'
-
-const EMAIL_PATTERN =
-  /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i
+import { isValidEmail } from '@/utils/email'
 
 const normalizeEmail = (value: string): string | null => value.trim() || null
-
-const isValidEmail = (value: string): boolean =>
-  value.length <= 254 && !value.includes('..') && EMAIL_PATTERN.test(value)
 
 // Local part (before @gov.bc.ca) of the default sending email address.
 const SENDER_EMAIL_PATTERN = /^[A-Za-z0-9._-]{1,64}$/
