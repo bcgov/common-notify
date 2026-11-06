@@ -17,7 +17,9 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TemplateCreateRouteImport } from './routes/template-create'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as UsageRouteImport } from './routes/usage'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminFeatureFlagsRouteImport } from './routes/admin/feature-flags'
+import { Route as AdminHealthRouteImport } from './routes/admin/health'
 import { Route as AdminMonitoringRouteImport } from './routes/admin/monitoring'
 import { Route as AdminUsageRouteImport } from './routes/admin/usage'
 import { Route as BulkNotificationsIndexRouteImport } from './routes/bulk-notifications/index'
@@ -69,9 +71,19 @@ const UsageRoute = UsageRouteImport.update({
   path: '/usage',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 const AdminFeatureFlagsRoute = AdminFeatureFlagsRouteImport.update({
   id: '/feature-flags',
   path: '/feature-flags',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminHealthRoute = AdminHealthRouteImport.update({
+  id: '/health',
+  path: '/health',
   getParentRoute: () => AdminRouteRoute,
 } as any)
 const AdminMonitoringRoute = AdminMonitoringRouteImport.update({
@@ -137,11 +149,13 @@ export interface FileRoutesByFullPath {
   '/templates': typeof TemplatesRoute
   '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
+  '/admin/health': typeof AdminHealthRoute
   '/admin/monitoring': typeof AdminMonitoringRoute
   '/admin/usage': typeof AdminUsageRoute
   '/events/create': typeof EventsCreateRoute
   '/request-status/$notificationRequestId': typeof RequestStatusNotificationRequestIdRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
+  '/admin/': typeof AdminIndexRoute
   '/bulk-notifications/': typeof BulkNotificationsIndexRoute
   '/events/': typeof EventsIndexRoute
   '/events/$eventId/email-test-send': typeof EventsEventIdEmailTestSendRoute
@@ -150,7 +164,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRouteRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/not-authorized': typeof NotAuthorizedRoute
   '/settings': typeof SettingsRoute
@@ -158,11 +171,13 @@ export interface FileRoutesByTo {
   '/templates': typeof TemplatesRoute
   '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
+  '/admin/health': typeof AdminHealthRoute
   '/admin/monitoring': typeof AdminMonitoringRoute
   '/admin/usage': typeof AdminUsageRoute
   '/events/create': typeof EventsCreateRoute
   '/request-status/$notificationRequestId': typeof RequestStatusNotificationRequestIdRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
+  '/admin': typeof AdminIndexRoute
   '/bulk-notifications': typeof BulkNotificationsIndexRoute
   '/events': typeof EventsIndexRoute
   '/events/$eventId/email-test-send': typeof EventsEventIdEmailTestSendRoute
@@ -180,11 +195,13 @@ export interface FileRoutesById {
   '/templates': typeof TemplatesRoute
   '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
+  '/admin/health': typeof AdminHealthRoute
   '/admin/monitoring': typeof AdminMonitoringRoute
   '/admin/usage': typeof AdminUsageRoute
   '/events/create': typeof EventsCreateRoute
   '/request-status/$notificationRequestId': typeof RequestStatusNotificationRequestIdRoute
   '/template-edit/$templateId': typeof TemplateEditTemplateIdRoute
+  '/admin/': typeof AdminIndexRoute
   '/bulk-notifications/': typeof BulkNotificationsIndexRoute
   '/events/': typeof EventsIndexRoute
   '/events/$eventId/email-test-send': typeof EventsEventIdEmailTestSendRoute
@@ -203,11 +220,13 @@ export interface FileRouteTypes {
     | '/templates'
     | '/usage'
     | '/admin/feature-flags'
+    | '/admin/health'
     | '/admin/monitoring'
     | '/admin/usage'
     | '/events/create'
     | '/request-status/$notificationRequestId'
     | '/template-edit/$templateId'
+    | '/admin/'
     | '/bulk-notifications/'
     | '/events/'
     | '/events/$eventId/email-test-send'
@@ -216,7 +235,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/admin'
     | '/dashboard'
     | '/not-authorized'
     | '/settings'
@@ -224,11 +242,13 @@ export interface FileRouteTypes {
     | '/templates'
     | '/usage'
     | '/admin/feature-flags'
+    | '/admin/health'
     | '/admin/monitoring'
     | '/admin/usage'
     | '/events/create'
     | '/request-status/$notificationRequestId'
     | '/template-edit/$templateId'
+    | '/admin'
     | '/bulk-notifications'
     | '/events'
     | '/events/$eventId/email-test-send'
@@ -245,11 +265,13 @@ export interface FileRouteTypes {
     | '/templates'
     | '/usage'
     | '/admin/feature-flags'
+    | '/admin/health'
     | '/admin/monitoring'
     | '/admin/usage'
     | '/events/create'
     | '/request-status/$notificationRequestId'
     | '/template-edit/$templateId'
+    | '/admin/'
     | '/bulk-notifications/'
     | '/events/'
     | '/events/$eventId/email-test-send'
@@ -334,11 +356,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UsageRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/admin/feature-flags': {
       id: '/admin/feature-flags'
       path: '/feature-flags'
       fullPath: '/admin/feature-flags'
       preLoaderRoute: typeof AdminFeatureFlagsRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/admin/health': {
+      id: '/admin/health'
+      path: '/health'
+      fullPath: '/admin/health'
+      preLoaderRoute: typeof AdminHealthRouteImport
       parentRoute: typeof AdminRouteRoute
     }
     '/admin/monitoring': {
@@ -416,14 +452,18 @@ declare module '@tanstack/react-router' {
 
 interface AdminRouteRouteChildren {
   AdminFeatureFlagsRoute: typeof AdminFeatureFlagsRoute
+  AdminHealthRoute: typeof AdminHealthRoute
   AdminMonitoringRoute: typeof AdminMonitoringRoute
   AdminUsageRoute: typeof AdminUsageRoute
+  AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminFeatureFlagsRoute: AdminFeatureFlagsRoute,
+  AdminHealthRoute: AdminHealthRoute,
   AdminMonitoringRoute: AdminMonitoringRoute,
   AdminUsageRoute: AdminUsageRoute,
+  AdminIndexRoute: AdminIndexRoute,
 }
 
 const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(

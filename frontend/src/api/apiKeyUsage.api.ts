@@ -45,13 +45,21 @@ export interface AdminTenantUsageRow {
   tenantId: string
   tenantName: string
   channel: string
-  rateLimitPerMinute: number
-  dailyLimit: number
-  annualLimit: number
-  warnThresholdPercent: number
+  /** The limit fields are null when the tenant has no limit on this channel, e.g. no API key. */
+  rateLimitPerMinute: number | null
+  dailyLimit: number | null
+  annualLimit: number | null
+  warnThresholdPercent: number | null
   usedThisMinute: number
   usedToday: number
   usedThisYear: number
+  /** ISO time of the tenant's last send on this channel, from any source; null if never. */
+  lastSentAt: string | null
+  /** Recipients per month over the last 12 full months; null with no full month yet. */
+  averageMonthlySends: number | null
+  /** Recipients sent to on this channel in the last 30 days, and how many of them failed. */
+  recipientsLast30Days: number
+  failedLast30Days: number
 }
 
 export interface PaginatedAdminUsageResponse {
@@ -60,6 +68,13 @@ export interface PaginatedAdminUsageResponse {
   page: number
   limit: number
   totalPages: number
+}
+
+/** How many tenants use Notify, across every tenant whatever the table's search or filters. */
+export interface AdminUsageSummary {
+  tenants: number
+  sentThisFiscalYear: number
+  withApiKey: number
 }
 
 export interface UpdateTenantLimitsRequest {
@@ -129,6 +144,16 @@ export async function getAllTenantsUsage(
     return await get<PaginatedAdminUsageResponse>(params)
   } catch (error) {
     throw toReadableError(error, 'tenant usage')
+  }
+}
+
+/** How many tenants use Notify. Requires NOTIFY_ADMIN. */
+export async function getAdminUsageSummary(): Promise<AdminUsageSummary> {
+  try {
+    const params = generateApiParameters('/api/v1/frontend/admin/api-key-usage/summary')
+    return await get<AdminUsageSummary>(params)
+  } catch (error) {
+    throw toReadableError(error, 'tenant summary')
   }
 }
 

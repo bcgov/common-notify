@@ -135,6 +135,14 @@ describe('apiKeyUsage API', () => {
       ['filter', 'status:in:x'],
     ])
   })
+  it('getAdminUsageSummary reads the summary endpoint and translates failures', async () => {
+    await expect(api.getAdminUsageSummary()).resolves.toEqual({ ok: true })
+    expect(vi.mocked(get).mock.lastCall![0]).toMatchObject({
+      url: '/api/v1/frontend/admin/api-key-usage/summary',
+    })
+    vi.mocked(get).mockRejectedValue({ response: { status: 500, data: { message: 'down' } } })
+    await expect(api.getAdminUsageSummary()).rejects.toThrow('Failed to load tenant summary: down')
+  })
   it("surfaces the server's message for any other failure", async () => {
     vi.mocked(get).mockRejectedValue(
       Object.assign(new Error('Request failed with status code 500'), {

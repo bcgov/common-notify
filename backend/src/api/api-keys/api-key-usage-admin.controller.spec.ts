@@ -14,15 +14,21 @@ import { NotifyAdminGuard } from '../../common/guards/notify-admin.guard'
 describe('ApiKeyUsageAdminController GET /frontend/admin/api-key-usage', () => {
   let app: INestApplication
   let getAllTenantsUsage: ReturnType<typeof vi.fn>
+  let getAdminUsageSummary: ReturnType<typeof vi.fn>
 
   beforeEach(async () => {
     getAllTenantsUsage = vi
       .fn()
       .mockResolvedValue({ data: [], count: 0, page: 1, limit: 15, totalPages: 0 })
+    getAdminUsageSummary = vi
+      .fn()
+      .mockResolvedValue({ tenants: 42, sentThisFiscalYear: 30, withApiKey: 12 })
 
     const module = await Test.createTestingModule({
       controllers: [ApiKeyUsageAdminController],
-      providers: [{ provide: ApiKeyUsageService, useValue: { getAllTenantsUsage } }],
+      providers: [
+        { provide: ApiKeyUsageService, useValue: { getAllTenantsUsage, getAdminUsageSummary } },
+      ],
     })
       .overrideGuard(NotifyAdminGuard)
       .useValue({ canActivate: () => true })
@@ -71,6 +77,13 @@ describe('ApiKeyUsageAdminController GET /frontend/admin/api-key-usage', () => {
   ])('rejects %s', async (_, filter) => {
     await request(app.getHttpServer()).get(url).query({ filter }).expect(400)
 
+    expect(getAllTenantsUsage).not.toHaveBeenCalled()
+  })
+
+  it('returns the tenant summary from /summary, not the paged list', async () => {
+    const response = await request(app.getHttpServer()).get(`${url}/summary`).expect(200)
+
+    expect(response.body).toEqual({ tenants: 42, sentThisFiscalYear: 30, withApiKey: 12 })
     expect(getAllTenantsUsage).not.toHaveBeenCalled()
   })
 
