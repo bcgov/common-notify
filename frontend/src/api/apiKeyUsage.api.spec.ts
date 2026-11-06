@@ -120,5 +120,13 @@ describe('apiKeyUsage API', () => {
     expect(get).toHaveBeenLastCalledWith(
       expect.objectContaining({ params: { page: '1', limit: '15' } }),
     )
+    await api.getAllTenantsUsage(1, 15, undefined, ['EMAIL', 'SMS'])
+    expect(get).toHaveBeenLastCalledWith(
+      expect.objectContaining({ params: { page: '1', limit: '15', channel: 'EMAIL,SMS' } }),
+    )
+    await api.getAllTenantsUsage(1, 15, undefined, [])
+    expect(get).toHaveBeenLastCalledWith(
+      expect.objectContaining({ params: { page: '1', limit: '15' } }),
+    )
   })
 })

@@ -13,7 +13,6 @@ import {
   ApiBearerAuth,
   ApiOkResponse,
   ApiOperation,
-  ApiQuery,
   ApiTags,
   ApiExcludeController,
 } from '@nestjs/swagger'
@@ -26,6 +25,7 @@ import {
   PaginatedAdminUsageResponseDto,
 } from './schemas/tenant-usage-response.dto'
 import { UpdateTenantLimitsDto } from './schemas/update-tenant-limits.dto'
+import { AdminUsageQueryDto } from './schemas/admin-usage-query.dto'
 
 /**
  * Admin API Controller for notification usage across all tenants.
@@ -47,24 +47,13 @@ export class ApiKeyUsageAdminController {
   @Get()
   @Roles(SsoRole.NOTIFY_ADMIN)
   @ApiOperation({ summary: 'Get notification usage vs limits for every tenant (admin only)' })
-  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
-  @ApiQuery({ name: 'limit', required: false, type: Number, example: 15 })
-  @ApiQuery({
-    name: 'search',
-    required: false,
-    type: String,
-    description: 'Filter tenants by name (case-insensitive substring)',
-  })
   @ApiOkResponse({ type: PaginatedAdminUsageResponseDto })
-  getAllTenantsUsage(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('search') search?: string,
-  ): Promise<PaginatedAdminUsageResponseDto> {
+  getAllTenantsUsage(@Query() query: AdminUsageQueryDto): Promise<PaginatedAdminUsageResponseDto> {
     return this.apiKeyUsageService.getAllTenantsUsage({
-      page: page ? Number.parseInt(page, 10) : undefined,
-      limit: limit ? Number.parseInt(limit, 10) : undefined,
-      search,
+      page: query.page,
+      limit: query.limit,
+      search: query.search,
+      channels: query.channel,
     })
   }
 

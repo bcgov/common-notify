@@ -231,15 +231,18 @@ export class ApiKeyUsageService {
   /**
    * Usage vs limits for every tenant, one row per (tenant, channel). For the
    * NOTIFY_ADMIN all-tenants view. Values are aggregated across each tenant's API keys.
+   * `channels` keeps only tenants with a limit on one of those channels, and only those rows.
    */
   async getAllTenantsUsage(options: {
     page?: number
     limit?: number
     search?: string
+    channels?: string[]
   }): Promise<PaginatedAdminUsageResponseDto> {
     const page = Math.max(1, options.page ?? 1)
     const limit = Math.min(100, Math.max(1, options.limit ?? 15))
     const search = options.search?.trim()
+    const channels = options.channels?.length ? options.channels : undefined
     const offset = (page - 1) * limit
 
     // Count distinct tenants (that have configured limits) matching the search.
@@ -249,6 +252,7 @@ export class ApiKeyUsageService {
       .innerJoin(Tenant, 't', 't.id = c.tenant_id')
       .select('COUNT(DISTINCT t.id)', 'count')
     if (search) countQb.andWhere('t.name ILIKE :search', { search: `%${search}%` })
+    if (channels) countQb.andWhere('l.channel_code IN (:...channels)', { channels })
     const countRaw = await countQb.getRawOne<{ count: string }>()
     const count = Number(countRaw?.count ?? 0)
     const totalPages = Math.ceil(count / limit)
@@ -271,22 +275,29 @@ export class ApiKeyUsageService {
       .offset(offset)
       .limit(limit)
     if (search) tenantQb.andWhere('t.name ILIKE :search', { search: `%${search}%` })
+    if (channels) tenantQb.andWhere('l.channel_code IN (:...channels)', { channels })
     const tenantRows = await tenantQb.getRawMany<{ tenantId: string; tenantName: string }>()
 
-    const data = await this.buildUsageRows(tenantRows.map((t) => t.tenantId))
+    const data = await this.buildUsageRows(
+      tenantRows.map((t) => t.tenantId),
+      channels,
+    )
     return { data, count, page, limit, totalPages }
   }
 
   /**
    * Build usage-vs-limits rows (one per tenant, channel) for the given tenant ids.
-   * Values are aggregated across each tenant's API keys.
+   * Values are aggregated across each tenant's API keys. `channels` narrows to those channels.
    */
-  private async buildUsageRows(tenantIds: string[]): Promise<AdminTenantUsageRowDto[]> {
+  private async buildUsageRows(
+    tenantIds: string[],
+    channels?: string[],
+  ): Promise<AdminTenantUsageRowDto[]> {
     if (tenantIds.length === 0) return []
     const fiscalYearStart = await this.getFiscalYearStart()
 
     // Limits per (tenant, channel): the lowest configured across the tenant's keys.
-    const limitRows = await this.apiKeyLimitRepository
+    const limitQb = this.apiKeyLimitRepository
       .createQueryBuilder('l')
       .innerJoin(ApiKeyConsumer, 'c', 'c.id = l.api_key_consumer_id')
       .innerJoin(Tenant, 't', 't.id = c.tenant_id')
@@ -306,15 +317,16 @@ export class ApiKeyUsageService {
       .groupBy('t.id')
       .addGroupBy('t.name')
       .addGroupBy('l.channel_code')
-      .getRawMany<{
-        tenantId: string
-        tenantName: string
-        channelCode: string
-        rateLimitPerMinute: string
-        dailyLimit: string
-        annualLimit: string
-        warnThresholdPercent: string
-      }>()
+    if (channels?.length) limitQb.andWhere('l.channel_code IN (:...channels)', { channels })
+    const limitRows = await limitQb.getRawMany<{
+      tenantId: string
+      tenantName: string
+      channelCode: string
+      rateLimitPerMinute: string
+      dailyLimit: string
+      annualLimit: string
+      warnThresholdPercent: string
+    }>()
 
     // Current-window usage per (tenant, channel, period), summed across the tenant's keys.
     const usageRows = await this.apiKeyUsageRepository

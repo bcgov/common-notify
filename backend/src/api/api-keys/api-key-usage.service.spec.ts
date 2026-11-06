@@ -214,3 +214,98 @@ describe('ApiKeyUsageService.assertWithinLimits', () => {
     })
   })
 })
+
+describe('ApiKeyUsageService.getAllTenantsUsage', () => {
+  /** A query builder that records its `andWhere` calls and answers with the given rows. */
+  function fakeQueryBuilder(result: { one?: unknown; many?: unknown[] }) {
+    const andWhere: Array<[string, Record<string, unknown> | undefined]> = []
+    const qb: Record<string, unknown> = new Proxy(
+      {},
+      {
+        get(_, prop: string) {
+          if (prop === 'andWhere') {
+            return (clause: string, params?: Record<string, unknown>) => {
+              andWhere.push([clause, params])
+              return qb
+            }
+          }
+          if (prop === 'getRawOne') return () => Promise.resolve(result.one)
+          if (prop === 'getRawMany') return () => Promise.resolve(result.many ?? [])
+          return () => qb
+        },
+      },
+    )
+    return { qb, andWhere }
+  }
+
+  function setup() {
+    const count = fakeQueryBuilder({ one: { count: '1' } })
+    const tenants = fakeQueryBuilder({ many: [{ tenantId: 't-1', tenantName: 'Parks' }] })
+    const limits = fakeQueryBuilder({
+      many: [
+        {
+          tenantId: 't-1',
+          tenantName: 'Parks',
+          channelCode: 'SMS',
+          rateLimitPerMinute: '1000',
+          dailyLimit: '500',
+          annualLimit: '10000',
+          warnThresholdPercent: '80',
+        },
+      ],
+    })
+    const usage = fakeQueryBuilder({ many: [] })
+    const limitRepository = {
+      createQueryBuilder: vi
+        .fn()
+        .mockReturnValueOnce(count.qb)
+        .mockReturnValueOnce(tenants.qb)
+        .mockReturnValueOnce(limits.qb),
+    }
+    const usageRepository = { createQueryBuilder: vi.fn().mockReturnValue(usage.qb) }
+    const service = new ApiKeyUsageService(
+      {} as Repository<ApiKeyConsumer>,
+      limitRepository as unknown as Repository<ApiKeyLimit>,
+      {} as Repository<ApiKeyLimitAlert>,
+      usageRepository as unknown as Repository<ApiKeyUsage>,
+      { findOne: vi.fn().mockResolvedValue(null) } as unknown as Repository<NotifyConfiguration>,
+    )
+    return { service, count, tenants, limits }
+  }
+
+  const channelClause = 'l.channel_code IN (:...channels)'
+
+  it('narrows the tenant count, the page of tenants and their rows to the chosen channels', async () => {
+    const { service, count, tenants, limits } = setup()
+
+    const result = await service.getAllTenantsUsage({ channels: ['SMS'] })
+
+    // The count has to agree with the page, or paging shows short pages.
+    for (const { andWhere } of [count, tenants, limits]) {
+      expect(andWhere).toContainEqual([channelClause, { channels: ['SMS'] }])
+    }
+    expect(result.count).toBe(1)
+    expect(result.data.map((row) => row.channel)).toEqual(['SMS'])
+  })
+
+  it('applies no channel condition when none is given', async () => {
+    const { service, count, tenants, limits } = setup()
+
+    await service.getAllTenantsUsage({ channels: [] })
+
+    for (const { andWhere } of [count, tenants, limits]) {
+      expect(andWhere.map(([clause]) => clause)).not.toContain(channelClause)
+    }
+  })
+
+  it('combines the channel filter with a tenant name search', async () => {
+    const { service, count } = setup()
+
+    await service.getAllTenantsUsage({ search: ' parks ', channels: ['EMAIL', 'SMS'] })
+
+    expect(count.andWhere).toEqual([
+      ['t.name ILIKE :search', { search: '%parks%' }],
+      [channelClause, { channels: ['EMAIL', 'SMS'] }],
+    ])
+  })
+})

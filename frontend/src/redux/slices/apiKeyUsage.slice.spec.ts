@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import reducer, { setAdminPage, setAdminLimit, setAdminSearch } from './apiKeyUsage.slice'
+import reducer, {
+  setAdminPage,
+  setAdminLimit,
+  setAdminSearch,
+  setAdminFilter,
+} from './apiKeyUsage.slice'
 import {
   fetchApiKeyUsage,
   fetchApiKeyUsageHistory,
@@ -124,6 +129,18 @@ describe('usage results', () => {
       adminPage: 1,
       adminSearch: 'Health',
     })
+  })
+  it('sets and clears column filters, returning to the first page', () => {
+    const filtered = reducer(
+      reducer(undefined, setAdminPage(3)),
+      setAdminFilter({ field: 'channel', values: ['SMS'] }),
+    )
+    expect(filtered).toMatchObject({ adminPage: 1, adminFilters: { channel: ['SMS'] } })
+    const cleared = reducer(
+      reducer(filtered, setAdminPage(2)),
+      setAdminFilter({ field: 'channel', values: [] }),
+    )
+    expect(cleared).toMatchObject({ adminPage: 1, adminFilters: {} })
   })
   const row = { tenantId: 'tenant', channel: 'EMAIL', warnThresholdPercent: 80 }
   const usage = { tenantId: 'tenant', channels: [row] }

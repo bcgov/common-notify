@@ -18,7 +18,7 @@ vi.mock('@/api/apiKeyUsage.api', () => ({
 const dispatch = vi.fn()
 const state = {
   tenant: { selectedTenant: { id: 'tenant' } },
-  apiKeyUsage: { adminPage: 2, adminLimit: 30, adminSearch: 'Ministry' },
+  apiKeyUsage: { adminPage: 2, adminLimit: 30, adminSearch: 'Ministry', adminFilters: {} },
 } as RootState
 beforeEach(() => vi.clearAllMocks())
 describe('apiKeyUsage thunks', () => {
@@ -123,12 +123,23 @@ describe('apiKeyUsage thunks', () => {
   })
   it('forwards committed pagination and omits empty searches', async () => {
     await fetchAllTenantsUsage()(dispatch, () => state, undefined)
-    expect(api.getAllTenantsUsage).toHaveBeenCalledWith(2, 30, 'Ministry')
+    expect(api.getAllTenantsUsage).toHaveBeenCalledWith(2, 30, 'Ministry', undefined)
     await fetchAllTenantsUsage()(
       dispatch,
       () => ({ ...state, apiKeyUsage: { ...state.apiKeyUsage, adminSearch: '' } }),
       undefined,
     )
-    expect(api.getAllTenantsUsage).toHaveBeenLastCalledWith(2, 30, undefined)
+    expect(api.getAllTenantsUsage).toHaveBeenLastCalledWith(2, 30, undefined, undefined)
+  })
+  it('forwards the committed channel filter', async () => {
+    await fetchAllTenantsUsage()(
+      dispatch,
+      () => ({
+        ...state,
+        apiKeyUsage: { ...state.apiKeyUsage, adminFilters: { channel: ['SMS'] } },
+      }),
+      undefined,
+    )
+    expect(api.getAllTenantsUsage).toHaveBeenCalledWith(2, 30, 'Ministry', ['SMS'])
   })
 })
