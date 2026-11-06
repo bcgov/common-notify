@@ -14,19 +14,17 @@
   font-weight: 700;
 }
 
-.queue-monitoring__memory {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-sm;
-  width: 100%;
-  max-width: 640px;
-}
-
-// One delivery provider's caption, reasons and tiles, stacked like the Redis memory block.
+// One delivery provider: its name, any reasons, then its tiles.
 .queue-monitoring__provider {
   display: flex;
   flex-direction: column;
   gap: $spacing-sm;
+}
+
+.queue-monitoring__provider-name {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
 }
 
 .queue-monitoring__memory-caption {

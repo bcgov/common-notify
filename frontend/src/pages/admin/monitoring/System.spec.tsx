@@ -15,6 +15,8 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 const mockedGet = vi.mocked(getQueueMonitoring)
+const sectionTitled = (title: string) =>
+  screen.getByRole('heading', { level: 2, name: title }).closest('section') as HTMLElement
 import System from './System'
 
 describe('System', () => {
@@ -162,8 +164,12 @@ describe('System', () => {
     mockedGet.mockResolvedValue(snapshot())
     render(<System />)
 
-    expect(await screen.findByText('CHES (Email)')).toBeInTheDocument()
-    expect(screen.getByText('ACS (SMS)')).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { level: 3, name: 'CHES (Email)' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 3, name: 'ACS (SMS)' })).toBeInTheDocument()
+    // Each provider's status is on the Overview, so the section doesn't repeat it.
+    expect(within(sectionTitled('Delivery providers')).queryByText('Healthy')).toBeNull()
     expect(screen.getAllByText('Sending to provider')).toHaveLength(2)
     expect(screen.getAllByText('Yes')).toHaveLength(2)
     expect(screen.getByText('3 of 5')).toBeInTheDocument()
@@ -203,6 +209,10 @@ describe('System', () => {
 
     expect(await screen.findByText('4 idle workers listening')).toBeInTheDocument()
     expect(screen.getByText('Peak memory')).toBeInTheDocument()
+    // Memory used and status are on the Overview's Redis card.
+    const redis = sectionTitled('Redis')
+    expect(within(redis).queryByRole('meter')).toBeNull()
+    expect(within(redis).queryByText('Healthy')).toBeNull()
     for (const removed of ['Fragmentation', 'Eviction policy', 'Evicted keys', 'noeviction']) {
       expect(screen.queryByText(removed)).not.toBeInTheDocument()
     }

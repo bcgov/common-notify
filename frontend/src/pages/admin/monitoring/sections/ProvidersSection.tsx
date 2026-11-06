@@ -1,9 +1,8 @@
 import type { FC } from 'react'
 import PageSubHeading from '@/components/PageSubHeading'
-import { StatusBadge } from '@/components/StatusBadge'
 import StatTile from '@/components/StatTile'
 import type { ProviderStats } from '@/interfaces/queueMonitoring.interface'
-import { HEALTH_LABELS, providerLabel } from '@/utils/monitoring'
+import { providerLabel } from '@/utils/monitoring'
 
 const CIRCUIT_LABELS: Record<NonNullable<ProviderStats['circuit']>, string> = {
   closed: 'Yes',
@@ -31,10 +30,8 @@ const ProvidersSection: FC<ProvidersSectionProps> = ({ providers }) => (
         const inFlight = inFlightText(provider)
         return (
           <div key={provider.name} className="queue-monitoring__provider">
-            <div className="queue-monitoring__memory-caption">
-              <span>{providerLabel(provider)}</span>
-              <StatusBadge status={provider.status} statusLabel={HEALTH_LABELS[provider.status]} />
-            </div>
+            {/* Status is on the Overview's Components panel; this is the detail behind it. */}
+            <h3 className="queue-monitoring__provider-name">{providerLabel(provider)}</h3>
             {provider.reasons.length > 0 && (
               <ul className="queue-monitoring__reasons">
                 {provider.reasons.map((reason) => (
