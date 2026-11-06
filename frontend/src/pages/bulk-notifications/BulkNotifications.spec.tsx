@@ -422,6 +422,33 @@ describe('BulkNotifications', () => {
     expect(screen.getByRole('button', { name: 'Send notifications' })).toBeDisabled()
   })
 
+  it('warns about empty placeholders but still lets the file be sent', async () => {
+    renderPage()
+    await chooseTemplate()
+
+    await userEvent.upload(
+      screen.getByLabelText('Upload CSV file (required)'),
+      csv('email,permitType,firstName\nalice@gov.bc.ca,,Alice'),
+    )
+
+    expect(await screen.findByText('1 item requires attention.')).toBeInTheDocument()
+    expect(screen.getByText('Missing or invalid value')).toBeInTheDocument()
+    expect(screen.queryByText('All required data passed validation.')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Send notifications' }))
+
+    await waitFor(() =>
+      expect(sendBulkMock).toHaveBeenCalledWith(
+        'template-1',
+        [
+          ['to', 'permitType', 'firstName'],
+          ['alice@gov.bc.ca', '', 'Alice'],
+        ],
+        'email',
+      ),
+    )
+  })
+
   it('rejects a structurally wrong file outright, in the design wording', async () => {
     renderPage()
     await chooseTemplate()
