@@ -357,8 +357,9 @@ export class TemplatesService {
    * @param template The template to render
    * @param personalisation The data to use for rendering (e.g., request.params)
    * @param bodyType Optional override for body content type. Ignored for SMS templates.
-   * @param options.allowEmptyValues Accept null or blank values for required placeholders. Only
-   *   for previews; anything that is sent must have every value filled in.
+   * @param options.allowEmptyValues Accept null or blank values for required placeholders. For
+   *   previews and merge sends, where a blank cell prints nothing; a single send must have every
+   *   value filled in.
    * @returns Object with rendered subject, body, and bodyType
    */
   public async renderTemplateContent(
@@ -497,8 +498,9 @@ export class TemplatesService {
 
     // A printed value that is empty leaves as much of a gap in the sent message as an absent key,
     // so both are missing. A value that is only tested (`{{#if notes}}`) may be blank: that is how
-    // a CSV cell or API caller says "skip this section". Previews allow blanks everywhere, since
-    // they render a template while its values are still being filled in.
+    // an API caller says "skip this section". Previews allow blanks everywhere, since they render a
+    // template while its values are still being filled in, and so do merge sends, where a blank
+    // cell prints nothing and allowing for that is up to the template.
     const missingKeys = required.filter(
       (key) =>
         !Object.hasOwn(personalisation, key) ||
