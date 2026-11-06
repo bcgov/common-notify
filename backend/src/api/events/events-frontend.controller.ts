@@ -146,7 +146,6 @@ export class EventsFrontendController {
     const tenant = this.getTenant(req)
     return this.eventsService.listCstarGroups({
       tenantId: tenant.externalId,
-      authHeader: req.headers.authorization,
     })
   }
 
@@ -228,7 +227,6 @@ export class EventsFrontendController {
     // the tenant's own groups, and CSTAR knows the tenant by its external ID.
     return this.eventsService.updateEmailChannelSetting(tenant.id, eventId, updateDto, user, {
       tenantId: tenant.externalId,
-      authHeader: req.headers.authorization,
     })
   }
 

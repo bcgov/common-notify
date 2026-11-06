@@ -23,7 +23,6 @@ import { GcNotifyModule } from './api/gc-notify/gc-notify.module'
 import { ClamavModule } from './services/clamav.module'
 import { FeatureFlagModule } from './api/feature-flag/feature-flag.module'
 import { LoggerModule } from './common/logger'
-import { McpModule } from './api/mcp/mcp.module'
 
 @Module({
   imports: [
@@ -45,7 +44,6 @@ import { McpModule } from './api/mcp/mcp.module'
     AdaptersModule.forRoot(),
     GcNotifyModule.forRoot(),
     ClamavModule,
-    McpModule,
   ],
   controllers: [AppController, MetricsController, HealthController],
   providers: [AppService],

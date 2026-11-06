@@ -58,7 +58,6 @@ interface Caller {
   apiKeyConsumerId?: string
   requestRoute?: string
   uploadedBy: string
-  authHeader?: string
   email?: unknown
 }
 
@@ -361,7 +360,6 @@ export class NotifySubmissionService {
       apiKeyConsumerId: req?.apiKeyConsumerId,
       requestRoute: extractRequestRoute(req),
       uploadedBy,
-      authHeader: req?.headers?.authorization,
       email: user?.email,
     }
   }
@@ -382,7 +380,6 @@ export class NotifySubmissionService {
     if (mode === 'full') {
       return resolver.resolveSend(tenantId, request.eventId, request.params, {
         tenantId: caller.tenantExternalId,
-        authHeader: caller.authHeader,
       })
     }
 

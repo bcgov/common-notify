@@ -106,21 +106,6 @@ routes:
     path_handling: v0
     request_buffering: true
     response_buffering: true
-  - name: ${ROUTE_PREFIX}mcp
-    tags: [${CONFIG_TAG}]
-    hosts:
-      - ${GATEWAY_HOSTNAME}
-    paths:
-      - ${PATH_PREFIX}/api/v1/mcp
-    methods:
-      - POST
-      - GET
-      - DELETE
-    strip_path: true
-    https_redirect_status_code: 426
-    path_handling: v0
-    request_buffering: false
-    response_buffering: false
   - name: ${ROUTE_PREFIX}notify-simple-cancel-reschedule
     tags: [${CONFIG_TAG}]
     hosts:
@@ -1174,27 +1159,6 @@ plugins:
     tags: [${CONFIG_TAG}]
     enabled: true
     route: ${ROUTE_PREFIX}notify-simple
-    config: *rateLimitConfig
-  - name: key-auth
-    tags: [${CONFIG_TAG}]
-    protocols: [http, https]
-    enabled: true
-    route: ${ROUTE_PREFIX}mcp
-    config: *keyAuthConfig
-
-  # X-Consumer-Groups header shim - see &aclHeaderConfig for details
-  - name: acl
-    tags: [${CONFIG_TAG}]
-    protocols: [http, https]
-    enabled: true
-    route: ${ROUTE_PREFIX}mcp
-    config: *aclHeaderConfig
-
-  # Rate limiting (per API key) - see &rateLimitConfig for details
-  - name: rate-limiting
-    tags: [${CONFIG_TAG}]
-    enabled: true
-    route: ${ROUTE_PREFIX}mcp
     config: *rateLimitConfig
   - name: key-auth
     tags: [${CONFIG_TAG}]
