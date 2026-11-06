@@ -77,8 +77,7 @@ const adminItems = {
       label: 'Monitor',
       links: [
         { label: 'Overview', to: '/admin', exact: true },
-        { label: 'Service health', to: '/admin/health' },
-        { label: 'Queues & processing', to: '/admin/monitoring' },
+        { label: 'System', to: '/admin/monitoring' },
       ],
     },
     {

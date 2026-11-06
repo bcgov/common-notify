@@ -10,26 +10,7 @@ interface RedisSectionProps {
   redis: RedisStats
 }
 
-/**
- * Below this much memory Redis's fixed overhead dominates the ratio, so a small, healthy
- * instance routinely reads 2-5. Only above it does a high ratio mean memory is being wasted.
- */
-export const FRAGMENTATION_MIN_BYTES = 100 * 1024 * 1024
-const FRAGMENTATION_HIGH_RATIO = 1.5
-
-function describeFragmentation(redis: RedisStats): { value: string; hint?: string } {
-  if (redis.fragmentationRatio === null) return { value: '—' }
-  if (redis.usedMemoryBytes < FRAGMENTATION_MIN_BYTES) {
-    return { value: '—', hint: 'Not meaningful at low memory use' }
-  }
-  const value = redis.fragmentationRatio.toFixed(2)
-  return redis.fragmentationRatio > FRAGMENTATION_HIGH_RATIO
-    ? { value, hint: 'High: Redis holds more memory than its data needs' }
-    : { value }
-}
-
 const RedisSection: FC<RedisSectionProps> = ({ redis }) => {
-  const fragmentation = describeFragmentation(redis)
   const used = formatBytes(redis.usedMemoryBytes)
   const memoryText =
     redis.maxMemoryBytes === null
@@ -65,12 +46,6 @@ const RedisSection: FC<RedisSectionProps> = ({ redis }) => {
         <dl className="stat-tile-grid">
           <StatTile label="Peak memory" value={formatBytes(redis.peakMemoryBytes)} />
           <StatTile
-            label="Eviction policy"
-            value={redis.maxMemoryPolicy}
-            hint={redis.maxMemoryPolicy === 'noeviction' ? 'Jobs are never dropped' : undefined}
-          />
-          <StatTile label="Evicted keys" value={redis.evictedKeys.toLocaleString()} />
-          <StatTile
             label="Connections"
             value={redis.connectedClients.toLocaleString()}
             hint={`${redis.blockedClients.toLocaleString()} idle workers listening`}
@@ -80,7 +55,6 @@ const RedisSection: FC<RedisSectionProps> = ({ redis }) => {
             value={redis.rejectedConnections.toLocaleString()}
           />
           <StatTile label="Operations" value={`${redis.opsPerSecond.toLocaleString()}/s`} />
-          <StatTile label="Fragmentation" value={fragmentation.value} hint={fragmentation.hint} />
           <StatTile
             label="Uptime"
             value={formatDuration(redis.uptimeSeconds * 1000)}

@@ -1,6 +1,5 @@
+import { useId } from 'react'
 import type { FC } from 'react'
-import { Link } from '@tanstack/react-router'
-import type { LinkProps } from '@tanstack/react-router'
 import { StatusBadge } from '@/components/StatusBadge'
 import '@/scss/components/component-status-list.scss'
 
@@ -9,27 +8,43 @@ export interface ComponentStatus {
   /** The value StatusBadge colours by, e.g. 'healthy' or 'critical'. */
   status: string
   statusLabel: string
-  /** The page with this component's details. */
-  to: NonNullable<LinkProps['to']>
 }
 
-interface ComponentStatusListProps {
+export interface ComponentStatusGroup {
   label: string
   components: ComponentStatus[]
 }
 
-/** One row per component: its name, linking to its details, and its status in words. */
-const ComponentStatusList: FC<ComponentStatusListProps> = ({ label, components }) => (
-  <ul className="component-status-list" aria-label={label}>
-    {components.map((component) => (
-      <li key={component.name} className="component-status-list__item">
-        <Link to={component.to} className="component-status-list__name">
-          {component.name}
-        </Link>
-        <StatusBadge status={component.status} statusLabel={component.statusLabel} />
-      </li>
+interface ComponentStatusListProps {
+  groups: ComponentStatusGroup[]
+}
+
+const Group: FC<ComponentStatusGroup> = ({ label, components }) => {
+  const labelId = useId()
+  return (
+    <div className="component-status__group">
+      <h3 id={labelId} className="component-status__group-label">
+        {label}
+      </h3>
+      <ul className="component-status__list" aria-labelledby={labelId}>
+        {components.map((component) => (
+          <li key={component.name} className="component-status__item">
+            <span>{component.name}</span>
+            <StatusBadge status={component.status} statusLabel={component.statusLabel} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** Components side by side in labelled columns, each with its status in words. */
+const ComponentStatusList: FC<ComponentStatusListProps> = ({ groups }) => (
+  <div className="component-status">
+    {groups.map((group) => (
+      <Group key={group.label} label={group.label} components={group.components} />
     ))}
-  </ul>
+  </div>
 )
 
 export default ComponentStatusList

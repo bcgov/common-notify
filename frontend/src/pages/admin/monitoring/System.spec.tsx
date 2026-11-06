@@ -15,14 +15,14 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 const mockedGet = vi.mocked(getQueueMonitoring)
-import QueuesAndProcessing from './QueuesAndProcessing'
+import System from './System'
 
-describe('QueuesAndProcessing', () => {
+describe('System', () => {
   beforeEach(() => mockedGet.mockReset())
 
   it('shows each queue with its backlog, rates and drain estimate', async () => {
     mockedGet.mockResolvedValue(snapshot())
-    render(<QueuesAndProcessing />)
+    render(<System />)
 
     const table = await screen.findByRole('table', { name: 'Queues' })
     const row = within(table).getByRole('row', { name: /Email delivery/ })
@@ -46,7 +46,7 @@ describe('QueuesAndProcessing', () => {
       liveWorkerPods: 0,
     }
     mockedGet.mockResolvedValue(data)
-    render(<QueuesAndProcessing />)
+    render(<System />)
 
     expect(
       await screen.findByText(
@@ -62,7 +62,7 @@ describe('QueuesAndProcessing', () => {
 
   it('rolls a merge send up into one row with its batches and time left', async () => {
     mockedGet.mockResolvedValue(snapshot())
-    render(<QueuesAndProcessing />)
+    render(<System />)
 
     const table = await screen.findByRole('table', { name: 'Sends in progress' })
     const meter = within(table).getByRole('meter', { name: 'Notification req-1 progress' })
@@ -86,7 +86,7 @@ describe('QueuesAndProcessing', () => {
       },
     ]
     mockedGet.mockResolvedValue(data)
-    render(<QueuesAndProcessing />)
+    render(<System />)
 
     const table = await screen.findByRole('table', { name: 'Sends in progress' })
     expect(within(table).getByText('Not sending yet')).toBeInTheDocument()
@@ -95,14 +95,14 @@ describe('QueuesAndProcessing', () => {
 
   it('says so when nothing is sending', async () => {
     mockedGet.mockResolvedValue(snapshot({ sendsInProgress: [] }))
-    render(<QueuesAndProcessing />)
+    render(<System />)
 
     expect((await screen.findAllByText('Nothing is sending right now.')).length).toBeGreaterThan(0)
   })
 
   it('lists worker pods, and labels one that is shutting down', async () => {
     mockedGet.mockResolvedValue(snapshot())
-    const { unmount } = render(<QueuesAndProcessing />)
+    const { unmount } = render(<System />)
 
     const workers = await screen.findByRole('table', { name: 'Workers' })
     expect(within(workers).getByText('notify-backend-abc12')).toBeInTheDocument()
@@ -112,21 +112,21 @@ describe('QueuesAndProcessing', () => {
     const data = snapshot()
     data.workers = [{ ...data.workers[0], draining: true }]
     mockedGet.mockResolvedValue(data)
-    render(<QueuesAndProcessing />)
+    render(<System />)
     const draining = await screen.findByRole('table', { name: 'Workers' })
     expect(within(draining).getByText('Shutting down')).toBeInTheDocument()
   })
 
   it('says when no worker has reported in', async () => {
     mockedGet.mockResolvedValue(snapshot({ workers: [] }))
-    render(<QueuesAndProcessing />)
+    render(<System />)
 
     expect(await screen.findAllByText(/No worker heartbeats received/)).not.toHaveLength(0)
   })
 
   it('shows what the delivery reconciler recovered', async () => {
     mockedGet.mockResolvedValue(snapshot())
-    render(<QueuesAndProcessing />)
+    render(<System />)
 
     const recoveries = await screen.findByRole('table', { name: 'Recent recoveries' })
     expect(within(recoveries).getByText('Re-queued')).toBeInTheDocument()
@@ -147,7 +147,7 @@ describe('QueuesAndProcessing', () => {
       recentActions: [],
     }
     mockedGet.mockResolvedValue(data)
-    render(<QueuesAndProcessing />)
+    render(<System />)
 
     expect(
       await screen.findByText(
@@ -156,5 +156,55 @@ describe('QueuesAndProcessing', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('Not run yet')).toBeInTheDocument()
     expect(screen.getAllByText('Nothing has needed recovering.')).not.toHaveLength(0)
+  })
+
+  it('shows each provider sending normally, with CHES requests in flight', async () => {
+    mockedGet.mockResolvedValue(snapshot())
+    render(<System />)
+
+    expect(await screen.findByText('CHES (Email)')).toBeInTheDocument()
+    expect(screen.getByText('ACS (SMS)')).toBeInTheDocument()
+    expect(screen.getAllByText('Sending to provider')).toHaveLength(2)
+    expect(screen.getAllByText('Yes')).toHaveLength(2)
+    expect(screen.getByText('3 of 5')).toBeInTheDocument()
+    // ACS has no concurrency cap, so no in-flight tile.
+    expect(screen.getAllByText('Requests in flight')).toHaveLength(1)
+  })
+
+  it('raises a paused provider in the banner and in its card', async () => {
+    const data = snapshot()
+    data.providers = [
+      data.providers[0],
+      {
+        ...data.providers[1],
+        status: 'warning',
+        reasons: ['Failing; sends are waiting, and resume once a test send succeeds'],
+        circuit: 'open',
+        reopensAt: '2026-10-01T18:00:30.000Z',
+      },
+    ]
+    mockedGet.mockResolvedValue(data)
+    render(<System />)
+
+    expect(
+      await screen.findByText(
+        'ACS (SMS): Failing; sends are waiting, and resume once a test send succeeds',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Paused: provider failing')).toBeInTheDocument()
+    expect(screen.getByText(/^Test send at /)).toBeInTheDocument()
+    // The details are on this page, so the banner doesn't link to it.
+    expect(screen.queryByRole('link', { name: 'View System' })).not.toBeInTheDocument()
+  })
+
+  it('shows Redis details, without the internals only an operator would read', async () => {
+    mockedGet.mockResolvedValue(snapshot())
+    render(<System />)
+
+    expect(await screen.findByText('4 idle workers listening')).toBeInTheDocument()
+    expect(screen.getByText('Peak memory')).toBeInTheDocument()
+    for (const removed of ['Fragmentation', 'Eviction policy', 'Evicted keys', 'noeviction']) {
+      expect(screen.queryByText(removed)).not.toBeInTheDocument()
+    }
   })
 })

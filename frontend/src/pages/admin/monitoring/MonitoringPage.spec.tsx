@@ -27,7 +27,7 @@ let stream: QueueMonitoringStreamHandlers
 let streamController: AbortController
 
 /** The frame with a stand-in for a page's sections, so "loaded" is one recognisable line. */
-function renderPage(page: 'overview' | 'health' | 'queues' = 'overview') {
+function renderPage(page: 'overview' | 'system' = 'overview') {
   return render(
     <MonitoringPage page={page} title="Test page" meta="Read-only.">
       {(data) => <p>Snapshot taken {data.generatedAt}</p>}
@@ -93,23 +93,18 @@ describe('MonitoringPage', () => {
       expect(
         banner.getByText('Email delivery: Jobs are waiting but no pod is processing this queue'),
       ).toBeInTheDocument()
-      expect(banner.getByRole('link', { name: 'View Service health' })).toHaveAttribute(
-        'href',
-        '/admin/health',
-      )
-      expect(banner.getByRole('link', { name: 'View Queues & processing' })).toHaveAttribute(
-        'href',
+      expect(banner.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
         '/admin/monitoring',
-      )
+      ])
+      expect(banner.getByRole('link', { name: 'View System' })).toBeInTheDocument()
     })
 
     it('does not link to the page the reader is already on', async () => {
       mockedGet.mockResolvedValue(degraded())
-      renderPage('health')
+      renderPage('system')
 
       await screen.findByText('2 warnings')
-      expect(screen.queryByRole('link', { name: 'View Service health' })).not.toBeInTheDocument()
-      expect(screen.getByRole('link', { name: 'View Queues & processing' })).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'View System' })).not.toBeInTheDocument()
     })
   })
 

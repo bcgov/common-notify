@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
-import QueuesAndProcessing from '@/pages/admin/monitoring/QueuesAndProcessing'
+import System from '@/pages/admin/monitoring/System'
 
 /**
  * This page used to hold every monitoring view behind ?tab=. Bookmarks and shared links still
@@ -19,5 +19,5 @@ export const Route = createFileRoute('/admin/monitoring')({
       throw redirect({ to: LEGACY_TABS[search.tab] ?? '/admin/monitoring', replace: true })
     }
   },
-  component: QueuesAndProcessing,
+  component: System,
 })

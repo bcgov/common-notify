@@ -59,17 +59,40 @@ export class AdminTenantUsageRowDto {
   @ApiProperty({ description: 'Notification channel', example: 'EMAIL' })
   channel: string
 
-  @ApiProperty({ description: 'API rate limit per minute', example: 1000 })
-  rateLimitPerMinute: number
+  @ApiProperty({
+    description: 'API rate limit per minute. Null when the tenant has no limit on this channel.',
+    example: 1000,
+    nullable: true,
+    type: Number,
+  })
+  rateLimitPerMinute: number | null
 
-  @ApiProperty({ description: 'Maximum notifications per calendar day', example: 100000 })
-  dailyLimit: number
+  @ApiProperty({
+    description:
+      'Maximum notifications per calendar day. Null when the tenant has no limit on this channel.',
+    example: 100000,
+    nullable: true,
+    type: Number,
+  })
+  dailyLimit: number | null
 
-  @ApiProperty({ description: 'Maximum notifications per fiscal year', example: 20000000 })
-  annualLimit: number
+  @ApiProperty({
+    description:
+      'Maximum notifications per fiscal year. Null when the tenant has no limit on this channel.',
+    example: 20000000,
+    nullable: true,
+    type: Number,
+  })
+  annualLimit: number | null
 
-  @ApiProperty({ description: 'Warning threshold percentage (1-100)', example: 80 })
-  warnThresholdPercent: number
+  @ApiProperty({
+    description:
+      'Warning threshold percentage (1-100). Null when the tenant has no limit on this channel.',
+    example: 80,
+    nullable: true,
+    type: Number,
+  })
+  warnThresholdPercent: number | null
 
   @ApiProperty({ description: 'Notifications sent in the current minute', example: 12 })
   usedThisMinute: number
@@ -79,6 +102,42 @@ export class AdminTenantUsageRowDto {
 
   @ApiProperty({ description: 'Notifications sent this fiscal year', example: 1200000 })
   usedThisYear: number
+
+  @ApiProperty({
+    description: 'When the tenant last sent on this channel, from any source. Null if never.',
+    example: '2026-11-03T17:20:00.000Z',
+    nullable: true,
+    type: String,
+  })
+  lastSentAt: string | null
+
+  @ApiProperty({
+    description:
+      'Recipients per month over the last 12 full calendar months, counting from the first ' +
+      'send. Null when the tenant has no full month in that window.',
+    example: 1240,
+    nullable: true,
+    type: Number,
+  })
+  averageMonthlySends: number | null
+}
+
+/**
+ * How many tenants use Notify, for the admin usage screen. Always across every tenant, whatever
+ * the table's search or filters.
+ */
+export class AdminUsageSummaryDto {
+  @ApiProperty({ description: 'Tenants with Notify connected in CSTAR', example: 42 })
+  tenants: number
+
+  @ApiProperty({
+    description: 'Of those, tenants that sent at least one notification this fiscal year',
+    example: 30,
+  })
+  sentThisFiscalYear: number
+
+  @ApiProperty({ description: 'Of those, tenants with an API key bound', example: 12 })
+  withApiKey: number
 }
 
 /**

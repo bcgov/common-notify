@@ -1,22 +1,35 @@
 @import '../variables';
 
-.component-status-list {
+// One panel, its groups side by side; they stack when there is no room for all three.
+.component-status {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: $spacing-sm $spacing-lg;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: $spacing-md $spacing-xl;
+  padding: $spacing-md $spacing-lg;
+  border: 1px solid $border-default;
+  border-radius: 4px;
+  background-color: $white;
+}
+
+.component-status__group-label {
+  margin: 0 0 $spacing-xs;
+  color: $text-secondary;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.component-status__list {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.component-status-list__item {
+.component-status__item {
   @include flex-between;
   gap: $spacing-sm;
-  padding: $spacing-sm $spacing-md;
-  border: 1px solid $border-default;
-  border-radius: 4px;
-}
+  padding: $spacing-sm 0;
 
-.component-status-list__name {
-  font-weight: 700;
+  & + & {
+    border-top: 1px solid $border-default;
+  }
 }

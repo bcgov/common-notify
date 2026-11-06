@@ -27,7 +27,7 @@ describe('AdminOverview', () => {
     const meter = await screen.findByRole('meter', { name: 'Redis memory used' })
     expect(meter).toHaveAttribute('aria-valuenow', '39.1')
     expect(meter).toHaveAttribute('aria-valuetext', '300 MB of 768 MB (39.1%)')
-    // Redis internals belong on Service health, not the overview.
+    // Redis internals belong on System, not the overview.
     expect(screen.queryByText('noeviction')).not.toBeInTheDocument()
   })
 
@@ -62,27 +62,20 @@ describe('AdminOverview', () => {
     expect(within(delivery).getByText('Nothing sent in the last hour')).toBeInTheDocument()
   })
 
-  it('lists each component’s status, linking to the page with its details', async () => {
+  it('lists each component’s status under its group', async () => {
     const data = snapshot()
     data.providers[1] = { ...data.providers[1], status: 'critical' }
     mockedGet.mockResolvedValue(data)
     render(<AdminOverview />)
 
-    const list = await screen.findByRole('list', { name: 'Component status' })
-    const rows = within(list)
-      .getAllByRole('listitem')
-      .map((item) => [
-        within(item).getByRole('link').textContent,
-        within(item).getByRole('link').getAttribute('href'),
-        item.textContent?.replace(within(item).getByRole('link').textContent ?? '', ''),
-      ])
-    expect(rows).toEqual([
-      ['CHES (Email)', '/admin/health', 'Healthy'],
-      ['ACS (SMS)', '/admin/health', 'Critical'],
-      ['Redis', '/admin/health', 'Healthy'],
-      ['Email delivery', '/admin/monitoring', 'Healthy'],
-      ['Delivery recovery', '/admin/monitoring', 'Healthy'],
-    ])
+    const items = async (group: string) =>
+      within(await screen.findByRole('list', { name: group }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent)
+    expect(await items('Delivery providers')).toEqual(['CHES (Email)Healthy', 'ACS (SMS)Critical'])
+    expect(await items('Queues')).toEqual(['Email deliveryHealthy'])
+    expect(await items('Supporting services')).toEqual(['RedisHealthy', 'Delivery recoveryHealthy'])
+    expect(screen.queryByRole('link', { name: 'Redis' })).not.toBeInTheDocument()
   })
 
   it('counts individual messages per channel, not just jobs', async () => {
@@ -115,7 +108,7 @@ describe('AdminOverview', () => {
     expect(await screen.findAllByText('No failed jobs.')).not.toHaveLength(0)
   })
 
-  it('leaves queue and worker detail to Queues & processing', async () => {
+  it('leaves queue and worker detail to System', async () => {
     mockedGet.mockResolvedValue(snapshot())
     render(<AdminOverview />)
 

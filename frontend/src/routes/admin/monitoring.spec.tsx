@@ -12,7 +12,7 @@ function redirectFor(search: { tab?: string }) {
 }
 
 describe('/admin/monitoring', () => {
-  it('renders Queues & processing when there is no tab', () => {
+  it('renders System when there is no tab', () => {
     expect(redirectFor({})).toBeUndefined()
   })
 

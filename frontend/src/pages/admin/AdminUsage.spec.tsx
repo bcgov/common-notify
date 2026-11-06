@@ -1,11 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, userEvent, waitFor, fireEvent } from '@/test-utils'
+import { render, screen, userEvent, waitFor, fireEvent, within } from '@/test-utils'
 import reducer, { setAdminFilter, setAdminSearch } from '@/redux/slices/apiKeyUsage.slice'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import AdminUsage from './AdminUsage'
 import { updateTenantLimits } from '@/redux/thunks/apiKeyUsage.thunks'
 import type * as UsageThunks from '@/redux/thunks/apiKeyUsage.thunks'
+import { getAdminUsageSummary } from '@/api/apiKeyUsage.api'
+import type * as UsageApi from '@/api/apiKeyUsage.api'
 
+vi.mock('@/api/apiKeyUsage.api', async (importOriginal) => ({
+  ...(await importOriginal<typeof UsageApi>()),
+  getAdminUsageSummary: vi.fn(),
+}))
 vi.mock('@/redux/thunks/apiKeyUsage.thunks', async (importOriginal) => {
   const actual = await importOriginal<typeof UsageThunks>()
   return { ...actual, updateTenantLimits: vi.fn(actual.updateTenantLimits) }
@@ -22,7 +28,6 @@ vi.mock('@/redux/hooks', () => ({
   useAppDispatch: () => mocks.dispatch,
 }))
 vi.mock('@/service/user-service', () => ({ default: { hasRole: () => mocks.admin } }))
-vi.mock('@/components/PageHeading', () => ({ default: () => <h1>Usage</h1> }))
 vi.mock('@/components/NotAuthorized', () => ({ default: () => <div>Not authorized</div> }))
 vi.mock('@/redux/utils/toastUtils', () => ({ showErrorToast: vi.fn(), showSuccessToast: vi.fn() }))
 
@@ -37,6 +42,8 @@ const row = {
   usedThisYear: 30,
   usedThisMinute: 0,
   rateLimitPerMinute: 10,
+  lastSentAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+  averageMonthlySends: 1240,
 }
 let usageState: ReturnType<typeof reducer>
 function setup(overrides = {}, roles = ['NOTIFY_OPERATIONS_ADMIN']) {
@@ -55,14 +62,73 @@ describe('AdminUsage', () => {
     mocks.admin = true
     mocks.save.mockResolvedValue(undefined)
     mocks.dispatch.mockReturnValue({ unwrap: () => mocks.save() })
+    vi.mocked(getAdminUsageSummary).mockResolvedValue({
+      tenants: 42,
+      sentThisFiscalYear: 30,
+      withApiKey: 12,
+    })
+  })
+  it('summarises how many tenants use Notify under the heading', async () => {
+    setup()
+    expect(
+      await screen.findByText(
+        '42 tenants use Notify · 30 sent this fiscal year · 12 with an API key',
+      ),
+    ).toBeInTheDocument()
+    expect(getAdminUsageSummary).toHaveBeenCalledTimes(1)
+  })
+  it('raises a failed summary as an error toast and still shows the table', async () => {
+    vi.mocked(getAdminUsageSummary).mockRejectedValue(new Error('Failed to load tenant summary'))
+    setup({ adminRows: [row], adminCount: 1 })
+    await waitFor(() =>
+      expect(showErrorToast).toHaveBeenCalledWith('Failed to load tenant summary'),
+    )
+    expect(screen.getByRole('row', { name: /Test Tenant/ })).toBeInTheDocument()
   })
   it('shows the empty state', () => {
     setup()
-    expect(screen.getAllByText('No tenant usage data found.')[0]).toBeInTheDocument()
+    expect(screen.getAllByText('No tenants found.')[0]).toBeInTheDocument()
+  })
+  it('shows a channel with no limits as unset, with nothing to edit', () => {
+    const unset = {
+      ...row,
+      dailyLimit: null,
+      annualLimit: null,
+      warnThresholdPercent: null,
+      rateLimitPerMinute: null,
+      usedToday: 0,
+      usedThisYear: 0,
+      lastSentAt: null,
+      averageMonthlySends: null,
+    }
+    setup({ adminRows: [unset], adminCount: 1 })
+    const tenantRow = screen.getByRole('row', { name: /Test Tenant/ })
+    const cells = within(tenantRow)
+      .getAllByRole('cell')
+      .map((cell) => cell.textContent)
+    expect(cells).toEqual([
+      'Test Tenant',
+      'Sms',
+      'Never',
+      '—No full month of sending yet',
+      '0 / Not set',
+      '0 / Not set',
+      'Not set',
+      'No limits to edit',
+    ])
+    expect(screen.queryByRole('button', { name: 'Edit limits' })).not.toBeInTheDocument()
+  })
+  it('shows when each channel last sent and its monthly average', () => {
+    setup({ adminRows: [row], adminCount: 1 })
+    const tenantRow = screen.getByRole('row', { name: /Test Tenant/ })
+    const lastSent = within(tenantRow).getByText('3 days ago')
+    expect(lastSent.tagName).toBe('TIME')
+    expect(lastSent).toHaveAttribute('dateTime', row.lastSentAt)
+    expect(within(tenantRow).getByText('1,240')).toBeInTheDocument()
   })
   it('shows loading instead of empty content', () => {
     setup({ adminLoading: true })
-    expect(screen.queryByText('No tenant usage data found.')).not.toBeInTheDocument()
+    expect(screen.queryByText('No tenants found.')).not.toBeInTheDocument()
     expect(screen.getAllByText(/Loading/)[0]).toBeInTheDocument()
   })
   it('shows failed loads', () => {
@@ -145,5 +211,6 @@ describe('AdminUsage', () => {
     setup()
     expect(screen.getAllByText('Not authorized')[0]).toBeInTheDocument()
     expect(mocks.dispatch).not.toHaveBeenCalled()
+    expect(getAdminUsageSummary).not.toHaveBeenCalled()
   })
 })

@@ -6,8 +6,14 @@ import { ApiKeyConsumer } from './entities/api-key-consumer.entity'
 import { ApiKeyLimit } from './entities/api-key-limit.entity'
 import { ApiKeyLimitAlert } from './entities/api-key-limit-alert.entity'
 import { ApiKeyUsage } from './entities/api-key-usage.entity'
-import { ApiKeyUsageService } from './api-key-usage.service'
-import type { ParsedListQuery } from '../../common/query/list-query.types'
+import { Tenant } from '../admin/tenants/entities/tenant.entity'
+import {
+  ApiKeyUsageService,
+  averageMonthlySends,
+  averageWindow,
+  channelsInScope,
+} from './api-key-usage.service'
+import type { ListQueryFilter, ParsedListQuery } from '../../common/query/list-query.types'
 
 describe('ApiKeyUsageService.recordUsage', () => {
   const apiKeyUsageRepository = {
@@ -23,6 +29,7 @@ describe('ApiKeyUsageService.recordUsage', () => {
     {} as Repository<ApiKeyLimitAlert>,
     apiKeyUsageRepository as unknown as Repository<ApiKeyUsage>,
     configurationRepository as unknown as Repository<NotifyConfiguration>,
+    {} as Repository<Tenant>,
   )
 
   beforeEach(() => {
@@ -122,6 +129,7 @@ describe('ApiKeyUsageService.assertWithinLimits', () => {
     {} as Repository<ApiKeyLimitAlert>,
     apiKeyUsageRepository as unknown as Repository<ApiKeyUsage>,
     configurationRepository as unknown as Repository<NotifyConfiguration>,
+    {} as Repository<Tenant>,
   )
 
   /** Tenant has a 100/day SMS limit with `usedToday` already spent. */
@@ -217,104 +225,300 @@ describe('ApiKeyUsageService.assertWithinLimits', () => {
 })
 
 describe('ApiKeyUsageService.getAllTenantsUsage', () => {
-  /** A query builder that records its `andWhere` calls and answers with the given rows. */
-  function fakeQueryBuilder(result: { one?: unknown; many?: unknown[] }) {
-    const andWhere: Array<[string, Record<string, unknown> | undefined]> = []
+  /** A query builder that records its where clauses and answers with the given result. */
+  function fakeQueryBuilder(result: { many?: unknown[]; manyAndCount?: [unknown[], number] }) {
+    const where: Array<[string, Record<string, unknown> | undefined]> = []
+    const calls: Record<string, unknown[]> = {}
     const qb: Record<string, unknown> = new Proxy(
       {},
       {
         get(_, prop: string) {
-          if (prop === 'andWhere') {
+          if (prop === 'where' || prop === 'andWhere') {
             return (clause: string, params?: Record<string, unknown>) => {
-              andWhere.push([clause, params])
+              where.push([clause, params])
               return qb
             }
           }
-          if (prop === 'getRawOne') return () => Promise.resolve(result.one)
           if (prop === 'getRawMany') return () => Promise.resolve(result.many ?? [])
+          if (prop === 'getManyAndCount') return () => Promise.resolve(result.manyAndCount)
+          return (...args: unknown[]) => {
+            calls[prop] = args
+            return qb
+          }
+        },
+      },
+    )
+    return { qb, where, calls }
+  }
+
+  const parks = { id: 't-1', name: 'Parks' }
+  const roads = { id: 't-2', name: 'Roads' }
+  const parksSmsLimit = {
+    tenantId: 't-1',
+    channelCode: 'SMS',
+    rateLimitPerMinute: '1000',
+    dailyLimit: '500',
+    annualLimit: '10000',
+    warnThresholdPercent: null,
+  }
+
+  function setup({
+    tenants = [parks, roads],
+    total = tenants.length,
+    limits = [parksSmsLimit],
+    usage = [{ tenantId: 't-1', channelCode: 'SMS', periodTypeCode: 'DAY', total: '42' }],
+    history = [
+      {
+        tenant_id: 't-1',
+        channel: 'SMS',
+        last_sent_at: new Date('2026-11-03T17:20:00.000Z'),
+        first_sent_at: new Date('2020-01-01T00:00:00.000Z'),
+        window_count: '1200',
+      },
+    ],
+  } = {}) {
+    const tenantQb = fakeQueryBuilder({ manyAndCount: [tenants, total] })
+    const limitQb = fakeQueryBuilder({ many: limits })
+    const usageQb = fakeQueryBuilder({ many: usage })
+    const tenantRepository = {
+      createQueryBuilder: vi.fn().mockReturnValue(tenantQb.qb),
+      query: vi.fn().mockResolvedValue(history),
+    }
+    const service = new ApiKeyUsageService(
+      {} as Repository<ApiKeyConsumer>,
+      {
+        createQueryBuilder: vi.fn().mockReturnValue(limitQb.qb),
+      } as unknown as Repository<ApiKeyLimit>,
+      {} as Repository<ApiKeyLimitAlert>,
+      {
+        createQueryBuilder: vi.fn().mockReturnValue(usageQb.qb),
+      } as unknown as Repository<ApiKeyUsage>,
+      { findOne: vi.fn().mockResolvedValue(null) } as unknown as Repository<NotifyConfiguration>,
+      tenantRepository as unknown as Repository<Tenant>,
+    )
+    return { service, tenantRepository, tenantQb, limitQb, usageQb }
+  }
+
+  const parsed = (
+    filters: ParsedListQuery['filters'] = [],
+    paging = { page: 1, limit: 15, skip: 0 },
+  ): ParsedListQuery => ({ ...paging, sorts: [], filters })
+  const smsOnly = [{ field: 'channel', operator: 'in' as const, value: ['SMS'] }]
+
+  it('lists every active CSTAR tenant, not only those with an API key', async () => {
+    const { service, tenantQb } = setup()
+
+    const result = await service.getAllTenantsUsage(parsed())
+
+    expect(tenantQb.where.map(([clause]) => clause)).toEqual([
+      't.isDeleted = :deleted',
+      't.status = :active',
+      't.externalId IS NOT NULL',
+    ])
+    expect(result.count).toBe(2)
+    expect(result.data.map((row) => [row.tenantName, row.channel])).toEqual([
+      ['Parks', 'EMAIL'],
+      ['Parks', 'SMS'],
+      ['Roads', 'EMAIL'],
+      ['Roads', 'SMS'],
+    ])
+  })
+
+  it('shows zero usage and no limits on a channel the tenant has no limit for', async () => {
+    const { service } = setup()
+
+    const { data } = await service.getAllTenantsUsage(parsed())
+
+    expect(data.find((row) => row.tenantId === 't-2' && row.channel === 'SMS')).toEqual({
+      tenantId: 't-2',
+      tenantName: 'Roads',
+      channel: 'SMS',
+      rateLimitPerMinute: null,
+      dailyLimit: null,
+      annualLimit: null,
+      warnThresholdPercent: null,
+      usedThisMinute: 0,
+      usedToday: 0,
+      usedThisYear: 0,
+      lastSentAt: null,
+      averageMonthlySends: null,
+    })
+    expect(data.find((row) => row.tenantId === 't-1' && row.channel === 'SMS')).toMatchObject({
+      dailyLimit: 500,
+      annualLimit: 10000,
+      warnThresholdPercent: 80,
+      usedToday: 42,
+      lastSentAt: '2026-11-03T17:20:00.000Z',
+      averageMonthlySends: 100,
+    })
+  })
+
+  it('keeps every tenant when filtered by channel, narrowing only their rows', async () => {
+    const { service, tenantQb, limitQb, usageQb } = setup()
+
+    const result = await service.getAllTenantsUsage(parsed(smsOnly))
+
+    expect(tenantQb.where.some(([clause]) => clause.includes('channel'))).toBe(false)
+    expect(result.count).toBe(2)
+    expect(result.data.map((row) => [row.tenantName, row.channel])).toEqual([
+      ['Parks', 'SMS'],
+      ['Roads', 'SMS'],
+    ])
+    for (const { where } of [limitQb, usageQb]) {
+      expect(where).toContainEqual(
+        expect.arrayContaining([expect.any(String), { channels: ['SMS'] }]),
+      )
+    }
+  })
+
+  it('searches tenant names with the trimmed term and pages by tenant', async () => {
+    const { service, tenantQb } = setup({ total: 32 })
+
+    const result = await service.getAllTenantsUsage(
+      parsed([], { page: 3, limit: 15, skip: 30 }),
+      ' parks ',
+    )
+
+    expect(tenantQb.where).toContainEqual(['t.name ILIKE :search', { search: '%parks%' }])
+    expect(tenantQb.calls.skip).toEqual([30])
+    expect(tenantQb.calls.take).toEqual([15])
+    expect(result).toMatchObject({ count: 32, page: 3, totalPages: 3 })
+  })
+
+  it('returns no rows without querying limits when no tenant matches', async () => {
+    const { service, limitQb } = setup({ tenants: [] })
+
+    const result = await service.getAllTenantsUsage(parsed())
+
+    expect(result).toEqual({ data: [], count: 0, page: 1, limit: 15, totalPages: 0 })
+    expect(limitQb.where).toEqual([])
+  })
+})
+
+describe('ApiKeyUsageService.updateTenantLimits', () => {
+  it("returns the edited channel's row under the tenant's name", async () => {
+    const limitRepository = {
+      update: vi.fn().mockResolvedValue({ affected: 1 }),
+      createQueryBuilder: vi.fn(() => rawQb([])),
+    }
+    const rawQb = (rows: unknown[]): Record<string, unknown> =>
+      new Proxy(
+        {},
+        {
+          get: (_, prop: string) =>
+            prop === 'getRawMany' ? () => Promise.resolve(rows) : () => rawQb(rows),
+        },
+      )
+    const service = new ApiKeyUsageService(
+      {
+        find: vi.fn().mockResolvedValue([{ id: 'consumer-1' }]),
+      } as unknown as Repository<ApiKeyConsumer>,
+      limitRepository as unknown as Repository<ApiKeyLimit>,
+      {} as Repository<ApiKeyLimitAlert>,
+      { createQueryBuilder: () => rawQb([]) } as unknown as Repository<ApiKeyUsage>,
+      { findOne: vi.fn().mockResolvedValue(null) } as unknown as Repository<NotifyConfiguration>,
+      {
+        findOneBy: vi.fn().mockResolvedValue({ id: 't-1', name: 'Parks' }),
+        query: vi.fn().mockResolvedValue([]),
+      } as unknown as Repository<Tenant>,
+    )
+
+    const rows = await service.updateTenantLimits('t-1', 'SMS', 10, 100)
+
+    expect(rows).toEqual([expect.objectContaining({ tenantName: 'Parks', channel: 'SMS' })])
+  })
+})
+
+describe('ApiKeyUsageService.getAdminUsageSummary', () => {
+  it('counts Notify tenants, those sending this fiscal year and those with an API key', async () => {
+    const where: string[] = []
+    const params: Record<string, unknown> = {}
+    const qb: Record<string, unknown> = new Proxy(
+      {},
+      {
+        get(_, prop: string) {
+          if (prop === 'where' || prop === 'andWhere')
+            return (clause: string) => {
+              where.push(clause)
+              return qb
+            }
+          if (prop === 'setParameter')
+            return (key: string, value: unknown) => {
+              params[key] = value
+              return qb
+            }
+          if (prop === 'getRawOne')
+            return () =>
+              Promise.resolve({ tenants: '42', sentThisFiscalYear: '30', withApiKey: '12' })
           return () => qb
         },
       },
     )
-    return { qb, andWhere }
-  }
-
-  function setup() {
-    const count = fakeQueryBuilder({ one: { count: '1' } })
-    const tenants = fakeQueryBuilder({ many: [{ tenantId: 't-1', tenantName: 'Parks' }] })
-    const limits = fakeQueryBuilder({
-      many: [
-        {
-          tenantId: 't-1',
-          tenantName: 'Parks',
-          channelCode: 'SMS',
-          rateLimitPerMinute: '1000',
-          dailyLimit: '500',
-          annualLimit: '10000',
-          warnThresholdPercent: '80',
-        },
-      ],
-    })
-    const usage = fakeQueryBuilder({ many: [] })
-    const limitRepository = {
-      createQueryBuilder: vi
-        .fn()
-        .mockReturnValueOnce(count.qb)
-        .mockReturnValueOnce(tenants.qb)
-        .mockReturnValueOnce(limits.qb),
-    }
-    const usageRepository = { createQueryBuilder: vi.fn().mockReturnValue(usage.qb) }
     const service = new ApiKeyUsageService(
       {} as Repository<ApiKeyConsumer>,
-      limitRepository as unknown as Repository<ApiKeyLimit>,
+      {} as Repository<ApiKeyLimit>,
       {} as Repository<ApiKeyLimitAlert>,
-      usageRepository as unknown as Repository<ApiKeyUsage>,
+      {} as Repository<ApiKeyUsage>,
       { findOne: vi.fn().mockResolvedValue(null) } as unknown as Repository<NotifyConfiguration>,
+      { createQueryBuilder: () => qb } as unknown as Repository<Tenant>,
     )
-    return { service, count, tenants, limits }
-  }
 
-  const channelClause = 'LOWER(l.channel_code) IN (:...filter_0)'
-  const parsed = (filters: ParsedListQuery['filters'] = []): ParsedListQuery => ({
-    page: 1,
-    limit: 15,
-    skip: 0,
-    sorts: [],
-    filters,
-  })
-  const smsOnly = [{ field: 'channel', operator: 'in' as const, value: ['SMS'] }]
+    const summary = await service.getAdminUsageSummary()
 
-  it('narrows the tenant count, the page of tenants and their rows to the chosen channels', async () => {
-    const { service, count, tenants, limits } = setup()
-
-    const result = await service.getAllTenantsUsage(parsed(smsOnly))
-
-    // The count has to agree with the page, or paging shows short pages.
-    for (const { andWhere } of [count, tenants, limits]) {
-      expect(andWhere).toContainEqual([channelClause, { filter_0: ['sms'] }])
-    }
-    expect(result.count).toBe(1)
-    expect(result.data.map((row) => row.channel)).toEqual(['SMS'])
-  })
-
-  it('applies no channel condition when none is given', async () => {
-    const { service, count, tenants, limits } = setup()
-
-    await service.getAllTenantsUsage(parsed())
-
-    for (const { andWhere } of [count, tenants, limits]) {
-      expect(andWhere).toEqual([])
-    }
-  })
-
-  it('combines the channel filter with a trimmed tenant name search', async () => {
-    const { service, count } = setup()
-
-    await service.getAllTenantsUsage(parsed(smsOnly), ' parks ')
-
-    expect(count.andWhere).toEqual([
-      ['t.name ILIKE :search', { search: '%parks%' }],
-      [channelClause, { filter_0: ['sms'] }],
+    expect(summary).toEqual({ tenants: 42, sentThisFiscalYear: 30, withApiKey: 12 })
+    // The same tenants the usage table lists, and no search or filter.
+    expect(where).toEqual([
+      't.isDeleted = :deleted',
+      't.status = :active',
+      't.externalId IS NOT NULL',
     ])
+    expect(params.fiscalYearStart).toBeInstanceOf(Date)
+  })
+})
+
+describe('averageWindow', () => {
+  it('covers the 12 full calendar months before the current one', () => {
+    expect(averageWindow(new Date('2026-11-06T18:00:00Z'))).toEqual({
+      start: new Date('2025-11-01T00:00:00Z'),
+      end: new Date('2026-11-01T00:00:00Z'),
+    })
+  })
+
+  it('crosses the year boundary in January', () => {
+    expect(averageWindow(new Date('2027-01-15T00:00:00Z'))).toEqual({
+      start: new Date('2026-01-01T00:00:00Z'),
+      end: new Date('2027-01-01T00:00:00Z'),
+    })
+  })
+})
+
+describe('averageMonthlySends', () => {
+  const window = averageWindow(new Date('2026-11-06T18:00:00Z'))
+
+  it('averages over all 12 months for a tenant sending since before the window', () => {
+    expect(averageMonthlySends(1200, new Date('2024-03-10T00:00:00Z'), window)).toBe(100)
+  })
+
+  it('averages only over the months since a newer tenant started', () => {
+    // First send in August: August, September and October count.
+    expect(averageMonthlySends(300, new Date('2026-08-20T00:00:00Z'), window)).toBe(100)
+  })
+
+  it('has no average before the tenant has a month in the window', () => {
+    expect(averageMonthlySends(5, new Date('2026-11-02T00:00:00Z'), window)).toBeNull()
+  })
+})
+
+describe('channelsInScope', () => {
+  it('covers every channel when there is no channel filter', () => {
+    expect(channelsInScope([])).toEqual(['EMAIL', 'SMS'])
+  })
+
+  it.each<[ListQueryFilter, string[]]>([
+    [{ field: 'channel', operator: 'in', value: ['sms'] }, ['SMS']],
+    [{ field: 'channel', operator: 'eq', value: 'EMAIL' }, ['EMAIL']],
+    [{ field: 'channel', operator: 'in', value: ['FAX'] }, []],
+  ])('narrows to the channels a filter names: %j', (filter, expected) => {
+    expect(channelsInScope([filter])).toEqual(expected)
   })
 })

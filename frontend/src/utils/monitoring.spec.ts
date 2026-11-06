@@ -101,8 +101,8 @@ describe('monitoringWarnings', () => {
     data.reconciler = { ...data.reconciler, reasons: ['Gave up on 2'] }
 
     expect(monitoringWarnings(data).map((w) => [w.message, w.page?.to])).toEqual([
-      ['Redis: Memory is high', '/admin/health'],
-      ['CHES (Email): Failing', '/admin/health'],
+      ['Redis: Memory is high', '/admin/monitoring'],
+      ['CHES (Email): Failing', '/admin/monitoring'],
       ['Email delivery: No pod is processing', '/admin/monitoring'],
       ['Delivery recovery: Gave up on 2', '/admin/monitoring'],
     ])

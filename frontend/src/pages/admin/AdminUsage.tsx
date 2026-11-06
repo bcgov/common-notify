@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FC } from 'react'
-import type { AdminTenantUsageRow } from '@/api/apiKeyUsage.api'
+import { getAdminUsageSummary } from '@/api/apiKeyUsage.api'
+import type { AdminTenantUsageRow, AdminUsageSummary } from '@/api/apiKeyUsage.api'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
 import { fetchAllTenantsUsage, updateTenantLimits } from '@/redux/thunks/apiKeyUsage.thunks'
 import {
@@ -19,7 +20,7 @@ import UsageCell from '@/components/UsageCell'
 import EditModal from '@/components/EditModal'
 import NumberInputField from '@/components/NumberInputField'
 import { showSuccessToast, showErrorToast } from '@/redux/utils/toastUtils'
-import { formatChannel } from '@/utils/usage'
+import { adoptionSummaryText, formatChannel, formatLastSent } from '@/utils/usage'
 
 const rowKeyOf = (row: AdminTenantUsageRow) => `${row.tenantId}-${row.channel}`
 
@@ -41,6 +42,16 @@ const AdminUsage: FC = () => {
   const [editingRow, setEditingRow] = useState<AdminTenantUsageRow | null>(null)
   const [dailyLimit, setDailyLimit] = useState(0)
   const [annualLimit, setAnnualLimit] = useState(0)
+  const [summary, setSummary] = useState<AdminUsageSummary | null>(null)
+
+  // Totals across every tenant, so they don't change with the table's search or filters and
+  // are fetched once. Only this screen reads them, so there is no slice.
+  useEffect(() => {
+    if (!isAdmin) return
+    getAdminUsageSummary()
+      .then(setSummary)
+      .catch((error: Error) => showErrorToast(error.message))
+  }, [isAdmin])
 
   // Server-side: refetch whenever the page, page size, committed search or filters change.
   useEffect(() => {
@@ -72,10 +83,10 @@ const AdminUsage: FC = () => {
     dispatch(setAdminFilter({ field: key, values }))
   }
 
-  function openEdit(row: AdminTenantUsageRow) {
+  function openEdit(row: AdminTenantUsageRow, limits: { daily: number; annual: number }) {
     setEditingRow(row)
-    setDailyLimit(row.dailyLimit)
-    setAnnualLimit(row.annualLimit)
+    setDailyLimit(limits.daily)
+    setAnnualLimit(limits.annual)
   }
 
   function closeEdit() {
@@ -127,6 +138,30 @@ const AdminUsage: FC = () => {
       render: (_, row) => <span>{formatChannel(row.channel)}</span>,
     },
     {
+      key: 'lastSentAt',
+      label: 'Last sent',
+      render: (_, row) =>
+        row.lastSentAt === null ? (
+          <span className="text-muted">Never</span>
+        ) : (
+          <time dateTime={row.lastSentAt} title={new Date(row.lastSentAt).toLocaleString()}>
+            {formatLastSent(row.lastSentAt, Date.now())}
+          </time>
+        ),
+    },
+    {
+      key: 'averageMonthlySends',
+      label: 'Avg / month',
+      render: (_, row) =>
+        row.averageMonthlySends === null ? (
+          <span className="text-muted">
+            —<span className="visually-hidden">No full month of sending yet</span>
+          </span>
+        ) : (
+          <span>{row.averageMonthlySends.toLocaleString()}</span>
+        ),
+    },
+    {
       key: 'dailyLimit',
       label: 'Daily',
       render: (_, row) => (
@@ -151,22 +186,41 @@ const AdminUsage: FC = () => {
     {
       key: 'warnThresholdPercent',
       label: 'Alert threshold',
-      render: (_, row) => <span>{row.warnThresholdPercent}%</span>,
+      render: (_, row) =>
+        row.warnThresholdPercent === null ? (
+          <span className="text-muted">Not set</span>
+        ) : (
+          <span>{row.warnThresholdPercent}%</span>
+        ),
     },
     {
       key: 'tenantId',
       label: 'Actions',
-      render: (_, row) => (
-        <button type="button" className="btn btn-sm btn-link p-0" onClick={() => openEdit(row)}>
-          Edit limits
-        </button>
-      ),
+      // Limits are created when an API key is bound, so there is nothing to edit until then.
+      render: (_, row) => {
+        const { dailyLimit: daily, annualLimit: annual } = row
+        if (daily === null || annual === null) {
+          return <span className="text-muted">No limits to edit</span>
+        }
+        return (
+          <button
+            type="button"
+            className="btn btn-sm btn-link p-0"
+            onClick={() => openEdit(row, { daily, annual })}
+          >
+            Edit limits
+          </button>
+        )
+      },
     },
   ]
 
   return (
     <div className="page">
-      <PageHeading title="Tenant Usage & Limits" />
+      <PageHeading
+        title="Tenant Usage & Limits"
+        meta={summary ? adoptionSummaryText(summary) : undefined}
+      />
       {adminError && <div role="alert">{adminError}</div>}
 
       <div className="page__toolbar">
@@ -184,7 +238,7 @@ const AdminUsage: FC = () => {
         data={adminRows}
         keyExtractor={(row) => rowKeyOf(row)}
         isLoading={adminLoading}
-        emptyMessage="No tenant usage data found."
+        emptyMessage="No tenants found."
         search={adminSearch}
         onClearSearch={clearSearch}
         activeFilters={adminFilters}

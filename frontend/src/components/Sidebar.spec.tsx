@@ -195,7 +195,7 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: /feature flags/i })).toBeInTheDocument()
   })
 
-  it('shows the Queues & processing link to NOTIFY_ADMIN users', async () => {
+  it('shows the System link to NOTIFY_ADMIN users', async () => {
     const user = userEvent.setup()
     const UserService = (await import('@/service/user-service')).default
     vi.mocked(UserService.hasRole).mockReturnValue(true)
@@ -203,19 +203,19 @@ describe('Sidebar', () => {
     renderSidebar()
     await user.click(screen.getByRole('button', { name: /admin/i }))
 
-    expect(screen.getByRole('link', { name: 'Queues & processing' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'System' })).toHaveAttribute(
       'href',
       '/admin/monitoring',
     )
   })
 
-  it('does not show the Queues & processing link without the NOTIFY_ADMIN role', async () => {
+  it('does not show the System link without the NOTIFY_ADMIN role', async () => {
     const UserService = (await import('@/service/user-service')).default
     vi.mocked(UserService.hasRole).mockReturnValue(false)
 
     renderSidebar()
 
-    expect(screen.queryByRole('link', { name: 'Queues & processing' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'System' })).not.toBeInTheDocument()
   })
 
   describe('admin menu', () => {
@@ -233,8 +233,7 @@ describe('Sidebar', () => {
 
       expect(linksIn('Monitor')).toEqual([
         ['Overview', '/admin'],
-        ['Service health', '/admin/health'],
-        ['Queues & processing', '/admin/monitoring'],
+        ['System', '/admin/monitoring'],
       ])
       expect(linksIn('Report')).toEqual([['Usage & Limits', '/admin/usage']])
       expect(linksIn('Manage')).toEqual([['Feature Flags', '/admin/feature-flags']])
@@ -254,7 +253,7 @@ describe('Sidebar', () => {
       const menuId = toggle.getAttribute('aria-controls')
       expect(menuId).toBeTruthy()
       expect(document.getElementById(menuId!)).toContainElement(
-        screen.getByRole('link', { name: 'Queues & processing' }),
+        screen.getByRole('link', { name: 'System' }),
       )
     })
 

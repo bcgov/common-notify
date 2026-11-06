@@ -4,13 +4,15 @@ import QueuesSection from './sections/QueuesSection'
 import SendsInProgressSection from './sections/SendsInProgressSection'
 import WorkersSection from './sections/WorkersSection'
 import ReconcilerSection from './sections/ReconcilerSection'
+import ProvidersSection from './sections/ProvidersSection'
+import RedisSection from './sections/RedisSection'
 
-/** The Bull queues, the sends moving through them, the pods working them, and recoveries. */
-const QueuesAndProcessing: FC = () => (
+/** The detail behind each component on the Overview, for when one of them needs a closer look. */
+const System: FC = () => (
   <MonitoringPage
-    page="queues"
-    title="Queues & processing"
-    meta="Jobs waiting and running, the pods working them, and what was recovered. Read-only."
+    page="system"
+    title="System"
+    meta="Queues, the pods working them, delivery providers and Redis. Read-only."
   >
     {(data, now) => (
       <>
@@ -18,9 +20,11 @@ const QueuesAndProcessing: FC = () => (
         <SendsInProgressSection sends={data.sendsInProgress} now={now} />
         <WorkersSection workers={data.workers} now={now} />
         <ReconcilerSection reconciler={data.reconciler} now={now} />
+        <ProvidersSection providers={data.providers} />
+        <RedisSection redis={data.redis} />
       </>
     )}
   </MonitoringPage>
 )
 
-export default QueuesAndProcessing
+export default System

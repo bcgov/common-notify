@@ -1,5 +1,5 @@
 import type { HealthWarning, HealthWarningPage } from '@/components/HealthBanner'
-import type { ComponentStatus } from '@/components/ComponentStatusList'
+import type { ComponentStatus, ComponentStatusGroup } from '@/components/ComponentStatusList'
 import type {
   HealthStatus,
   MessageChannelStats,
@@ -76,48 +76,56 @@ export function providerLabel(provider: ProviderStats): string {
 /** The admin monitoring pages, and which part of the snapshot each one details. */
 export const MONITORING_PAGES = {
   overview: { label: 'Overview', to: '/admin' },
-  health: { label: 'Service health', to: '/admin/health' },
-  queues: { label: 'Queues & processing', to: '/admin/monitoring' },
+  system: { label: 'System', to: '/admin/monitoring' },
 } as const satisfies Record<string, HealthWarningPage>
 
 /** Every warning in the snapshot, each pointing at the page that explains it. */
 export function monitoringWarnings(data: QueueMonitoring): HealthWarning[] {
-  const { health, queues } = MONITORING_PAGES
+  const { system } = MONITORING_PAGES
   return [
-    ...data.redis.reasons.map((reason) => ({ message: `Redis: ${reason}`, page: health })),
+    ...data.redis.reasons.map((reason) => ({ message: `Redis: ${reason}`, page: system })),
     ...data.providers.flatMap((provider) =>
       provider.reasons.map((reason) => ({
         message: `${providerLabel(provider)}: ${reason}`,
-        page: health,
+        page: system,
       })),
     ),
     ...data.queues.flatMap((queue) =>
       queue.reasons.map((reason) => ({
         message: `${formatQueueName(queue.name)}: ${reason}`,
-        page: queues,
+        page: system,
       })),
     ),
     ...data.reconciler.reasons.map((reason) => ({
       message: `Delivery recovery: ${reason}`,
-      page: queues,
+      page: system,
     })),
   ]
 }
 
-/** Each part of the service with a status of its own, for the Overview's at-a-glance list. */
-export function componentStatuses(data: QueueMonitoring): ComponentStatus[] {
-  const { health, queues } = MONITORING_PAGES
-  const entry = (name: string, status: HealthStatus, to: HealthWarningPage['to']) => ({
+/** Each part of the service with a status of its own, grouped for the Overview. */
+export function componentStatuses(data: QueueMonitoring): ComponentStatusGroup[] {
+  const entry = (name: string, status: HealthStatus): ComponentStatus => ({
     name,
     status,
     statusLabel: HEALTH_LABELS[status],
-    to,
   })
   return [
-    ...data.providers.map((provider) => entry(providerLabel(provider), provider.status, health.to)),
-    entry('Redis', data.redis.status, health.to),
-    ...data.queues.map((queue) => entry(formatQueueName(queue.name), queue.status, queues.to)),
-    entry('Delivery recovery', data.reconciler.status, queues.to),
+    {
+      label: 'Delivery providers',
+      components: data.providers.map((provider) => entry(providerLabel(provider), provider.status)),
+    },
+    {
+      label: 'Queues',
+      components: data.queues.map((queue) => entry(formatQueueName(queue.name), queue.status)),
+    },
+    {
+      label: 'Supporting services',
+      components: [
+        entry('Redis', data.redis.status),
+        entry('Delivery recovery', data.reconciler.status),
+      ],
+    },
   ]
 }
 

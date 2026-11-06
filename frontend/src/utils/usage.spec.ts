@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatChannel, percentOf } from './usage'
+import { adoptionSummaryText, formatChannel, formatLastSent, percentOf } from './usage'
 
 describe('formatChannel', () => {
   it('title-cases a channel code', () => {
@@ -23,5 +23,32 @@ describe('percentOf', () => {
   it('guards against a zero or invalid limit', () => {
     expect(percentOf(5, 0)).toBe(0)
     expect(percentOf(5, -10)).toBe(0)
+  })
+})
+
+describe('adoptionSummaryText', () => {
+  it('joins the three counts, with thousands separators', () => {
+    expect(adoptionSummaryText({ tenants: 1200, sentThisFiscalYear: 30, withApiKey: 0 })).toBe(
+      '1,200 tenants use Notify · 30 sent this fiscal year · 0 with an API key',
+    )
+  })
+
+  it('reads naturally for a single tenant', () => {
+    expect(adoptionSummaryText({ tenants: 1, sentThisFiscalYear: 1, withApiKey: 1 })).toBe(
+      '1 tenant uses Notify · 1 sent this fiscal year · 1 with an API key',
+    )
+  })
+})
+
+describe('formatLastSent', () => {
+  const now = new Date('2026-11-06T18:00:00Z').getTime()
+
+  it.each([
+    ['2026-11-06T09:00:00Z', 'Today'],
+    ['2026-11-05T12:00:00Z', 'Yesterday'],
+    ['2026-10-25T18:00:00Z', '12 days ago'],
+    ['2026-08-15T18:00:00Z', 'Aug 15, 2026'],
+  ])('describes %s as %s', (iso, expected) => {
+    expect(formatLastSent(iso, now)).toBe(expected)
   })
 })

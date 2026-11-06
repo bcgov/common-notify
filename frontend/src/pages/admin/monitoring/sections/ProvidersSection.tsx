@@ -6,7 +6,7 @@ import type { ProviderStats } from '@/interfaces/queueMonitoring.interface'
 import { HEALTH_LABELS, providerLabel } from '@/utils/monitoring'
 
 const CIRCUIT_LABELS: Record<NonNullable<ProviderStats['circuit']>, string> = {
-  closed: 'Sending',
+  closed: 'Yes',
   open: 'Paused: provider failing',
   'half-open': 'Testing recovery',
 }
@@ -44,7 +44,7 @@ const ProvidersSection: FC<ProvidersSectionProps> = ({ providers }) => (
             )}
             <dl className="stat-tile-grid">
               <StatTile
-                label="Circuit"
+                label="Sending to provider"
                 value={provider.circuit ? CIRCUIT_LABELS[provider.circuit] : 'Unknown'}
                 hint={
                   provider.reopensAt

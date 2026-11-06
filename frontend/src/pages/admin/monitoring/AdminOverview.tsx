@@ -19,7 +19,7 @@ const AdminOverview: FC = () => (
         <OverviewCards overview={data.overview} messages={data.messages} redis={data.redis} />
         <section className="page__section">
           <PageSubHeading title="Components" />
-          <ComponentStatusList label="Component status" components={componentStatuses(data)} />
+          <ComponentStatusList groups={componentStatuses(data)} />
         </section>
         <MessagesSection messages={data.messages} />
         <RecentFailuresSection failures={data.recentFailures} now={now} />

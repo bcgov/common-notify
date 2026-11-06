@@ -1043,8 +1043,8 @@ routes:
 
   # /api/v1/frontend/admin/api-key-usage (admin variant - all tenants' usage)
   # Admin-only (NOTIFY_ADMIN SSO role), not tenant-scoped. Same jwt-keycloak plugin
-  # as the other frontend admin routes. Kong prefix-matches, so PATCH also covers
-  # /api/v1/frontend/admin/api-key-usage/limits.
+  # as the other frontend admin routes. Kong prefix-matches, so this also covers
+  # GET /api/v1/frontend/admin/api-key-usage/summary and PATCH .../limits.
   - name: ${ROUTE_PREFIX}admin-api-key-usage-frontend
     tags: [${CONFIG_TAG}]
     hosts:

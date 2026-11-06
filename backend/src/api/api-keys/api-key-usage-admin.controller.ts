@@ -23,6 +23,7 @@ import { ApiKeyUsageService, adminUsageListQueryConfig } from './api-key-usage.s
 import { parseListQuery } from '../../common/query/list-query.parser'
 import {
   AdminTenantUsageRowDto,
+  AdminUsageSummaryDto,
   PaginatedAdminUsageResponseDto,
 } from './schemas/tenant-usage-response.dto'
 import { UpdateTenantLimitsDto } from './schemas/update-tenant-limits.dto'
@@ -52,6 +53,15 @@ export class ApiKeyUsageAdminController {
   getAllTenantsUsage(@Query() query: AdminUsageQueryDto): Promise<PaginatedAdminUsageResponseDto> {
     const parsedQuery = parseListQuery(query, adminUsageListQueryConfig)
     return this.apiKeyUsageService.getAllTenantsUsage(parsedQuery, query.search)
+  }
+
+  @Version('1')
+  @Get('summary')
+  @Roles(SsoRole.NOTIFY_ADMIN)
+  @ApiOperation({ summary: 'How many tenants use Notify (admin only)' })
+  @ApiOkResponse({ type: AdminUsageSummaryDto })
+  getSummary(): Promise<AdminUsageSummaryDto> {
+    return this.apiKeyUsageService.getAdminUsageSummary()
   }
 
   @Version('1')
