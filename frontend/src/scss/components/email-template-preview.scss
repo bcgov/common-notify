@@ -1,0 +1,54 @@
+// Read-only preview of a template, custom div.
+.email-template-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--layout-padding-xsmall);
+}
+
+.email-template-preview__label {
+  font: var(--typography-regular-small-body);
+  font-weight: 700;
+  color: var(--typography-color-primary);
+}
+
+.email-template-preview__box {
+  padding: var(--layout-padding-small) 12px;
+  background: var(--surface-color-forms-default, #fff);
+  border: var(--layout-border-width-small) solid var(--surface-color-border-default);
+  border-radius: var(--layout-border-radius-medium);
+}
+
+.email-template-preview__subject {
+  margin: 0 0 8px;
+  font: var(--typography-regular-body);
+  color: var(--typography-color-primary);
+}
+
+.email-template-preview__body-label {
+  margin: 0;
+  font: var(--typography-regular-body);
+  color: var(--typography-color-primary);
+}
+
+.email-template-preview__content {
+  margin: 0;
+  font: var(--typography-regular-body);
+  color: var(--typography-color-primary);
+  white-space: pre-wrap;
+  // An unbroken run, such as a URL or minified MJML, wraps rather than widening the box.
+  overflow-wrap: anywhere;
+}
+
+// Matches the greyed-out look of the DS form controls when the channel is inactive.
+.email-template-preview--disabled {
+  .email-template-preview__label,
+  .email-template-preview__subject,
+  .email-template-preview__body-label,
+  .email-template-preview__content {
+    color: var(--typography-color-disabled, #9f9d9c);
+  }
+
+  .email-template-preview__box {
+    background: var(--surface-color-forms-disabled);
+  }
+}
