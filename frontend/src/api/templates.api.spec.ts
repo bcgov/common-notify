@@ -4,6 +4,7 @@ import {
   TemplateEngine,
   createTemplate,
   deleteTemplate,
+  getPreviousTemplateVersion,
   getTemplateById,
   getTemplateUsage,
   getTemplates,
@@ -119,6 +120,45 @@ describe('templates.api', () => {
       vi.mocked(get).mockRejectedValue(httpError(status))
 
       await expect(getTemplateById('t1')).rejects.toThrow(message)
+    })
+  })
+
+  describe('getPreviousTemplateVersion', () => {
+    it('reads the previous version and skips the app-wide spinner', async () => {
+      vi.mocked(get).mockResolvedValue({ version: 1 })
+
+      await expect(getPreviousTemplateVersion('t1')).resolves.toEqual({ version: 1 })
+      expect(get).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: `${BASE_URL}/t1/previous-version`,
+          skipGlobalLoading: true,
+        }),
+      )
+    })
+
+    it.each([
+      [404, 'No previous version of this template was found'],
+      [401, 'You are not authorized to view this template'],
+    ])('explains a %i', async (status, message) => {
+      vi.mocked(get).mockRejectedValue(httpError(status))
+
+      await expect(getPreviousTemplateVersion('t1')).rejects.toThrow(message)
+    })
+
+    it('passes along the reason for any other failure', async () => {
+      vi.mocked(get).mockRejectedValue(new Error('network down'))
+
+      await expect(getPreviousTemplateVersion('t1')).rejects.toThrow(
+        'Failed to fetch previous version: network down',
+      )
+    })
+
+    it('still reports a failure that is not an Error', async () => {
+      vi.mocked(get).mockRejectedValue('nope')
+
+      await expect(getPreviousTemplateVersion('t1')).rejects.toThrow(
+        'Failed to fetch previous version: Unknown error',
+      )
     })
   })
 

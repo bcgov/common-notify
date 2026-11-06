@@ -299,7 +299,7 @@ export class TemplatesRepository {
    * Find the newest version older than the given one. Not simply version - 1, because version
    * numbers are not guaranteed to be contiguous.
    */
-  async findPreviousVersion(templateId: string, version: number): Promise<TemplateVersion | null> {
+  findPreviousVersion(templateId: string, version: number): Promise<TemplateVersion | null> {
     return this.templateVersionRepository.findOne({
       where: { templateId, version: LessThan(version) },
       order: { version: 'DESC' },

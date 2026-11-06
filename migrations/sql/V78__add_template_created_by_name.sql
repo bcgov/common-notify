@@ -9,7 +9,19 @@
 --
 -- The version trigger already takes template_version.created_by from
 -- template.updated_by; it now takes created_by_name from updated_by_name the
--- same way. The rest of the function is unchanged from V15.
+-- same way.
+--
+-- Keep only the current and previous version of each template
+--
+-- The version trigger now removes anything older than the previous version as
+-- it adds a new one, so the cleanup also covers direct database modifications
+-- (datafixes). The rest of the function is unchanged from V15.
+--
+-- The newest two rows are found by position, not by version - 1, because version
+-- numbers are not guaranteed to be contiguous. The newest row is always kept, so
+-- the trigger's MAX(version) + 1 carries on numbering from where it was.
+--
+-- This permanently deletes the older template_version entries of existing templates.
 -- ============================================================================
 BEGIN;
 
@@ -71,10 +83,39 @@ BEGIN
       NEW.updated_by_name,
       NOW()
     );
+
+    -- Remove anything older than the previous version
+    DELETE FROM notify.template_version
+    WHERE template_id = NEW.id
+      AND version < (
+        SELECT version
+        FROM notify.template_version
+        WHERE template_id = NEW.id
+        ORDER BY version DESC
+        OFFSET 1
+        LIMIT 1
+      );
   END IF;
 
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+DELETE FROM notify.template_version
+WHERE id IN (
+  SELECT id
+  FROM (
+    SELECT id, ROW_NUMBER() OVER (PARTITION BY template_id ORDER BY version DESC) AS position
+    FROM notify.template_version
+  ) ranked
+  WHERE position > 2
+);
+
+COMMENT ON TABLE notify.template_version IS 'The current and previous version of each template. Older versions are removed by the version trigger.';
+
+COMMENT ON TRIGGER template_version_trigger ON notify.template IS
+  'Automatically creates template_version record on any template table update, including direct database modifications (datafixes).
+   Only creates new version if actual content changes (detects via IS DISTINCT FROM).
+   Removes versions older than the previous one, so template_version is not a full audit trail.';
 
 COMMIT;

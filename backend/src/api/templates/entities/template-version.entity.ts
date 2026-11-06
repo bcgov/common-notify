@@ -13,8 +13,9 @@ import { TemplateEngineCode } from './template-engine-code.entity'
 import { NotificationChannelCode } from '../../notification/entities/notification-channel-code.entity'
 
 /**
- * TemplateVersion entity representing a historical version of a template.
- * Allows tracking changes to templates and rolling back to previous versions.
+ * TemplateVersion entity representing a version of a template.
+ * Only the current and previous version of each template are kept: the database trigger that
+ * creates a version also removes anything older.
  *
  * Each version is immutable once created.
  */

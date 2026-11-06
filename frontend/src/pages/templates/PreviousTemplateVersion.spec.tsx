@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import type * as TemplatesApi from '@/api/templates.api'
 import PreviousTemplateVersion from './PreviousTemplateVersion'
 
@@ -106,6 +106,59 @@ describe('PreviousTemplateVersion', () => {
     expect((await screen.findByRole('alert')).textContent).toContain(
       'No previous version of this template was found',
     )
+  })
+
+  it('falls back to a general message when the failure is not an Error', async () => {
+    getPreviousTemplateVersionMock.mockRejectedValue('nope')
+
+    render(<PreviousTemplateVersion template={template} />)
+
+    await openModal()
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Failed to load previous version',
+    )
+  })
+
+  describe('when the template changes while a response is outstanding', () => {
+    const newerVersion = { ...previousVersion, name: 'Newer Template' }
+
+    /** Opens the modal on a request that stays pending, then moves to another template. */
+    const moveOnFromPendingRequest = async () => {
+      let resolve!: (value: unknown) => void
+      let reject!: (reason: unknown) => void
+      const stale = new Promise((res, rej) => {
+        resolve = res
+        reject = rej
+      })
+      getPreviousTemplateVersionMock.mockReturnValueOnce(stale)
+      getPreviousTemplateVersionMock.mockResolvedValue(newerVersion)
+
+      const { rerender } = render(<PreviousTemplateVersion template={template} />)
+      await openModal()
+      rerender(<PreviousTemplateVersion template={{ ...template, id: 'template-456' }} />)
+      await screen.findByRole('heading', { name: 'Newer Template' })
+
+      return { resolve, reject }
+    }
+
+    it('ignores the late response', async () => {
+      const { resolve } = await moveOnFromPendingRequest()
+
+      await act(async () => resolve(previousVersion))
+
+      expect(screen.getByRole('heading', { name: 'Newer Template' })).toBeTruthy()
+      expect(screen.queryByRole('heading', { name: 'New Order Ready' })).toBeNull()
+    })
+
+    it('ignores the late failure', async () => {
+      const { reject } = await moveOnFromPendingRequest()
+
+      await act(async () => reject(new Error('stale failure')))
+
+      expect(screen.queryByRole('alert')).toBeNull()
+      expect(screen.getByRole('heading', { name: 'Newer Template' })).toBeTruthy()
+    })
   })
 
   it('loads again each time it is reopened', async () => {
