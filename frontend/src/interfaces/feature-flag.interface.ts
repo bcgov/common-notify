@@ -23,3 +23,20 @@ export interface FeatureFlag {
   createdAt: string
   updatedAt: string
 }
+
+/**
+ * One change to a feature flag: its creation or an enable/disable.
+ */
+export interface FeatureFlagHistoryEntry {
+  id: string
+  featureFlagId: string
+  code: string
+  /** Null for a global flag. */
+  tenantId: string | null
+  enabled: boolean
+  /** Stable user identifier (for IDIR, an opaque `<guid>@azureidir`). */
+  createdBy: string
+  /** Display name at the time of the change, when the token carried one. */
+  createdByName: string | null
+  createdAt: string
+}

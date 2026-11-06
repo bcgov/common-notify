@@ -135,4 +135,12 @@ describe('apiKeyUsage API', () => {
       ['filter', 'status:in:x'],
     ])
   })
+  it("surfaces the server's message for any other failure", async () => {
+    vi.mocked(get).mockRejectedValue(
+      Object.assign(new Error('Request failed with status code 500'), {
+        response: { status: 500, data: { message: 'database is down' } },
+      }),
+    )
+    await expect(api.getApiKeyUsage()).rejects.toThrow('Failed to load usage: database is down')
+  })
 })

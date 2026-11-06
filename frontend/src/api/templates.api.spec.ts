@@ -209,6 +209,7 @@ describe('templates.api', () => {
     it.each([
       [401, 'You are not authorized to create templates'],
       [403, 'You do not have permission to create templates'],
+      [500, 'Failed to create template: Request failed with status code 500'],
     ])('explains a %i', async (status, message) => {
       vi.mocked(post).mockRejectedValue(httpError(status))
 
@@ -237,6 +238,7 @@ describe('templates.api', () => {
       [404, 'Template not found'],
       [401, 'You are not authorized to update this template'],
       [403, 'You do not have permission to update this template'],
+      [500, 'Failed to update template: Request failed with status code 500'],
     ])('explains a %i', async (status, message) => {
       vi.mocked(post).mockRejectedValue(httpError(status))
 
@@ -281,6 +283,7 @@ describe('templates.api', () => {
       [401, 'You are not authorized to delete this template'],
       [403, 'You do not have permission to delete this template'],
       [409, 'This template is in use by an event and cannot be deleted'],
+      [500, 'Failed to delete template: Request failed with status code 500'],
     ])('explains a %i', async (status, message) => {
       vi.mocked(deleteMethod).mockRejectedValue(httpError(status))
 
