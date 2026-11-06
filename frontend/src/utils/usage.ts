@@ -41,3 +41,10 @@ export function formatLastSent(iso: string, now: number): string {
     day: 'numeric',
   })
 }
+
+/** "0", or "12 (0.4%)": failures with their share of the recipients sent to. */
+export function formatFailures(failed: number, recipients: number): string {
+  if (failed === 0) return '0'
+  const share = Math.round(percentOf(failed, recipients) * 10) / 10
+  return `${failed.toLocaleString()} (${share}%)`
+}

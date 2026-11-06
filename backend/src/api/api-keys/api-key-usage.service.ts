@@ -10,6 +10,7 @@ import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
+import { NotificationStatus } from '../../enum/notification-status.enum'
 import type {
   ListQueryFilter,
   ParsedListQuery,
@@ -79,7 +80,14 @@ interface SendHistory {
   firstSentAt: Date
   /** Recipients in the average's window. */
   windowCount: number
+  /** Recipients, and failed recipients, in the last FAILURE_WINDOW_DAYS. */
+  recentCount: number
+  recentFailed: number
 }
+
+/** How far back the admin usage failure count looks. */
+export const FAILURE_WINDOW_DAYS = 30
+const DAY_MS = 24 * 60 * 60 * 1000
 
 /** The 12 full calendar months (UTC) before the one `now` is in: what the monthly average covers. */
 export function averageWindow(now: Date): { start: Date; end: Date } {
@@ -419,13 +427,17 @@ export class ApiKeyUsageService {
           averageMonthlySends: history
             ? averageMonthlySends(history.windowCount, history.firstSentAt, window)
             : null,
+          recipientsLast30Days: history?.recentCount ?? 0,
+          failedLast30Days: history?.recentFailed ?? 0,
         }
       }),
     )
   }
 
   /**
-   * When each tenant last sent on each channel, and how much it sent in the average's window.
+   * When each tenant last sent on each channel, how much it sent in the average's window, and
+   * how many recipients failed recently. Failed means status `failed`: blocked (safelist) and
+   * quarantined (malware) are outcomes of their own, not delivery failures.
    * Read from the per-recipient records rather than usage rows, so sends made from the UI
    * count as well as those made with an API key.
    */
@@ -440,16 +452,27 @@ export class ApiKeyUsageService {
       last_sent_at: Date
       first_sent_at: Date
       window_count: string
+      recent_count: string
+      recent_failed: string
     }> = await this.tenantRepository.query(
       `SELECT r.tenant_id, d.channel,
               MAX(d.created_at) AS last_sent_at,
               MIN(d.created_at) AS first_sent_at,
-              COUNT(*) FILTER (WHERE d.created_at >= $3 AND d.created_at < $4) AS window_count
+              COUNT(*) FILTER (WHERE d.created_at >= $3 AND d.created_at < $4) AS window_count,
+              COUNT(*) FILTER (WHERE d.created_at >= $5) AS recent_count,
+              COUNT(*) FILTER (WHERE d.created_at >= $5 AND d.status = $6) AS recent_failed
          FROM notify.notification_request_detail d
          JOIN notify.notification_request r ON r.id = d.notification_request_id
         WHERE r.tenant_id = ANY($1) AND d.channel = ANY($2)
         GROUP BY r.tenant_id, d.channel`,
-      [tenantIds, channels, window.start, window.end],
+      [
+        tenantIds,
+        channels,
+        window.start,
+        window.end,
+        new Date(Date.now() - FAILURE_WINDOW_DAYS * DAY_MS),
+        NotificationStatus.FAILED,
+      ],
     )
     return new Map(
       rows.map((row) => [
@@ -458,6 +481,8 @@ export class ApiKeyUsageService {
           lastSentAt: new Date(row.last_sent_at),
           firstSentAt: new Date(row.first_sent_at),
           windowCount: Number(row.window_count),
+          recentCount: Number(row.recent_count),
+          recentFailed: Number(row.recent_failed),
         },
       ]),
     )
@@ -799,7 +824,10 @@ function toUsageRow(
   channel: string,
   limits: LimitRow | undefined,
   usage: WindowUsage | undefined,
-): Omit<AdminTenantUsageRowDto, 'lastSentAt' | 'averageMonthlySends'> {
+): Omit<
+  AdminTenantUsageRowDto,
+  'lastSentAt' | 'averageMonthlySends' | 'recipientsLast30Days' | 'failedLast30Days'
+> {
   return {
     tenantId: tenant.id,
     tenantName: tenant.name,

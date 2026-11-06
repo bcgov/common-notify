@@ -120,6 +120,18 @@ export class AdminTenantUsageRowDto {
     type: Number,
   })
   averageMonthlySends: number | null
+
+  @ApiProperty({
+    description: 'Recipients sent to on this channel in the last 30 days',
+    example: 3100,
+  })
+  recipientsLast30Days: number
+
+  @ApiProperty({
+    description: 'Of those, recipients whose delivery failed. Excludes blocked and quarantined.',
+    example: 12,
+  })
+  failedLast30Days: number
 }
 
 /**

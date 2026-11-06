@@ -160,24 +160,7 @@ describe('System', () => {
     expect(screen.getAllByText('Nothing has needed recovering.')).not.toHaveLength(0)
   })
 
-  it('shows each provider sending normally, with CHES requests in flight', async () => {
-    mockedGet.mockResolvedValue(snapshot())
-    render(<System />)
-
-    expect(
-      await screen.findByRole('heading', { level: 3, name: 'CHES (Email)' }),
-    ).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 3, name: 'ACS (SMS)' })).toBeInTheDocument()
-    // Each provider's status is on the Overview, so the section doesn't repeat it.
-    expect(within(sectionTitled('Delivery providers')).queryByText('Healthy')).toBeNull()
-    expect(screen.getAllByText('Sending to provider')).toHaveLength(2)
-    expect(screen.getAllByText('Yes')).toHaveLength(2)
-    expect(screen.getByText('3 of 5')).toBeInTheDocument()
-    // ACS has no concurrency cap, so no in-flight tile.
-    expect(screen.getAllByText('Requests in flight')).toHaveLength(1)
-  })
-
-  it('raises a paused provider in the banner and in its card', async () => {
+  it('raises a paused provider in the banner, with no provider section of its own', async () => {
     const data = snapshot()
     data.providers = [
       data.providers[0],
@@ -197,10 +180,8 @@ describe('System', () => {
         'ACS (SMS): Failing; sends are waiting, and resume once a test send succeeds',
       ),
     ).toBeInTheDocument()
-    expect(screen.getByText('Paused: provider failing')).toBeInTheDocument()
-    expect(screen.getByText(/^Test send at /)).toBeInTheDocument()
-    // The details are on this page, so the banner doesn't link to it.
-    expect(screen.queryByRole('link', { name: 'View System' })).not.toBeInTheDocument()
+    // Provider status is on the Overview; the banner carries anything wrong with one.
+    expect(screen.queryByRole('heading', { name: 'Delivery providers' })).not.toBeInTheDocument()
   })
 
   it('shows Redis details, without the internals only an operator would read', async () => {

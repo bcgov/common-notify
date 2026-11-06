@@ -44,6 +44,8 @@ const row = {
   rateLimitPerMinute: 10,
   lastSentAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
   averageMonthlySends: 1240,
+  recipientsLast30Days: 3000,
+  failedLast30Days: 12,
 }
 let usageState: ReturnType<typeof reducer>
 function setup(overrides = {}, roles = ['NOTIFY_OPERATIONS_ADMIN']) {
@@ -100,6 +102,8 @@ describe('AdminUsage', () => {
       usedThisYear: 0,
       lastSentAt: null,
       averageMonthlySends: null,
+      recipientsLast30Days: 0,
+      failedLast30Days: 0,
     }
     setup({ adminRows: [unset], adminCount: 1 })
     const tenantRow = screen.getByRole('row', { name: /Test Tenant/ })
@@ -111,6 +115,7 @@ describe('AdminUsage', () => {
       'Sms',
       'Never',
       '—No full month of sending yet',
+      '0',
       '0 / Not set',
       '0 / Not set',
       'Not set',
@@ -125,6 +130,7 @@ describe('AdminUsage', () => {
     expect(lastSent.tagName).toBe('TIME')
     expect(lastSent).toHaveAttribute('dateTime', row.lastSentAt)
     expect(within(tenantRow).getByText('1,240')).toBeInTheDocument()
+    expect(within(tenantRow).getByText('12 (0.4%)')).toBeInTheDocument()
   })
   it('shows loading instead of empty content', () => {
     setup({ adminLoading: true })

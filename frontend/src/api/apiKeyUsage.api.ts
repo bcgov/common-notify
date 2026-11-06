@@ -57,6 +57,9 @@ export interface AdminTenantUsageRow {
   lastSentAt: string | null
   /** Recipients per month over the last 12 full months; null with no full month yet. */
   averageMonthlySends: number | null
+  /** Recipients sent to on this channel in the last 30 days, and how many of them failed. */
+  recipientsLast30Days: number
+  failedLast30Days: number
 }
 
 export interface PaginatedAdminUsageResponse {

@@ -14,19 +14,6 @@
   font-weight: 700;
 }
 
-// One delivery provider: its name, any reasons, then its tiles.
-.queue-monitoring__provider {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-sm;
-}
-
-.queue-monitoring__provider-name {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 700;
-}
-
 .queue-monitoring__memory-caption {
   @include flex-between;
   font-size: $font-size-sm;

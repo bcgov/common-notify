@@ -274,6 +274,8 @@ describe('ApiKeyUsageService.getAllTenantsUsage', () => {
         last_sent_at: new Date('2026-11-03T17:20:00.000Z'),
         first_sent_at: new Date('2020-01-01T00:00:00.000Z'),
         window_count: '1200',
+        recent_count: '310',
+        recent_failed: '4',
       },
     ],
   } = {}) {
@@ -342,6 +344,8 @@ describe('ApiKeyUsageService.getAllTenantsUsage', () => {
       usedThisYear: 0,
       lastSentAt: null,
       averageMonthlySends: null,
+      recipientsLast30Days: 0,
+      failedLast30Days: 0,
     })
     expect(data.find((row) => row.tenantId === 't-1' && row.channel === 'SMS')).toMatchObject({
       dailyLimit: 500,
@@ -350,7 +354,20 @@ describe('ApiKeyUsageService.getAllTenantsUsage', () => {
       usedToday: 42,
       lastSentAt: '2026-11-03T17:20:00.000Z',
       averageMonthlySends: 100,
+      recipientsLast30Days: 310,
+      failedLast30Days: 4,
     })
+  })
+
+  it('counts failures over the last 30 days by the failed status only', async () => {
+    const { service, tenantRepository } = setup()
+
+    await service.getAllTenantsUsage(parsed())
+
+    const [, params] = tenantRepository.query.mock.calls[0] as [string, unknown[]]
+    const since = params[4] as Date
+    expect(Date.now() - since.getTime()).toBeCloseTo(30 * 24 * 60 * 60 * 1000, -4)
+    expect(params[5]).toBe('failed')
   })
 
   it('keeps every tenant when filtered by channel, narrowing only their rows', async () => {

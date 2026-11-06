@@ -20,7 +20,7 @@ import UsageCell from '@/components/UsageCell'
 import EditModal from '@/components/EditModal'
 import NumberInputField from '@/components/NumberInputField'
 import { showSuccessToast, showErrorToast } from '@/redux/utils/toastUtils'
-import { adoptionSummaryText, formatChannel, formatLastSent } from '@/utils/usage'
+import { adoptionSummaryText, formatChannel, formatFailures, formatLastSent } from '@/utils/usage'
 
 const rowKeyOf = (row: AdminTenantUsageRow) => `${row.tenantId}-${row.channel}`
 
@@ -160,6 +160,15 @@ const AdminUsage: FC = () => {
         ) : (
           <span>{row.averageMonthlySends.toLocaleString()}</span>
         ),
+    },
+    {
+      key: 'failedLast30Days',
+      label: 'Failed (30 days)',
+      render: (_, row) => (
+        <span className={row.failedLast30Days > 0 ? 'text-danger fw-semibold' : undefined}>
+          {formatFailures(row.failedLast30Days, row.recipientsLast30Days)}
+        </span>
+      ),
     },
     {
       key: 'dailyLimit',

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { adoptionSummaryText, formatChannel, formatLastSent, percentOf } from './usage'
+import {
+  adoptionSummaryText,
+  formatChannel,
+  formatFailures,
+  formatLastSent,
+  percentOf,
+} from './usage'
 
 describe('formatChannel', () => {
   it('title-cases a channel code', () => {
@@ -50,5 +56,16 @@ describe('formatLastSent', () => {
     ['2026-08-15T18:00:00Z', 'Aug 15, 2026'],
   ])('describes %s as %s', (iso, expected) => {
     expect(formatLastSent(iso, now)).toBe(expected)
+  })
+})
+
+describe('formatFailures', () => {
+  it.each([
+    [0, 0, '0'],
+    [0, 500, '0'],
+    [12, 3000, '12 (0.4%)'],
+    [1500, 3000, '1,500 (50%)'],
+  ])('%i of %i → %s', (failed, recipients, expected) => {
+    expect(formatFailures(failed, recipients)).toBe(expected)
   })
 })
