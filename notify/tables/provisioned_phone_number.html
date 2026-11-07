@@ -401,12 +401,12 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td>chk_provisioned_phone_number_allocation</td>
-                                    <td>(((tenant_id IS NULL) AND (allocated_at IS NULL)) OR ((tenant_id IS NOT NULL) AND (allocated_at IS NOT NULL)))</td>
-                                </tr>
-                                <tr>
                                     <td>chk_provisioned_phone_number_e164</td>
                                     <td>((phone_number)::text ~ &#39;^\+[1-9][0-9]{1,14}$&#39;::text)</td>
+                                </tr>
+                                <tr>
+                                    <td>chk_provisioned_phone_number_allocation</td>
+                                    <td>(((tenant_id IS NULL) AND (allocated_at IS NULL)) OR ((tenant_id IS NOT NULL) AND (allocated_at IS NOT NULL)))</td>
                                 </tr>
                                 </tbody>
                             </table>

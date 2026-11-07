@@ -581,6 +581,24 @@
             <column ascending="true" name="code"/>
          </index>
       </table>
+      <table name="feature_flag_history" remarks="Audit trail of feature flag changes: one row when a flag is created and one each time it is enabled or disabled. Append-only." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="feature_flag_id" nullable="false" remarks="The feature_flag row that changed. Not a foreign key: the row may since have been deleted." size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="code" nullable="false" remarks="feature_flag.code at the time of the change, so the row is readable after the flag is deleted." size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="tenant_id" nullable="true" remarks="feature_flag.tenant_id at the time of the change; NULL for a global flag. Not a foreign key: the tenant may since have been deleted." size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="enabled" nullable="false" remarks="Value of feature_flag.enabled after the change. A row is only written when the value changes, so the value before was the opposite." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="created_by" nullable="false" remarks="Stable identifier of the user who made the change (JWT preferred_username), matching feature_flag.updated_by." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="created_by_name" nullable="true" remarks="Display name of the user at the time of the change (JWT display_name), for showing in the admin UI. NULL if the token carried none." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="7" name="created_at" nullable="false" remarks="When the change was made." size="35" type="timestamptz" typeCode="93"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="feature_flag_history_pkey" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_feature_flag_history_flag_created_at" unique="false">
+            <column ascending="true" name="feature_flag_id"/>
+            <column ascending="false" name="created_at"/>
+         </index>
+      </table>
       <table name="flyway_schema_history" remarks="" schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="installed_rank" nullable="false" remarks="" size="10" type="int4" typeCode="4"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="version" nullable="true" remarks="" size="50" type="varchar" typeCode="12"/>

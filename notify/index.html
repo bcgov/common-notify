@@ -78,7 +78,7 @@
                         <div class="col-md-12">
                             <div class="callout callout-info">
                                 <h4>SchemaSpy Analysis of default.notify</h4>
-                                <p>Generated on Sat Oct 31 11:07 GMT 2026</p>
+                                <p>Generated on Sat Nov 07 11:07 GMT 2026</p>
                             </div>
                         </div>
                     </div>
@@ -94,7 +94,7 @@
                                 <span class="info-box-icon bg-aqua"><i class="fa fa-table"></i></span>
                                 <div class="info-box-content">
                                     <span class="info-box-text">TABLES</span>
-                                    <span class="info-box-number">48</span>
+                                    <span class="info-box-number">49</span>
                                 </div>
                                 <!-- /.info-box-content -->
                             </div>
@@ -118,7 +118,7 @@
                                 <span class="info-box-icon bg-green"><span class="glyphicon glyphicon-list-alt" aria-hidden="true"></span></span>
                                 <div class="info-box-content">
                                     <span class="info-box-text">COLUMNS</span>
-                                    <span class="info-box-number">447</span>
+                                    <span class="info-box-number">455</span>
                                 </div>
                                 <!-- /.info-box-content -->
                             </div>
@@ -206,15 +206,6 @@
                                         <td class="comment detail" style="display: table-cell;"></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
-                                        <td class="detail"><a href="tables/attachment.html">attachment</a></td>
-                                        <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">1</td>
-                                        <td class="detail" align="right">11</td>
-                                        <td class="detail" align="right">-1</td>
-                                        <td class="detail" align="right">Table</td>
-                                        <td class="comment detail" style="display: table-cell;"></td>
-                                    </tr>
-                                    <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/event_channel_setting.html">event_channel_setting</a></td>
                                         <td class="detail" align="right">4</td>
                                         <td class="detail" align="right">5</td>
@@ -278,15 +269,6 @@
                                         <td class="comment detail" style="display: table-cell;"></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
-                                        <td class="detail"><a href="tables/email_logo.html">email_logo</a></td>
-                                        <td class="detail" align="right">2</td>
-                                        <td class="detail" align="right">3</td>
-                                        <td class="detail" align="right">14</td>
-                                        <td class="detail" align="right">24</td>
-                                        <td class="detail" align="right">Table</td>
-                                        <td class="comment detail" style="display: table-cell;"><p>Email logo metadata for system-provided and tenant-provided logos.</p></td>
-                                    </tr>
-                                    <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/email_logo_status_code.html">email_logo_status_code</a></td>
                                         <td class="detail" align="right">1</td>
                                         <td class="detail" align="right">0</td>
@@ -305,33 +287,6 @@
                                         <td class="comment detail" style="display: table-cell;"><p>Code table for notification event types. Defines all valid events that can trigger notifications.</p></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
-                                        <td class="detail"><a href="tables/provisioned_phone_number.html">provisioned_phone_number</a></td>
-                                        <td class="detail" align="right">1</td>
-                                        <td class="detail" align="right">1</td>
-                                        <td class="detail" align="right">11</td>
-                                        <td class="detail" align="right">-1</td>
-                                        <td class="detail" align="right">Table</td>
-                                        <td class="comment detail" style="display: table-cell;"><p>Pool of SMS phone numbers provisioned from the SMS provider. A row with tenant_id NULL is available for allocation; a row with tenant_id set is allocated to that tenant. A tenant holds at most one live number and all of its SMS events send from it.</p></td>
-                                    </tr>
-                                    <tr class="tbl even" valign="top">
-                                        <td class="detail"><a href="tables/notification_status_code.html">notification_status_code</a></td>
-                                        <td class="detail" align="right">2</td>
-                                        <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">8</td>
-                                        <td class="detail" align="right">-1</td>
-                                        <td class="detail" align="right">Table</td>
-                                        <td class="comment detail" style="display: table-cell;"><p>Lookup table for notification request statuses</p></td>
-                                    </tr>
-                                    <tr class="tbl even" valign="top">
-                                        <td class="detail"><a href="tables/event_channel_cstar_group.html">event_channel_cstar_group</a></td>
-                                        <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">4</td>
-                                        <td class="detail" align="right">10</td>
-                                        <td class="detail" align="right">-1</td>
-                                        <td class="detail" align="right">Table</td>
-                                        <td class="comment detail" style="display: table-cell;"><p>CSTAR groups an event channel is addressed to, one row per group per recipient list. Only the group ID is stored; the members behind it are resolved from CSTAR at send time, so a group gaining or losing people needs no change here. A list may hold any number of groups, and may hold groups alongside the manually entered addresses in notify.event_channel_recipient.</p></td>
-                                    </tr>
-                                    <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/email_logo_source_code.html">email_logo_source_code</a></td>
                                         <td class="detail" align="right">1</td>
                                         <td class="detail" align="right">0</td>
@@ -348,15 +303,6 @@
                                         <td class="detail" align="right">-1</td>
                                         <td class="detail" align="right">Table</td>
                                         <td class="comment detail" style="display: table-cell;"><p>Templates for notifications. Each template is scoped to a tenant and can be used to render notifications across different channels.</p></td>
-                                    </tr>
-                                    <tr class="tbl even" valign="top">
-                                        <td class="detail"><a href="tables/feature_flag.html">feature_flag</a></td>
-                                        <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">2</td>
-                                        <td class="detail" align="right">8</td>
-                                        <td class="detail" align="right">-1</td>
-                                        <td class="detail" align="right">Table</td>
-                                        <td class="comment detail" style="display: table-cell;"><p>Feature flags table - enables/disables features dynamically without redeployment. Supports global flags (tenant_id = NULL) and per-tenant overrides. Resolution strategy: tenant-specific flag &gt; global flag &gt; default false.</p></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/identity_provider.html">identity_provider</a></td>
@@ -386,15 +332,6 @@
                                         <td class="comment detail" style="display: table-cell;"><p>Code table for the recipient lists an event channel can address (to, cc, bcc).</p></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
-                                        <td class="detail"><a href="tables/api_key_limit.html">api_key_limit</a></td>
-                                        <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">2</td>
-                                        <td class="detail" align="right">10</td>
-                                        <td class="detail" align="right">-1</td>
-                                        <td class="detail" align="right">Table</td>
-                                        <td class="comment detail" style="display: table-cell;"><p>Configured numeric notification limits per (API key, channel). Populated once when an API key is linked to a tenant during onboarding.</p></td>
-                                    </tr>
-                                    <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/template_version.html">template_version</a></td>
                                         <td class="detail" align="right">0</td>
                                         <td class="detail" align="right">3</td>
@@ -402,15 +339,6 @@
                                         <td class="detail" align="right">-1</td>
                                         <td class="detail" align="right">Table</td>
                                         <td class="comment detail" style="display: table-cell;"><p>Historical versions of templates. Allows tracking changes and rolling back to previous versions.</p></td>
-                                    </tr>
-                                    <tr class="tbl even" valign="top">
-                                        <td class="detail"><a href="tables/event_channel_setting_history.html">event_channel_setting_history</a></td>
-                                        <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">6</td>
-                                        <td class="detail" align="right">-1</td>
-                                        <td class="detail" align="right">Table</td>
-                                        <td class="comment detail" style="display: table-cell;"><p>Immutable audit log of changes to event_channel_setting: activation, sender, template and header changes. Each row is a full snapshot after INSERT/UPDATE.</p></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/feature_flag_code.html">feature_flag_code</a></td>
@@ -422,24 +350,6 @@
                                         <td class="comment detail" style="display: table-cell;"><p>Lookup table for valid feature flag codes. Defines all available features that can be toggled. Prevents typos and ensures consistency across backend/frontend. Follows notification_channel_code pattern.</p></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
-                                        <td class="detail"><a href="tables/recipient_safelist.html">recipient_safelist</a></td>
-                                        <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">2</td>
-                                        <td class="detail" align="right">11</td>
-                                        <td class="detail" align="right">-1</td>
-                                        <td class="detail" align="right">Table</td>
-                                        <td class="comment detail" style="display: table-cell;"><p>Per-tenant list of recipients that may be sent to in non-production environments, where the recipient_safelist feature flag is enabled. Equivalent to GC Notify service_safelist. Ignored in PROD, where the flag is off.</p></td>
-                                    </tr>
-                                    <tr class="tbl even" valign="top">
-                                        <td class="detail"><a href="tables/notification_channel_code.html">notification_channel_code</a></td>
-                                        <td class="detail" align="right">10</td>
-                                        <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">9</td>
-                                        <td class="detail" align="right">2</td>
-                                        <td class="detail" align="right">Table</td>
-                                        <td class="comment detail" style="display: table-cell;"><p>Code table for notification channel types. Channel codes are uppercase (EMAIL, SMS). This ensures consistency with the NotificationChannel TypeScript enum.</p></td>
-                                    </tr>
-                                    <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/api_key_limit_alert.html">api_key_limit_alert</a></td>
                                         <td class="detail" align="right">0</td>
                                         <td class="detail" align="right">2</td>
@@ -447,15 +357,6 @@
                                         <td class="detail" align="right">-1</td>
                                         <td class="detail" align="right">Table</td>
                                         <td class="comment detail" style="display: table-cell;"><p>Per-(API key, channel) limit-alert configuration. Seeded when an API key is bound to a tenant. Holds the warning threshold and an enabled flag; the 100% (limit reached) alert always fires.</p></td>
-                                    </tr>
-                                    <tr class="tbl even" valign="top">
-                                        <td class="detail"><a href="tables/client_tenant_mapping.html">client_tenant_mapping</a></td>
-                                        <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">1</td>
-                                        <td class="detail" align="right">9</td>
-                                        <td class="detail" align="right">-1</td>
-                                        <td class="detail" align="right">Table</td>
-                                        <td class="comment detail" style="display: table-cell;"><p>Maps API Gateway client IDs to CSTAR tenants. Enables service-to-service access by linking OAuth2 client credentials (from API Portal) to authorized tenants. One client can access multiple tenants.</p></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/configuration.html">configuration</a></td>
@@ -476,24 +377,6 @@
                                         <td class="comment detail" style="display: table-cell;"><p>Code table for allowed attachment MIME types. Defines which MIME types can be used for inline attachments in notification requests.</p></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
-                                        <td class="detail"><a href="tables/event_channel_recipient_history.html">event_channel_recipient_history</a></td>
-                                        <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">6</td>
-                                        <td class="detail" align="right">-1</td>
-                                        <td class="detail" align="right">Table</td>
-                                        <td class="comment detail" style="display: table-cell;"><p>Immutable audit log of changes to event_channel_recipient - who was added to or removed from an event, and by whom. Removal is a soft delete, so it appears here as an UPDATE.</p></td>
-                                    </tr>
-                                    <tr class="tbl even" valign="top">
-                                        <td class="detail"><a href="tables/event_channel_cstar_group_history.html">event_channel_cstar_group_history</a></td>
-                                        <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">6</td>
-                                        <td class="detail" align="right">-1</td>
-                                        <td class="detail" align="right">Table</td>
-                                        <td class="comment detail" style="display: table-cell;"><p>Immutable audit log of changes to event_channel_cstar_group - which groups were added to or removed from an event, and by whom. Removal is a soft delete, so it appears here as an UPDATE.</p></td>
-                                    </tr>
-                                    <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/provisioned_phone_number_history.html">provisioned_phone_number_history</a></td>
                                         <td class="detail" align="right">0</td>
                                         <td class="detail" align="right">0</td>
@@ -503,13 +386,13 @@
                                         <td class="comment detail" style="display: table-cell;"><p>Immutable audit log of changes to provisioned_phone_number. Each row is a full snapshot after INSERT/UPDATE, populated by the notify.audit_history() trigger. Allocation to a tenant and release back to the pool are both UPDATE rows.</p></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
-                                        <td class="detail"><a href="tables/tenant.html">tenant</a></td>
-                                        <td class="detail" align="right">11</td>
-                                        <td class="detail" align="right">1</td>
-                                        <td class="detail" align="right">10</td>
+                                        <td class="detail"><a href="tables/feature_flag_history.html">feature_flag_history</a></td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">8</td>
                                         <td class="detail" align="right">-1</td>
                                         <td class="detail" align="right">Table</td>
-                                        <td class="comment detail" style="display: table-cell;"><p>Represents an organization or service using BC Notify. All data in the system is scoped under a tenant.</p></td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Audit trail of feature flag changes: one row when a flag is created and one each time it is enabled or disabled. Append-only.</p></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/recipient_safelist_history.html">recipient_safelist_history</a></td>
@@ -528,15 +411,6 @@
                                         <td class="detail" align="right">-1</td>
                                         <td class="detail" align="right">Table</td>
                                         <td class="comment detail" style="display: table-cell;"><p>Tracks each webhook delivery attempt, including HTTP status, response body, retry scheduling, and final delivery status.</p></td>
-                                    </tr>
-                                    <tr class="tbl even" valign="top">
-                                        <td class="detail"><a href="tables/channel_recipient_kind.html">channel_recipient_kind</a></td>
-                                        <td class="detail" align="right">4</td>
-                                        <td class="detail" align="right">2</td>
-                                        <td class="detail" align="right">6</td>
-                                        <td class="detail" align="right">-1</td>
-                                        <td class="detail" align="right">Table</td>
-                                        <td class="comment detail" style="display: table-cell;"><p>Which recipient lists each notification channel supports. EMAIL carries to/cc/bcc; SMS carries to only. event_channel_recipient references this pair, so an unsupported combination cannot be stored.</p></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/notify_user.html">notify_user</a></td>
@@ -575,6 +449,159 @@
                                         <td class="comment detail" style="display: table-cell;"><p>Defines webhook types that determine the payload format sent to the webhook endpoint.</p></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/notification_request.html">notification_request</a></td>
+                                        <td class="detail" align="right">3</td>
+                                        <td class="detail" align="right">3</td>
+                                        <td class="detail" align="right">16</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Stores all incoming notification requests for auditing and tracking</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/usage_period_type_code.html">usage_period_type_code</a></td>
+                                        <td class="detail" align="right">2</td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">8</td>
+                                        <td class="detail" align="right">3</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Code table for usage counter granularity. Defines the valid window types for api_key_usage buckets and limit checks.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/attachment.html">attachment</a></td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">1</td>
+                                        <td class="detail" align="right">11</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/email_logo.html">email_logo</a></td>
+                                        <td class="detail" align="right">2</td>
+                                        <td class="detail" align="right">3</td>
+                                        <td class="detail" align="right">14</td>
+                                        <td class="detail" align="right">24</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Email logo metadata for system-provided and tenant-provided logos.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/provisioned_phone_number.html">provisioned_phone_number</a></td>
+                                        <td class="detail" align="right">1</td>
+                                        <td class="detail" align="right">1</td>
+                                        <td class="detail" align="right">11</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Pool of SMS phone numbers provisioned from the SMS provider. A row with tenant_id NULL is available for allocation; a row with tenant_id set is allocated to that tenant. A tenant holds at most one live number and all of its SMS events send from it.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/notification_status_code.html">notification_status_code</a></td>
+                                        <td class="detail" align="right">2</td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">8</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Lookup table for notification request statuses</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/event_channel_cstar_group.html">event_channel_cstar_group</a></td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">4</td>
+                                        <td class="detail" align="right">10</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>CSTAR groups an event channel is addressed to, one row per group per recipient list. Only the group ID is stored; the members behind it are resolved from CSTAR at send time, so a group gaining or losing people needs no change here. A list may hold any number of groups, and may hold groups alongside the manually entered addresses in notify.event_channel_recipient.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/feature_flag.html">feature_flag</a></td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">2</td>
+                                        <td class="detail" align="right">8</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Feature flags table - enables/disables features dynamically without redeployment. Supports global flags (tenant_id = NULL) and per-tenant overrides. Resolution strategy: tenant-specific flag &gt; global flag &gt; default false.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/api_key_limit.html">api_key_limit</a></td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">2</td>
+                                        <td class="detail" align="right">10</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Configured numeric notification limits per (API key, channel). Populated once when an API key is linked to a tenant during onboarding.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/event_channel_setting_history.html">event_channel_setting_history</a></td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">6</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Immutable audit log of changes to event_channel_setting: activation, sender, template and header changes. Each row is a full snapshot after INSERT/UPDATE.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/recipient_safelist.html">recipient_safelist</a></td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">2</td>
+                                        <td class="detail" align="right">11</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Per-tenant list of recipients that may be sent to in non-production environments, where the recipient_safelist feature flag is enabled. Equivalent to GC Notify service_safelist. Ignored in PROD, where the flag is off.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/notification_channel_code.html">notification_channel_code</a></td>
+                                        <td class="detail" align="right">10</td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">9</td>
+                                        <td class="detail" align="right">2</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Code table for notification channel types. Channel codes are uppercase (EMAIL, SMS). This ensures consistency with the NotificationChannel TypeScript enum.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/client_tenant_mapping.html">client_tenant_mapping</a></td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">1</td>
+                                        <td class="detail" align="right">9</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Maps API Gateway client IDs to CSTAR tenants. Enables service-to-service access by linking OAuth2 client credentials (from API Portal) to authorized tenants. One client can access multiple tenants.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/event_channel_recipient_history.html">event_channel_recipient_history</a></td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">6</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Immutable audit log of changes to event_channel_recipient - who was added to or removed from an event, and by whom. Removal is a soft delete, so it appears here as an UPDATE.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/event_channel_cstar_group_history.html">event_channel_cstar_group_history</a></td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">0</td>
+                                        <td class="detail" align="right">6</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Immutable audit log of changes to event_channel_cstar_group - which groups were added to or removed from an event, and by whom. Removal is a soft delete, so it appears here as an UPDATE.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/tenant.html">tenant</a></td>
+                                        <td class="detail" align="right">11</td>
+                                        <td class="detail" align="right">1</td>
+                                        <td class="detail" align="right">10</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Represents an organization or service using BC Notify. All data in the system is scoped under a tenant.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
+                                        <td class="detail"><a href="tables/channel_recipient_kind.html">channel_recipient_kind</a></td>
+                                        <td class="detail" align="right">4</td>
+                                        <td class="detail" align="right">2</td>
+                                        <td class="detail" align="right">6</td>
+                                        <td class="detail" align="right">-1</td>
+                                        <td class="detail" align="right">Table</td>
+                                        <td class="comment detail" style="display: table-cell;"><p>Which recipient lists each notification channel supports. EMAIL carries to/cc/bcc; SMS carries to only. event_channel_recipient references this pair, so an unsupported combination cannot be stored.</p></td>
+                                    </tr>
+                                    <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/notification_event_history.html">notification_event_history</a></td>
                                         <td class="detail" align="right">0</td>
                                         <td class="detail" align="right">0</td>
@@ -602,15 +629,6 @@
                                         <td class="comment detail" style="display: table-cell;"><p>Code table for template rendering engines. Defines all valid engines for template rendering.</p></td>
                                     </tr>
                                     <tr class="tbl even" valign="top">
-                                        <td class="detail"><a href="tables/notification_request.html">notification_request</a></td>
-                                        <td class="detail" align="right">3</td>
-                                        <td class="detail" align="right">3</td>
-                                        <td class="detail" align="right">16</td>
-                                        <td class="detail" align="right">-1</td>
-                                        <td class="detail" align="right">Table</td>
-                                        <td class="comment detail" style="display: table-cell;"><p>Stores all incoming notification requests for auditing and tracking</p></td>
-                                    </tr>
-                                    <tr class="tbl even" valign="top">
                                         <td class="detail"><a href="tables/api_key_consumer.html">api_key_consumer</a></td>
                                         <td class="detail" align="right">4</td>
                                         <td class="detail" align="right">1</td>
@@ -618,15 +636,6 @@
                                         <td class="detail" align="right">-1</td>
                                         <td class="detail" align="right">Table</td>
                                         <td class="comment detail" style="display: table-cell;"></td>
-                                    </tr>
-                                    <tr class="tbl even" valign="top">
-                                        <td class="detail"><a href="tables/usage_period_type_code.html">usage_period_type_code</a></td>
-                                        <td class="detail" align="right">2</td>
-                                        <td class="detail" align="right">0</td>
-                                        <td class="detail" align="right">8</td>
-                                        <td class="detail" align="right">3</td>
-                                        <td class="detail" align="right">Table</td>
-                                        <td class="comment detail" style="display: table-cell;"><p>Code table for usage counter granularity. Defines the valid window types for api_key_usage buckets and limit checks.</p></td>
                                     </tr>
                             </table>
                         </div>

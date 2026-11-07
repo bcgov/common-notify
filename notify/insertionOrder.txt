@@ -39,6 +39,7 @@ event_channel_recipient
 event_channel_cstar_group_history
 event_channel_recipient_history
 event_channel_setting_history
+feature_flag_history
 flyway_schema_history
 mime_type_code
 notification_event_history
