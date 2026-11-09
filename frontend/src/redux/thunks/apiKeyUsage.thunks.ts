@@ -53,12 +53,18 @@ export const fetchAllTenantsUsage = createAsyncThunk<
   { state: RootState; rejectValue: string }
 >('apiKeyUsage/fetchAllTenants', async (_, { getState, rejectWithValue }) => {
   try {
-    const { adminPage, adminLimit, adminSearch, adminFilters } = getState().apiKeyUsage
+    const { adminPage, adminLimit, adminSearch, adminFilters, adminSortBy, adminSortOrder } =
+      getState().apiKeyUsage
+    const sort =
+      adminSortBy && adminSortOrder
+        ? `${adminSortOrder === 'desc' ? '-' : ''}${adminSortBy}`
+        : undefined
     return await getAllTenantsUsage(
       adminPage,
       adminLimit,
       adminSearch || undefined,
       toFilterParams(adminFilters),
+      sort,
     )
   } catch (error) {
     return rejectWithValue(error instanceof Error ? error.message : 'Failed to load tenant usage')

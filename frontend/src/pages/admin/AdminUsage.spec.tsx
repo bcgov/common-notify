@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, userEvent, waitFor, fireEvent, within } from '@/test-utils'
-import reducer, { setAdminFilter, setAdminSearch } from '@/redux/slices/apiKeyUsage.slice'
+import reducer, {
+  setAdminFilter,
+  setAdminSearch,
+  setAdminSort,
+} from '@/redux/slices/apiKeyUsage.slice'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import AdminUsage from './AdminUsage'
 import { updateTenantLimits } from '@/redux/thunks/apiKeyUsage.thunks'
@@ -270,6 +274,27 @@ describe('AdminUsage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Apply' }))
     expect(mocks.dispatch).toHaveBeenCalledWith(
       setAdminFilter({ field: 'status', values: ['disabled'] }),
+    )
+  })
+  it.each([
+    ['Failed (30 days)', 'failedLast30Days'],
+    ['Daily', 'usedToday'],
+    ['Annual (fiscal year)', 'usedThisYear'],
+  ])('sorts tenants by %s', async (column, sortBy) => {
+    setup({ adminRows: [row], adminCount: 1 })
+    await userEvent.click(screen.getByRole('button', { name: `Column options for ${column}` }))
+    await userEvent.click(screen.getByRole('menuitem', { name: /High to Low/ }))
+    expect(mocks.dispatch).toHaveBeenCalledWith(setAdminSort({ sortBy, sortOrder: 'desc' }))
+  })
+  it('marks the sorted column', () => {
+    setup({ adminRows: [row], adminCount: 1, adminSortBy: 'usedToday', adminSortOrder: 'asc' })
+    expect(screen.getByRole('columnheader', { name: /Daily/ })).toHaveAttribute(
+      'aria-sort',
+      'ascending',
+    )
+    expect(screen.getByRole('columnheader', { name: /Annual/ })).toHaveAttribute(
+      'aria-sort',
+      'none',
     )
   })
   it('offers to clear a channel filter that matches no tenants', async () => {

@@ -134,6 +134,12 @@ describe('apiKeyUsage API', () => {
       ['filter', 'channel:in:EMAIL|SMS'],
       ['filter', 'status:in:x'],
     ])
+    await api.getAllTenantsUsage(1, 15, undefined, undefined, '-usedToday')
+    expect(lastQuery()).toEqual([
+      ['page', '1'],
+      ['limit', '15'],
+      ['sort', '-usedToday'],
+    ])
   })
   it('getAdminUsageSummary reads the summary endpoint and translates failures', async () => {
     await expect(api.getAdminUsageSummary()).resolves.toEqual({ ok: true })

@@ -54,7 +54,7 @@ describe('useTenantlessAdmin', () => {
   })
 
   it('leaves an admin with no tenants where they are inside the admin section', () => {
-    expect(run({ pathname: '/admin/usage' })).toBe(true)
+    expect(run({ pathname: '/admin/tenants' })).toBe(true)
     expect(router.navigate).not.toHaveBeenCalled()
   })
 

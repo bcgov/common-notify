@@ -229,6 +229,7 @@ describe('ApiKeyUsageService.getAllTenantsUsage', () => {
   function fakeQueryBuilder(result: { many?: unknown[]; manyAndCount?: [unknown[], number] }) {
     const where: Array<[string, Record<string, unknown> | undefined]> = []
     const calls: Record<string, unknown[]> = {}
+    const log: Array<[string, ...unknown[]]> = []
     const qb: Record<string, unknown> = new Proxy(
       {},
       {
@@ -243,12 +244,13 @@ describe('ApiKeyUsageService.getAllTenantsUsage', () => {
           if (prop === 'getManyAndCount') return () => Promise.resolve(result.manyAndCount)
           return (...args: unknown[]) => {
             calls[prop] = args
+            log.push([prop, ...args])
             return qb
           }
         },
       },
     )
-    return { qb, where, calls }
+    return { qb, where, calls, log }
   }
 
   const active = {
@@ -433,6 +435,41 @@ describe('ApiKeyUsageService.getAllTenantsUsage', () => {
       { filter_0: ['disabled'] },
     ])
     expect(tenantQb.where.some(([clause]) => clause.includes('channel'))).toBe(false)
+  })
+
+  it('ranks tenants by a total over the channels in scope, then by name', async () => {
+    const { service, tenantQb } = setup()
+
+    await service.getAllTenantsUsage({
+      ...parsed(smsOnly),
+      sorts: [{ field: 'failedLast30Days', direction: 'DESC' }],
+    })
+
+    const made = (name: string) => tenantQb.log.filter(([prop]) => prop === name)
+    expect(made('addSelect')).toEqual([
+      ['addSelect', expect.stringContaining('d.status = :sortFailedStatus'), 'sort_failed'],
+    ])
+    expect(made('addOrderBy')).toEqual([
+      ['addOrderBy', 'sort_failed', 'DESC'],
+      ['addOrderBy', 't.name', 'ASC'],
+      ['addOrderBy', 't.id', 'ASC'],
+    ])
+    expect(tenantQb.calls.setParameters).toEqual([
+      expect.objectContaining({ sortChannels: ['SMS'], sortFailedStatus: 'failed' }),
+    ])
+  })
+
+  it('orders by name alone when no sort is asked for', async () => {
+    const { service, tenantQb } = setup()
+
+    await service.getAllTenantsUsage(parsed())
+
+    expect(tenantQb.log.filter(([prop]) => prop === 'addSelect')).toEqual([])
+    expect(tenantQb.log.filter(([prop]) => prop === 'addOrderBy')[0]).toEqual([
+      'addOrderBy',
+      't.name',
+      'ASC',
+    ])
   })
 
   it('returns no rows without querying limits when no tenant matches', async () => {

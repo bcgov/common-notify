@@ -21,6 +21,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminFeatureFlagsRouteImport } from './routes/admin/feature-flags'
 import { Route as AdminHealthRouteImport } from './routes/admin/health'
 import { Route as AdminMonitoringRouteImport } from './routes/admin/monitoring'
+import { Route as AdminTenantsRouteImport } from './routes/admin/tenants'
 import { Route as AdminUsageRouteImport } from './routes/admin/usage'
 import { Route as BulkNotificationsIndexRouteImport } from './routes/bulk-notifications/index'
 import { Route as EventsIndexRouteImport } from './routes/events/index'
@@ -91,6 +92,11 @@ const AdminMonitoringRoute = AdminMonitoringRouteImport.update({
   path: '/monitoring',
   getParentRoute: () => AdminRouteRoute,
 } as any)
+const AdminTenantsRoute = AdminTenantsRouteImport.update({
+  id: '/tenants',
+  path: '/tenants',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 const AdminUsageRoute = AdminUsageRouteImport.update({
   id: '/usage',
   path: '/usage',
@@ -151,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/monitoring': typeof AdminMonitoringRoute
+  '/admin/tenants': typeof AdminTenantsRoute
   '/admin/usage': typeof AdminUsageRoute
   '/events/create': typeof EventsCreateRoute
   '/request-status/$notificationRequestId': typeof RequestStatusNotificationRequestIdRoute
@@ -173,6 +180,7 @@ export interface FileRoutesByTo {
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/monitoring': typeof AdminMonitoringRoute
+  '/admin/tenants': typeof AdminTenantsRoute
   '/admin/usage': typeof AdminUsageRoute
   '/events/create': typeof EventsCreateRoute
   '/request-status/$notificationRequestId': typeof RequestStatusNotificationRequestIdRoute
@@ -197,6 +205,7 @@ export interface FileRoutesById {
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/monitoring': typeof AdminMonitoringRoute
+  '/admin/tenants': typeof AdminTenantsRoute
   '/admin/usage': typeof AdminUsageRoute
   '/events/create': typeof EventsCreateRoute
   '/request-status/$notificationRequestId': typeof RequestStatusNotificationRequestIdRoute
@@ -222,6 +231,7 @@ export interface FileRouteTypes {
     | '/admin/feature-flags'
     | '/admin/health'
     | '/admin/monitoring'
+    | '/admin/tenants'
     | '/admin/usage'
     | '/events/create'
     | '/request-status/$notificationRequestId'
@@ -244,6 +254,7 @@ export interface FileRouteTypes {
     | '/admin/feature-flags'
     | '/admin/health'
     | '/admin/monitoring'
+    | '/admin/tenants'
     | '/admin/usage'
     | '/events/create'
     | '/request-status/$notificationRequestId'
@@ -267,6 +278,7 @@ export interface FileRouteTypes {
     | '/admin/feature-flags'
     | '/admin/health'
     | '/admin/monitoring'
+    | '/admin/tenants'
     | '/admin/usage'
     | '/events/create'
     | '/request-status/$notificationRequestId'
@@ -384,6 +396,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminMonitoringRouteImport
       parentRoute: typeof AdminRouteRoute
     }
+    '/admin/tenants': {
+      id: '/admin/tenants'
+      path: '/tenants'
+      fullPath: '/admin/tenants'
+      preLoaderRoute: typeof AdminTenantsRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/admin/usage': {
       id: '/admin/usage'
       path: '/usage'
@@ -454,6 +473,7 @@ interface AdminRouteRouteChildren {
   AdminFeatureFlagsRoute: typeof AdminFeatureFlagsRoute
   AdminHealthRoute: typeof AdminHealthRoute
   AdminMonitoringRoute: typeof AdminMonitoringRoute
+  AdminTenantsRoute: typeof AdminTenantsRoute
   AdminUsageRoute: typeof AdminUsageRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
@@ -462,6 +482,7 @@ const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminFeatureFlagsRoute: AdminFeatureFlagsRoute,
   AdminHealthRoute: AdminHealthRoute,
   AdminMonitoringRoute: AdminMonitoringRoute,
+  AdminTenantsRoute: AdminTenantsRoute,
   AdminUsageRoute: AdminUsageRoute,
   AdminIndexRoute: AdminIndexRoute,
 }

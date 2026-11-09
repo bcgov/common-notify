@@ -16,7 +16,10 @@ export interface FilterOption {
 
 export interface TableColumn<T> {
   key: keyof T & string
-  /** Identifies the column when more than one renders from the same `key`. Defaults to `key`. */
+  /**
+   * Identifies the column, for sorting and React keys, when more than one renders from the same
+   * `key`. Defaults to `key`.
+   */
   id?: string
   label: string
   sortable?: boolean
@@ -211,8 +214,8 @@ export function DataTable<T extends object>({
                 sortable={col.sortable}
                 sortLabel={col.sortLabel}
                 sortType={col.sortType}
-                sortOrder={sortBy === col.key ? sortOrder : null}
-                onSort={col.sortable ? (order) => onSort?.(col.key, order) : undefined}
+                sortOrder={sortBy === (col.id ?? col.key) ? sortOrder : null}
+                onSort={col.sortable ? (order) => onSort?.(col.id ?? col.key, order) : undefined}
                 filterOptions={col.filterOptions}
                 filterTitle={`Filter by ${col.label}`}
                 activeFilterValues={activeFilters?.[col.filterKey ?? col.key]}

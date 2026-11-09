@@ -81,12 +81,11 @@ const adminItems = {
       ],
     },
     {
-      label: 'Report',
-      links: [{ label: 'Usage & Limits', to: '/admin/usage' }],
-    },
-    {
       label: 'Manage',
-      links: [{ label: 'Feature Flags', to: '/admin/feature-flags' }],
+      links: [
+        { label: 'Tenants', to: '/admin/tenants' },
+        { label: 'Feature Flags', to: '/admin/feature-flags' },
+      ],
     },
   ],
 } as const satisfies {

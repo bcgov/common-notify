@@ -107,6 +107,16 @@ describe('ApiKeyUsageAdminController GET /frontend/admin/api-key-usage', () => {
     )
   })
 
+  it('passes a sort on a usage total, and rejects one that is not sortable', async () => {
+    await request(app.getHttpServer()).get(url).query({ sort: '-usedThisYear' }).expect(200)
+    expect(getAllTenantsUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ sorts: [{ field: 'usedThisYear', direction: 'DESC' }] }),
+      undefined,
+    )
+
+    await request(app.getHttpServer()).get(url).query({ sort: 'tenantName' }).expect(400)
+  })
+
   it('lists the tenants for the search from /tenants', async () => {
     const response = await request(app.getHttpServer()).get(`${url}/tenants`).expect(200)
 

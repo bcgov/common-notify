@@ -138,7 +138,8 @@ export async function updateApiKeyThreshold(
 
 /**
  * Get a paginated page of usage vs limits across tenants (one row per tenant × channel),
- * optionally filtered by tenant name and `field:in:values` filters. Pagination is by tenant.
+ * optionally filtered by tenant name and `field:in:values` filters, and sorted by a usage total
+ * (`usedToday`, or `-usedToday` for descending). Pagination is by tenant.
  * Requires NOTIFY_ADMIN. Backed by /api/v1/frontend/admin/api-key-usage.
  */
 export async function getAllTenantsUsage(
@@ -146,6 +147,7 @@ export async function getAllTenantsUsage(
   limit: number = 15,
   search?: string,
   filter?: string[],
+  sort?: string,
 ): Promise<PaginatedAdminUsageResponse> {
   try {
     const qs = new URLSearchParams()
@@ -153,6 +155,7 @@ export async function getAllTenantsUsage(
     qs.set('limit', String(limit))
     if (search) qs.set('search', search)
     filter?.forEach((f) => qs.append('filter', f))
+    if (sort) qs.set('sort', sort)
     const params = generateApiParameters(`/api/v1/frontend/admin/api-key-usage?${qs.toString()}`)
     return await get<PaginatedAdminUsageResponse>(params)
   } catch (error) {

@@ -9,6 +9,7 @@ import {
   setAdminLimit,
   setAdminSearch,
   setAdminFilter,
+  setAdminSort,
 } from '@/redux/slices/apiKeyUsage.slice'
 import UserService from '@/service/user-service'
 import PageHeading from '@/components/PageHeading'
@@ -73,6 +74,8 @@ const AdminUsage: FC = () => {
     adminCount,
     adminSearch,
     adminFilters,
+    adminSortBy,
+    adminSortOrder,
     adminUpdatingKey,
     adminError,
   } = useAppSelector((state) => state.apiKeyUsage)
@@ -114,7 +117,16 @@ const AdminUsage: FC = () => {
     if (isAdmin) {
       dispatch(fetchAllTenantsUsage())
     }
-  }, [isAdmin, adminPage, adminLimit, adminSearch, adminFilters, dispatch])
+  }, [
+    isAdmin,
+    adminPage,
+    adminLimit,
+    adminSearch,
+    adminFilters,
+    adminSortBy,
+    adminSortOrder,
+    dispatch,
+  ])
 
   if (!isAdmin) {
     return <NotAuthorized />
@@ -133,6 +145,10 @@ const AdminUsage: FC = () => {
   function clearSearch() {
     setSearchInput('')
     dispatch(setAdminSearch(''))
+  }
+
+  function handleSort(key: string, order: 'asc' | 'desc' | null) {
+    dispatch(setAdminSort({ sortBy: order === null ? null : key, sortOrder: order }))
   }
 
   function handleFilter(key: string, values: string[]) {
@@ -260,8 +276,10 @@ const AdminUsage: FC = () => {
     },
     {
       key: 'channels',
-      id: 'failed',
+      id: 'failedLast30Days',
       label: 'Failed (30 days)',
+      sortable: true,
+      sortType: 'numeric',
       render: (_, tenant) => (
         <ChannelValues
           rows={tenant.channels}
@@ -275,8 +293,10 @@ const AdminUsage: FC = () => {
     },
     {
       key: 'channels',
-      id: 'daily',
+      id: 'usedToday',
       label: 'Daily',
+      sortable: true,
+      sortType: 'numeric',
       render: (_, tenant) => (
         <ChannelValues
           rows={tenant.channels}
@@ -292,8 +312,10 @@ const AdminUsage: FC = () => {
     },
     {
       key: 'channels',
-      id: 'annual',
+      id: 'usedThisYear',
       label: 'Annual (fiscal year)',
+      sortable: true,
+      sortType: 'numeric',
       render: (_, tenant) => (
         <ChannelValues
           rows={tenant.channels}
@@ -340,7 +362,7 @@ const AdminUsage: FC = () => {
   return (
     <div className="page">
       <PageHeading
-        title="Tenant Usage & Limits"
+        title="Manage Tenants"
         meta={summary ? adoptionSummaryText(summary) : undefined}
       />
       {adminError && <div role="alert">{adminError}</div>}
@@ -365,6 +387,9 @@ const AdminUsage: FC = () => {
         emptyMessage="No tenants found."
         search={adminSearch}
         onClearSearch={clearSearch}
+        sortBy={adminSortBy ?? undefined}
+        sortOrder={adminSortOrder}
+        onSort={handleSort}
         activeFilters={adminFilters}
         onFilter={handleFilter}
         currentPage={adminPage}
@@ -373,7 +398,7 @@ const AdminUsage: FC = () => {
         onPageChange={(nextPage) => dispatch(setAdminPage(nextPage))}
         onPageSizeChange={handleLimitChange}
         pageSizeOptions={[15, 30]}
-        label="All tenants notification usage"
+        label="Tenants"
       />
 
       {sendingTarget && (

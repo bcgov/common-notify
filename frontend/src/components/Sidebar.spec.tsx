@@ -235,8 +235,11 @@ describe('Sidebar', () => {
         ['Overview', '/admin'],
         ['System', '/admin/monitoring'],
       ])
-      expect(linksIn('Report')).toEqual([['Usage & Limits', '/admin/usage']])
-      expect(linksIn('Manage')).toEqual([['Feature Flags', '/admin/feature-flags']])
+      expect(linksIn('Manage')).toEqual([
+        ['Tenants', '/admin/tenants'],
+        ['Feature Flags', '/admin/feature-flags'],
+      ])
+      expect(screen.queryByRole('list', { name: 'Report' })).not.toBeInTheDocument()
     })
 
     it('starts closed away from the admin pages, and reports its state', async () => {
@@ -257,17 +260,17 @@ describe('Sidebar', () => {
       )
     })
 
-    it.each(['/admin', '/admin/usage'])('opens on its own on %s', (pathname) => {
+    it.each(['/admin', '/admin/tenants'])('opens on its own on %s', (pathname) => {
       location.pathname = pathname
       renderSidebar()
 
       expect(screen.getByRole('button', { name: 'Admin' })).toHaveAttribute('aria-expanded', 'true')
-      expect(screen.getByRole('link', { name: 'Usage & Limits' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Tenants' })).toBeInTheDocument()
     })
 
     it('stays closed on an admin page once the user closes it', async () => {
       const user = userEvent.setup()
-      location.pathname = '/admin/usage'
+      location.pathname = '/admin/tenants'
       renderSidebar()
 
       await user.click(screen.getByRole('button', { name: 'Admin' }))
@@ -276,7 +279,7 @@ describe('Sidebar', () => {
         'aria-expanded',
         'false',
       )
-      expect(screen.queryByRole('link', { name: 'Usage & Limits' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'Tenants' })).not.toBeInTheDocument()
     })
 
     it('does not open for a page that only starts with the word admin', () => {

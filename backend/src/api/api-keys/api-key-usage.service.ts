@@ -1,6 +1,7 @@
 import { HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { In, Repository } from 'typeorm'
+import type { SelectQueryBuilder } from 'typeorm'
 import { ApiKeyConsumer } from './entities/api-key-consumer.entity'
 import { ApiKeyLimit } from './entities/api-key-limit.entity'
 import { ApiKeyLimitAlert } from './entities/api-key-limit-alert.entity'
@@ -15,6 +16,7 @@ import { NotificationStatus } from '../../enum/notification-status.enum'
 import { applyListQueryFilters } from '../../common/query/typeorm-list-query.util'
 import type {
   ListQueryFilter,
+  ListQuerySort,
   ParsedListQuery,
   QueryableFieldsConfig,
 } from '../../common/query/list-query.types'
@@ -34,13 +36,17 @@ const DEFAULT_FISCAL_DAY = 1
 const DEFAULT_WARN_THRESHOLD_PERCENT = 80
 
 /**
- * What the admin all-tenants usage table can be filtered on. Tenants are always ordered by
- * name, so there is nothing to sort on. The channel filter picks which channel rows each tenant
- * gets rather than which tenants are listed, so it is applied by channelsInScope, not as SQL;
- * `status` (active or disabled) filters the tenants.
+ * What the admin all-tenants usage table can be sorted and filtered on. Tenants are paged, so a
+ * sort ranks tenants by their total across the channels in scope; see TENANT_SORTS. The channel
+ * filter picks which channel rows each tenant gets rather than which tenants are listed, so it
+ * is applied by channelsInScope, not as SQL; `status` (active or disabled) filters the tenants.
  */
 export const adminUsageListQueryConfig: QueryableFieldsConfig = {
-  sortableFields: {},
+  sortableFields: {
+    failedLast30Days: 'sort_failed',
+    usedToday: 'sort_daily',
+    usedThisYear: 'sort_annual',
+  },
   filterableFields: {
     channel: { column: 'l.channel_code', valueType: 'string', operators: ['eq', 'in'] },
     status: { column: 't.status', valueType: 'string', operators: ['eq', 'in'] },
@@ -48,6 +54,28 @@ export const adminUsageListQueryConfig: QueryableFieldsConfig = {
 }
 
 const ALL_CHANNELS: string[] = Object.values(NotificationChannel)
+
+/**
+ * Per-tenant totals the admin table sorts on, summed over the channels in scope
+ * (:sortChannels), keyed by sort field. Each matches the figure its column shows.
+ */
+const TENANT_SORTS: Record<string, string> = {
+  failedLast30Days: `(SELECT COUNT(*)
+      FROM notify.notification_request_detail d
+      JOIN notify.notification_request r ON r.id = d.notification_request_id
+     WHERE r.tenant_id = t.id AND d.channel IN (:...sortChannels)
+       AND d.status = :sortFailedStatus AND d.created_at >= :sortFailedSince)`,
+  usedToday: `(SELECT COALESCE(SUM(u.sent_count), 0)
+      FROM notify.api_key_usage u
+      JOIN notify.api_key_consumer c ON c.id = u.api_key_consumer_id
+     WHERE c.tenant_id = t.id AND u.channel_code IN (:...sortChannels)
+       AND u.period_type_code = :sortDay AND u.period_start >= date_trunc('day', now()))`,
+  usedThisYear: `(SELECT COALESCE(SUM(u.sent_count), 0)
+      FROM notify.api_key_usage u
+      JOIN notify.api_key_consumer c ON c.id = u.api_key_consumer_id
+     WHERE c.tenant_id = t.id AND u.channel_code IN (:...sortChannels)
+       AND u.period_type_code = :sortYear AND u.period_start >= :sortFiscalYearStart)`,
+}
 
 /** The channels the admin usage rows cover: every channel, narrowed by each channel filter. */
 export function channelsInScope(filters: ListQueryFilter[]): string[] {
@@ -355,8 +383,9 @@ export class ApiKeyUsageService {
       filters.filter((filter) => filter.field !== 'channel'),
       adminUsageListQueryConfig,
     )
+    await this.applyTenantSorts(qb, parsedQuery.sorts, channels)
     const [tenants, count] = await qb
-      .orderBy('t.name', 'ASC')
+      .addOrderBy('t.name', 'ASC')
       .addOrderBy('t.id', 'ASC')
       .skip(skip)
       .take(limit)
@@ -402,6 +431,32 @@ export class ApiKeyUsageService {
       sentThisFiscalYear: Number(row?.sentThisFiscalYear ?? 0),
       withApiKey: Number(row?.withApiKey ?? 0),
       disabled: Number(row?.disabled ?? 0),
+    }
+  }
+
+  /**
+   * Orders tenants by each requested total, selected under the alias the sort config names so
+   * ORDER BY can use it. Name order, added after, breaks ties.
+   */
+  private async applyTenantSorts(
+    qb: SelectQueryBuilder<Tenant>,
+    sorts: ListQuerySort[],
+    channels: string[],
+  ): Promise<void> {
+    if (sorts.length === 0) return
+    for (const { field, direction } of sorts) {
+      const alias = adminUsageListQueryConfig.sortableFields[field]
+      qb.addSelect(TENANT_SORTS[field], alias).addOrderBy(alias, direction)
+    }
+    qb.setParameters({
+      sortChannels: channels,
+      sortFailedStatus: NotificationStatus.FAILED,
+      sortFailedSince: new Date(Date.now() - FAILURE_WINDOW_DAYS * DAY_MS),
+      sortDay: UsagePeriodType.DAY,
+      sortYear: UsagePeriodType.YEAR,
+    })
+    if (sorts.some((sort) => sort.field === 'usedThisYear')) {
+      qb.setParameter('sortFiscalYearStart', await this.getFiscalYearStart())
     }
   }
 
