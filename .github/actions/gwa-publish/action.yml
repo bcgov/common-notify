@@ -1,0 +1,93 @@
+name: GWA publish
+description: Install the gwa CLI, log in, and optionally publish a Kong config
+
+inputs:
+  gwa_acct:
+    description: GWA service account JSON containing client_id and client_secret
+    required: true
+  convert_from:
+    description: GatewayService yaml to convert into config_file before publishing. Omit to skip.
+    required: false
+    default: ""
+  config_file:
+    description: Kong config to publish. Omit to install and log in only.
+    required: false
+    default: ""
+  qualifier:
+    description: Qualifier scoping the publish (dev, test, prod). Omit to publish unscoped.
+    required: false
+    default: ""
+  gateway:
+    description: Gateway to target
+    required: false
+    default: gw-fe8c5
+  version:
+    description: gwa CLI release to install
+    required: false
+    default: "3.0.7"
+  sha256:
+    description: Expected checksum of the gwa tarball, verified before install
+    required: false
+    default: "685f399f07c5d33f60d73eb4d319038980a3c546b5e1418df42cf17c6de9ddf4"
+
+runs:
+  using: composite
+  steps:
+    - name: Convert GatewayService yaml to Kong config
+      if: inputs.convert_from != ''
+      shell: bash
+      env:
+        SRC: ${{ inputs.convert_from }}
+        DEST: ${{ inputs.config_file }}
+      run: |
+        set -euo pipefail
+        python3 -c 'import yaml' >/dev/null 2>&1 || pip3 install --quiet --break-system-packages pyyaml
+        python3 api-gateway/scripts/gwservice-to-kong.py "${SRC}" > "${DEST}"
+
+    - name: Install gwa CLI
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        SHA256: ${{ inputs.sha256 }}
+      run: |
+        set -euo pipefail
+        URL="https://github.com/bcgov/gwa-cli/releases/download/v${VERSION}/gwa_Linux_x86_64.tgz"
+        curl -fsSL -o /tmp/gwa.tgz "${URL}"
+        echo "${SHA256}  /tmp/gwa.tgz" | sha256sum -c -
+        tar -xzf /tmp/gwa.tgz gwa
+        sudo mv gwa /usr/local/bin/gwa
+        rm -f /tmp/gwa.tgz
+        gwa --version
+
+    - name: Log in
+      shell: bash
+      env:
+        GWA_ACCT: ${{ inputs.gwa_acct }}
+        GATEWAY: ${{ inputs.gateway }}
+      run: |
+        set -euo pipefail
+        CLIENT_ID=$(jq -r '.client_id' <<<"${GWA_ACCT}")
+        CLIENT_SECRET=$(jq -r '.client_secret' <<<"${GWA_ACCT}")
+        gwa login --client-id "${CLIENT_ID}" --client-secret "${CLIENT_SECRET}"
+        # publish-gateway ignores --gateway and reads it from ~/.gwa-config.yaml.
+        gwa config set gateway "${GATEWAY}"
+
+    - name: Publish
+      if: inputs.config_file != ''
+      shell: bash
+      env:
+        CONFIG_FILE: ${{ inputs.config_file }}
+        QUALIFIER: ${{ inputs.qualifier }}
+      run: |
+        set -uo pipefail
+        if [ -n "${QUALIFIER}" ]; then
+          OUT=$(gwa publish-gateway "${CONFIG_FILE}" --qualifier "${QUALIFIER}" 2>&1); STATUS=$?
+        else
+          OUT=$(gwa publish-gateway "${CONFIG_FILE}" 2>&1); STATUS=$?
+        fi
+        echo "${OUT}"
+        # gwa can exit 0 even when the publish is rejected.
+        if [ "${STATUS}" -ne 0 ] || grep -qiE "publish failed|Errors encountered|Rejecting request|Validation Errors|Sync Failed" <<<"${OUT}"; then
+          echo "::error::gwa publish-gateway failed${QUALIFIER:+ for qualifier=${QUALIFIER}}"
+          exit 1
+        fi
