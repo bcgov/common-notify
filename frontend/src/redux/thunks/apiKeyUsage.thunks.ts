@@ -55,10 +55,10 @@ export const fetchAllTenantsUsage = createAsyncThunk<
   try {
     const { adminPage, adminLimit, adminSearch, adminFilters, adminSortBy, adminSortOrder } =
       getState().apiKeyUsage
-    const sort =
-      adminSortBy && adminSortOrder
-        ? `${adminSortOrder === 'desc' ? '-' : ''}${adminSortBy}`
-        : undefined
+    let sort: string | undefined
+    if (adminSortBy && adminSortOrder) {
+      sort = adminSortOrder === 'desc' ? `-${adminSortBy}` : adminSortBy
+    }
     return await getAllTenantsUsage(
       adminPage,
       adminLimit,

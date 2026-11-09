@@ -285,7 +285,7 @@ export class TenantsService {
       throw new BadRequestException('A reason is required to disable sending')
     }
 
-    return this.tenantRepository.manager.transaction(async (manager) => {
+    return await this.tenantRepository.manager.transaction(async (manager) => {
       // Row lock, so two admins changing the same tenant at once record one change, not two.
       // Eager relations off: FOR UPDATE can't lock the outer join they add.
       const tenant = await manager.findOne(Tenant, {

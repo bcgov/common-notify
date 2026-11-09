@@ -462,11 +462,11 @@ export class ApiKeyUsageService {
 
   /** Every tenant the usage table can list, by name: the options for its tenant search. */
   async listNotifyTenants(): Promise<AdminTenantOptionDto[]> {
-    return this.notifyTenants()
+    const tenants = await this.notifyTenants()
       .select(['t.id', 't.name'])
       .orderBy('t.name', 'ASC')
       .getMany()
-      .then((tenants) => tenants.map(({ id, name }) => ({ id, name })))
+    return tenants.map(({ id, name }) => ({ id, name }))
   }
 
   /**
