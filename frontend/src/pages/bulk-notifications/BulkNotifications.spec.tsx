@@ -17,7 +17,7 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 // SMS availability is a feature flag; default it on and let one test turn it off.
-const featureFlagMock = vi.fn(() => true)
+const featureFlagMock = vi.fn<(code: string) => boolean>(() => true)
 vi.mock('@/config/featureFlags/useFeatureFlag', () => ({
   useFeatureFlag: (code: string) => featureFlagMock(code),
 }))
