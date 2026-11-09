@@ -272,44 +272,6 @@
   gap: var(--layout-padding-xsmall);
 }
 
-// Tight above the rule and generous below it, so the header reads as one block and the message
-// as another. Matches HEADER_PADDING_BELOW_PX / HEADER_MARGIN_BELOW_PX in the backend's
-// email-template-layout.service, which is what the delivered email uses.
-.events__header-preview-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  // No padding above the rule: the approved logo SVGs carry whitespace around their artwork, so
-  // the image box already supplies that gap.
-  margin-bottom: 28px;
-  border-bottom: 1px solid $border-default;
-}
-
-// In the preview modal the header carries its own rule, so the one under the envelope above it
-// is dropped. The modal is shared with other previews, hence keying off the header row.
-.notification-preview__output-pane:has(.events__header-preview-row)
-  .notification-preview__envelope {
-  border-bottom: 0;
-}
-
-// Kept in step with LOGO_HEIGHT_PX in the backend's email-template-layout.service, which is what
-// the delivered email uses - this preview is only honest while the two agree.
-.events__header-preview-logo {
-  height: 110px;
-}
-
-.events__header-preview-title {
-  font-size: $font-size-xl;
-  color: $dark-text;
-}
-
-// The divider only belongs between the two halves, so it hangs off the title and only
-// when a logo actually precedes it.
-.events__header-preview-logo + .events__header-preview-title {
-  padding-left: 16px;
-  border-left: 1px solid $border-default;
-}
-
 .events__help {
   margin: 0;
   font-size: $font-size-sm;
