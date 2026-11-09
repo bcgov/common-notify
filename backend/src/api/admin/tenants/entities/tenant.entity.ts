@@ -41,4 +41,17 @@ export class Tenant {
 
   @Column({ default: false, name: 'is_deleted' })
   isDeleted: boolean
+
+  /** Why an admin disabled sending; null while the tenant is active. */
+  @Column({ type: 'varchar', length: 500, nullable: true, name: 'disabled_reason' })
+  disabledReason: string | null
+
+  @Column({ type: 'varchar', length: 200, nullable: true, name: 'disabled_by' })
+  disabledBy: string | null
+
+  @Column({ type: 'varchar', length: 200, nullable: true, name: 'disabled_by_name' })
+  disabledByName: string | null
+
+  @Column({ type: 'timestamptz', nullable: true, name: 'disabled_at' })
+  disabledAt: Date | null
 }

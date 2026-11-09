@@ -18,12 +18,15 @@ export function adoptionSummaryText({
   tenants,
   sentThisFiscalYear,
   withApiKey,
+  disabled,
 }: AdminUsageSummary): string {
   const users = tenants === 1 ? 'tenant uses' : 'tenants use'
   return [
     `${tenants.toLocaleString()} ${users} Notify`,
     `${sentThisFiscalYear.toLocaleString()} sent this fiscal year`,
     `${withApiKey.toLocaleString()} with an API key`,
+    // Only when there are any: "0 disabled" is noise on every visit.
+    ...(disabled > 0 ? [`${disabled.toLocaleString()} disabled`] : []),
   ].join(' · ')
 }
 

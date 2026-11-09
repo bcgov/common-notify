@@ -6,6 +6,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { ApiKeyUsageAdminController } from './api-key-usage-admin.controller'
 import { ApiKeyUsageService } from './api-key-usage.service'
 import { NotifyAdminGuard } from '../../common/guards/notify-admin.guard'
+import { TenantsService } from '../admin/tenants/tenants.service'
 
 /**
  * Driven over HTTP, through the global ValidationPipe as app.ts installs it, because the query
@@ -15,11 +16,13 @@ describe('ApiKeyUsageAdminController GET /frontend/admin/api-key-usage', () => {
   let app: INestApplication
   let getAllTenantsUsage: ReturnType<typeof vi.fn>
   let getAdminUsageSummary: ReturnType<typeof vi.fn>
+  let setSending: ReturnType<typeof vi.fn>
 
   beforeEach(async () => {
     getAllTenantsUsage = vi
       .fn()
       .mockResolvedValue({ data: [], count: 0, page: 1, limit: 15, totalPages: 0 })
+    setSending = vi.fn().mockImplementation((_id, enabled: boolean) => Promise.resolve(enabled))
     getAdminUsageSummary = vi
       .fn()
       .mockResolvedValue({ tenants: 42, sentThisFiscalYear: 30, withApiKey: 12 })
@@ -28,6 +31,7 @@ describe('ApiKeyUsageAdminController GET /frontend/admin/api-key-usage', () => {
       controllers: [ApiKeyUsageAdminController],
       providers: [
         { provide: ApiKeyUsageService, useValue: { getAllTenantsUsage, getAdminUsageSummary } },
+        { provide: TenantsService, useValue: { setSending } },
       ],
     })
       .overrideGuard(NotifyAdminGuard)
@@ -91,5 +95,49 @@ describe('ApiKeyUsageAdminController GET /frontend/admin/api-key-usage', () => {
     await request(app.getHttpServer()).get(`${url}?page=two`).expect(400)
 
     expect(getAllTenantsUsage).not.toHaveBeenCalled()
+  })
+
+  describe('PATCH tenants/:tenantId/sending', () => {
+    const tenantId = '0b9f6d0c-1d7e-4c55-9d2a-5f3f4a1b2c3d'
+    const sending = `${url}/tenants/${tenantId}/sending`
+
+    it('disables sending with a trimmed reason', async () => {
+      const response = await request(app.getHttpServer())
+        .patch(sending)
+        .send({ enabled: false, reason: '  Unpaid invoice  ' })
+        .expect(200)
+
+      expect(response.body).toEqual({ sendingEnabled: false })
+      expect(setSending).toHaveBeenCalledWith(
+        tenantId,
+        false,
+        'Unpaid invoice',
+        expect.objectContaining({ id: expect.any(String) }),
+      )
+    })
+
+    it('enables sending without a reason', async () => {
+      await request(app.getHttpServer()).patch(sending).send({ enabled: true }).expect(200)
+
+      expect(setSending).toHaveBeenCalledWith(tenantId, true, undefined, expect.anything())
+    })
+
+    it.each([
+      ['no reason', { enabled: false }],
+      ['a blank reason', { enabled: false, reason: '   ' }],
+      ['a reason over 500 characters', { enabled: false, reason: 'x'.repeat(501) }],
+      ['no enabled flag', { reason: 'Billing' }],
+    ])('rejects disabling with %s', async (_, body) => {
+      await request(app.getHttpServer()).patch(sending).send(body).expect(400)
+
+      expect(setSending).not.toHaveBeenCalled()
+    })
+
+    it('rejects a tenant id that is not a UUID', async () => {
+      await request(app.getHttpServer())
+        .patch(`${url}/tenants/not-a-uuid/sending`)
+        .send({ enabled: true })
+        .expect(400)
+    })
   })
 })

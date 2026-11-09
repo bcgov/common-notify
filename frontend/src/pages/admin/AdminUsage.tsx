@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FC } from 'react'
 import { getAdminUsageSummary } from '@/api/apiKeyUsage.api'
 import type { AdminTenantUsageRow, AdminUsageSummary } from '@/api/apiKeyUsage.api'
@@ -20,6 +20,9 @@ import UsageCell from '@/components/UsageCell'
 import EditModal from '@/components/EditModal'
 import NumberInputField from '@/components/NumberInputField'
 import { showSuccessToast, showErrorToast } from '@/redux/utils/toastUtils'
+import TenantNameCell from './TenantNameCell'
+import TenantSendingDialog from './TenantSendingDialog'
+import UsageRowActions from './UsageRowActions'
 import { adoptionSummaryText, formatChannel, formatFailures, formatLastSent } from '@/utils/usage'
 
 const rowKeyOf = (row: AdminTenantUsageRow) => `${row.tenantId}-${row.channel}`
@@ -43,15 +46,31 @@ const AdminUsage: FC = () => {
   const [dailyLimit, setDailyLimit] = useState(0)
   const [annualLimit, setAnnualLimit] = useState(0)
   const [summary, setSummary] = useState<AdminUsageSummary | null>(null)
+  const [sendingTarget, setSendingTarget] = useState<AdminTenantUsageRow | null>(null)
 
-  // Totals across every tenant, so they don't change with the table's search or filters and
-  // are fetched once. Only this screen reads them, so there is no slice.
-  useEffect(() => {
-    if (!isAdmin) return
+  // Totals across every tenant, so they don't change with the table's search or filters: fetched
+  // on arrival and after a change that moves them. Only this screen reads them, so no slice.
+  const loadSummary = useCallback(() => {
     getAdminUsageSummary()
       .then(setSummary)
       .catch((error: Error) => showErrorToast(error.message))
-  }, [isAdmin])
+  }, [])
+
+  useEffect(() => {
+    if (isAdmin) loadSummary()
+  }, [isAdmin, loadSummary])
+
+  // Rows are tenant × channel; per-tenant actions belong on each tenant's first row only.
+  const firstRowKeys = useMemo(() => {
+    const seen = new Set<string>()
+    return new Set(
+      adminRows.flatMap((row) => {
+        if (seen.has(row.tenantId)) return []
+        seen.add(row.tenantId)
+        return [rowKeyOf(row)]
+      }),
+    )
+  }, [adminRows])
 
   // Server-side: refetch whenever the page, page size, committed search or filters change.
   useEffect(() => {
@@ -126,7 +145,7 @@ const AdminUsage: FC = () => {
     {
       key: 'tenantName',
       label: 'Tenant',
-      render: (_, row) => <span className="fw-semibold">{row.tenantName}</span>,
+      render: (_, row) => <TenantNameCell {...row} />,
     },
     {
       key: 'channel',
@@ -205,22 +224,14 @@ const AdminUsage: FC = () => {
     {
       key: 'tenantId',
       label: 'Actions',
-      // Limits are created when an API key is bound, so there is nothing to edit until then.
-      render: (_, row) => {
-        const { dailyLimit: daily, annualLimit: annual } = row
-        if (daily === null || annual === null) {
-          return <span className="text-muted">No limits to edit</span>
-        }
-        return (
-          <button
-            type="button"
-            className="btn btn-sm btn-link p-0"
-            onClick={() => openEdit(row, { daily, annual })}
-          >
-            Edit limits
-          </button>
-        )
-      },
+      render: (_, row) => (
+        <UsageRowActions
+          row={row}
+          showSendingToggle={firstRowKeys.has(rowKeyOf(row))}
+          onEditLimits={openEdit}
+          onToggleSending={setSendingTarget}
+        />
+      ),
     },
   ]
 
@@ -260,6 +271,18 @@ const AdminUsage: FC = () => {
         pageSizeOptions={[15, 30]}
         label="All tenants notification usage"
       />
+
+      {sendingTarget && (
+        <TenantSendingDialog
+          key={sendingTarget.tenantId}
+          tenant={sendingTarget}
+          onClose={() => setSendingTarget(null)}
+          onChanged={() => {
+            dispatch(fetchAllTenantsUsage())
+            loadSummary()
+          }}
+        />
+      )}
 
       <EditModal
         isOpen={editingRow !== null}

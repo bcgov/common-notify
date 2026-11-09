@@ -1,0 +1,14 @@
+@import '../variables';
+
+.tenant-name-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: $spacing-xs;
+}
+
+.tenant-name-cell__detail {
+  max-width: 280px;
+  color: $text-secondary;
+  font-size: $font-size-sm;
+}

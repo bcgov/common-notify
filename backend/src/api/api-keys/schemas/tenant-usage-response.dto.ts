@@ -59,6 +59,18 @@ export class AdminTenantUsageRowDto {
   @ApiProperty({ description: 'Notification channel', example: 'EMAIL' })
   channel: string
 
+  @ApiProperty({ description: 'False when an admin has disabled sending for the tenant' })
+  sendingEnabled: boolean
+
+  @ApiProperty({ description: 'Why sending was disabled', nullable: true, type: String })
+  disabledReason: string | null
+
+  @ApiProperty({ description: 'When sending was disabled', nullable: true, type: String })
+  disabledAt: string | null
+
+  @ApiProperty({ description: 'Who disabled sending (display name)', nullable: true, type: String })
+  disabledBy: string | null
+
   @ApiProperty({
     description: 'API rate limit per minute. Null when the tenant has no limit on this channel.',
     example: 1000,
@@ -150,6 +162,9 @@ export class AdminUsageSummaryDto {
 
   @ApiProperty({ description: 'Of those, tenants with an API key bound', example: 12 })
   withApiKey: number
+
+  @ApiProperty({ description: 'Of those, tenants an admin has disabled from sending', example: 1 })
+  disabled: number
 }
 
 /**

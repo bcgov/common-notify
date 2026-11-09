@@ -251,8 +251,23 @@ describe('ApiKeyUsageService.getAllTenantsUsage', () => {
     return { qb, where, calls }
   }
 
-  const parks = { id: 't-1', name: 'Parks' }
-  const roads = { id: 't-2', name: 'Roads' }
+  const active = {
+    status: 'active',
+    disabledReason: null,
+    disabledAt: null,
+    disabledBy: null,
+    disabledByName: null,
+  }
+  const parks = { id: 't-1', name: 'Parks', ...active }
+  const roads = {
+    id: 't-2',
+    name: 'Roads',
+    status: 'disabled',
+    disabledReason: 'Unpaid invoice',
+    disabledAt: new Date('2026-11-01T16:00:00.000Z'),
+    disabledBy: 'padmin',
+    disabledByName: 'Pat Admin',
+  }
   const parksSmsLimit = {
     tenantId: 't-1',
     channelCode: 'SMS',
@@ -312,9 +327,9 @@ describe('ApiKeyUsageService.getAllTenantsUsage', () => {
 
     const result = await service.getAllTenantsUsage(parsed())
 
+    // Disabled tenants are listed too, so an admin can see them and turn sending back on.
     expect(tenantQb.where.map(([clause]) => clause)).toEqual([
       't.isDeleted = :deleted',
-      't.status = :active',
       't.externalId IS NOT NULL',
     ])
     expect(result.count).toBe(2)
@@ -335,6 +350,10 @@ describe('ApiKeyUsageService.getAllTenantsUsage', () => {
       tenantId: 't-2',
       tenantName: 'Roads',
       channel: 'SMS',
+      sendingEnabled: false,
+      disabledReason: 'Unpaid invoice',
+      disabledAt: '2026-11-01T16:00:00.000Z',
+      disabledBy: 'Pat Admin',
       rateLimitPerMinute: null,
       dailyLimit: null,
       annualLimit: null,
@@ -466,7 +485,12 @@ describe('ApiKeyUsageService.getAdminUsageSummary', () => {
             }
           if (prop === 'getRawOne')
             return () =>
-              Promise.resolve({ tenants: '42', sentThisFiscalYear: '30', withApiKey: '12' })
+              Promise.resolve({
+                tenants: '42',
+                sentThisFiscalYear: '30',
+                withApiKey: '12',
+                disabled: '2',
+              })
           return () => qb
         },
       },
@@ -482,13 +506,9 @@ describe('ApiKeyUsageService.getAdminUsageSummary', () => {
 
     const summary = await service.getAdminUsageSummary()
 
-    expect(summary).toEqual({ tenants: 42, sentThisFiscalYear: 30, withApiKey: 12 })
+    expect(summary).toEqual({ tenants: 42, sentThisFiscalYear: 30, withApiKey: 12, disabled: 2 })
     // The same tenants the usage table lists, and no search or filter.
-    expect(where).toEqual([
-      't.isDeleted = :deleted',
-      't.status = :active',
-      't.externalId IS NOT NULL',
-    ])
+    expect(where).toEqual(['t.isDeleted = :deleted', 't.externalId IS NOT NULL'])
     expect(params.fiscalYearStart).toBeInstanceOf(Date)
   })
 })

@@ -7,6 +7,7 @@ import { ApiKeyLimitAlert } from './entities/api-key-limit-alert.entity'
 import { ApiKeyUsage } from './entities/api-key-usage.entity'
 import { lowestLimitsByChannel, lowestThresholdsByChannel } from './tenant-limits'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
+import { TENANT_DISABLED } from '../admin/tenants/tenants.service'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
@@ -55,10 +56,10 @@ export function channelsInScope(filters: ListQueryFilter[]): string[] {
     }, ALL_CHANNELS)
 }
 
-interface TenantRef {
-  id: string
-  name: string
-}
+type TenantRef = Pick<
+  Tenant,
+  'id' | 'name' | 'status' | 'disabledReason' | 'disabledAt' | 'disabledBy' | 'disabledByName'
+>
 
 interface LimitRow {
   tenantId: string
@@ -378,25 +379,32 @@ export class ApiKeyUsageService {
         ))`,
         'withApiKey',
       )
+      .addSelect('COUNT(*) FILTER (WHERE t.status = :disabled)', 'disabled')
+      .setParameter('disabled', TENANT_DISABLED)
       .setParameter('fiscalYearStart', fiscalYearStart)
-      .getRawOne<{ tenants: string; sentThisFiscalYear: string; withApiKey: string }>()
+      .getRawOne<{
+        tenants: string
+        sentThisFiscalYear: string
+        withApiKey: string
+        disabled: string
+      }>()
     return {
       tenants: Number(row?.tenants ?? 0),
       sentThisFiscalYear: Number(row?.sentThisFiscalYear ?? 0),
       withApiKey: Number(row?.withApiKey ?? 0),
+      disabled: Number(row?.disabled ?? 0),
     }
   }
 
   /**
-   * Tenants using Notify: active ones that came from CSTAR, which only returns tenants with
-   * Notify connected. Rows created some other way, such as the load-test tenant, have no
-   * external id.
+   * Tenants using Notify: those that came from CSTAR, which only returns tenants with Notify
+   * connected, including ones an admin has disabled. Rows created some other way, such as the
+   * load-test tenant, have no external id.
    */
   private notifyTenants() {
     return this.tenantRepository
       .createQueryBuilder('t')
       .where('t.isDeleted = :deleted', { deleted: false })
-      .andWhere('t.status = :active', { active: 'active' })
       .andWhere('t.externalId IS NOT NULL')
   }
 
@@ -831,6 +839,10 @@ function toUsageRow(
   return {
     tenantId: tenant.id,
     tenantName: tenant.name,
+    sendingEnabled: tenant.status !== TENANT_DISABLED,
+    disabledReason: tenant.disabledReason ?? null,
+    disabledAt: tenant.disabledAt ? new Date(tenant.disabledAt).toISOString() : null,
+    disabledBy: tenant.disabledByName ?? tenant.disabledBy ?? null,
     channel,
     rateLimitPerMinute: limits ? Number(limits.rateLimitPerMinute) : null,
     dailyLimit: limits ? Number(limits.dailyLimit) : null,

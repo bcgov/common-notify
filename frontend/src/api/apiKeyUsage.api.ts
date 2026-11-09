@@ -53,6 +53,11 @@ export interface AdminTenantUsageRow {
   usedThisMinute: number
   usedToday: number
   usedThisYear: number
+  /** False when an admin has disabled sending for the tenant; the disabled* fields say why. */
+  sendingEnabled: boolean
+  disabledReason: string | null
+  disabledAt: string | null
+  disabledBy: string | null
   /** ISO time of the tenant's last send on this channel, from any source; null if never. */
   lastSentAt: string | null
   /** Recipients per month over the last 12 full months; null with no full month yet. */
@@ -75,6 +80,8 @@ export interface AdminUsageSummary {
   tenants: number
   sentThisFiscalYear: number
   withApiKey: number
+  /** Tenants an admin has disabled from sending. */
+  disabled: number
 }
 
 export interface UpdateTenantLimitsRequest {
@@ -144,6 +151,23 @@ export async function getAllTenantsUsage(
     return await get<PaginatedAdminUsageResponse>(params)
   } catch (error) {
     throw toReadableError(error, 'tenant usage')
+  }
+}
+
+/** Enable or disable sending for a tenant. A reason is required to disable. Requires NOTIFY_ADMIN. */
+export async function setTenantSending(
+  tenantId: string,
+  enabled: boolean,
+  reason?: string,
+): Promise<{ sendingEnabled: boolean }> {
+  try {
+    const params = generateApiParameters(
+      `/api/v1/frontend/admin/api-key-usage/tenants/${encodeURIComponent(tenantId)}/sending`,
+      enabled ? { enabled } : { enabled, reason },
+    )
+    return await patch<{ sendingEnabled: boolean }>(params)
+  } catch (error) {
+    throw toReadableError(error, 'tenant sending')
   }
 }
 

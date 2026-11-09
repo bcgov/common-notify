@@ -143,6 +143,16 @@ describe('apiKeyUsage API', () => {
     vi.mocked(get).mockRejectedValue({ response: { status: 500, data: { message: 'down' } } })
     await expect(api.getAdminUsageSummary()).rejects.toThrow('Failed to load tenant summary: down')
   })
+  it('setTenantSending sends the reason only when disabling', async () => {
+    await api.setTenantSending('tenant 1', false, 'Unpaid invoice')
+    expect(vi.mocked(patch).mock.lastCall![0]).toMatchObject({
+      url: '/api/v1/frontend/admin/api-key-usage/tenants/tenant%201/sending',
+      params: { enabled: false, reason: 'Unpaid invoice' },
+    })
+    await api.setTenantSending('tenant-1', true, 'ignored')
+    expect(vi.mocked(patch).mock.lastCall![0]).toMatchObject({ params: { enabled: true } })
+    expect(vi.mocked(patch).mock.lastCall![0]).not.toHaveProperty('params.reason')
+  })
   it("surfaces the server's message for any other failure", async () => {
     vi.mocked(get).mockRejectedValue(
       Object.assign(new Error('Request failed with status code 500'), {

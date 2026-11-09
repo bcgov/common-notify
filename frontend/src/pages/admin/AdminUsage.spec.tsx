@@ -5,12 +5,13 @@ import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import AdminUsage from './AdminUsage'
 import { updateTenantLimits } from '@/redux/thunks/apiKeyUsage.thunks'
 import type * as UsageThunks from '@/redux/thunks/apiKeyUsage.thunks'
-import { getAdminUsageSummary } from '@/api/apiKeyUsage.api'
+import { getAdminUsageSummary, setTenantSending } from '@/api/apiKeyUsage.api'
 import type * as UsageApi from '@/api/apiKeyUsage.api'
 
 vi.mock('@/api/apiKeyUsage.api', async (importOriginal) => ({
   ...(await importOriginal<typeof UsageApi>()),
   getAdminUsageSummary: vi.fn(),
+  setTenantSending: vi.fn(),
 }))
 vi.mock('@/redux/thunks/apiKeyUsage.thunks', async (importOriginal) => {
   const actual = await importOriginal<typeof UsageThunks>()
@@ -34,6 +35,10 @@ vi.mock('@/redux/utils/toastUtils', () => ({ showErrorToast: vi.fn(), showSucces
 const row = {
   tenantId: 'tenant',
   tenantName: 'Test Tenant',
+  sendingEnabled: true,
+  disabledReason: null,
+  disabledAt: null,
+  disabledBy: null,
   channel: 'SMS',
   dailyLimit: 100,
   annualLimit: 1000,
@@ -68,6 +73,7 @@ describe('AdminUsage', () => {
       tenants: 42,
       sentThisFiscalYear: 30,
       withApiKey: 12,
+      disabled: 0,
     })
   })
   it('summarises how many tenants use Notify under the heading', async () => {
@@ -119,7 +125,7 @@ describe('AdminUsage', () => {
       '0 / Not set',
       '0 / Not set',
       'Not set',
-      'No limits to edit',
+      'No limits to editDisable sending',
     ])
     expect(screen.queryByRole('button', { name: 'Edit limits' })).not.toBeInTheDocument()
   })
@@ -218,5 +224,83 @@ describe('AdminUsage', () => {
     expect(screen.getAllByText('Not authorized')[0]).toBeInTheDocument()
     expect(mocks.dispatch).not.toHaveBeenCalled()
     expect(getAdminUsageSummary).not.toHaveBeenCalled()
+  })
+
+  describe('sending', () => {
+    const emailRow = { ...row, channel: 'EMAIL' }
+    const disabledRow = {
+      ...row,
+      sendingEnabled: false,
+      disabledReason: 'Unpaid invoice',
+      disabledAt: '2026-11-01T16:00:00.000Z',
+      disabledBy: 'Pat Admin',
+    }
+
+    beforeEach(() => {
+      vi.mocked(setTenantSending).mockResolvedValue({ sendingEnabled: false })
+    })
+
+    it('offers the toggle once per tenant, on its first row', () => {
+      setup({ adminRows: [emailRow, row], adminCount: 1 })
+      expect(
+        screen.getAllByRole('button', { name: 'Disable sending for Test Tenant' }),
+      ).toHaveLength(1)
+    })
+
+    it('marks a disabled tenant, with why, who and when', () => {
+      setup({ adminRows: [disabledRow], adminCount: 1 })
+      const tenantRow = screen.getByRole('row', { name: /Test Tenant/ })
+      expect(within(tenantRow).getByText('Sending disabled')).toBeInTheDocument()
+      expect(
+        within(tenantRow).getByText('Unpaid invoice (Pat Admin, Nov 1, 2026)'),
+      ).toBeInTheDocument()
+      expect(
+        within(tenantRow).getByRole('button', { name: 'Enable sending for Test Tenant' }),
+      ).toBeInTheDocument()
+    })
+
+    it('requires a reason to disable, then saves it and refreshes the table and summary', async () => {
+      setup({ adminRows: [row], adminCount: 1 })
+      await userEvent.click(screen.getByRole('button', { name: 'Disable sending for Test Tenant' }))
+      const dialog = screen.getByRole('dialog', { name: 'Disable sending for Test Tenant' })
+
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Disable sending' }))
+      expect(within(dialog).getByText('Enter a reason for disabling sending.')).toBeInTheDocument()
+      expect(setTenantSending).not.toHaveBeenCalled()
+
+      await userEvent.type(within(dialog).getByRole('textbox', { name: /Reason/ }), ' Unpaid ')
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Disable sending' }))
+
+      await waitFor(() => expect(setTenantSending).toHaveBeenCalledWith('tenant', false, 'Unpaid'))
+      expect(showSuccessToast).toHaveBeenCalledWith('Sending disabled for Test Tenant')
+      expect(getAdminUsageSummary).toHaveBeenCalledTimes(2)
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    })
+
+    it('enables with a confirmation and no reason', async () => {
+      vi.mocked(setTenantSending).mockResolvedValue({ sendingEnabled: true })
+      setup({ adminRows: [disabledRow], adminCount: 1 })
+      await userEvent.click(screen.getByRole('button', { name: 'Enable sending for Test Tenant' }))
+      const dialog = screen.getByRole('dialog', { name: 'Enable sending for Test Tenant' })
+
+      expect(within(dialog).queryByRole('textbox')).not.toBeInTheDocument()
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Enable sending' }))
+
+      await waitFor(() => expect(setTenantSending).toHaveBeenCalledWith('tenant', true, undefined))
+    })
+
+    it('keeps the dialog open and says why when the change fails', async () => {
+      vi.mocked(setTenantSending).mockRejectedValue(
+        new Error('Failed to load tenant sending: down'),
+      )
+      setup({ adminRows: [disabledRow], adminCount: 1 })
+      await userEvent.click(screen.getByRole('button', { name: 'Enable sending for Test Tenant' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Enable sending' }))
+
+      await waitFor(() =>
+        expect(showErrorToast).toHaveBeenCalledWith('Failed to load tenant sending: down'),
+      )
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
   })
 })
