@@ -68,6 +68,8 @@ runs:
         set -euo pipefail
         CLIENT_ID=$(jq -r '.client_id' <<<"${GWA_ACCT}")
         CLIENT_SECRET=$(jq -r '.client_secret' <<<"${GWA_ACCT}")
+        # Fields pulled out of the secret are not masked automatically.
+        echo "::add-mask::${CLIENT_SECRET}"
         gwa login --client-id "${CLIENT_ID}" --client-secret "${CLIENT_SECRET}"
         # publish-gateway ignores --gateway and reads it from ~/.gwa-config.yaml.
         gwa config set gateway "${GATEWAY}"
@@ -80,6 +82,7 @@ runs:
         QUALIFIER: ${{ inputs.qualifier }}
       run: |
         set -uo pipefail
+        echo "Publishing ${CONFIG_FILE}${QUALIFIER:+ (qualifier=${QUALIFIER})}"
         if [ -n "${QUALIFIER}" ]; then
           OUT=$(gwa publish-gateway "${CONFIG_FILE}" --qualifier "${QUALIFIER}" 2>&1); STATUS=$?
         else
@@ -91,3 +94,4 @@ runs:
           echo "::error::gwa publish-gateway failed${QUALIFIER:+ for qualifier=${QUALIFIER}}"
           exit 1
         fi
+        echo "Published ${CONFIG_FILE}${QUALIFIER:+ (qualifier=${QUALIFIER})}"
