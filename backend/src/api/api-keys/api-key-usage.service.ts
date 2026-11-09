@@ -12,12 +12,14 @@ import { NotifyConfiguration } from '../notification/entities/configuration.enti
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { NotificationStatus } from '../../enum/notification-status.enum'
+import { applyListQueryFilters } from '../../common/query/typeorm-list-query.util'
 import type {
   ListQueryFilter,
   ParsedListQuery,
   QueryableFieldsConfig,
 } from '../../common/query/list-query.types'
 import {
+  AdminTenantOptionDto,
   AdminTenantUsageRowDto,
   AdminUsageSummaryDto,
   ChannelUsageDto,
@@ -34,12 +36,14 @@ const DEFAULT_WARN_THRESHOLD_PERCENT = 80
 /**
  * What the admin all-tenants usage table can be filtered on. Tenants are always ordered by
  * name, so there is nothing to sort on. The channel filter picks which channel rows each tenant
- * gets rather than which tenants are listed, so it is applied by channelsInScope, not as SQL.
+ * gets rather than which tenants are listed, so it is applied by channelsInScope, not as SQL;
+ * `status` (active or disabled) filters the tenants.
  */
 export const adminUsageListQueryConfig: QueryableFieldsConfig = {
   sortableFields: {},
   filterableFields: {
     channel: { column: 'l.channel_code', valueType: 'string', operators: ['eq', 'in'] },
+    status: { column: 't.status', valueType: 'string', operators: ['eq', 'in'] },
   },
 }
 
@@ -346,6 +350,11 @@ export class ApiKeyUsageService {
     const qb = this.notifyTenants()
     const term = search?.trim()
     if (term) qb.andWhere('t.name ILIKE :search', { search: `%${term}%` })
+    applyListQueryFilters(
+      qb,
+      filters.filter((filter) => filter.field !== 'channel'),
+      adminUsageListQueryConfig,
+    )
     const [tenants, count] = await qb
       .orderBy('t.name', 'ASC')
       .addOrderBy('t.id', 'ASC')
@@ -394,6 +403,15 @@ export class ApiKeyUsageService {
       withApiKey: Number(row?.withApiKey ?? 0),
       disabled: Number(row?.disabled ?? 0),
     }
+  }
+
+  /** Every tenant the usage table can list, by name: the options for its tenant search. */
+  async listNotifyTenants(): Promise<AdminTenantOptionDto[]> {
+    return this.notifyTenants()
+      .select(['t.id', 't.name'])
+      .orderBy('t.name', 'ASC')
+      .getMany()
+      .then((tenants) => tenants.map(({ id, name }) => ({ id, name })))
   }
 
   /**

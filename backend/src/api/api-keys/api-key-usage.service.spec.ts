@@ -421,6 +421,20 @@ describe('ApiKeyUsageService.getAllTenantsUsage', () => {
     expect(result).toMatchObject({ count: 32, page: 3, totalPages: 3 })
   })
 
+  it('filters tenants by sending status, leaving the channel filter to pick rows', async () => {
+    const { service, tenantQb } = setup()
+
+    await service.getAllTenantsUsage(
+      parsed([...smsOnly, { field: 'status', operator: 'in', value: ['disabled'] }]),
+    )
+
+    expect(tenantQb.where).toContainEqual([
+      'LOWER(t.status) IN (:...filter_0)',
+      { filter_0: ['disabled'] },
+    ])
+    expect(tenantQb.where.some(([clause]) => clause.includes('channel'))).toBe(false)
+  })
+
   it('returns no rows without querying limits when no tenant matches', async () => {
     const { service, limitQb } = setup({ tenants: [] })
 
@@ -510,6 +524,40 @@ describe('ApiKeyUsageService.getAdminUsageSummary', () => {
     // The same tenants the usage table lists, and no search or filter.
     expect(where).toEqual(['t.isDeleted = :deleted', 't.externalId IS NOT NULL'])
     expect(params.fiscalYearStart).toBeInstanceOf(Date)
+  })
+})
+
+describe('ApiKeyUsageService.listNotifyTenants', () => {
+  it('lists the CSTAR tenants the usage table shows, by name, as id and name only', async () => {
+    const where: string[] = []
+    const calls: Record<string, unknown[]> = {}
+    const qb: Record<string, unknown> = new Proxy(
+      {},
+      {
+        get(_, prop: string) {
+          if (prop === 'getMany') {
+            return () => Promise.resolve([{ id: 't-1', name: 'Parks', status: 'active' }])
+          }
+          return (...args: unknown[]) => {
+            if (prop === 'where' || prop === 'andWhere') where.push(String(args[0]))
+            else calls[prop] = args
+            return qb
+          }
+        },
+      },
+    )
+    const service = new ApiKeyUsageService(
+      {} as Repository<ApiKeyConsumer>,
+      {} as Repository<ApiKeyLimit>,
+      {} as Repository<ApiKeyLimitAlert>,
+      {} as Repository<ApiKeyUsage>,
+      {} as Repository<NotifyConfiguration>,
+      { createQueryBuilder: () => qb } as unknown as Repository<Tenant>,
+    )
+
+    await expect(service.listNotifyTenants()).resolves.toEqual([{ id: 't-1', name: 'Parks' }])
+    expect(where).toEqual(['t.isDeleted = :deleted', 't.externalId IS NOT NULL'])
+    expect(calls.orderBy).toEqual(['t.name', 'ASC'])
   })
 })
 

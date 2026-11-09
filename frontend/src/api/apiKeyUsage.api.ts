@@ -84,6 +84,12 @@ export interface AdminUsageSummary {
   disabled: number
 }
 
+/** A tenant the admin usage table can list. */
+export interface AdminTenantOption {
+  id: string
+  name: string
+}
+
 export interface UpdateTenantLimitsRequest {
   tenantId: string
   channel: string
@@ -178,6 +184,16 @@ export async function getAdminUsageSummary(): Promise<AdminUsageSummary> {
     return await get<AdminUsageSummary>(params)
   } catch (error) {
     throw toReadableError(error, 'tenant summary')
+  }
+}
+
+/** Every tenant the admin usage table can list, by name: the options for its search. */
+export async function getAdminUsageTenants(): Promise<AdminTenantOption[]> {
+  try {
+    const params = generateApiParameters('/api/v1/frontend/admin/api-key-usage/tenants')
+    return await get<AdminTenantOption[]>(params)
+  } catch (error) {
+    throw toReadableError(error, 'tenants')
   }
 }
 

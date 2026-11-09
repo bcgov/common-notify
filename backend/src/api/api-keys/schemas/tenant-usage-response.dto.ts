@@ -167,6 +167,15 @@ export class AdminUsageSummaryDto {
   disabled: number
 }
 
+/** A tenant the admin usage table can list, for its tenant search. */
+export class AdminTenantOptionDto {
+  @ApiProperty({ description: 'Tenant ID' })
+  id: string
+
+  @ApiProperty({ description: 'Tenant name', example: 'Parks Booking' })
+  name: string
+}
+
 /**
  * Paginated admin all-tenants usage response. Pagination is by tenant (each tenant's
  * per-channel rows stay together); `count` is the number of matching tenants.

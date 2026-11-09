@@ -16,6 +16,7 @@ describe('ApiKeyUsageAdminController GET /frontend/admin/api-key-usage', () => {
   let app: INestApplication
   let getAllTenantsUsage: ReturnType<typeof vi.fn>
   let getAdminUsageSummary: ReturnType<typeof vi.fn>
+  let listNotifyTenants: ReturnType<typeof vi.fn>
   let setSending: ReturnType<typeof vi.fn>
 
   beforeEach(async () => {
@@ -23,6 +24,7 @@ describe('ApiKeyUsageAdminController GET /frontend/admin/api-key-usage', () => {
       .fn()
       .mockResolvedValue({ data: [], count: 0, page: 1, limit: 15, totalPages: 0 })
     setSending = vi.fn().mockImplementation((_id, enabled: boolean) => Promise.resolve(enabled))
+    listNotifyTenants = vi.fn().mockResolvedValue([{ id: 't-1', name: 'Parks' }])
     getAdminUsageSummary = vi
       .fn()
       .mockResolvedValue({ tenants: 42, sentThisFiscalYear: 30, withApiKey: 12 })
@@ -30,7 +32,10 @@ describe('ApiKeyUsageAdminController GET /frontend/admin/api-key-usage', () => {
     const module = await Test.createTestingModule({
       controllers: [ApiKeyUsageAdminController],
       providers: [
-        { provide: ApiKeyUsageService, useValue: { getAllTenantsUsage, getAdminUsageSummary } },
+        {
+          provide: ApiKeyUsageService,
+          useValue: { getAllTenantsUsage, getAdminUsageSummary, listNotifyTenants },
+        },
         { provide: TenantsService, useValue: { setSending } },
       ],
     })
@@ -89,6 +94,23 @@ describe('ApiKeyUsageAdminController GET /frontend/admin/api-key-usage', () => {
 
     expect(response.body).toEqual({ tenants: 42, sentThisFiscalYear: 30, withApiKey: 12 })
     expect(getAllTenantsUsage).not.toHaveBeenCalled()
+  })
+
+  it('parses a sending status filter', async () => {
+    await request(app.getHttpServer()).get(`${url}?filter=status:in:disabled`).expect(200)
+
+    expect(getAllTenantsUsage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filters: [{ field: 'status', operator: 'in', value: ['disabled'] }],
+      }),
+      undefined,
+    )
+  })
+
+  it('lists the tenants for the search from /tenants', async () => {
+    const response = await request(app.getHttpServer()).get(`${url}/tenants`).expect(200)
+
+    expect(response.body).toEqual([{ id: 't-1', name: 'Parks' }])
   })
 
   it('rejects a page that is not a whole number', async () => {

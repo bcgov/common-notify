@@ -24,6 +24,7 @@ import { SsoRole } from '../../enum/sso-role.enum'
 import { ApiKeyUsageService, adminUsageListQueryConfig } from './api-key-usage.service'
 import { parseListQuery } from '../../common/query/list-query.parser'
 import {
+  AdminTenantOptionDto,
   AdminTenantUsageRowDto,
   AdminUsageSummaryDto,
   PaginatedAdminUsageResponseDto,
@@ -71,6 +72,15 @@ export class ApiKeyUsageAdminController {
   @ApiOkResponse({ type: AdminUsageSummaryDto })
   getSummary(): Promise<AdminUsageSummaryDto> {
     return this.apiKeyUsageService.getAdminUsageSummary()
+  }
+
+  @Version('1')
+  @Get('tenants')
+  @Roles(SsoRole.NOTIFY_ADMIN)
+  @ApiOperation({ summary: 'Every tenant the usage table lists, by name (admin only)' })
+  @ApiOkResponse({ type: [AdminTenantOptionDto] })
+  listTenants(): Promise<AdminTenantOptionDto[]> {
+    return this.apiKeyUsageService.listNotifyTenants()
   }
 
   @Version('1')

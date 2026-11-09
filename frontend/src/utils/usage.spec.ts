@@ -4,13 +4,44 @@ import {
   formatChannel,
   formatFailures,
   formatLastSent,
+  groupUsageByTenant,
   percentOf,
 } from './usage'
+import type { AdminTenantUsageRow } from '@/api/apiKeyUsage.api'
 
 describe('formatChannel', () => {
-  it('title-cases a channel code', () => {
+  it('title-cases a channel code and keeps SMS an acronym', () => {
     expect(formatChannel('EMAIL')).toBe('Email')
-    expect(formatChannel('sms')).toBe('Sms')
+    expect(formatChannel('sms')).toBe('SMS')
+  })
+})
+
+describe('groupUsageByTenant', () => {
+  const row = (tenantId: string, channel: string) =>
+    ({
+      tenantId,
+      tenantName: `Tenant ${tenantId}`,
+      channel,
+      sendingEnabled: tenantId !== 'b',
+      disabledReason: tenantId === 'b' ? 'Unpaid' : null,
+      disabledAt: null,
+      disabledBy: null,
+    }) as AdminTenantUsageRow
+
+  it('makes one entry per tenant, in order, holding its channel rows', () => {
+    const rows = [row('a', 'EMAIL'), row('a', 'SMS'), row('b', 'EMAIL')]
+
+    const tenants = groupUsageByTenant(rows)
+
+    expect(tenants.map((t) => [t.tenantId, t.channels.map((c) => c.channel)])).toEqual([
+      ['a', ['EMAIL', 'SMS']],
+      ['b', ['EMAIL']],
+    ])
+    expect(tenants[1]).toMatchObject({ sendingEnabled: false, disabledReason: 'Unpaid' })
+  })
+
+  it('returns nothing for no rows', () => {
+    expect(groupUsageByTenant([])).toEqual([])
   })
 })
 

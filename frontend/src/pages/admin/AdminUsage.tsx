@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FC } from 'react'
-import { getAdminUsageSummary } from '@/api/apiKeyUsage.api'
+import { getAdminUsageSummary, getAdminUsageTenants } from '@/api/apiKeyUsage.api'
 import type { AdminTenantUsageRow, AdminUsageSummary } from '@/api/apiKeyUsage.api'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
 import { fetchAllTenantsUsage, updateTenantLimits } from '@/redux/thunks/apiKeyUsage.thunks'
@@ -12,7 +12,9 @@ import {
 } from '@/redux/slices/apiKeyUsage.slice'
 import UserService from '@/service/user-service'
 import PageHeading from '@/components/PageHeading'
-import SearchField from '@/components/SearchField'
+import TypeaheadSearchField from '@/components/TypeaheadSearchField'
+import ChannelValues from '@/components/ChannelValues'
+import RowActionsMenu from '@/components/RowActionsMenu'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
 import NotAuthorized from '@/components/NotAuthorized'
@@ -20,12 +22,46 @@ import UsageCell from '@/components/UsageCell'
 import EditModal from '@/components/EditModal'
 import NumberInputField from '@/components/NumberInputField'
 import { showSuccessToast, showErrorToast } from '@/redux/utils/toastUtils'
-import TenantNameCell from './TenantNameCell'
+import TenantSendingCell from './TenantSendingCell'
 import TenantSendingDialog from './TenantSendingDialog'
-import UsageRowActions from './UsageRowActions'
-import { adoptionSummaryText, formatChannel, formatFailures, formatLastSent } from '@/utils/usage'
+import {
+  adoptionSummaryText,
+  formatChannel,
+  formatFailures,
+  formatLastSent,
+  groupUsageByTenant,
+} from '@/utils/usage'
+import type { AdminTenantUsage } from '@/utils/usage'
 
 const rowKeyOf = (row: AdminTenantUsageRow) => `${row.tenantId}-${row.channel}`
+
+const SENDING_ACTION = 'sending'
+const LIMITS_ACTION_PREFIX = 'limits:'
+
+/** The ⋮ menu's groups for a tenant: edit each channel that has limits, then the sending toggle. */
+function tenantActionGroups(tenant: AdminTenantUsage) {
+  return [
+    {
+      id: 'limits',
+      // Limits are created when an API key is bound, so a channel without them has nothing to edit.
+      actions: tenant.channels
+        .filter((row) => row.dailyLimit !== null && row.annualLimit !== null)
+        .map((row) => ({
+          id: `${LIMITS_ACTION_PREFIX}${row.channel}`,
+          label: `Edit ${formatChannel(row.channel)} limits`,
+        })),
+    },
+    {
+      id: SENDING_ACTION,
+      actions: [
+        {
+          id: SENDING_ACTION,
+          label: tenant.sendingEnabled ? 'Disable sending' : 'Enable sending',
+        },
+      ],
+    },
+  ]
+}
 
 const AdminUsage: FC = () => {
   const dispatch = useAppDispatch()
@@ -46,7 +82,8 @@ const AdminUsage: FC = () => {
   const [dailyLimit, setDailyLimit] = useState(0)
   const [annualLimit, setAnnualLimit] = useState(0)
   const [summary, setSummary] = useState<AdminUsageSummary | null>(null)
-  const [sendingTarget, setSendingTarget] = useState<AdminTenantUsageRow | null>(null)
+  const [sendingTarget, setSendingTarget] = useState<AdminTenantUsage | null>(null)
+  const [tenantNames, setTenantNames] = useState<string[]>([])
 
   // Totals across every tenant, so they don't change with the table's search or filters: fetched
   // on arrival and after a change that moves them. Only this screen reads them, so no slice.
@@ -60,17 +97,17 @@ const AdminUsage: FC = () => {
     if (isAdmin) loadSummary()
   }, [isAdmin, loadSummary])
 
-  // Rows are tenant × channel; per-tenant actions belong on each tenant's first row only.
-  const firstRowKeys = useMemo(() => {
-    const seen = new Set<string>()
-    return new Set(
-      adminRows.flatMap((row) => {
-        if (seen.has(row.tenantId)) return []
-        seen.add(row.tenantId)
-        return [rowKeyOf(row)]
-      }),
-    )
-  }, [adminRows])
+  // Fetched once: the search's suggestions. Without them the search still works on typed text,
+  // so a failure leaves the list empty rather than raising an error over the table.
+  useEffect(() => {
+    if (!isAdmin) return
+    getAdminUsageTenants()
+      .then((tenants) => setTenantNames(tenants.map((tenant) => tenant.name)))
+      .catch(() => setTenantNames([]))
+  }, [isAdmin])
+
+  // The API returns a row per tenant and channel; the table shows a row per tenant.
+  const tenants = useMemo(() => groupUsageByTenant(adminRows), [adminRows])
 
   // Server-side: refetch whenever the page, page size, committed search or filters change.
   useEffect(() => {
@@ -89,8 +126,8 @@ const AdminUsage: FC = () => {
     dispatch(setAdminLimit(newLimit))
   }
 
-  function handleSearch() {
-    dispatch(setAdminSearch(searchInput.trim()))
+  function handleSearch(term: string) {
+    dispatch(setAdminSearch(term.trim()))
   }
 
   function clearSearch() {
@@ -102,10 +139,20 @@ const AdminUsage: FC = () => {
     dispatch(setAdminFilter({ field: key, values }))
   }
 
-  function openEdit(row: AdminTenantUsageRow, limits: { daily: number; annual: number }) {
+  function openEdit(row: AdminTenantUsageRow) {
     setEditingRow(row)
-    setDailyLimit(limits.daily)
-    setAnnualLimit(limits.annual)
+    setDailyLimit(row.dailyLimit ?? 0)
+    setAnnualLimit(row.annualLimit ?? 0)
+  }
+
+  function handleTenantAction(tenant: AdminTenantUsage, actionId: string) {
+    if (actionId === SENDING_ACTION) {
+      setSendingTarget(tenant)
+      return
+    }
+    const channel = actionId.slice(LIMITS_ACTION_PREFIX.length)
+    const row = tenant.channels.find((candidate) => candidate.channel === channel)
+    if (row) openEdit(row)
   }
 
   function closeEdit() {
@@ -141,95 +188,150 @@ const AdminUsage: FC = () => {
     }
   }
 
-  const columns: TableColumn<AdminTenantUsageRow>[] = [
+  const columns: TableColumn<AdminTenantUsage>[] = [
     {
       key: 'tenantName',
       label: 'Tenant',
-      render: (_, row) => <TenantNameCell {...row} />,
+      render: (_, tenant) => <span className="fw-semibold">{tenant.tenantName}</span>,
     },
     {
-      key: 'channel',
+      key: 'sendingEnabled',
+      label: 'Sending',
+      filterKey: 'status',
+      filterOptions: [
+        { label: 'Enabled', value: 'active' },
+        { label: 'Disabled', value: 'disabled' },
+      ],
+      render: (_, tenant) => <TenantSendingCell {...tenant} />,
+    },
+    {
+      key: 'channels',
       label: 'Channel',
+      filterKey: 'channel',
       filterOptions: [
         { label: 'Email', value: 'EMAIL' },
         { label: 'SMS', value: 'SMS' },
       ],
-      render: (_, row) => <span>{formatChannel(row.channel)}</span>,
+      render: (_, tenant) => (
+        <ChannelValues
+          rows={tenant.channels}
+          labelled={false}
+          render={(row) => formatChannel(row.channel)}
+        />
+      ),
     },
     {
-      key: 'lastSentAt',
+      key: 'channels',
+      id: 'lastSent',
       label: 'Last sent',
-      render: (_, row) =>
-        row.lastSentAt === null ? (
-          <span className="text-muted">Never</span>
-        ) : (
-          <time dateTime={row.lastSentAt} title={new Date(row.lastSentAt).toLocaleString()}>
-            {formatLastSent(row.lastSentAt, Date.now())}
-          </time>
-        ),
+      render: (_, tenant) => (
+        <ChannelValues
+          rows={tenant.channels}
+          render={(row) =>
+            row.lastSentAt === null ? (
+              <span className="text-muted">Never</span>
+            ) : (
+              <time dateTime={row.lastSentAt} title={new Date(row.lastSentAt).toLocaleString()}>
+                {formatLastSent(row.lastSentAt, Date.now())}
+              </time>
+            )
+          }
+        />
+      ),
     },
     {
-      key: 'averageMonthlySends',
+      key: 'channels',
+      id: 'averageMonthly',
       label: 'Avg / month',
-      render: (_, row) =>
-        row.averageMonthlySends === null ? (
-          <span className="text-muted">
-            —<span className="visually-hidden">No full month of sending yet</span>
-          </span>
-        ) : (
-          <span>{row.averageMonthlySends.toLocaleString()}</span>
-        ),
+      render: (_, tenant) => (
+        <ChannelValues
+          rows={tenant.channels}
+          render={(row) =>
+            row.averageMonthlySends === null ? (
+              <span className="text-muted">
+                —<span className="visually-hidden">No full month of sending yet</span>
+              </span>
+            ) : (
+              row.averageMonthlySends.toLocaleString()
+            )
+          }
+        />
+      ),
     },
     {
-      key: 'failedLast30Days',
+      key: 'channels',
+      id: 'failed',
       label: 'Failed (30 days)',
-      render: (_, row) => (
-        <span className={row.failedLast30Days > 0 ? 'text-danger fw-semibold' : undefined}>
-          {formatFailures(row.failedLast30Days, row.recipientsLast30Days)}
-        </span>
+      render: (_, tenant) => (
+        <ChannelValues
+          rows={tenant.channels}
+          render={(row) => (
+            <span className={row.failedLast30Days > 0 ? 'text-danger fw-semibold' : undefined}>
+              {formatFailures(row.failedLast30Days, row.recipientsLast30Days)}
+            </span>
+          )}
+        />
       ),
     },
     {
-      key: 'dailyLimit',
+      key: 'channels',
+      id: 'daily',
       label: 'Daily',
-      render: (_, row) => (
-        <UsageCell
-          used={row.usedToday}
-          limit={row.dailyLimit}
-          thresholdPercent={row.warnThresholdPercent}
+      render: (_, tenant) => (
+        <ChannelValues
+          rows={tenant.channels}
+          render={(row) => (
+            <UsageCell
+              used={row.usedToday}
+              limit={row.dailyLimit}
+              thresholdPercent={row.warnThresholdPercent}
+            />
+          )}
         />
       ),
     },
     {
-      key: 'annualLimit',
+      key: 'channels',
+      id: 'annual',
       label: 'Annual (fiscal year)',
-      render: (_, row) => (
-        <UsageCell
-          used={row.usedThisYear}
-          limit={row.annualLimit}
-          thresholdPercent={row.warnThresholdPercent}
+      render: (_, tenant) => (
+        <ChannelValues
+          rows={tenant.channels}
+          render={(row) => (
+            <UsageCell
+              used={row.usedThisYear}
+              limit={row.annualLimit}
+              thresholdPercent={row.warnThresholdPercent}
+            />
+          )}
         />
       ),
     },
     {
-      key: 'warnThresholdPercent',
+      key: 'channels',
+      id: 'threshold',
       label: 'Alert threshold',
-      render: (_, row) =>
-        row.warnThresholdPercent === null ? (
-          <span className="text-muted">Not set</span>
-        ) : (
-          <span>{row.warnThresholdPercent}%</span>
-        ),
+      render: (_, tenant) => (
+        <ChannelValues
+          rows={tenant.channels}
+          render={(row) =>
+            row.warnThresholdPercent === null ? (
+              <span className="text-muted">Not set</span>
+            ) : (
+              `${row.warnThresholdPercent}%`
+            )
+          }
+        />
+      ),
     },
     {
       key: 'tenantId',
       label: 'Actions',
-      render: (_, row) => (
-        <UsageRowActions
-          row={row}
-          showSendingToggle={firstRowKeys.has(rowKeyOf(row))}
-          onEditLimits={openEdit}
-          onToggleSending={setSendingTarget}
+      render: (_, tenant) => (
+        <RowActionsMenu
+          label={`Actions for ${tenant.tenantName}`}
+          groups={tenantActionGroups(tenant)}
+          onAction={(actionId) => handleTenantAction(tenant, actionId)}
         />
       ),
     },
@@ -244,10 +346,11 @@ const AdminUsage: FC = () => {
       {adminError && <div role="alert">{adminError}</div>}
 
       <div className="page__toolbar">
-        <SearchField
+        <TypeaheadSearchField
           value={searchInput}
           onChange={setSearchInput}
           onSearch={handleSearch}
+          suggestions={tenantNames}
           placeholder="Search tenants..."
           ariaLabel="Search tenants"
         />
@@ -255,8 +358,9 @@ const AdminUsage: FC = () => {
 
       <DataTable
         columns={columns}
-        data={adminRows}
-        keyExtractor={(row) => rowKeyOf(row)}
+        data={tenants}
+        keyExtractor={(tenant) => tenant.tenantId}
+        multiline
         isLoading={adminLoading}
         emptyMessage="No tenants found."
         search={adminSearch}
