@@ -209,6 +209,19 @@
   padding-right: 0;
 }
 
+// The preview tabs sit directly on the output they switch, so the pane's gap is dropped here
+// and only the intro keeps space below it.
+.template-preview .notification-preview__output-pane {
+  gap: 0;
+}
+
+.template-preview__output-intro {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  margin-bottom: $spacing-sm;
+}
+
 // Events that still use a template, listed when it cannot be deleted.
 .templates__usage-list {
   margin: 0;
