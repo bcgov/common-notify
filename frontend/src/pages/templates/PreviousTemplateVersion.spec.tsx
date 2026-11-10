@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { act, fireEvent, render, screen } from '@testing-library/react'
+import { NotificationChannel } from '@/api/templates.api'
 import type * as TemplatesApi from '@/api/templates.api'
 import PreviousTemplateVersion from './PreviousTemplateVersion'
 
@@ -18,6 +19,7 @@ const template = {
   version: 2,
   updatedAt: '2026-08-13T17:43:00Z',
   updatedByName: 'Isabella Samantha',
+  channelCode: NotificationChannel.EMAIL,
 }
 
 const previousVersion = {
@@ -92,6 +94,30 @@ describe('PreviousTemplateVersion', () => {
     const edited = await screen.findByText(/^Edit made on /)
     expect(edited.textContent).not.toContain(', by ')
     expect(screen.queryByText('Subject line:')).toBeNull()
+  })
+
+  it('shows no SMS estimate for an email template', async () => {
+    render(<PreviousTemplateVersion template={template} />)
+
+    await openModal()
+    await screen.findByRole('heading', { name: 'New Order Ready' })
+
+    expect(screen.queryByText(/Estimated character count/)).toBeNull()
+  })
+
+  it('shows the SMS estimate below the body of an SMS template', async () => {
+    getPreviousTemplateVersionMock.mockResolvedValue({ ...previousVersion, subject: null })
+
+    render(
+      <PreviousTemplateVersion template={{ ...template, channelCode: NotificationChannel.SMS }} />,
+    )
+
+    await openModal()
+
+    const estimate = await screen.findByText(/Estimated character count/)
+    expect(estimate.textContent).toContain('21/1000 characters maximum')
+    expect(estimate.textContent).toContain('Estimated parts: 1')
+    expect(screen.queryByText('Body text:')).toBeNull()
   })
 
   it('shows the error when the version cannot be loaded', async () => {

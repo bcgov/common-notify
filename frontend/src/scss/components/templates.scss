@@ -72,6 +72,12 @@
   color: var(--typography-color-primary);
 }
 
+.previous-template-version__sms-estimate {
+  margin: var(--layout-padding-xsmall) 0 0;
+  font: var(--typography-regular-small-body);
+  color: var(--typography-color-primary);
+}
+
 .previous-template-version__loading {
   display: flex;
   justify-content: center;

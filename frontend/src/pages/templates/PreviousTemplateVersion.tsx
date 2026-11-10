@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
 import type { FC } from 'react'
 import { AlertDialog, Modal, ProgressCircle } from '@bcgov/design-system-react-components'
-import { getPreviousTemplateVersion } from '@/api/templates.api'
+import { getPreviousTemplateVersion, NotificationChannel } from '@/api/templates.api'
 import type { TemplateResponse, TemplateVersionResponse } from '@/api/templates.api'
 import Alert from '@/components/Alert'
 import EmailTemplatePreview from '@/components/EmailTemplatePreview'
+import PreviousVersionSmsEstimate from './PreviousVersionSmsEstimate'
 import '@/scss/components/templates.scss'
 
 type PreviousTemplateVersionProps = {
-  template: Pick<TemplateResponse, 'id' | 'version' | 'updatedAt' | 'updatedByName'>
+  template: Pick<TemplateResponse, 'id' | 'version' | 'updatedAt' | 'updatedByName' | 'channelCode'>
 }
 
 const MODAL_TITLE = 'Previous Version'
@@ -16,7 +17,10 @@ const MODAL_TITLE = 'Previous Version'
 /**
  * refetches the previous version every time the modal loads
  */
-const PreviousVersionContent: FC<{ templateId: string }> = ({ templateId }) => {
+const PreviousVersionContent: FC<{ templateId: string; isSms: boolean }> = ({
+  templateId,
+  isSms,
+}) => {
   const [version, setVersion] = useState<TemplateVersionResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -59,6 +63,7 @@ const PreviousVersionContent: FC<{ templateId: string }> = ({ templateId }) => {
         {version.createdByName ? `, by ${version.createdByName}.` : '.'}
       </p>
       <EmailTemplatePreview subject={version.subject} body={version.body} />
+      {isSms && <PreviousVersionSmsEstimate body={version.body} />}
     </>
   )
 }
@@ -94,7 +99,10 @@ const PreviousTemplateVersion: FC<PreviousTemplateVersionProps> = ({ template })
           aria-label={MODAL_TITLE}
         >
           <div className="previous-template-version">
-            <PreviousVersionContent templateId={template.id} />
+            <PreviousVersionContent
+              templateId={template.id}
+              isSms={template.channelCode === NotificationChannel.SMS}
+            />
           </div>
         </AlertDialog>
       </Modal>
