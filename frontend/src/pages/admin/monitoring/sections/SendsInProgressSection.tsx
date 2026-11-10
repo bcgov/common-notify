@@ -4,7 +4,8 @@ import MeterBar from '@/components/MeterBar'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
 import type { SendInProgress } from '@/interfaces/queueMonitoring.interface'
-import { formatAgo, formatMessageChannel, formatRate } from '@/utils/monitoring'
+import { formatAgo, formatRate } from '@/utils/monitoring'
+import { formatChannel } from '@/utils/channels'
 
 interface SendsInProgressSectionProps {
   sends: SendInProgress[]
@@ -44,7 +45,7 @@ const SendsInProgressSection: FC<SendsInProgressSectionProps> = ({ sends, now })
     {
       key: 'channels',
       label: 'Channel',
-      render: (_, row) => row.channels.map(formatMessageChannel).join(', ') || '—',
+      render: (_, row) => row.channels.map(formatChannel).join(', ') || '—',
     },
     {
       key: 'sent',

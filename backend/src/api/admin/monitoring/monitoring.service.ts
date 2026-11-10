@@ -28,6 +28,7 @@ import {
 import type { WorkerHeartbeatPayload } from '../../../queue/worker-heartbeat'
 import { readReconcileActivity } from '../../../queue/reconcile-activity'
 import { readCircuitState } from '../../../common/redis/circuit-breaker'
+import { redisKey } from '../../../common/redis/redis-namespace'
 import type { CircuitState } from '../../../common/redis/circuit-breaker'
 import {
   CHES_CIRCUIT_KEY,
@@ -60,6 +61,11 @@ const UNHELD_GRACE_MS = HEARTBEAT_INTERVAL_MS * 2
 const IN_FLIGHT_DETAIL_STATUSES = ['pending', 'queued', 'processing', 'sending']
 /** Older in-flight rows are abandoned, not backlog, and would pin "oldest pending" forever. */
 const PENDING_LOOKBACK_MS = 24 * 60 * 60 * 1000
+/** Day and month boundaries for the totals cards: Notify's users work in BC. */
+const REPORTING_TIME_ZONE = 'America/Vancouver'
+/** One small key with a TTL, so it is safe on the noeviction instance (AGENTS.md §5.1). */
+const SEND_TOTALS_KEY = redisKey('monitoring:send-totals')
+const SEND_TOTALS_TTL_SECONDS = 60
 /** A longer pause between consecutive sends is idle time, not part of how fast sending runs. */
 const IDLE_GAP_SECONDS = 30
 const MIN_RATE_MESSAGES = 10
@@ -451,10 +457,32 @@ export function sendingRateFrom(
   }
 }
 
+export interface SendTotalsRow {
+  day_start: Date | string
+  month_start: Date | string
+  sent_today: string
+  sent_month: string
+  failed_today: string
+  last_failure: Date | string | null
+}
+
+const iso = (value: Date | string) => new Date(value).toISOString()
+
+export function sendTotalsFrom(row: SendTotalsRow): MonitoringOverviewDto['totals'] {
+  return {
+    dayStart: iso(row.day_start),
+    monthStart: iso(row.month_start),
+    sentToday: Number(row.sent_today),
+    sentThisMonth: Number(row.sent_month),
+    failedToday: Number(row.failed_today),
+    lastFailureAt: row.last_failure ? iso(row.last_failure) : null,
+  }
+}
+
 export function buildOverview(
   messages: MessageChannelStatsDto[],
   queues: QueueStatsDto[],
-  deliveryTime: MonitoringOverviewDto['deliveryTime'],
+  totals: MonitoringOverviewDto['totals'],
   sendingRate: MonitoringOverviewDto['sendingRate'],
 ): MonitoringOverviewDto {
   const sumSeries = (pick: (m: MessageChannelStatsDto) => number[]) =>
@@ -466,7 +494,7 @@ export function buildOverview(
 
   return {
     windowMinutes: MONITORING_WINDOW_MINUTES,
-    deliveryTime,
+    totals,
     messagesSent,
     messagesFailed,
     sendingRate,
@@ -576,7 +604,7 @@ export class MonitoringService {
       messages,
       failedJobs,
       activeByQueue,
-      deliveryTime,
+      totals,
       sendingRate,
       reconcileActivity,
       sendRows,
@@ -587,7 +615,7 @@ export class MonitoringService {
       this.getMessageStats(now),
       this.getRecentFailedJobs(),
       this.getActiveJobs(),
-      this.getDeliveryTime(now),
+      this.getSendTotals(),
       this.getSendingRate(now),
       readReconcileActivity(this.redis, now, MONITORING_WINDOW_MINUTES),
       this.getSendsInProgress(now),
@@ -615,7 +643,7 @@ export class MonitoringService {
         ...providers.map((provider) => provider.status),
         ...queues.map((queue) => queue.status),
       ]),
-      overview: buildOverview(messages, queues, deliveryTime, sendingRate),
+      overview: buildOverview(messages, queues, totals, sendingRate),
       redis,
       messages,
       queues,
@@ -762,34 +790,39 @@ export class MonitoringService {
   }
 
   /**
-   * Median and 95th percentile time to send, over recipients sent in the last hour. Timed from
-   * the parent request's acceptance rather than the detail row's creation, which for a merge
-   * send only happens once ingestion runs; a scheduled send is timed from when it fell due.
+   * Sent and failed recipients since Pacific midnight and the 1st of the month, across every
+   * tenant and UI sends included. Cached in Redis because the page refetches on every change
+   * during a send, and a month's count is the heaviest read on it.
    */
-  private async getDeliveryTime(now: number): Promise<MonitoringOverviewDto['deliveryTime']> {
-    const since = new Date(now - MONITORING_WINDOW_MINUTES * 60_000)
-    const elapsedMs =
-      'EXTRACT(EPOCH FROM (detail.last_attempt_at - GREATEST(request.created_at, ' +
-      'COALESCE(request.delayed_send_time, request.created_at)))) * 1000'
-    const row = await this.detailRepository
-      .createQueryBuilder('detail')
-      .innerJoin('detail.notificationRequest', 'request')
-      .select(`percentile_cont(0.5) WITHIN GROUP (ORDER BY ${elapsedMs})`, 'median')
-      .addSelect(`percentile_cont(0.95) WITHIN GROUP (ORDER BY ${elapsedMs})`, 'p95')
-      .addSelect('COUNT(*)', 'messages')
-      // Repeats the partial index predicate (V72) so the planner uses it, then narrows to sent.
-      .where("detail.status IN ('sent', 'failed')")
-      .andWhere("detail.status = 'sent'")
-      .andWhere('detail.last_attempt_at >= :since', { since })
-      .getRawOne<{ median: string | null; p95: string | null; messages: string }>()
+  private async getSendTotals(): Promise<MonitoringOverviewDto['totals']> {
+    const redis = this.redis as Redis
+    const cached = await redis.get(SEND_TOTALS_KEY).catch(() => null)
+    if (cached) return JSON.parse(cached) as MonitoringOverviewDto['totals']
 
-    const messages = Number(row?.messages ?? 0)
-    if (!row || messages === 0 || row.median === null || row.p95 === null) return null
-    return {
-      medianMs: Math.max(0, Math.round(Number(row.median))),
-      p95Ms: Math.max(0, Math.round(Number(row.p95))),
-      messages,
-    }
+    const table = this.detailRepository.metadata.tablePath
+    // The status filter repeats the partial index predicate (V72) so the planner uses it.
+    const [row] = (await this.detailRepository.query(
+      `WITH bounds AS (
+         SELECT date_trunc('day', now() AT TIME ZONE $1) AT TIME ZONE $1 AS day_start,
+                date_trunc('month', now() AT TIME ZONE $1) AT TIME ZONE $1 AS month_start
+       )
+       SELECT b.day_start, b.month_start,
+              COUNT(d.*) FILTER (WHERE d.status = 'sent' AND d.last_attempt_at >= b.day_start) AS sent_today,
+              COUNT(d.*) FILTER (WHERE d.status = 'sent') AS sent_month,
+              COUNT(d.*) FILTER (WHERE d.status = 'failed' AND d.last_attempt_at >= b.day_start) AS failed_today,
+              MAX(d.last_attempt_at) FILTER (WHERE d.status = 'failed') AS last_failure
+         FROM bounds b
+         LEFT JOIN ${table} d
+           ON d.status IN ('sent', 'failed') AND d.last_attempt_at >= b.month_start
+        GROUP BY b.day_start, b.month_start`,
+      [REPORTING_TIME_ZONE],
+    )) as SendTotalsRow[]
+
+    const totals = sendTotalsFrom(row)
+    await redis
+      .set(SEND_TOTALS_KEY, JSON.stringify(totals), 'EX', SEND_TOTALS_TTL_SECONDS)
+      .catch(() => {})
+    return totals
   }
 
   /**
@@ -815,6 +848,35 @@ export class MonitoringService {
     )) as Array<{ busy_messages: string; busy_seconds: string }>
 
     return sendingRateFrom(Number(row?.busy_messages ?? 0), Number(row?.busy_seconds ?? 0))
+  }
+
+  /**
+   * Each channel's busy pace, measured like getSendingRate. Failures count too, since they
+   * leave the backlog as surely as sends. A channel without enough sends to measure is absent.
+   */
+  private async getChannelSendingRates(now: number): Promise<Map<string, number>> {
+    const since = new Date(now - MONITORING_WINDOW_MINUTES * 60_000)
+    const table = this.detailRepository.metadata.tablePath
+    const rows = (await this.detailRepository.query(
+      `SELECT channel,
+              COUNT(*) FILTER (WHERE gap <= $2) AS busy_messages,
+              COALESCE(SUM(gap) FILTER (WHERE gap <= $2), 0) AS busy_seconds
+         FROM (
+           SELECT channel, EXTRACT(EPOCH FROM last_attempt_at - lag(last_attempt_at)
+                    OVER (PARTITION BY channel ORDER BY last_attempt_at)) AS gap
+             FROM ${table}
+            WHERE status IN ('sent', 'failed') AND last_attempt_at >= $1
+         ) gaps
+        GROUP BY channel`,
+      [since, IDLE_GAP_SECONDS],
+    )) as Array<{ channel?: string; busy_messages: string; busy_seconds: string }>
+
+    const rates = new Map<string, number>()
+    for (const row of rows) {
+      const rate = sendingRateFrom(Number(row.busy_messages), Number(row.busy_seconds))
+      if (row.channel && rate) rates.set(row.channel, rate.perMinute)
+    }
+    return rates
   }
 
   /**
@@ -907,7 +969,7 @@ export class MonitoringService {
   private async getMessageStats(now: number): Promise<MessageChannelStatsDto[]> {
     const since = new Date((minuteOf(now) - (MONITORING_WINDOW_MINUTES - 1)) * 60_000)
 
-    const [pendingRows, finishedRows] = await Promise.all([
+    const [pendingRows, finishedRows, busyRates] = await Promise.all([
       this.detailRepository
         .createQueryBuilder('detail')
         .innerJoin('detail.notificationRequest', 'request')
@@ -933,6 +995,7 @@ export class MonitoringService {
         .addGroupBy('detail.status')
         .addGroupBy('minute')
         .getRawMany<{ channel: string; status: string; minute: Date | string; count: string }>(),
+      this.getChannelSendingRates(now),
     ])
 
     const channels = new Set<string>(DEFAULT_MESSAGE_CHANNELS)
@@ -968,7 +1031,12 @@ export class MonitoringService {
         failed,
         sentPerMinute,
         failedPerMinute,
-        estimatedClearMinutes: estimateClearMinutes(pending, finishedPerMinute),
+        // The busy pace, not the per-minute average: a burst a minute old would otherwise be
+        // averaged with the idle minutes before it and read as many times slower than it is.
+        estimatedClearMinutes: estimateClearMinutes(
+          pending,
+          busyRates.get(channel) ?? finishedPerMinute,
+        ),
       }
     })
   }

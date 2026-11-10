@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  Param,
+  ParseUUIDPipe,
   Patch,
   Query,
   Req,
@@ -22,11 +24,17 @@ import { SsoRole } from '../../enum/sso-role.enum'
 import { ApiKeyUsageService, adminUsageListQueryConfig } from './api-key-usage.service'
 import { parseListQuery } from '../../common/query/list-query.parser'
 import {
+  AdminTenantOptionDto,
   AdminTenantUsageRowDto,
+  AdminUsageSummaryDto,
   PaginatedAdminUsageResponseDto,
 } from './schemas/tenant-usage-response.dto'
 import { UpdateTenantLimitsDto } from './schemas/update-tenant-limits.dto'
-import { AdminUsageQueryDto } from './schemas/admin-usage-query.dto'
+import { SearchableListQueryDto } from '../../common/query/searchable-list-query.dto'
+import type { Request as ExpressRequest } from 'express'
+import { SetTenantSendingDto } from './schemas/set-tenant-sending.dto'
+import { TenantsService } from '../admin/tenants/tenants.service'
+import { JwtUserExtractor } from '../../common/utils/jwt-user-extractor'
 
 /**
  * Admin API Controller for notification usage across all tenants.
@@ -42,16 +50,39 @@ import { AdminUsageQueryDto } from './schemas/admin-usage-query.dto'
 @UseGuards(NotifyAdminGuard)
 @ApiBearerAuth()
 export class ApiKeyUsageAdminController {
-  constructor(private readonly apiKeyUsageService: ApiKeyUsageService) {}
+  constructor(
+    private readonly apiKeyUsageService: ApiKeyUsageService,
+    private readonly tenantsService: TenantsService,
+  ) {}
 
   @Version('1')
   @Get()
   @Roles(SsoRole.NOTIFY_ADMIN)
   @ApiOperation({ summary: 'Get notification usage vs limits for every tenant (admin only)' })
   @ApiOkResponse({ type: PaginatedAdminUsageResponseDto })
-  getAllTenantsUsage(@Query() query: AdminUsageQueryDto): Promise<PaginatedAdminUsageResponseDto> {
+  getAllTenantsUsage(
+    @Query() query: SearchableListQueryDto,
+  ): Promise<PaginatedAdminUsageResponseDto> {
     const parsedQuery = parseListQuery(query, adminUsageListQueryConfig)
     return this.apiKeyUsageService.getAllTenantsUsage(parsedQuery, query.search)
+  }
+
+  @Version('1')
+  @Get('summary')
+  @Roles(SsoRole.NOTIFY_ADMIN)
+  @ApiOperation({ summary: 'How many tenants use Notify (admin only)' })
+  @ApiOkResponse({ type: AdminUsageSummaryDto })
+  getSummary(): Promise<AdminUsageSummaryDto> {
+    return this.apiKeyUsageService.getAdminUsageSummary()
+  }
+
+  @Version('1')
+  @Get('tenants')
+  @Roles(SsoRole.NOTIFY_ADMIN)
+  @ApiOperation({ summary: 'Every tenant the usage table lists, by name (admin only)' })
+  @ApiOkResponse({ type: [AdminTenantOptionDto] })
+  listTenants(): Promise<AdminTenantOptionDto[]> {
+    return this.apiKeyUsageService.listNotifyTenants()
   }
 
   @Version('1')
@@ -71,5 +102,22 @@ export class ApiKeyUsageAdminController {
       dto.annualLimit,
       updatedBy,
     )
+  }
+
+  @Version('1')
+  @Patch('tenants/:tenantId/sending')
+  @Roles(SsoRole.NOTIFY_ADMIN)
+  @ApiOperation({ summary: 'Enable or disable sending for a tenant (admin only)' })
+  @ApiOkResponse({ schema: { properties: { sendingEnabled: { type: 'boolean' } } } })
+  async setTenantSending(
+    @Req() req: ExpressRequest,
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Body() dto: SetTenantSendingDto,
+  ): Promise<{ sendingEnabled: boolean }> {
+    const sendingEnabled = await this.tenantsService.setSending(tenantId, dto.enabled, dto.reason, {
+      id: JwtUserExtractor.extractUser(req),
+      name: JwtUserExtractor.extractDisplayName(req),
+    })
+    return { sendingEnabled }
   }
 }

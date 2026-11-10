@@ -34,6 +34,7 @@ const NOT_TENANT_SCOPED = [
   'codeTables',
   'tenant',
   'adminTenants',
+  'adminNotifications',
 ] as const
 
 const tenant = { id: 'tenant-b', name: 'Tenant B' } as Tenant
