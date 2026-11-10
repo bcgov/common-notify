@@ -15,7 +15,7 @@ export function useAdminNotification(id: string) {
     let current = true
     getAdminNotification(id)
       .then((result) => current && setDetail(result))
-      .catch((failure: Error) => current && setError(failure.message))
+      .catch((error_: Error) => current && setError(error_.message))
     return () => {
       current = false
     }
@@ -58,9 +58,9 @@ export function useAdminDeliveries(id: string) {
     })
     listAdminDeliveries(id, { page, limit, filter: toFilterParams(filters) })
       .then((result) => current && setLoaded({ query, rows: result.data, count: result.count }))
-      .catch((failure: Error) => {
+      .catch((error_: Error) => {
         if (!current) return
-        showErrorToast(failure.message, undefined, { toastId: 'admin-deliveries-error' })
+        showErrorToast(error_.message, undefined, { toastId: 'admin-deliveries-error' })
         // Keep the rows on screen, but stop showing them as loading.
         setLoaded(keep)
       })

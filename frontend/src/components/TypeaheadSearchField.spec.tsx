@@ -63,4 +63,18 @@ describe('TypeaheadSearchField', () => {
     await userEvent.click(input())
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
   })
+
+  it('clears the text and the search, then returns focus to the field', async () => {
+    const onSearch = vi.fn()
+    render(<Harness onSearch={onSearch} />)
+    expect(screen.queryByRole('button', { name: 'Clear search text' })).not.toBeInTheDocument()
+
+    await userEvent.type(input(), 'Roads{Escape}')
+    await userEvent.click(screen.getByRole('button', { name: 'Clear search text' }))
+
+    expect(input()).toHaveValue('')
+    expect(input()).toHaveFocus()
+    expect(onSearch).toHaveBeenLastCalledWith('')
+    expect(screen.queryByRole('button', { name: 'Clear search text' })).not.toBeInTheDocument()
+  })
 })

@@ -20,6 +20,16 @@ describe('redactRecipients', () => {
     )
   })
 
+  it('keeps the punctuation around an address, including a closing full stop', () => {
+    expect(redactRecipients('Bounced: "a@b.ca", (c.d@e.gov.bc.ca). Retry a@b.ca...')).toBe(
+      'Bounced: "[email]", ([email]). Retry [email]...',
+    )
+  })
+
+  it('leaves text with an @ that is not an address alone', () => {
+    expect(redactRecipients('@mention, user@ and @host.ca')).toBe('@mention, user@ and @host.ca')
+  })
+
   it('leaves timestamps, ids and status codes alone', () => {
     const text = 'CHES 422 at 2026-11-10T10:42:00Z txId 0d2c6a3e-1f4b-4c8d-9e7a-5b6c7d8e9f01'
     expect(redactRecipients(text)).toBe(text)

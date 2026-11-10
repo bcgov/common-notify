@@ -51,6 +51,27 @@
   }
 }
 
+.typeahead-search-field__clear {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 2px;
+  border: none;
+  border-radius: var(--layout-border-radius-small);
+  background: transparent;
+  color: var(--typography-color-secondary);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--typography-color-primary);
+    background: var(--surface-color-secondary-hover);
+  }
+
+  &:focus-visible {
+    outline: solid var(--layout-border-width-medium) var(--surface-color-border-active);
+    outline-offset: 1px;
+  }
+}
+
 .typeahead-search-field__popover {
   min-width: var(--trigger-width);
   max-height: 320px;

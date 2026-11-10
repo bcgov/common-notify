@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import type { FC, KeyboardEvent } from 'react'
 import { ComboBox, Input, ListBox, ListBoxItem, Popover } from 'react-aria-components'
 import { Button } from '@bcgov/design-system-react-components'
 import SearchIcon from '@mui/icons-material/Search'
+import CloseIcon from '@mui/icons-material/Close'
 import '@/scss/components/search-field.scss'
 import '@/scss/components/typeahead-search-field.scss'
 
@@ -23,7 +24,7 @@ interface TypeaheadSearchFieldProps {
 /**
  * SearchField with suggestions: typing lists the matching values, and picking one searches for
  * it. Free text still searches on Enter or the Search button, so a partial name finds every
- * tenant containing it.
+ * tenant containing it. A clear button empties the text and the search together.
  */
 const TypeaheadSearchField: FC<TypeaheadSearchFieldProps> = ({
   value,
@@ -34,6 +35,7 @@ const TypeaheadSearchField: FC<TypeaheadSearchFieldProps> = ({
   placeholder,
   maxSuggestions = DEFAULT_MAX_SUGGESTIONS,
 }) => {
+  const inputRef = useRef<HTMLInputElement>(null)
   const matches = useMemo(() => {
     const query = value.trim().toLocaleLowerCase()
     if (!query) return []
@@ -50,6 +52,12 @@ const TypeaheadSearchField: FC<TypeaheadSearchFieldProps> = ({
     if (event.key === 'Enter' && !event.currentTarget.getAttribute('aria-activedescendant')) {
       onSearch(value)
     }
+  }
+
+  function clear() {
+    onChange('')
+    onSearch('')
+    inputRef.current?.focus()
   }
 
   return (
@@ -75,10 +83,23 @@ const TypeaheadSearchField: FC<TypeaheadSearchFieldProps> = ({
           <div className="typeahead-search-field__control">
             <SearchIcon fontSize="small" aria-hidden="true" />
             <Input
+              ref={inputRef}
               className="typeahead-search-field__input"
               placeholder={placeholder}
               onKeyDown={handleKeyDown}
             />
+            {value && (
+              // A plain button: a react-aria Button here would take the ComboBox's trigger slot
+              // and open the suggestions instead of clearing.
+              <button
+                type="button"
+                className="typeahead-search-field__clear"
+                aria-label="Clear search text"
+                onClick={clear}
+              >
+                <CloseIcon fontSize="small" aria-hidden="true" />
+              </button>
+            )}
           </div>
           <Popover className="typeahead-search-field__popover" placement="bottom start" offset={4}>
             <ListBox className="typeahead-search-field__list">

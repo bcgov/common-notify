@@ -28,7 +28,7 @@ function toCalendarDate(day: string | null): CalendarDate | null {
 
 /**
  * A start and end date, each a design-system DatePicker. Each picker stops the other crossing
- * it, so the range can't run backwards.
+ * it, so the range can't run backwards. Medium size, the height of the search field beside it.
  */
 const DateRangeFields: FC<DateRangeFieldsProps> = ({
   from,
@@ -44,14 +44,14 @@ const DateRangeFields: FC<DateRangeFieldsProps> = ({
     <div className="date-range-fields">
       <DatePicker
         label={fromLabel}
-        size="small"
+        showFormatHelpText={false}
         value={fromDate}
         maxValue={toDate ?? undefined}
         onChange={(value) => onChange({ from: value?.toString() ?? null, to })}
       />
       <DatePicker
         label={toLabel}
-        size="small"
+        showFormatHelpText={false}
         value={toDate}
         minValue={fromDate ?? undefined}
         onChange={(value) => onChange({ from, to: value?.toString() ?? null })}
