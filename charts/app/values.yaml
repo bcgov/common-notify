@@ -108,14 +108,29 @@ backend:
     # 4. Any namespace on port 3000 (for Kong API Gateway)
     # NOTE: More restrictive namespace selector needed from platform team
   #-- which transport each channel sends through. The credentials for the selected adapter must
-  #-- exist in app-api-secrets, or the adapter logs instead of sending.
+  #-- exist (app-api-secrets, or backend.awsSms.credentialsSecret for aws), or it does not send.
   delivery:
     #-- email transport: ches | nodemailer | log ("log" is a non-delivering sink, load tests only)
     emailAdapter: ches
-    #-- sms transport: acs | twilio
-    #-- Both report per-recipient outcomes, so a partial failure marks only the recipients that
-    #-- actually failed and the queue retry does not re-send to the rest.
-    smsAdapter: acs
+    #-- sms transport: aws | acs | twilio
+    #-- All three report per-recipient outcomes, so a partial failure marks only the recipients
+    #-- that actually failed and the queue retry does not re-send to the rest.
+    smsAdapter: aws
+  #-- AWS End User Messaging SMS (smsAdapter: aws).
+  awsSms:
+    region: ca-central-1
+    #-- Secret holding AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY for the SMS IAM user, mounted
+    #-- into the backend as files. Not created by this chart: seed it once per namespace from the
+    #-- user's Parameter Store entry, and the sync CronJob below keeps it current.
+    credentialsSecret: aws-sms-credentials
+    #-- The BC Gov IAM User Service rotates the key every two days and deletes the old one two
+    #-- days later, so this copies the current key into the Secret. One per namespace: PR
+    #-- releases turn it off, since they share DEV's Secret.
+    credentialsSync:
+      enabled: true
+      schedule: "17 */6 * * *"
+      #-- Parameter Store entry the IAM User Service writes the rotated keys to
+      keysParameter: /iam_users/notify-sms-dev_keys
   #-- Seconds within which an identical send (same tenant, recipients and content) is answered
   #-- with the original notifyId instead of being sent again. 0 disables deduplication.
   dedupWindowSeconds: 300

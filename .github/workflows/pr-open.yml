@@ -158,6 +158,7 @@ jobs:
         --set frontend.cstarApiUrl=https://test.connect.digital.gov.bc.ca
         --set frontend.cstarTenantSetupUrl=https://test.connect.digital.gov.bc.ca
         --set backend.clamav.enabled=false
+        --set backend.awsSms.credentialsSync.enabled=false
         --set backend.clamav.host=common-notify-dev-clamav
       triggers: ('backend/' 'frontend/' 'migrations/' 'charts/' 'api-gateway/' '.github/workflows/.deployer.yml')
       db_triggers: ('charts/crunchy/')
