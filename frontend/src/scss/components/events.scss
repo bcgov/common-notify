@@ -408,6 +408,12 @@
     min-width: 0;
   }
 
+  // Sets the subject apart from the addresses: on top of the envelope's $spacing-xs row gap,
+  // this makes 8px. Not when it is the only row, where there is nothing to set it apart from.
+  .notification-preview__envelope-row--subject:not(:first-child) {
+    margin-top: $spacing-sm - $spacing-xs;
+  }
+
   // Stacked panes go full width, as in the base modal.
   @media (max-width: $breakpoint-md) {
     .notification-preview__data {
