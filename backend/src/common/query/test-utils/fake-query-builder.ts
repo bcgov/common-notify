@@ -36,10 +36,10 @@ export function fakeQueryBuilder(results: FakeQueryResults = {}) {
         if (prop in terminals) return terminals[prop]
         return (...args: unknown[]) => {
           if (prop === 'where' || prop === 'andWhere') {
-            where.push([String(args[0]), args[1] as Record<string, unknown> | undefined])
+            where.push([args[0] as string, args[1] as Record<string, unknown> | undefined])
             return qb
           }
-          if (prop === 'setParameter') parameters[String(args[0])] = args[1]
+          if (prop === 'setParameter') parameters[args[0] as string] = args[1]
           if (prop === 'setParameters') Object.assign(parameters, args[0])
           calls[prop] = args
           log.push([prop, ...args])
