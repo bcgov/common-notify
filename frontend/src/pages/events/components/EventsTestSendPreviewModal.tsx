@@ -63,7 +63,6 @@ const EventsTestSendPreviewModal: FC<EventsTestSendPreviewModalProps> = ({
     [template.subject, template.body, template.engineCode],
   )
 
-  const [initialValues, setInitialValues] = useState<Record<string, string>>({})
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [subject, setSubject] = useState('')
   const [bodyHtml, setBodyHtml] = useState<string | undefined>()
@@ -74,10 +73,6 @@ const EventsTestSendPreviewModal: FC<EventsTestSendPreviewModalProps> = ({
   // The draft the preview was last rendered from, so a change back to the opening values still
   // re-renders. Identity is enough: every edit makes a new object.
   const renderedDraft = useRef<Record<string, string> | null>(null)
-
-  const isDirty = variables.some(
-    (variable) => (draft[variable.name] ?? '') !== (initialValues[variable.name] ?? ''),
-  )
 
   // A condition always holds true or false, so only text can be empty.
   const isEmptyField = (variable: DetectedVariable) =>
@@ -127,7 +122,6 @@ const EventsTestSendPreviewModal: FC<EventsTestSendPreviewModalProps> = ({
     variables.forEach((variable) => {
       initial[variable.name] = values[variable.name] ?? (variable.type === 'boolean' ? 'true' : '')
     })
-    setInitialValues(initial)
     setDraft(initial)
     setDismissedNotice(null)
     renderedDraft.current = initial
@@ -202,7 +196,7 @@ const EventsTestSendPreviewModal: FC<EventsTestSendPreviewModalProps> = ({
           type="button"
           variant="primary"
           onPress={() => void handleApply()}
-          isDisabled={!isDirty || loading}
+          isDisabled={loading}
         >
           {loading ? 'Applying...' : 'Apply to test notification'}
         </Button>

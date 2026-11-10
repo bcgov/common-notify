@@ -162,15 +162,20 @@ describe('EventsTestSendPreviewModal', () => {
   })
 
   describe('editing values', () => {
-    it('has nothing to apply until a value is changed', async () => {
-      renderModal({ values: { firstName: 'Molly' } })
+    it('can apply the values it opened with, without a change', async () => {
+      const onApply = vi.fn()
+      renderModal({ values: { firstName: 'Molly' }, onApply })
 
       await screen.findByText('Permit for Molly')
-      expect(applyButton()).toBeDisabled()
-
-      await userEvent.type(firstNameField(), '!')
-
       expect(applyButton()).toBeEnabled()
+
+      await userEvent.click(applyButton())
+
+      await waitFor(() =>
+        expect(onApply).toHaveBeenCalledWith(
+          expect.objectContaining({ params: { firstName: 'Molly', isUrgent: 'true' } }),
+        ),
+      )
     })
 
     it('re-renders the preview once typing stops', async () => {
@@ -197,8 +202,6 @@ describe('EventsTestSendPreviewModal', () => {
       await userEvent.type(firstNameField(), '{Backspace}')
 
       expect(await screen.findByText('Permit for Molly', {}, { timeout: 2000 })).toBeInTheDocument()
-      // Back where it started, so there is nothing to apply.
-      expect(applyButton()).toBeDisabled()
     })
 
     it('sends a condition switched off as empty', async () => {
