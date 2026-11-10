@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import cstarApi from '@/api/cstar.api'
+import { get } from '@/common/api'
 import type { Tenant } from '@/interfaces/CstarTenant'
 import userReducer from '@/redux/slices/user.slice'
 import tenantReducer from '@/redux/slices/tenant.slice'
@@ -17,6 +18,8 @@ vi.mock('@tanstack/react-router', () => ({ useNavigate: () => navigate }))
 vi.mock('@/api/cstar.api', () => ({
   default: { fetchUserTenants: vi.fn(), fetchUserRoles: vi.fn() },
 }))
+
+vi.mock('@/common/api', () => ({ get: vi.fn() }))
 
 const tenantA = { id: 'tenant-a', name: 'Tenant A' } as Tenant
 const tenantB = { id: 'tenant-b', name: 'Tenant B' } as Tenant
@@ -66,6 +69,7 @@ describe('TenantSwitcher', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     localStorage.clear()
+    vi.mocked(get).mockResolvedValue({ dashboard: true })
   })
 
   it('goes to the dashboard when the user has roles in the new tenant', async () => {
@@ -75,6 +79,20 @@ describe('TenantSwitcher', () => {
     await switchTo(tenantB)
 
     await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/dashboard' }))
+  })
+
+  it('goes home when the dashboard flag is off for the new tenant', async () => {
+    vi.mocked(cstarApi.fetchUserRoles).mockResolvedValue({ data: { roles: ['viewer'] } } as never)
+    vi.mocked(get).mockResolvedValue({ dashboard: false })
+    renderSwitcher()
+
+    await switchTo(tenantB)
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/' }))
+    expect(get).toHaveBeenCalledWith(
+      { url: '/api/v1/frontend/feature-flags' },
+      { 'X-Tenant-ID': tenantB.id },
+    )
   })
 
   it('goes to not-authorized when the user has no roles in the new tenant', async () => {

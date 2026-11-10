@@ -4,6 +4,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useAppDispatch, useAppSelector, useAppStore } from '@/redux/hooks'
 import { selectTenant } from '@/redux/slices/tenant.slice'
 import { fetchCstarRoles } from '@/redux/thunks/cstar.thunks'
+import { fetchFeatureFlags } from '@/redux/slices/featureFlags.slice'
 import type { Tenant } from '@/interfaces/CstarTenant'
 import '@/scss/components/tenant-switcher.scss'
 import { Select } from '@bcgov/design-system-react-components'
@@ -56,7 +57,7 @@ const TenantSwitcher: FC<Props> = ({ className = '' }) => {
   const handleSelectTenant = (tenant: Tenant) => {
     dispatch(selectTenant(tenant))
     // Fetch user's roles in the selected tenant
-    dispatch(fetchCstarRoles({ tenantId: tenant.id })).then((result) => {
+    dispatch(fetchCstarRoles({ tenantId: tenant.id })).then(async (result) => {
       // The user switched again before these roles arrived; they say nothing about the
       // tenant now selected, so don't redirect on them.
       if (store.getState().tenant.selectedTenant?.id !== tenant.id) {
@@ -72,8 +73,13 @@ const TenantSwitcher: FC<Props> = ({ className = '' }) => {
         // (even if they're NOTIFY_ADMIN - admin role doesn't grant tenant access)
         navigate({ to: '/not-authorized' })
       } else if (result.payload && Array.isArray(result.payload) && result.payload.length > 0) {
-        // User has roles in this tenant, navigate to dashboard
-        navigate({ to: '/dashboard' })
+        const flags = await dispatch(fetchFeatureFlags(tenant.id))
+        if (store.getState().tenant.selectedTenant?.id !== tenant.id) {
+          return
+        }
+        const dashboardEnabled =
+          fetchFeatureFlags.fulfilled.match(flags) && flags.payload.flags.dashboard
+        navigate({ to: dashboardEnabled ? '/dashboard' : '/' })
       }
     })
   }
