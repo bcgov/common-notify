@@ -16,6 +16,7 @@ import { ApiKeyUsageService } from '../api-keys/api-key-usage.service'
 import { SmsSegmentService } from '../notify/services/sms-segment.service'
 import { NotificationDedupService } from '../notify/services/notification-dedup.service'
 import { NotifySubmissionService } from '../notify/services/notify-submission.service'
+import { TenantsService } from '../admin/tenants/tenants.service'
 import { EventNotificationResolver } from '../events/event-notification.resolver'
 import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import { QueueName } from '../../enum/queue-name.enum'
@@ -130,6 +131,7 @@ describe('GcNotifyInternalExecutionService', () => {
         { provide: AttachmentProcessingService, useValue: mockAttachmentProcessingService },
         { provide: NotificationDedupService, useValue: mockNotificationDedupService },
         { provide: EventNotificationResolver, useValue: {} },
+        { provide: TenantsService, useValue: { assertCanSend: vi.fn() } },
         NotifySubmissionService,
       ],
     }).compile()

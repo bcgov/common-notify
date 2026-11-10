@@ -97,20 +97,15 @@ function RootLayout() {
 
     checkAuthorizationRef.current = true
 
-    // Check user's authorization status
-    const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
-
-    // If user has no CSTAR tenants AND no tenant is selected:
-    // - If they are NOTIFY_ADMIN: redirect to feature flags (bootstrap/admin access)
-    // - If they are not NOTIFY_ADMIN: redirect to not-authorized (no access)
-    // NOTE: Only show not-authorized if tenant is not set. A tenant may be set from
-    // localStorage even if CSTAR failed/returned no tenants during this session.
-    if (cstarTenants.length === 0 && !selectedTenant) {
-      if (isAdmin) {
-        navigate({ to: '/admin/feature-flags' })
-      } else {
-        navigate({ to: '/not-authorized' })
-      }
+    // A user with no CSTAR tenants and no selected tenant has no access, unless they are
+    // NOTIFY_ADMIN: useTenantlessAdmin (in Layout) keeps those in the admin section instead.
+    // A tenant may be set from localStorage even if CSTAR failed or returned none this session.
+    if (
+      cstarTenants.length === 0 &&
+      !selectedTenant &&
+      !UserService.hasRole(SsoRole.NOTIFY_ADMIN)
+    ) {
+      navigate({ to: '/not-authorized' })
     }
   }, [user?.id, cstarTenants, cstarIsLoading, cstarHasLoaded, selectedTenant, navigate])
 

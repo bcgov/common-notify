@@ -24,6 +24,7 @@ import NoDataCard from '@/components/NoDataCard'
 import { showErrorToast } from '@/redux/utils/toastUtils'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
 import { RecipientsCell } from './RecipientsCell'
+import { channelFilterOptions } from '@/utils/channels'
 
 /**
  * NotificationStatusTable Component
@@ -112,11 +113,7 @@ const NotificationStatusTable: FC = () => {
       key: 'channelCodes',
       label: 'Channel',
       width: '23%',
-      filterOptions: [
-        { label: 'Email', value: 'EMAIL' },
-        { label: 'SMS', value: 'SMS' },
-        { label: 'MsgApp', value: 'MSGAPP' },
-      ],
+      filterOptions: channelFilterOptions(),
       render: (_, row) => <ChannelBadge channels={row.channelCodes ?? []} />,
     },
     {

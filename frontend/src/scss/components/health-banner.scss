@@ -1,0 +1,18 @@
+@import '../variables';
+
+.health-banner__title {
+  margin: 0 0 $spacing-xs;
+  font-weight: 700;
+}
+
+.health-banner__list {
+  margin: 0 0 $spacing-xs;
+  padding-left: $spacing-lg;
+}
+
+.health-banner__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-md;
+  margin: 0;
+}
