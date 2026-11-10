@@ -79,7 +79,6 @@ export interface PaginatedAdminUsageResponse {
 export interface AdminUsageSummary {
   tenants: number
   sentThisFiscalYear: number
-  withApiKey: number
   /** Tenants an admin has disabled from sending. */
   disabled: number
 }

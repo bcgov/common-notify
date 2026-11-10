@@ -21,7 +21,7 @@ interface MonitoringPageProps {
   /** Which monitoring page this is, so the warnings banner doesn't link to the page it is on. */
   page: keyof typeof MONITORING_PAGES
   title: string
-  meta: string
+  meta?: string
   /** The page's sections, given the latest snapshot and the time it was taken. */
   children: (data: QueueMonitoring, now: number) => ReactNode
 }

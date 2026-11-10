@@ -52,18 +52,16 @@ export function percentOf(used: number, limit: number): number {
   return Math.round((used / limit) * 1e7) / 1e5
 }
 
-/** "42 tenants use Notify · 30 sent this fiscal year · 12 with an API key". */
+/** "42 tenants use Notify · 30 sent this fiscal year · 2 disabled". */
 export function adoptionSummaryText({
   tenants,
   sentThisFiscalYear,
-  withApiKey,
   disabled,
 }: AdminUsageSummary): string {
   const users = tenants === 1 ? 'tenant uses' : 'tenants use'
   return [
     `${tenants.toLocaleString()} ${users} Notify`,
     `${sentThisFiscalYear.toLocaleString()} sent this fiscal year`,
-    `${withApiKey.toLocaleString()} with an API key`,
     // Only when there are any: "0 disabled" is noise on every visit.
     ...(disabled > 0 ? [`${disabled.toLocaleString()} disabled`] : []),
   ].join(' · ')

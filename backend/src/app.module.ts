@@ -16,6 +16,7 @@ import { QueueModule } from './queue/queue.module'
 // and loading that file first from the admin chain leaves TemplatesModule undefined inside
 // NotificationModule. test/app.e2e-spec.ts fails if the order breaks.
 import { MonitoringModule } from './api/admin/monitoring/monitoring.module'
+import { AdminNotificationsModule } from './api/admin/notifications/admin-notifications.module'
 import { NotificationModule } from './api/notification/notification.module'
 import configuration from './config/configuration'
 import { AdaptersModule } from './adapters'
@@ -37,6 +38,7 @@ import { LoggerModule } from './common/logger'
     QueueModule,
     AdminModule,
     MonitoringModule,
+    AdminNotificationsModule,
     ApiModule,
     AuthModule,
     NotificationModule,

@@ -9,11 +9,7 @@ import RecentFailuresSection from './sections/RecentFailuresSection'
 
 /** The admin landing page: is Notify healthy, how much is it sending, and what is failing. */
 const AdminOverview: FC = () => (
-  <MonitoringPage
-    page="overview"
-    title="Overview"
-    meta="Notification delivery across every pod. Read-only."
-  >
+  <MonitoringPage page="overview" title="Overview">
     {(data, now) => (
       <>
         <OverviewCards overview={data.overview} messages={data.messages} now={now} />

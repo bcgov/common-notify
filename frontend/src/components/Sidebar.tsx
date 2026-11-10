@@ -78,6 +78,7 @@ const adminItems = {
       links: [
         { label: 'Overview', to: '/admin', exact: true },
         { label: 'System', to: '/admin/monitoring' },
+        { label: 'Notifications', to: '/admin/notifications' },
       ],
     },
     {

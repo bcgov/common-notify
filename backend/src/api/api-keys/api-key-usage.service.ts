@@ -396,7 +396,7 @@ export class ApiKeyUsageService {
   }
 
   /**
-   * How many tenants use Notify: connected, sending this fiscal year, and with an API key.
+   * How many tenants use Notify: connected, sending this fiscal year, and disabled.
    * Sending is read from notification requests, not usage rows, because usage is only recorded
    * for sends made with an API key and tenants also send from the UI.
    */
@@ -411,25 +411,17 @@ export class ApiKeyUsageService {
         ))`,
         'sentThisFiscalYear',
       )
-      .addSelect(
-        `COUNT(*) FILTER (WHERE EXISTS (
-          SELECT 1 FROM notify.api_key_consumer c WHERE c.tenant_id = t.id
-        ))`,
-        'withApiKey',
-      )
       .addSelect('COUNT(*) FILTER (WHERE t.status = :disabled)', 'disabled')
       .setParameter('disabled', TENANT_DISABLED)
       .setParameter('fiscalYearStart', fiscalYearStart)
       .getRawOne<{
         tenants: string
         sentThisFiscalYear: string
-        withApiKey: string
         disabled: string
       }>()
     return {
       tenants: Number(row?.tenants ?? 0),
       sentThisFiscalYear: Number(row?.sentThisFiscalYear ?? 0),
-      withApiKey: Number(row?.withApiKey ?? 0),
       disabled: Number(row?.disabled ?? 0),
     }
   }

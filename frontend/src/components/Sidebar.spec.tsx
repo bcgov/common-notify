@@ -221,7 +221,7 @@ describe('Sidebar', () => {
   describe('admin menu', () => {
     beforeEach(() => vi.mocked(UserService.hasRole).mockReturnValue(true))
 
-    it('groups the admin pages under Monitor, Report and Manage', async () => {
+    it('groups the admin pages under Monitor and Manage', async () => {
       const user = userEvent.setup()
       renderSidebar()
       await user.click(screen.getByRole('button', { name: 'Admin' }))
@@ -234,6 +234,7 @@ describe('Sidebar', () => {
       expect(linksIn('Monitor')).toEqual([
         ['Overview', '/admin'],
         ['System', '/admin/monitoring'],
+        ['Notifications', '/admin/notifications'],
       ])
       expect(linksIn('Manage')).toEqual([
         ['Tenants', '/admin/tenants'],

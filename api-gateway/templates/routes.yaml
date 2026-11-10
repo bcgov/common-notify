@@ -662,6 +662,22 @@ routes:
     request_buffering: false
     response_buffering: false
 
+  # /api/v1/frontend/admin/notifications (requests across tenants, for troubleshooting)
+  # Kong prefix-matches, so this also covers /:id and /:id/deliveries.
+  - name: ${ROUTE_PREFIX}admin-notifications-frontend
+    tags: [${CONFIG_TAG}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/admin/notifications
+    methods:
+      - GET
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
   # ============================================================================
   # FEATURE FLAG ADMIN ROUTES (admin only)
   # ============================================================================
@@ -1941,6 +1957,13 @@ plugins:
     tags: [${CONFIG_TAG}]
     enabled: true
     route: ${ROUTE_PREFIX}tenant-settings-frontend
+    config: *jwtConfig
+
+  # Admin Notifications Frontend - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [${CONFIG_TAG}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-notifications-frontend
     config: *jwtConfig
 
   # Admin API Key Usage Frontend - Frontend Admin Token

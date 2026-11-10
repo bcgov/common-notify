@@ -8,11 +8,7 @@ import RedisSection from './sections/RedisSection'
 
 /** The detail behind each component on the Overview, for when one of them needs a closer look. */
 const System: FC = () => (
-  <MonitoringPage
-    page="system"
-    title="System"
-    meta="Queues, the pods working them, delivery recovery and Redis. Read-only."
-  >
+  <MonitoringPage page="system" title="System">
     {(data, now) => (
       <>
         <QueuesSection queues={data.queues} />

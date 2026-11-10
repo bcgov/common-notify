@@ -77,7 +77,6 @@ describe('AdminUsage', () => {
     vi.mocked(getAdminUsageSummary).mockResolvedValue({
       tenants: 42,
       sentThisFiscalYear: 30,
-      withApiKey: 12,
       disabled: 0,
     })
     vi.mocked(getAdminUsageTenants).mockResolvedValue([
@@ -94,9 +93,7 @@ describe('AdminUsage', () => {
   it('summarises how many tenants use Notify under the heading', async () => {
     setup()
     expect(
-      await screen.findByText(
-        '42 tenants use Notify · 30 sent this fiscal year · 12 with an API key',
-      ),
+      await screen.findByText('42 tenants use Notify · 30 sent this fiscal year'),
     ).toBeInTheDocument()
     expect(getAdminUsageSummary).toHaveBeenCalledTimes(1)
   })

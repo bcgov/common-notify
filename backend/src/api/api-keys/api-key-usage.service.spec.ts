@@ -517,7 +517,7 @@ describe('ApiKeyUsageService.updateTenantLimits', () => {
 })
 
 describe('ApiKeyUsageService.getAdminUsageSummary', () => {
-  it('counts Notify tenants, those sending this fiscal year and those with an API key', async () => {
+  it('counts Notify tenants, those sending this fiscal year and those disabled', async () => {
     const where: string[] = []
     const params: Record<string, unknown> = {}
     const qb: Record<string, unknown> = new Proxy(
@@ -539,7 +539,6 @@ describe('ApiKeyUsageService.getAdminUsageSummary', () => {
               Promise.resolve({
                 tenants: '42',
                 sentThisFiscalYear: '30',
-                withApiKey: '12',
                 disabled: '2',
               })
           return () => qb
@@ -557,7 +556,7 @@ describe('ApiKeyUsageService.getAdminUsageSummary', () => {
 
     const summary = await service.getAdminUsageSummary()
 
-    expect(summary).toEqual({ tenants: 42, sentThisFiscalYear: 30, withApiKey: 12, disabled: 2 })
+    expect(summary).toEqual({ tenants: 42, sentThisFiscalYear: 30, disabled: 2 })
     // The same tenants the usage table lists, and no search or filter.
     expect(where).toEqual(['t.isDeleted = :deleted', 't.externalId IS NOT NULL'])
     expect(params.fiscalYearStart).toBeInstanceOf(Date)

@@ -27,7 +27,7 @@ describe('ApiKeyUsageAdminController GET /frontend/admin/api-key-usage', () => {
     listNotifyTenants = vi.fn().mockResolvedValue([{ id: 't-1', name: 'Parks' }])
     getAdminUsageSummary = vi
       .fn()
-      .mockResolvedValue({ tenants: 42, sentThisFiscalYear: 30, withApiKey: 12 })
+      .mockResolvedValue({ tenants: 42, sentThisFiscalYear: 30, disabled: 0 })
 
     const module = await Test.createTestingModule({
       controllers: [ApiKeyUsageAdminController],
@@ -92,7 +92,7 @@ describe('ApiKeyUsageAdminController GET /frontend/admin/api-key-usage', () => {
   it('returns the tenant summary from /summary, not the paged list', async () => {
     const response = await request(app.getHttpServer()).get(`${url}/summary`).expect(200)
 
-    expect(response.body).toEqual({ tenants: 42, sentThisFiscalYear: 30, withApiKey: 12 })
+    expect(response.body).toEqual({ tenants: 42, sentThisFiscalYear: 30, disabled: 0 })
     expect(getAllTenantsUsage).not.toHaveBeenCalled()
   })
 

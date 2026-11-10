@@ -160,9 +160,6 @@ export class AdminUsageSummaryDto {
   })
   sentThisFiscalYear: number
 
-  @ApiProperty({ description: 'Of those, tenants with an API key bound', example: 12 })
-  withApiKey: number
-
   @ApiProperty({ description: 'Of those, tenants an admin has disabled from sending', example: 1 })
   disabled: number
 }

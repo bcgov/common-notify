@@ -28,6 +28,8 @@ import { Route as EventsIndexRouteImport } from './routes/events/index'
 import { Route as EventsCreateRouteImport } from './routes/events/create'
 import { Route as RequestStatusNotificationRequestIdRouteImport } from './routes/request-status/$notificationRequestId'
 import { Route as TemplateEditTemplateIdRouteImport } from './routes/template-edit/$templateId'
+import { Route as AdminNotificationsIndexRouteImport } from './routes/admin/notifications/index'
+import { Route as AdminNotificationsNotificationRequestIdRouteImport } from './routes/admin/notifications/$notificationRequestId'
 import { Route as EventsEventIdIndexRouteImport } from './routes/events/$eventId/index'
 import { Route as EventsEventIdEmailTestSendRouteImport } from './routes/events/$eventId/email-test-send'
 import { Route as EventsEventIdSavedRouteImport } from './routes/events/$eventId/saved'
@@ -128,6 +130,17 @@ const TemplateEditTemplateIdRoute = TemplateEditTemplateIdRouteImport.update({
   path: '/template-edit/$templateId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminNotificationsIndexRoute = AdminNotificationsIndexRouteImport.update({
+  id: '/notifications/',
+  path: '/notifications/',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminNotificationsNotificationRequestIdRoute =
+  AdminNotificationsNotificationRequestIdRouteImport.update({
+    id: '/notifications/$notificationRequestId',
+    path: '/notifications/$notificationRequestId',
+    getParentRoute: () => AdminRouteRoute,
+  } as any)
 const EventsEventIdIndexRoute = EventsEventIdIndexRouteImport.update({
   id: '/events/$eventId/',
   path: '/events/$eventId/',
@@ -165,8 +178,10 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/bulk-notifications/': typeof BulkNotificationsIndexRoute
   '/events/': typeof EventsIndexRoute
+  '/admin/notifications/$notificationRequestId': typeof AdminNotificationsNotificationRequestIdRoute
   '/events/$eventId/email-test-send': typeof EventsEventIdEmailTestSendRoute
   '/events/$eventId/saved': typeof EventsEventIdSavedRoute
+  '/admin/notifications/': typeof AdminNotificationsIndexRoute
   '/events/$eventId/': typeof EventsEventIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -188,8 +203,10 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/bulk-notifications': typeof BulkNotificationsIndexRoute
   '/events': typeof EventsIndexRoute
+  '/admin/notifications/$notificationRequestId': typeof AdminNotificationsNotificationRequestIdRoute
   '/events/$eventId/email-test-send': typeof EventsEventIdEmailTestSendRoute
   '/events/$eventId/saved': typeof EventsEventIdSavedRoute
+  '/admin/notifications': typeof AdminNotificationsIndexRoute
   '/events/$eventId': typeof EventsEventIdIndexRoute
 }
 export interface FileRoutesById {
@@ -213,8 +230,10 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/bulk-notifications/': typeof BulkNotificationsIndexRoute
   '/events/': typeof EventsIndexRoute
+  '/admin/notifications/$notificationRequestId': typeof AdminNotificationsNotificationRequestIdRoute
   '/events/$eventId/email-test-send': typeof EventsEventIdEmailTestSendRoute
   '/events/$eventId/saved': typeof EventsEventIdSavedRoute
+  '/admin/notifications/': typeof AdminNotificationsIndexRoute
   '/events/$eventId/': typeof EventsEventIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -239,8 +258,10 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/bulk-notifications/'
     | '/events/'
+    | '/admin/notifications/$notificationRequestId'
     | '/events/$eventId/email-test-send'
     | '/events/$eventId/saved'
+    | '/admin/notifications/'
     | '/events/$eventId/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -262,8 +283,10 @@ export interface FileRouteTypes {
     | '/admin'
     | '/bulk-notifications'
     | '/events'
+    | '/admin/notifications/$notificationRequestId'
     | '/events/$eventId/email-test-send'
     | '/events/$eventId/saved'
+    | '/admin/notifications'
     | '/events/$eventId'
   id:
     | '__root__'
@@ -286,8 +309,10 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/bulk-notifications/'
     | '/events/'
+    | '/admin/notifications/$notificationRequestId'
     | '/events/$eventId/email-test-send'
     | '/events/$eventId/saved'
+    | '/admin/notifications/'
     | '/events/$eventId/'
   fileRoutesById: FileRoutesById
 }
@@ -445,6 +470,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TemplateEditTemplateIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/notifications/': {
+      id: '/admin/notifications/'
+      path: '/notifications'
+      fullPath: '/admin/notifications/'
+      preLoaderRoute: typeof AdminNotificationsIndexRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/admin/notifications/$notificationRequestId': {
+      id: '/admin/notifications/$notificationRequestId'
+      path: '/notifications/$notificationRequestId'
+      fullPath: '/admin/notifications/$notificationRequestId'
+      preLoaderRoute: typeof AdminNotificationsNotificationRequestIdRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/events/$eventId/': {
       id: '/events/$eventId/'
       path: '/events/$eventId'
@@ -476,6 +515,8 @@ interface AdminRouteRouteChildren {
   AdminTenantsRoute: typeof AdminTenantsRoute
   AdminUsageRoute: typeof AdminUsageRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  AdminNotificationsNotificationRequestIdRoute: typeof AdminNotificationsNotificationRequestIdRoute
+  AdminNotificationsIndexRoute: typeof AdminNotificationsIndexRoute
 }
 
 const AdminRouteRouteChildren: AdminRouteRouteChildren = {
@@ -485,6 +526,9 @@ const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminTenantsRoute: AdminTenantsRoute,
   AdminUsageRoute: AdminUsageRoute,
   AdminIndexRoute: AdminIndexRoute,
+  AdminNotificationsNotificationRequestIdRoute:
+    AdminNotificationsNotificationRequestIdRoute,
+  AdminNotificationsIndexRoute: AdminNotificationsIndexRoute,
 }
 
 const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(

@@ -27,9 +27,9 @@ let stream: QueueMonitoringStreamHandlers
 let streamController: AbortController
 
 /** The frame with a stand-in for a page's sections, so "loaded" is one recognisable line. */
-function renderPage(page: 'overview' | 'system' = 'overview') {
+function renderPage(page: 'overview' | 'system' = 'overview', meta?: string) {
   return render(
-    <MonitoringPage page={page} title="Test page" meta="Read-only.">
+    <MonitoringPage page={page} title="Test page" meta={meta}>
       {(data) => <p>Snapshot taken {data.generatedAt}</p>}
     </MonitoringPage>,
   )
@@ -60,6 +60,18 @@ describe('MonitoringPage', () => {
     expect(screen.getByText('Healthy')).toBeInTheDocument()
     expect(screen.getByText('63 messages pending')).toBeInTheDocument()
     expect(screen.getByText('Clears in ~3 min')).toBeInTheDocument()
+  })
+
+  it('shows a meta line under the heading only when given one', async () => {
+    mockedGet.mockResolvedValue(snapshot())
+    const { unmount } = renderPage()
+    await loaded()
+    expect(screen.queryByText('Read-only.')).not.toBeInTheDocument()
+    unmount()
+
+    renderPage('overview', 'Read-only.')
+    await loaded()
+    expect(screen.getByText('Read-only.')).toBeInTheDocument()
   })
 
   it('shows no warnings banner when nothing needs attention', async () => {

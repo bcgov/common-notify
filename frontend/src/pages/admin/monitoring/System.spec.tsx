@@ -188,15 +188,27 @@ describe('System', () => {
     mockedGet.mockResolvedValue(snapshot())
     render(<System />)
 
-    expect(await screen.findByText('4 idle workers listening')).toBeInTheDocument()
-    expect(screen.getByText('Peak memory')).toBeInTheDocument()
+    await screen.findByRole('heading', { level: 2, name: 'Redis' })
     const redis = sectionTitled('Redis')
     expect(within(redis).getByRole('meter', { name: 'Redis memory used' })).toHaveAttribute(
       'aria-valuetext',
-      '300 MB of 768 MB (39.1%)',
+      '300 MB of 768 MB (39.1%), peak 400 MB',
     )
+    expect(
+      within(redis).getByText('Memory: 300 MB of 768 MB (39.1%), peak 400 MB'),
+    ).toBeInTheDocument()
     expect(within(redis).getByText('Healthy')).toBeInTheDocument()
-    for (const removed of ['Fragmentation', 'Eviction policy', 'Evicted keys', 'noeviction']) {
+    for (const removed of [
+      'Peak memory',
+      'Connections',
+      'Rejected connections',
+      'Operations',
+      'Uptime',
+      'Fragmentation',
+      'Eviction policy',
+      'Evicted keys',
+      'noeviction',
+    ]) {
       expect(screen.queryByText(removed)).not.toBeInTheDocument()
     }
   })

@@ -64,22 +64,22 @@ describe('percentOf', () => {
 })
 
 describe('adoptionSummaryText', () => {
-  it('joins the three counts, with thousands separators', () => {
-    expect(
-      adoptionSummaryText({ tenants: 1200, sentThisFiscalYear: 30, withApiKey: 0, disabled: 0 }),
-    ).toBe('1,200 tenants use Notify · 30 sent this fiscal year · 0 with an API key')
+  it('joins the counts, with thousands separators', () => {
+    expect(adoptionSummaryText({ tenants: 1200, sentThisFiscalYear: 30, disabled: 0 })).toBe(
+      '1,200 tenants use Notify · 30 sent this fiscal year',
+    )
   })
 
   it('adds the disabled count only when there are any', () => {
-    expect(
-      adoptionSummaryText({ tenants: 42, sentThisFiscalYear: 30, withApiKey: 12, disabled: 2 }),
-    ).toBe('42 tenants use Notify · 30 sent this fiscal year · 12 with an API key · 2 disabled')
+    expect(adoptionSummaryText({ tenants: 42, sentThisFiscalYear: 30, disabled: 2 })).toBe(
+      '42 tenants use Notify · 30 sent this fiscal year · 2 disabled',
+    )
   })
 
   it('reads naturally for a single tenant', () => {
-    expect(
-      adoptionSummaryText({ tenants: 1, sentThisFiscalYear: 1, withApiKey: 1, disabled: 0 }),
-    ).toBe('1 tenant uses Notify · 1 sent this fiscal year · 1 with an API key')
+    expect(adoptionSummaryText({ tenants: 1, sentThisFiscalYear: 1, disabled: 0 })).toBe(
+      '1 tenant uses Notify · 1 sent this fiscal year',
+    )
   })
 })
 
