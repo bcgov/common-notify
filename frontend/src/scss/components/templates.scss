@@ -222,6 +222,21 @@
   margin-bottom: $spacing-sm;
 }
 
+// The rendered email, boxed to match the raw template beside it.
+.template-preview__rendered {
+  padding: $spacing-md;
+  border: 1px solid $border-default;
+  border-radius: 4px;
+  background: $white;
+}
+
+// The raw template, in the same type as the rendered email so the tabs read alike. Bootstrap's
+// reboot otherwise shrinks a <pre> to 0.875em.
+.template-preview .notification-preview__text {
+  font: var(--typography-regular-body);
+  color: var(--typography-color-primary);
+}
+
 // Events that still use a template, listed when it cannot be deleted.
 .templates__usage-list {
   margin: 0;

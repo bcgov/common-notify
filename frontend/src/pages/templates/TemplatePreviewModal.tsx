@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { FC } from 'react'
+import type { FC, ReactNode } from 'react'
 import { Button } from '@bcgov/design-system-react-components'
+import EmailBodyFrame from '@/components/EmailBodyFrame'
 import NotificationPreviewModal from '@/components/NotificationPreviewModal'
 import TabBar from '@/components/TabBar'
 import type { TemplateEngine } from '@/api/templates.api'
@@ -104,6 +105,23 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
     dispatch(setPreviewValues({ [name]: value }))
   }
 
+  let renderedOverride: ReactNode
+  if (activeTab === 'rendered' && !hasApplied && !loading) {
+    renderedOverride = (
+      <p className="notification-preview__placeholder">
+        Select Apply to template to view the rendered template.
+      </p>
+    )
+  } else if (activeTab === 'rendered' && !loading && !error && renderedHtml !== undefined) {
+    // Sized to its content and in the app font, like the events preview. Only once a render has
+    // succeeded, so the modal's own loading and error states still show.
+    renderedOverride = (
+      <div className="template-preview__rendered">
+        <EmailBodyFrame html={renderedHtml} />
+      </div>
+    )
+  }
+
   return (
     <NotificationPreviewModal
       isOpen={isOpen}
@@ -117,13 +135,13 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
         isInvalid: showErrors && variable.type !== 'boolean' && isMissing(variable.name),
         errorMessage: 'This field is empty.',
       }))}
-      variablesIntro="Enter values for all variables in your template."
+      variablesIntro="Enter values for all variables to view the rendered template."
       isEditable
       onVariableChange={(name, value) => handleValueChange(name)(value)}
-      variablesFooter={
+      footer={
         <Button
           type="button"
-          variant="secondary"
+          variant="primary"
           onPress={() => {
             setActiveTab('rendered')
             // Empty fields are flagged but still render, printing nothing.
@@ -133,18 +151,12 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
           }}
           isDisabled={loading}
         >
-          {loading ? 'Applying...' : 'Apply to Preview'}
+          {loading ? 'Applying...' : 'Apply to template'}
         </Button>
       }
       bodyHtml={activeTab === 'rendered' && hasApplied ? renderedHtml : undefined}
       bodyText={activeTab === 'rendered' ? rendered : body}
-      bodyOverride={
-        activeTab === 'rendered' && !hasApplied && !loading ? (
-          <p className="notification-preview__placeholder">
-            Select Apply to Preview to view the rendered template.
-          </p>
-        ) : undefined
-      }
+      bodyOverride={renderedOverride}
       outputHeader={
         <>
           <div className="template-preview__output-intro">

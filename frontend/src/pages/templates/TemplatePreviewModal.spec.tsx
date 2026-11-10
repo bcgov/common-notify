@@ -168,7 +168,7 @@ describe('TemplatePreviewModal apply flow', () => {
     expect(screen.getByText('Show preview')).toBeTruthy()
     expect(screen.queryByText('Subject line:')).toBeNull()
 
-    const applyButton = screen.getByRole('button', { name: /apply to preview/i })
+    const applyButton = screen.getByRole('button', { name: /apply to template/i })
     expect(applyButton).toBeEnabled()
     expect(previewTemplateBodyMock).not.toHaveBeenCalled()
     expect(screen.queryByText('This field is empty.')).toBeNull()
