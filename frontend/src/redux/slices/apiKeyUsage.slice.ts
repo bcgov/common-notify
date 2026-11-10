@@ -37,6 +37,9 @@ interface ApiKeyUsageState {
   adminSearch: string
   /** Column filters on the admin table, keyed by column, e.g. { channel: ['SMS'] }. */
   adminFilters: Record<string, string[]>
+  /** Sort on the admin table: a usage total, ranking tenants; null keeps name order. */
+  adminSortBy: string | null
+  adminSortOrder: 'asc' | 'desc' | null
   adminCount: number
   adminTotalPages: number
   // Key (`${tenantId}-${channel}`) currently being saved via the admin limit editor
@@ -64,6 +67,8 @@ const initialState: ApiKeyUsageState = {
   adminLimit: 15,
   adminSearch: '',
   adminFilters: {},
+  adminSortBy: null,
+  adminSortOrder: null,
   adminCount: 0,
   adminTotalPages: 0,
   adminUpdatingKey: null,
@@ -93,6 +98,14 @@ export const apiKeyUsageSlice = createSlice({
       } else {
         state.adminFilters[field] = values
       }
+      state.adminPage = 1
+    },
+    setAdminSort(
+      state,
+      action: PayloadAction<{ sortBy: string | null; sortOrder: 'asc' | 'desc' | null }>,
+    ) {
+      state.adminSortBy = action.payload.sortBy
+      state.adminSortOrder = action.payload.sortOrder
       state.adminPage = 1
     },
   },
@@ -208,7 +221,7 @@ export const apiKeyUsageSlice = createSlice({
   },
 })
 
-export const { setAdminPage, setAdminLimit, setAdminSearch, setAdminFilter } =
+export const { setAdminPage, setAdminLimit, setAdminSearch, setAdminFilter, setAdminSort } =
   apiKeyUsageSlice.actions
 
 export default apiKeyUsageSlice.reducer
