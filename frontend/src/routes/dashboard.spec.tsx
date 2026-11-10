@@ -112,6 +112,21 @@ describe('/dashboard route', () => {
     expect(screen.getByRole('progressbar', { name: 'Loading...' })).toBeInTheDocument()
   })
 
+  it('does not render a flag value loaded for a different tenant', () => {
+    renderRoute({ flagsTenantId: 'previous-tenant', dashboardEnabled: true })
+
+    expect(screen.getByRole('progressbar', { name: 'Loading...' })).toBeInTheDocument()
+    expect(screen.queryByText('Dashboard page')).not.toBeInTheDocument()
+  })
+
+  it('denies access when a refresh fails after an enabled flag was cached', async () => {
+    getMock.mockRejectedValueOnce(new Error('flag service down'))
+    renderRoute({ flagsSynced: false, dashboardEnabled: true })
+
+    expect(await screen.findByText('404')).toBeInTheDocument()
+    expect(screen.queryByText('Dashboard page')).not.toBeInTheDocument()
+  })
+
   it('falls back to 404 when the flag lookup fails, instead of waiting forever', async () => {
     getMock.mockRejectedValueOnce(new Error('flag service down'))
     // Nothing loaded yet, so the hook fetches and the rejection above is what settles it.
