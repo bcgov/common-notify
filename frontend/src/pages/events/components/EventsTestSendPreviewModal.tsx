@@ -159,6 +159,7 @@ const EventsTestSendPreviewModal: FC<EventsTestSendPreviewModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Edit Notification Values"
+      className="notification-preview--test-send"
       notice={
         dismissedNotice === notice.variant ? undefined : (
           <InlineAlert
@@ -177,7 +178,7 @@ const EventsTestSendPreviewModal: FC<EventsTestSendPreviewModalProps> = ({
         isInvalid: isEmptyField(variable),
         errorMessage: 'This field is empty.',
       }))}
-      variablesHeading="Notification values"
+      variablesHeading="Preview data"
       variablesIntro="Provide values for all variables in your template. The preview updates automatically as you make changes."
       isEditable
       onVariableChange={(name, value) => setDraft((prev) => ({ ...prev, [name]: value }))}

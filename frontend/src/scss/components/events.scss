@@ -297,7 +297,7 @@
 // Test send page. The notification sits in a card of its own, under the addresses it will
 // be sent between.
 .events__preview-card {
-  padding: 24px;
+  padding: 8px 12px;
   border: 1px solid $border-default;
   border-radius: 4px;
 }
@@ -388,6 +388,31 @@
   }
   .bcds-react-aria-Select--TagOverlay .bcds-react-aria-Tag.blue:not([data-disabled]) {
     background-color: var(--theme-blue-20, #d8eafd);
+  }
+}
+
+// Test send values pane: a 372px content column (the pane keeps its padding and right border)
+// with narrower 248px fields inside it.
+.notification-preview--test-send {
+  .notification-preview__data {
+    width: calc(372px + #{$spacing-lg * 2} + 1px);
+  }
+
+  .notification-preview__field-text .bcds-react-aria-TextField {
+    width: 248px;
+  }
+
+  // An input will not shrink below its default ~20-character width as a flex item, which at
+  // 248px pushed the invalid icon out past the field's border.
+  .notification-preview__field-text .bcds-react-aria-TextField--Input {
+    min-width: 0;
+  }
+
+  // Stacked panes go full width, as in the base modal.
+  @media (max-width: $breakpoint-md) {
+    .notification-preview__data {
+      width: 100%;
+    }
   }
 }
 
