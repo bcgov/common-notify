@@ -30,7 +30,7 @@ import {
   PaginatedAdminUsageResponseDto,
 } from './schemas/tenant-usage-response.dto'
 import { UpdateTenantLimitsDto } from './schemas/update-tenant-limits.dto'
-import { AdminUsageQueryDto } from './schemas/admin-usage-query.dto'
+import { SearchableListQueryDto } from '../../common/query/searchable-list-query.dto'
 import type { Request as ExpressRequest } from 'express'
 import { SetTenantSendingDto } from './schemas/set-tenant-sending.dto'
 import { TenantsService } from '../admin/tenants/tenants.service'
@@ -60,7 +60,9 @@ export class ApiKeyUsageAdminController {
   @Roles(SsoRole.NOTIFY_ADMIN)
   @ApiOperation({ summary: 'Get notification usage vs limits for every tenant (admin only)' })
   @ApiOkResponse({ type: PaginatedAdminUsageResponseDto })
-  getAllTenantsUsage(@Query() query: AdminUsageQueryDto): Promise<PaginatedAdminUsageResponseDto> {
+  getAllTenantsUsage(
+    @Query() query: SearchableListQueryDto,
+  ): Promise<PaginatedAdminUsageResponseDto> {
     const parsedQuery = parseListQuery(query, adminUsageListQueryConfig)
     return this.apiKeyUsageService.getAllTenantsUsage(parsedQuery, query.search)
   }

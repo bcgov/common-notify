@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
+import { PaginatedResponse } from '../../../common/schemas/paginated-response'
 
 /**
  * Usage counts for a channel against its current limit windows.
@@ -177,22 +178,7 @@ export class AdminTenantOptionDto {
  * Paginated admin all-tenants usage response. Pagination is by tenant (each tenant's
  * per-channel rows stay together); `count` is the number of matching tenants.
  */
-export class PaginatedAdminUsageResponseDto {
-  @ApiProperty({ type: [AdminTenantUsageRowDto], description: 'Tenant × channel usage rows' })
-  data: AdminTenantUsageRowDto[]
-
-  @ApiProperty({ description: 'Total number of matching tenants', example: 42 })
-  count: number
-
-  @ApiProperty({ description: 'Current page (1-indexed)', example: 1 })
-  page: number
-
-  @ApiProperty({ description: 'Tenants per page', example: 15 })
-  limit: number
-
-  @ApiProperty({ description: 'Total number of pages', example: 3 })
-  totalPages: number
-}
+export class PaginatedAdminUsageResponseDto extends PaginatedResponse(AdminTenantUsageRowDto) {}
 
 /**
  * A single fiscal-year usage history entry for a channel.

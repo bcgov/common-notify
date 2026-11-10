@@ -1,20 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import {
   adoptionSummaryText,
-  formatChannel,
   formatFailures,
   formatLastSent,
   groupUsageByTenant,
   percentOf,
 } from './usage'
 import type { AdminTenantUsageRow } from '@/api/apiKeyUsage.api'
-
-describe('formatChannel', () => {
-  it('title-cases a channel code and keeps SMS an acronym', () => {
-    expect(formatChannel('EMAIL')).toBe('Email')
-    expect(formatChannel('sms')).toBe('SMS')
-  })
-})
 
 describe('groupUsageByTenant', () => {
   const row = (tenantId: string, channel: string) =>

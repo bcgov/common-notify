@@ -1,8 +1,41 @@
 import type { SelectQueryBuilder } from 'typeorm'
 import type { ListQueryFilter, ParsedListQuery, QueryableFieldsConfig } from './list-query.types'
 
-function escapeLikePattern(value: string): string {
+/** Escapes LIKE's wildcards, so a search for `a_b` or `100%` matches only that text. */
+export function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, String.raw`\$&`)
+}
+
+/**
+ * A case-insensitive "contains" search on one column, e.g. a tenant name. Blank terms add nothing.
+ */
+export function andWhereContains<T>(
+  qb: SelectQueryBuilder<T>,
+  column: string,
+  term: string | undefined,
+  param = 'search',
+): SelectQueryBuilder<T> {
+  const trimmed = term?.trim()
+  if (!trimmed) return qb
+  return qb.andWhere(String.raw`${column} ILIKE :${param} ESCAPE '\'`, {
+    [param]: `%${escapeLikePattern(trimmed)}%`,
+  })
+}
+
+/**
+ * Rows whose jsonb array column holds any of the values, e.g. a request's channel_codes. The
+ * generic filters compare scalar columns, so an array column is filtered here. No values adds nothing.
+ */
+export function andWhereJsonbHasAny<T>(
+  qb: SelectQueryBuilder<T>,
+  column: string,
+  values: string[],
+  param: string,
+): SelectQueryBuilder<T> {
+  if (values.length === 0) return qb
+  return qb.andWhere(`jsonb_exists_any(${column}, ARRAY[:...${param}]::text[])`, {
+    [param]: values,
+  })
 }
 
 export function applyParsedListQueryToQueryBuilder<T>(

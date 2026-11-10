@@ -1,6 +1,7 @@
-import type { AxiosError } from 'axios'
-import { getApiErrorMessage } from '@/utils/apiErrorMessage'
-import { get, patch, generateApiParameters, STATUS_CODES } from '@/common/api'
+import { toReadableError } from '@/utils/apiErrorMessage'
+import { get, patch, generateApiParameters } from '@/common/api'
+import type { PaginatedResponse } from '@/interfaces/PaginatedNotificationResponse'
+import { toListQueryString } from './listQuery'
 
 /**
  * API Key Usage / Limits API
@@ -67,13 +68,7 @@ export interface AdminTenantUsageRow {
   failedLast30Days: number
 }
 
-export interface PaginatedAdminUsageResponse {
-  data: AdminTenantUsageRow[]
-  count: number
-  page: number
-  limit: number
-  totalPages: number
-}
+export type PaginatedAdminUsageResponse = PaginatedResponse<AdminTenantUsageRow>
 
 /** How many tenants use Notify, across every tenant whatever the table's search or filters. */
 export interface AdminUsageSummary {
@@ -149,13 +144,8 @@ export async function getAllTenantsUsage(
   sort?: string,
 ): Promise<PaginatedAdminUsageResponse> {
   try {
-    const qs = new URLSearchParams()
-    qs.set('page', String(page))
-    qs.set('limit', String(limit))
-    if (search) qs.set('search', search)
-    filter?.forEach((f) => qs.append('filter', f))
-    if (sort) qs.set('sort', sort)
-    const params = generateApiParameters(`/api/v1/frontend/admin/api-key-usage?${qs.toString()}`)
+    const qs = toListQueryString({ page, limit, search, sort, filter })
+    const params = generateApiParameters(`/api/v1/frontend/admin/api-key-usage?${qs}`)
     return await get<PaginatedAdminUsageResponse>(params)
   } catch (error) {
     throw toReadableError(error, 'tenant usage')
@@ -212,17 +202,4 @@ export async function updateTenantLimits(
   } catch (error) {
     throw toReadableError(error, 'tenant limits')
   }
-}
-
-function toReadableError(error: unknown, resource: string): Error {
-  const axiosError = error as AxiosError
-
-  if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
-    return new Error(`You are not authorized to view ${resource}`)
-  }
-  if (axiosError.response?.status === STATUS_CODES.Forbidden) {
-    return new Error(`You do not have permission to modify the ${resource}`)
-  }
-
-  return new Error(`Failed to load ${resource}: ${getApiErrorMessage(error)}`)
 }

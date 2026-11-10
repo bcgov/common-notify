@@ -9,9 +9,9 @@ import { DataTable } from '@/components/DataTable'
 import type { TableColumn } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
 import { ChannelBadge } from '@/components/ChannelBadge'
-import { formatChannel } from '@/utils/usage'
+import { channelFilterOptions, formatChannel } from '@/utils/channels'
+import { formatDateTime } from '@/utils/dates'
 import { useAdminDeliveries, useAdminNotification } from './useAdminNotificationDetail'
-import { CHANNEL_FILTER_OPTIONS, formatDateTime } from './adminNotificationFormat'
 import '@/scss/components/admin-notifications.scss'
 
 const DELIVERY_STATUS_OPTIONS = [
@@ -28,7 +28,7 @@ const deliveryColumns: TableColumn<AdminDelivery>[] = [
   {
     key: 'channel',
     label: 'Channel',
-    filterOptions: CHANNEL_FILTER_OPTIONS,
+    filterOptions: channelFilterOptions(),
     render: (_, row) => <ChannelBadge channels={[row.channel]} />,
   },
   {

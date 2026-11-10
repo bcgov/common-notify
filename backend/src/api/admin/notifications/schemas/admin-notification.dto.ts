@@ -1,19 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { IsOptional, IsString } from 'class-validator'
-import { ListQueryDto } from '../../../../common/query/list-query.dto'
+import { PaginatedResponse } from '../../../../common/schemas/paginated-response'
 
 /**
  * These DTOs carry no recipient addresses and no message content: admins troubleshoot sends
  * across every tenant, so they see what happened, never who it went to or what it said.
  */
-
-/** The shared list query plus a tenant name search. */
-export class AdminNotificationQueryDto extends ListQueryDto {
-  /** Case-insensitive substring of the tenant name. */
-  @IsOptional()
-  @IsString()
-  search?: string
-}
 
 export class AdminNotificationStatusDto {
   @ApiProperty({ example: 'failed' })
@@ -55,22 +46,9 @@ export class AdminNotificationRowDto {
   failedCount: number
 }
 
-export class PaginatedAdminNotificationResponseDto {
-  @ApiProperty({ type: [AdminNotificationRowDto] })
-  data: AdminNotificationRowDto[]
-
-  @ApiProperty()
-  count: number
-
-  @ApiProperty()
-  page: number
-
-  @ApiProperty()
-  limit: number
-
-  @ApiProperty()
-  totalPages: number
-}
+export class PaginatedAdminNotificationResponseDto extends PaginatedResponse(
+  AdminNotificationRowDto,
+) {}
 
 export class AdminDeliveryCountDto {
   @ApiProperty({ example: 'EMAIL' })
@@ -148,19 +126,4 @@ export class AdminDeliveryDto {
   providerResponse: string | null
 }
 
-export class PaginatedAdminDeliveryResponseDto {
-  @ApiProperty({ type: [AdminDeliveryDto] })
-  data: AdminDeliveryDto[]
-
-  @ApiProperty()
-  count: number
-
-  @ApiProperty()
-  page: number
-
-  @ApiProperty()
-  limit: number
-
-  @ApiProperty()
-  totalPages: number
-}
+export class PaginatedAdminDeliveryResponseDto extends PaginatedResponse(AdminDeliveryDto) {}

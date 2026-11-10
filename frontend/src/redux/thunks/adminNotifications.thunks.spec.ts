@@ -4,9 +4,9 @@ import reducer, {
   setDateRange,
   setFilter,
   setSearch,
-  localDay,
 } from '@/redux/slices/adminNotifications.slice'
 import { fetchAdminNotifications } from './adminNotifications.thunks'
+import { localDay } from '@/utils/dates'
 import { listAdminNotifications } from '@/api/adminNotifications.api'
 
 vi.mock('@/api/adminNotifications.api', () => ({ listAdminNotifications: vi.fn() }))

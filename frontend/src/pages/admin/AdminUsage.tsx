@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FC } from 'react'
-import { getAdminUsageSummary, getAdminUsageTenants } from '@/api/apiKeyUsage.api'
+import { getAdminUsageSummary } from '@/api/apiKeyUsage.api'
+import { useNotifyTenantNames } from '@/hooks/useNotifyTenantNames'
 import type { AdminTenantUsageRow, AdminUsageSummary } from '@/api/apiKeyUsage.api'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
 import { fetchAllTenantsUsage, updateTenantLimits } from '@/redux/thunks/apiKeyUsage.thunks'
@@ -13,6 +14,7 @@ import {
 } from '@/redux/slices/apiKeyUsage.slice'
 import UserService from '@/service/user-service'
 import PageHeading from '@/components/PageHeading'
+import { channelFilterOptions, formatChannel } from '@/utils/channels'
 import TypeaheadSearchField from '@/components/TypeaheadSearchField'
 import ChannelValues from '@/components/ChannelValues'
 import RowActionsMenu from '@/components/RowActionsMenu'
@@ -27,7 +29,6 @@ import TenantSendingCell from './TenantSendingCell'
 import TenantSendingDialog from './TenantSendingDialog'
 import {
   adoptionSummaryText,
-  formatChannel,
   formatFailures,
   formatLastSent,
   groupUsageByTenant,
@@ -86,7 +87,6 @@ const AdminUsage: FC = () => {
   const [annualLimit, setAnnualLimit] = useState(0)
   const [summary, setSummary] = useState<AdminUsageSummary | null>(null)
   const [sendingTarget, setSendingTarget] = useState<AdminTenantUsage | null>(null)
-  const [tenantNames, setTenantNames] = useState<string[]>([])
 
   // Totals across every tenant, so they don't change with the table's search or filters: fetched
   // on arrival and after a change that moves them. Only this screen reads them, so no slice.
@@ -100,14 +100,7 @@ const AdminUsage: FC = () => {
     if (isAdmin) loadSummary()
   }, [isAdmin, loadSummary])
 
-  // Fetched once: the search's suggestions. Without them the search still works on typed text,
-  // so a failure leaves the list empty rather than raising an error over the table.
-  useEffect(() => {
-    if (!isAdmin) return
-    getAdminUsageTenants()
-      .then((tenants) => setTenantNames(tenants.map((tenant) => tenant.name)))
-      .catch(() => setTenantNames([]))
-  }, [isAdmin])
+  const tenantNames = useNotifyTenantNames(isAdmin)
 
   // The API returns a row per tenant and channel; the table shows a row per tenant.
   const tenants = useMemo(() => groupUsageByTenant(adminRows), [adminRows])
@@ -224,10 +217,7 @@ const AdminUsage: FC = () => {
       key: 'channels',
       label: 'Channel',
       filterKey: 'channel',
-      filterOptions: [
-        { label: 'Email', value: 'EMAIL' },
-        { label: 'SMS', value: 'SMS' },
-      ],
+      filterOptions: channelFilterOptions(['EMAIL', 'SMS']),
       render: (_, tenant) => (
         <ChannelValues
           rows={tenant.channels}

@@ -5,7 +5,11 @@ import { NotificationRequest } from '../../notification/entities/notification-re
 import { NotificationRequestDetail } from '../../notification/entities/notification-request-detail.entity'
 import type { ListQueryDto } from '../../../common/query/list-query.dto'
 import { parseListQuery } from '../../../common/query/list-query.parser'
-import { applyParsedListQueryToQueryBuilder } from '../../../common/query/typeorm-list-query.util'
+import {
+  andWhereContains,
+  andWhereJsonbHasAny,
+  applyParsedListQueryToQueryBuilder,
+} from '../../../common/query/typeorm-list-query.util'
 import type { ListQueryFilter, QueryableFieldsConfig } from '../../../common/query/list-query.types'
 import { redactRecipients, redactValue } from '../../../common/utils/redact-recipients'
 import { lokiLogsUrl } from './loki-link'
@@ -52,6 +56,12 @@ const LISTED_RECIPIENTS = ['email', 'sms', 'msgApp']
   )
   .join(' + ')
 
+/** The values of the channel filter, which is applied to the jsonb array, not a column. */
+function channelValues(filters: ListQueryFilter[]): string[] {
+  const value = filters.find((f) => f.field === 'channel')?.value
+  return Array.isArray(value) ? value.map(String) : []
+}
+
 interface RecipientCounts {
   id: string
   deliveries: string
@@ -75,9 +85,8 @@ export class AdminNotificationsService {
   async list(query: ListQueryDto, search?: string): Promise<PaginatedAdminNotificationResponseDto> {
     const parsed = parseListQuery(query, adminNotificationListQueryConfig)
     const qb = this.requests()
-    const term = search?.trim()
-    if (term) qb.andWhere('t.name ILIKE :search', { search: `%${term}%` })
-    this.applyChannelFilter(qb, parsed.filters)
+    andWhereContains(qb, 't.name', search)
+    andWhereJsonbHasAny(qb, 'n.channel_codes', channelValues(parsed.filters), 'channels')
     applyParsedListQueryToQueryBuilder(
       qb,
       { ...parsed, filters: parsed.filters.filter((f) => f.field !== 'channel') },
@@ -180,17 +189,6 @@ export class AdminNotificationsService {
         's.displayName',
       ])
       .where('n.isInternal = :internal', { internal: false })
-  }
-
-  private applyChannelFilter(
-    qb: SelectQueryBuilder<NotificationRequest>,
-    filters: ListQueryFilter[],
-  ): void {
-    const channels = filters.find((f) => f.field === 'channel')?.value
-    if (!Array.isArray(channels) || channels.length === 0) return
-    qb.andWhere('jsonb_exists_any(n.channel_codes, ARRAY[:...channels]::text[])', {
-      channels: channels.map(String),
-    })
   }
 
   private async recipientCounts(ids: string[]): Promise<Map<string, RecipientCounts>> {

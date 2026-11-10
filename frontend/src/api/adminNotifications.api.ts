@@ -1,6 +1,8 @@
-import type { AxiosError } from 'axios'
-import { getApiErrorMessage } from '@/utils/apiErrorMessage'
-import { get, generateApiParameters, STATUS_CODES } from '@/common/api'
+import { toReadableError } from '@/utils/apiErrorMessage'
+import { get, generateApiParameters } from '@/common/api'
+import type { PaginatedResponse } from '@/interfaces/PaginatedNotificationResponse'
+import { toListQueryString } from './listQuery'
+import type { ListQuery } from './listQuery'
 
 /**
  * Notification requests across every tenant, for admins troubleshooting a send. Requires
@@ -56,38 +58,12 @@ export interface AdminDelivery {
   providerResponse: string | null
 }
 
-export interface Paginated<T> {
-  data: T[]
-  count: number
-  page: number
-  limit: number
-  totalPages: number
-}
-
-export interface AdminListQuery {
-  page: number
-  limit: number
-  search?: string
-  sort?: string
-  filter?: string[]
-}
-
-function toQueryString({ page, limit, search, sort, filter }: AdminListQuery): string {
-  const qs = new URLSearchParams()
-  qs.set('page', String(page))
-  qs.set('limit', String(limit))
-  if (search) qs.set('search', search)
-  if (sort) qs.set('sort', sort)
-  filter?.forEach((f) => qs.append('filter', f))
-  return qs.toString()
-}
-
 /** A page of requests, newest first, filtered by tenant name, status, channel and date. */
 export async function listAdminNotifications(
-  query: AdminListQuery,
-): Promise<Paginated<AdminNotificationRow>> {
+  query: ListQuery,
+): Promise<PaginatedResponse<AdminNotificationRow>> {
   try {
-    return await get(generateApiParameters(`${BASE_URL}?${toQueryString(query)}`))
+    return await get(generateApiParameters(`${BASE_URL}?${toListQueryString(query)}`))
   } catch (error) {
     throw toReadableError(error, 'notifications')
   }
@@ -97,32 +73,21 @@ export async function getAdminNotification(id: string): Promise<AdminNotificatio
   try {
     return await get(generateApiParameters(`${BASE_URL}/${encodeURIComponent(id)}`))
   } catch (error) {
-    throw toReadableError(error, 'notification')
+    throw toReadableError(error, 'notification', { notFound: true })
   }
 }
 
 export async function listAdminDeliveries(
   id: string,
-  query: AdminListQuery,
-): Promise<Paginated<AdminDelivery>> {
+  query: ListQuery,
+): Promise<PaginatedResponse<AdminDelivery>> {
   try {
     return await get(
       generateApiParameters(
-        `${BASE_URL}/${encodeURIComponent(id)}/deliveries?${toQueryString(query)}`,
+        `${BASE_URL}/${encodeURIComponent(id)}/deliveries?${toListQueryString(query)}`,
       ),
     )
   } catch (error) {
     throw toReadableError(error, 'deliveries')
   }
-}
-
-function toReadableError(error: unknown, resource: string): Error {
-  const status = (error as AxiosError).response?.status
-  if (status === STATUS_CODES.Unauthorized || status === STATUS_CODES.Forbidden) {
-    return new Error(`You do not have permission to view ${resource}`)
-  }
-  if (status === STATUS_CODES.NotFound) {
-    return new Error(`The ${resource} could not be found`)
-  }
-  return new Error(`Failed to load ${resource}: ${getApiErrorMessage(error)}`)
 }

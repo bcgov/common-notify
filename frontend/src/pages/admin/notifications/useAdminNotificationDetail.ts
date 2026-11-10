@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getAdminNotification, listAdminDeliveries } from '@/api/adminNotifications.api'
 import type { AdminDelivery, AdminNotificationDetail } from '@/api/adminNotifications.api'
 import { showErrorToast } from '@/redux/utils/toastUtils'
+import { toFilterParams } from '@/redux/utils/listFilters'
 
 /**
  * One request's detail, loaded once. Only its page reads it, so it is fetched here rather than
@@ -29,9 +30,6 @@ interface DeliveryPage {
   rows: AdminDelivery[]
   count: number
 }
-
-const toFilterParams = (filters: Record<string, string[]>) =>
-  Object.entries(filters).map(([field, values]) => `${field}:in:${values.join('|')}`)
 
 /** Without its value when it has none; with it otherwise. */
 function withFilter(filters: Record<string, string[]>, field: string, values: string[]) {

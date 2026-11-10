@@ -1,7 +1,7 @@
 import type { FC } from 'react'
 import { StatusBadge } from '@/components/StatusBadge'
 import type { AdminTenantUsageRow } from '@/api/apiKeyUsage.api'
-import { formatShortDate } from '@/utils/usage'
+import { formatDate } from '@/utils/dates'
 import '@/scss/components/tenant-sending-cell.scss'
 
 type TenantSendingCellProps = Pick<
@@ -25,7 +25,7 @@ const TenantSendingCell: FC<TenantSendingCellProps> = ({
       {disabledBy && <span className="tenant-sending-cell__detail">By {disabledBy}</span>}
       {disabledAt && (
         <span className="tenant-sending-cell__detail">
-          On <time dateTime={disabledAt}>{formatShortDate(disabledAt)}</time>
+          On <time dateTime={disabledAt}>{formatDate(disabledAt)}</time>
         </span>
       )}
     </div>

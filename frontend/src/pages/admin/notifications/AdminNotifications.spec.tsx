@@ -37,10 +37,11 @@ function setup(overrides = {}) {
   mocks.state = {
     adminNotifications: { ...reducer(undefined, { type: 'init' }), hasLoaded: true, ...overrides },
     adminTenants: {
-      items: [
+      notifyOptions: [
         { id: 't-1', name: 'Parks Booking' },
         { id: 't-2', name: 'Roads' },
       ],
+      notifyOptionsRequested: true,
     },
     codeTables: {
       statuses: [

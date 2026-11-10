@@ -9,13 +9,12 @@ import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import AdminUsage from './AdminUsage'
 import { updateTenantLimits } from '@/redux/thunks/apiKeyUsage.thunks'
 import type * as UsageThunks from '@/redux/thunks/apiKeyUsage.thunks'
-import { getAdminUsageSummary, getAdminUsageTenants, setTenantSending } from '@/api/apiKeyUsage.api'
+import { getAdminUsageSummary, setTenantSending } from '@/api/apiKeyUsage.api'
 import type * as UsageApi from '@/api/apiKeyUsage.api'
 
 vi.mock('@/api/apiKeyUsage.api', async (importOriginal) => ({
   ...(await importOriginal<typeof UsageApi>()),
   getAdminUsageSummary: vi.fn(),
-  getAdminUsageTenants: vi.fn(),
   setTenantSending: vi.fn(),
 }))
 vi.mock('@/redux/thunks/apiKeyUsage.thunks', async (importOriginal) => {
@@ -58,10 +57,12 @@ const row = {
   failedLast30Days: 12,
 }
 let usageState: ReturnType<typeof reducer>
+let tenantOptions: Array<{ id: string; name: string }> = []
 function setup(overrides = {}, roles = ['NOTIFY_OPERATIONS_ADMIN']) {
   usageState = { ...reducer(undefined, { type: 'init' }), ...overrides }
   mocks.state = {
     apiKeyUsage: usageState,
+    adminTenants: { notifyOptions: tenantOptions, notifyOptionsRequested: true },
     tenant: { selectedTenant: { id: 'tenant' } },
     user: { current: { cstarRoles: roles } },
   }
@@ -79,10 +80,10 @@ describe('AdminUsage', () => {
       sentThisFiscalYear: 30,
       disabled: 0,
     })
-    vi.mocked(getAdminUsageTenants).mockResolvedValue([
+    tenantOptions = [
       { id: 'parks', name: 'Parks Booking' },
       { id: 'roads', name: 'Roads' },
-    ])
+    ]
   })
 
   /** Opens a tenant's ⋮ menu and picks an action from it. */
@@ -219,7 +220,6 @@ describe('AdminUsage', () => {
   })
   it('suggests matching tenants as you type and searches for the one picked', async () => {
     setup({ adminRows: [row], adminCount: 1 })
-    await waitFor(() => expect(getAdminUsageTenants).toHaveBeenCalled())
     await userEvent.type(screen.getByRole('combobox', { name: 'Search tenants' }), 'park')
 
     const options = within(await screen.findByRole('listbox')).getAllByRole('option')
@@ -234,10 +234,9 @@ describe('AdminUsage', () => {
     await userEvent.type(screen.getByRole('combobox', { name: 'Search tenants' }), 'oad{Enter}')
     expect(mocks.dispatch).toHaveBeenCalledWith(setAdminSearch('oad'))
   })
-  it('still searches typed text when the tenant list fails to load', async () => {
-    vi.mocked(getAdminUsageTenants).mockRejectedValue(new Error('down'))
+  it('still searches typed text when there are no tenant suggestions', async () => {
+    tenantOptions = []
     setup({ adminRows: [row], adminCount: 1 })
-    await waitFor(() => expect(getAdminUsageTenants).toHaveBeenCalled())
     await userEvent.type(screen.getByRole('combobox', { name: 'Search tenants' }), 'Parks')
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Search' }))

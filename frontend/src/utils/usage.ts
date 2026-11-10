@@ -1,12 +1,7 @@
 import type { AdminTenantUsageRow, AdminUsageSummary } from '@/api/apiKeyUsage.api'
+import { formatDate } from './dates'
 
 /** Shared helpers for the notification usage & limits screens. */
-
-/** A channel code as a label: EMAIL -> Email, and SMS stays an acronym. */
-export function formatChannel(channel: string): string {
-  if (channel.toUpperCase() === 'SMS') return 'SMS'
-  return channel.charAt(0).toUpperCase() + channel.slice(1).toLowerCase()
-}
 
 /** One tenant of the admin usage table, with its per-channel rows. */
 export type AdminTenantUsage = Pick<
@@ -35,15 +30,6 @@ export function groupUsageByTenant(rows: readonly AdminTenantUsageRow[]): AdminT
     })
   }
   return [...tenants.values()]
-}
-
-/** A date as "Nov 9, 2026". */
-export function formatShortDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-CA', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
 }
 
 /** Usage as a percentage of a limit, rounded to five decimal places. */
@@ -75,7 +61,7 @@ export function formatLastSent(iso: string, now: number): string {
   if (days <= 0) return 'Today'
   if (days === 1) return 'Yesterday'
   if (days < 31) return `${days} days ago`
-  return formatShortDate(iso)
+  return formatDate(iso)
 }
 
 /** "0", or "12 (0.4%)": failures with their share of the recipients sent to. */

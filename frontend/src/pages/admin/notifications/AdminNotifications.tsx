@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FC } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
@@ -14,6 +14,7 @@ import { selectStatuses } from '@/redux/slices/codeTables.slice'
 import type { AdminNotificationRow } from '@/api/adminNotifications.api'
 import PageHeading from '@/components/PageHeading'
 import TypeaheadSearchField from '@/components/TypeaheadSearchField'
+import { useNotifyTenantNames } from '@/hooks/useNotifyTenantNames'
 import DateRangeFields from '@/components/DateRangeFields'
 import type { DateRange } from '@/components/DateRangeFields'
 import { DataTable } from '@/components/DataTable'
@@ -21,7 +22,8 @@ import type { TableColumn } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
 import { ChannelBadge } from '@/components/ChannelBadge'
 import { showErrorToast } from '@/redux/utils/toastUtils'
-import { CHANNEL_FILTER_OPTIONS, formatDateTime } from './adminNotificationFormat'
+import { channelFilterOptions } from '@/utils/channels'
+import { formatDateTime } from '@/utils/dates'
 import '@/scss/components/admin-notifications.scss'
 
 /**
@@ -34,8 +36,7 @@ const AdminNotifications: FC = () => {
   const { items, page, limit, count, search, filters, from, to, isLoading, hasLoaded, error } =
     useAppSelector((state) => state.adminNotifications)
   const statuses = useAppSelector(selectStatuses)
-  const tenants = useAppSelector((state) => state.adminTenants.items)
-  const tenantNames = useMemo(() => tenants.map((tenant) => tenant.name), [tenants])
+  const tenantNames = useNotifyTenantNames()
   const [searchInput, setSearchInput] = useState(search)
 
   useEffect(() => {
@@ -71,7 +72,7 @@ const AdminNotifications: FC = () => {
       key: 'channels',
       label: 'Channel',
       filterKey: 'channel',
-      filterOptions: CHANNEL_FILTER_OPTIONS,
+      filterOptions: channelFilterOptions(),
       render: (_, row) => <ChannelBadge channels={row.channels} />,
     },
     {

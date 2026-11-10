@@ -1,5 +1,6 @@
 import { In, Repository } from 'typeorm'
 import { vi } from 'vitest'
+import { fakeQueryBuilder } from '../../common/query/test-utils/fake-query-builder'
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { ApiKeyConsumer } from './entities/api-key-consumer.entity'
@@ -225,34 +226,6 @@ describe('ApiKeyUsageService.assertWithinLimits', () => {
 })
 
 describe('ApiKeyUsageService.getAllTenantsUsage', () => {
-  /** A query builder that records its where clauses and answers with the given result. */
-  function fakeQueryBuilder(result: { many?: unknown[]; manyAndCount?: [unknown[], number] }) {
-    const where: Array<[string, Record<string, unknown> | undefined]> = []
-    const calls: Record<string, unknown[]> = {}
-    const log: Array<[string, ...unknown[]]> = []
-    const qb: Record<string, unknown> = new Proxy(
-      {},
-      {
-        get(_, prop: string) {
-          if (prop === 'where' || prop === 'andWhere') {
-            return (clause: string, params?: Record<string, unknown>) => {
-              where.push([clause, params])
-              return qb
-            }
-          }
-          if (prop === 'getRawMany') return () => Promise.resolve(result.many ?? [])
-          if (prop === 'getManyAndCount') return () => Promise.resolve(result.manyAndCount)
-          return (...args: unknown[]) => {
-            calls[prop] = args
-            log.push([prop, ...args])
-            return qb
-          }
-        },
-      },
-    )
-    return { qb, where, calls, log }
-  }
-
   const active = {
     status: 'active',
     disabledReason: null,
@@ -297,8 +270,8 @@ describe('ApiKeyUsageService.getAllTenantsUsage', () => {
     ],
   } = {}) {
     const tenantQb = fakeQueryBuilder({ manyAndCount: [tenants, total] })
-    const limitQb = fakeQueryBuilder({ many: limits })
-    const usageQb = fakeQueryBuilder({ many: usage })
+    const limitQb = fakeQueryBuilder({ rawMany: limits })
+    const usageQb = fakeQueryBuilder({ rawMany: usage })
     const tenantRepository = {
       createQueryBuilder: vi.fn().mockReturnValue(tenantQb.qb),
       query: vi.fn().mockResolvedValue(history),
@@ -417,7 +390,10 @@ describe('ApiKeyUsageService.getAllTenantsUsage', () => {
       ' parks ',
     )
 
-    expect(tenantQb.where).toContainEqual(['t.name ILIKE :search', { search: '%parks%' }])
+    expect(tenantQb.where).toContainEqual([
+      String.raw`t.name ILIKE :search ESCAPE '\'`,
+      { search: '%parks%' },
+    ])
     expect(tenantQb.calls.skip).toEqual([30])
     expect(tenantQb.calls.take).toEqual([15])
     expect(result).toMatchObject({ count: 32, page: 3, totalPages: 3 })
@@ -488,14 +464,7 @@ describe('ApiKeyUsageService.updateTenantLimits', () => {
       update: vi.fn().mockResolvedValue({ affected: 1 }),
       createQueryBuilder: vi.fn(() => rawQb([])),
     }
-    const rawQb = (rows: unknown[]): Record<string, unknown> =>
-      new Proxy(
-        {},
-        {
-          get: (_, prop: string) =>
-            prop === 'getRawMany' ? () => Promise.resolve(rows) : () => rawQb(rows),
-        },
-      )
+    const rawQb = (rows: unknown[]) => fakeQueryBuilder({ rawMany: rows }).qb
     const service = new ApiKeyUsageService(
       {
         find: vi.fn().mockResolvedValue([{ id: 'consumer-1' }]),
@@ -518,33 +487,9 @@ describe('ApiKeyUsageService.updateTenantLimits', () => {
 
 describe('ApiKeyUsageService.getAdminUsageSummary', () => {
   it('counts Notify tenants, those sending this fiscal year and those disabled', async () => {
-    const where: string[] = []
-    const params: Record<string, unknown> = {}
-    const qb: Record<string, unknown> = new Proxy(
-      {},
-      {
-        get(_, prop: string) {
-          if (prop === 'where' || prop === 'andWhere')
-            return (clause: string) => {
-              where.push(clause)
-              return qb
-            }
-          if (prop === 'setParameter')
-            return (key: string, value: unknown) => {
-              params[key] = value
-              return qb
-            }
-          if (prop === 'getRawOne')
-            return () =>
-              Promise.resolve({
-                tenants: '42',
-                sentThisFiscalYear: '30',
-                disabled: '2',
-              })
-          return () => qb
-        },
-      },
-    )
+    const { qb, where, parameters } = fakeQueryBuilder({
+      rawOne: { tenants: '42', sentThisFiscalYear: '30', disabled: '2' },
+    })
     const service = new ApiKeyUsageService(
       {} as Repository<ApiKeyConsumer>,
       {} as Repository<ApiKeyLimit>,
@@ -558,30 +503,19 @@ describe('ApiKeyUsageService.getAdminUsageSummary', () => {
 
     expect(summary).toEqual({ tenants: 42, sentThisFiscalYear: 30, disabled: 2 })
     // The same tenants the usage table lists, and no search or filter.
-    expect(where).toEqual(['t.isDeleted = :deleted', 't.externalId IS NOT NULL'])
-    expect(params.fiscalYearStart).toBeInstanceOf(Date)
+    expect(where.map(([clause]) => clause)).toEqual([
+      't.isDeleted = :deleted',
+      't.externalId IS NOT NULL',
+    ])
+    expect(parameters.fiscalYearStart).toBeInstanceOf(Date)
   })
 })
 
 describe('ApiKeyUsageService.listNotifyTenants', () => {
   it('lists the CSTAR tenants the usage table shows, by name, as id and name only', async () => {
-    const where: string[] = []
-    const calls: Record<string, unknown[]> = {}
-    const qb: Record<string, unknown> = new Proxy(
-      {},
-      {
-        get(_, prop: string) {
-          if (prop === 'getMany') {
-            return () => Promise.resolve([{ id: 't-1', name: 'Parks', status: 'active' }])
-          }
-          return (...args: unknown[]) => {
-            if (prop === 'where' || prop === 'andWhere') where.push(String(args[0]))
-            else calls[prop] = args
-            return qb
-          }
-        },
-      },
-    )
+    const { qb, where, calls } = fakeQueryBuilder({
+      many: [{ id: 't-1', name: 'Parks', status: 'active' }],
+    })
     const service = new ApiKeyUsageService(
       {} as Repository<ApiKeyConsumer>,
       {} as Repository<ApiKeyLimit>,
@@ -592,7 +526,10 @@ describe('ApiKeyUsageService.listNotifyTenants', () => {
     )
 
     await expect(service.listNotifyTenants()).resolves.toEqual([{ id: 't-1', name: 'Parks' }])
-    expect(where).toEqual(['t.isDeleted = :deleted', 't.externalId IS NOT NULL'])
+    expect(where.map(([clause]) => clause)).toEqual([
+      't.isDeleted = :deleted',
+      't.externalId IS NOT NULL',
+    ])
     expect(calls.orderBy).toEqual(['t.name', 'ASC'])
   })
 })

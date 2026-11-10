@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { formatChannel } from '@/utils/usage'
+import { formatChannel } from '@/utils/channels'
 import '@/scss/components/channel-values.scss'
 
 interface ChannelValuesProps<T extends { channel: string }> {

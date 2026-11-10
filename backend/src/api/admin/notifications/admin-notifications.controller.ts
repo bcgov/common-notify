@@ -10,10 +10,10 @@ import { NotifyAdminGuard } from '../../../common/guards/notify-admin.guard'
 import { Roles } from '../../../common/decorators/roles.decorator'
 import { SsoRole } from '../../../enum/sso-role.enum'
 import { ListQueryDto } from '../../../common/query/list-query.dto'
+import { SearchableListQueryDto } from '../../../common/query/searchable-list-query.dto'
 import { AdminNotificationsService } from './admin-notifications.service'
 import {
   AdminNotificationDetailDto,
-  AdminNotificationQueryDto,
   PaginatedAdminDeliveryResponseDto,
   PaginatedAdminNotificationResponseDto,
 } from './schemas/admin-notification.dto'
@@ -39,7 +39,7 @@ export class AdminNotificationsController {
   @Roles(SsoRole.NOTIFY_ADMIN)
   @ApiOperation({ summary: 'List notification requests across tenants (admin only)' })
   @ApiOkResponse({ type: PaginatedAdminNotificationResponseDto })
-  list(@Query() query: AdminNotificationQueryDto): Promise<PaginatedAdminNotificationResponseDto> {
+  list(@Query() query: SearchableListQueryDto): Promise<PaginatedAdminNotificationResponseDto> {
     return this.adminNotificationsService.list(query, query.search)
   }
 

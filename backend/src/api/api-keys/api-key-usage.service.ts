@@ -13,7 +13,7 @@ import { NotifyConfiguration } from '../notification/entities/configuration.enti
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { NotificationStatus } from '../../enum/notification-status.enum'
-import { applyListQueryFilters } from '../../common/query/typeorm-list-query.util'
+import { andWhereContains, applyListQueryFilters } from '../../common/query/typeorm-list-query.util'
 import type {
   ListQueryFilter,
   ListQuerySort,
@@ -376,8 +376,7 @@ export class ApiKeyUsageService {
 
     // Paged by tenant, so a tenant's channel rows always stay together on one page.
     const qb = this.notifyTenants()
-    const term = search?.trim()
-    if (term) qb.andWhere('t.name ILIKE :search', { search: `%${term}%` })
+    andWhereContains(qb, 't.name', search)
     applyListQueryFilters(
       qb,
       filters.filter((filter) => filter.field !== 'channel'),

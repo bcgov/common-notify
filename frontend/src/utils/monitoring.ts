@@ -1,4 +1,5 @@
 import type { HealthWarning, HealthWarningPage } from '@/components/HealthBanner'
+import { formatChannel } from './channels'
 import type { ComponentStatus, ComponentStatusGroup } from '@/components/ComponentStatusList'
 import type {
   HealthStatus,
@@ -16,16 +17,6 @@ const QUEUE_LABELS: Record<string, string> = {
 
 export function formatQueueName(name: string): string {
   return QUEUE_LABELS[name] ?? name
-}
-
-const CHANNEL_LABELS: Record<string, string> = {
-  EMAIL: 'Email',
-  SMS: 'SMS',
-  MSGAPP: 'In-app',
-}
-
-export function formatMessageChannel(channel: string): string {
-  return CHANNEL_LABELS[channel] ?? channel
 }
 
 export const HEALTH_LABELS: Record<HealthStatus, string> = {
@@ -70,7 +61,7 @@ export function formatRate(perMinute: number): string {
 
 /** "CHES (Email)". */
 export function providerLabel(provider: ProviderStats): string {
-  return `${provider.name} (${formatMessageChannel(provider.channel)})`
+  return `${provider.name} (${formatChannel(provider.channel)})`
 }
 
 /** The admin monitoring pages, and which part of the snapshot each one details. */

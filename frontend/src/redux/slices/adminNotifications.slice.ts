@@ -3,18 +3,10 @@ import type { PayloadAction } from '@reduxjs/toolkit'
 import type { AdminNotificationRow } from '@/api/adminNotifications.api'
 import { fetchAdminNotifications } from '../thunks/adminNotifications.thunks'
 import { isStaleResponse } from '../utils/latestRequest'
+import { localDay } from '@/utils/dates'
 
 /** How far back the list looks until an admin picks dates: a week, today included. */
 export const DEFAULT_RANGE_DAYS = 7
-
-/** A local date as YYYY-MM-DD, `daysAgo` days before today. */
-export function localDay(daysAgo = 0): string {
-  const date = new Date()
-  date.setDate(date.getDate() - daysAgo)
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${date.getFullYear()}-${month}-${day}`
-}
 
 /**
  * The admin Notifications list's query and rows. Kept in the store, not the page, so the

@@ -95,7 +95,11 @@ describe('AdminNotificationDetail', () => {
     await within(table).findByText('550 mailbox [recipient] unavailable')
     expect(within(table).getByText('ID: msg-9')).toBeInTheDocument()
     expect(within(table).getByText('3')).toBeInTheDocument()
-    expect(listAdminDeliveries).toHaveBeenCalledWith('req-1', { page: 1, limit: 15, filter: [] })
+    expect(listAdminDeliveries).toHaveBeenCalledWith('req-1', {
+      page: 1,
+      limit: 15,
+      filter: undefined,
+    })
   })
 
   it('refetches deliveries filtered by status', async () => {

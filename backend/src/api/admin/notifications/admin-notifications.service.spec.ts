@@ -1,37 +1,7 @@
 import { NotFoundException } from '@nestjs/common'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AdminNotificationsService } from './admin-notifications.service'
-
-/** A query builder stand-in that records every call and resolves the given results. */
-function fakeQueryBuilder(result: {
-  one?: unknown
-  manyAndCount?: [unknown[], number]
-  raw?: unknown[]
-}) {
-  const where: Array<[string, Record<string, unknown> | undefined]> = []
-  const log: Array<[string, ...unknown[]]> = []
-  const qb: Record<string, unknown> = new Proxy(
-    {},
-    {
-      get(_, prop: string) {
-        if (prop === 'where' || prop === 'andWhere') {
-          return (clause: string, params?: Record<string, unknown>) => {
-            where.push([clause, params])
-            return qb
-          }
-        }
-        if (prop === 'getOne') return () => Promise.resolve(result.one ?? null)
-        if (prop === 'getManyAndCount') return () => Promise.resolve(result.manyAndCount)
-        if (prop === 'getRawMany') return () => Promise.resolve(result.raw ?? [])
-        return (...args: unknown[]) => {
-          log.push([prop, ...args])
-          return qb
-        }
-      },
-    },
-  )
-  return { qb, where, log }
-}
+import { fakeQueryBuilder } from '../../../common/query/test-utils/fake-query-builder'
 
 const request = {
   id: 'req-1',
@@ -89,7 +59,10 @@ describe('AdminNotificationsService', () => {
 
       const clauses = requestQb.where.map(([clause]) => clause)
       expect(clauses).toContain('n.isInternal = :internal')
-      expect(requestQb.where).toContainEqual(['t.name ILIKE :search', { search: '%parks%' }])
+      expect(requestQb.where).toContainEqual([
+        String.raw`t.name ILIKE :search ESCAPE '\'`,
+        { search: '%parks%' },
+      ])
       expect(requestQb.where).toContainEqual([
         'jsonb_exists_any(n.channel_codes, ARRAY[:...channels]::text[])',
         { channels: ['EMAIL', 'SMS'] },
@@ -162,7 +135,7 @@ describe('AdminNotificationsService', () => {
             },
           },
         },
-        { raw: [{ channel: 'EMAIL', status: 'failed', count: '2' }] },
+        { rawMany: [{ channel: 'EMAIL', status: 'failed', count: '2' }] },
       )
       requestQuery.mockImplementation((sql: string) =>
         Promise.resolve(
