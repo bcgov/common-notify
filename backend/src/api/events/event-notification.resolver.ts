@@ -38,8 +38,8 @@ export interface EventEmailSendSettings {
  * Turns an event into a notification request.
  *
  * An event names a template, a sender, a header and a set of recipients; the send pipeline takes
- * a NotifySimpleRequest. This resolves one into the other so that everything downstream of the
- * @Queueable decorator - validation, limits, the queue, the workers - handles an event send with
+ * a NotifySimpleRequest. This resolves one into the other so that everything downstream of
+ * NotifySubmissionService - validation, limits, the queue, the workers - handles an event send with
  * no knowledge that an event was involved.
  *
  * It runs at accept time in order to expand any existing CSTAR groups into recipient emails.

@@ -1,6 +1,5 @@
 import { NestFactory } from '@nestjs/core'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
-import { ModuleRef } from '@nestjs/core'
 import { AppModule } from './app.module'
 import { StructuredLoggerService } from './common/logger'
 import type { NestExpressApplication } from '@nestjs/platform-express'
@@ -26,9 +25,6 @@ export async function bootstrap() {
   // Route all framework and application logging through the structured logger
   // so every `new Logger(context)` call ships JSON to Loki via winston.
   app.useLogger(app.get(StructuredLoggerService))
-
-  // Store ModuleRef globally for decorator access (used by @Queueable)
-  ;(global as any).__nestModuleRef__ = app.get(ModuleRef)
 
   // Add body parsers for form data. The JSON limit is raised above the 100KB
   // default so a full-size mail merge send (up to MAIL_MERGE_MAX_RECIPIENTS rows) fits.

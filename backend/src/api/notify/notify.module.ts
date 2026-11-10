@@ -30,6 +30,7 @@ import { AttachmentResolverService } from './services/attachment-resolver.servic
 import { LimitAlertNotificationService } from './services/limit-alert-notification.service'
 import { SmsSegmentService } from './services/sms-segment.service'
 import { NotificationDedupService } from './services/notification-dedup.service'
+import { NotifySubmissionService } from './services/notify-submission.service'
 import { PhoneNumberService } from './services/phone-number.service'
 import { AttachmentModule } from '../attachment/attachment.module'
 import { SafelistModule } from '../safelist/safelist.module'
@@ -71,6 +72,7 @@ import { EventsModule } from '../events/events.module'
     LimitAlertNotificationService,
     SmsSegmentService,
     NotificationDedupService,
+    NotifySubmissionService,
   ],
   exports: [
     NotifyService,
@@ -80,6 +82,7 @@ import { EventsModule } from '../events/events.module'
     AttachmentResolverService,
     SmsSegmentService,
     NotificationDedupService,
+    NotifySubmissionService,
   ],
 })
 export class NotifyModule {}

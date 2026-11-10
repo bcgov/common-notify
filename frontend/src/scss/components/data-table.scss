@@ -176,6 +176,23 @@ $table-header-bg: #f1f8fe; // Table header / footer color
     }
   }
 
+  // Puts an empty-state action (e.g. "Clear search") on its own line under the message.
+  &__empty-row td .bcds-react-aria-Button {
+    display: flex;
+    margin: $spacing-sm auto 0;
+  }
+
+  // Search/filter empty state sits on white. Scoped under tbody tr to tie with the striped
+  // odd-row and row hover backgrounds, and placed after them so it wins.
+  tbody tr.data-table__empty-row--action,
+  tbody tr.data-table__empty-row--action:hover {
+    background-color: $white;
+  }
+
+  tbody tr.data-table__empty-row--action td {
+    padding-top: $spacing-md;
+  }
+
   /* Pagination footer row */
 
   &__footer {
@@ -253,10 +270,6 @@ $table-header-bg: #f1f8fe; // Table header / footer color
         opacity: 0.4;
         cursor: not-allowed;
       }
-
-      // &:hover:not(:disabled) {
-      //   background-color: rgba($primary-color, 0.05);
-      // }
     }
   }
 
@@ -286,9 +299,10 @@ $table-header-bg: #f1f8fe; // Table header / footer color
     }
   }
 
-  &__dropdown-icon {
+  // Scoped under the button so it outranks the font size MUI's own class gives the icon.
+  &__dropdown-btn &__dropdown-icon {
     display: block;
-    font-size: 1.2rem !important;
+    font-size: 1.2rem;
     opacity: 0.7;
   }
 

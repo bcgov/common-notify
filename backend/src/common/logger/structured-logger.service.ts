@@ -28,12 +28,10 @@ export interface LogContext {
  */
 @Injectable()
 export class StructuredLoggerService implements LoggerService {
-  private logger: winston.Logger
-  private context: string
+  private readonly logger: winston.Logger
+  private context = 'Application'
 
   constructor() {
-    this.context = 'Application'
-
     // Determine if we're in production/k8s environment
     const isProduction =
       process.env.NODE_ENV === 'production' || process.env.KUBERNETES_SERVICE_HOST !== undefined

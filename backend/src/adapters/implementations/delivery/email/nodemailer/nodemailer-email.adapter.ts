@@ -7,7 +7,7 @@ import { IEmailTransport, SendEmailOptions, SendEmailResult } from '../../../../
 @Injectable()
 export class NodemailerEmailTransport implements IEmailTransport {
   readonly name = 'nodemailer'
-  private transporter: Transporter
+  private readonly transporter: Transporter
 
   constructor(private readonly configService: ConfigService) {
     const host = this.configService.get<string>('nodemailer.host', 'localhost')

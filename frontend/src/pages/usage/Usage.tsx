@@ -20,7 +20,7 @@ const OPERATIONS_ADMIN_ROLE = 'NOTIFY_OPERATIONS_ADMIN'
 
 const Usage: FC = () => {
   const dispatch = useAppDispatch()
-  const { usage, isLoading, updatingChannel } = useAppSelector((state) => state.apiKeyUsage)
+  const { usage, isLoading, updatingChannel, error } = useAppSelector((state) => state.apiKeyUsage)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const cstarRoles = useAppSelector((state) => state.user.current?.cstarRoles)
 
@@ -115,6 +115,7 @@ const Usage: FC = () => {
   return (
     <div className="page">
       <PageHeading title="Notification Usage & Limits" />
+      {error && <div role="alert">{error}</div>}
 
       <DataTable
         columns={channelColumns}

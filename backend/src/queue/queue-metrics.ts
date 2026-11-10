@@ -1,13 +1,14 @@
-import type Bull from 'bull'
+import type { Queue } from 'bullmq'
+import type Redis from 'ioredis'
 import { Logger } from '@nestjs/common'
-import { REDIS_KEY_PREFIX } from '../common/redis/redis-namespace'
+import { QUEUE_KEY_PREFIX } from '../common/redis/redis-namespace'
 
 const logger = new Logger('QueueMetrics')
 
 const MINUTE_MS = 60_000
 
 /**
- * Per-minute "added" counters live this long. Bull records completed/failed itself (see
+ * Per-minute "added" counters live this long. BullMQ records completed/failed itself (see
  * QUEUE_METRICS_MAX_DATA_POINTS) but has no equivalent for adds, so the fill rate is ours.
  */
 const ADDED_COUNTER_TTL_SECONDS = 2 * 60 * 60
@@ -19,13 +20,9 @@ export function minuteOf(timestampMs: number): number {
   return Math.floor(timestampMs / MINUTE_MS)
 }
 
-/** The key Bull itself uses for `suffix` on this queue, given our `prefix` option. */
-export function bullKey(queueName: string, suffix: string): string {
-  return `${REDIS_KEY_PREFIX}:${queueName}:${suffix}`
-}
-
+/** Kept beside the queue's own keys, so it is namespaced and cleared with them. */
 export function addedCounterKey(queueName: string, minute: number): string {
-  return bullKey(queueName, `metrics:added:${minute}`)
+  return `${QUEUE_KEY_PREFIX}:${queueName}:metrics:added:${minute}`
 }
 
 /**
@@ -33,15 +30,15 @@ export function addedCounterKey(queueName: string, minute: number): string {
  *
  * Jobs are added from a dozen call sites, so this wraps `add` once where the queue is built
  * rather than at each of them. Counting is best-effort: a Redis error is logged and never
- * fails the add, which has already succeeded by then. A re-add Bull deduplicates by jobId is
+ * fails the add, which has already succeeded by then. A re-add BullMQ deduplicates by jobId is
  * still counted, which slightly overstates the fill rate during a pending-sweep retry.
  */
-export function countAddedJobs(queue: Bull.Queue): void {
-  const add = queue.add.bind(queue) as (...args: unknown[]) => Promise<Bull.Job>
-  const counted = async (...args: unknown[]): Promise<Bull.Job> => {
+export function countAddedJobs(queue: Queue, redis: Redis): void {
+  const add = queue.add.bind(queue)
+  queue.add = (async (...args: Parameters<Queue['add']>) => {
     const job = await add(...args)
     const key = addedCounterKey(queue.name, minuteOf(Date.now()))
-    queue.client
+    redis
       .multi()
       .incr(key)
       .expire(key, ADDED_COUNTER_TTL_SECONDS)
@@ -50,26 +47,25 @@ export function countAddedJobs(queue: Bull.Queue): void {
         logger.warn(`Failed to count added job on ${queue.name}: ${error.message}`)
       })
     return job
-  }
-  queue.add = counted as Bull.Queue['add']
+  }) as Queue['add']
 }
 
-/** Bull's `getMetrics()` result, as returned at runtime (list entries are strings). */
-export interface BullMetrics {
+/** BullMQ's `getMetrics()` result. */
+export interface QueueMetrics {
   meta: { count: number; prevTS: number; prevCount: number }
   data: Array<string | number>
 }
 
 /**
- * Re-align Bull's completed/failed data points onto wall-clock minutes, oldest first.
+ * Re-align BullMQ's completed/failed data points onto wall-clock minutes, oldest first.
  *
- * Bull only writes a data point when a job finishes in a later minute than the previous one,
+ * BullMQ only writes a data point when a job finishes in a later minute than the previous one,
  * so its list is anchored to `prevTS`, not to now: `data[i]` is minute(prevTS) - 1 - i, and
  * jobs finished in minute(prevTS) are still held as `count - prevCount`. Reading the list as
  * if index 0 were the current minute shifts every point by however long the queue has been
  * quiet.
  */
-export function alignBullMetrics(metrics: BullMetrics, nowMs: number): number[] {
+export function alignQueueMetrics(metrics: QueueMetrics, nowMs: number): number[] {
   const currentMinute = minuteOf(nowMs)
   const flushedMinute = minuteOf(metrics.meta.prevTS)
   const pending = Math.max(0, metrics.meta.count - metrics.meta.prevCount)

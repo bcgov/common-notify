@@ -10,7 +10,7 @@ interface IssueRow extends RowIssue {
   id: number
 }
 
-type IssueSort = { key: keyof IssueRow & string; order: 'asc' | 'desc' | null }
+type IssueSort = { key: keyof IssueRow; order: 'asc' | 'desc' | null }
 
 const issueColumns: TableColumn<IssueRow>[] = [
   { key: 'row', label: 'Row', width: '90px', sortable: true, sortType: 'numeric' },
@@ -102,7 +102,7 @@ const CsvIssuesTable: FC<Props> = ({ issues }) => {
         label="Problems found in the uploaded file"
         sortBy={sort.order ? sort.key : undefined}
         sortOrder={sort.order}
-        onSort={(key, order) => setSort({ key: key as keyof IssueRow & string, order })}
+        onSort={(key, order) => setSort({ key: key as keyof IssueRow, order })}
         size="sm"
         // The Issue cell is a title over its fix, so rows are taller than one line.
         multiline

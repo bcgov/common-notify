@@ -109,11 +109,7 @@ const EventsAdditionalRecipients: FC<EventsAdditionalRecipientsProps> = ({
     ].filter(Boolean)
 
     return (
-      <div
-        className="events__additional-recipients"
-        role="group"
-        aria-label="Additional recipients"
-      >
+      <fieldset className="events__additional-recipients" aria-label="Additional recipients">
         <span className="events__field-label">Additional recipient(s) (required)</span>
 
         <TagListField
@@ -126,12 +122,12 @@ const EventsAdditionalRecipients: FC<EventsAdditionalRecipientsProps> = ({
           isInvalid={errors.length > 0}
           errorMessage={errors.length > 0 ? errors.join(' ') : undefined}
         />
-      </div>
+      </fieldset>
     )
   }
 
   return (
-    <div className="events__additional-recipients" role="group" aria-label="Additional recipients">
+    <fieldset className="events__additional-recipients" aria-label="Additional recipients">
       <span className="events__field-label">Additional recipient(s) (required)</span>
 
       {RECIPIENT_FIELDS.map(({ id, label }) => {
@@ -166,7 +162,7 @@ const EventsAdditionalRecipients: FC<EventsAdditionalRecipientsProps> = ({
           </div>
         )
       })}
-    </div>
+    </fieldset>
   )
 }
 

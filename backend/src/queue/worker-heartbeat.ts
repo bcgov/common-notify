@@ -1,4 +1,4 @@
-import type Bull from 'bull'
+import type { Job, Worker } from 'bullmq'
 import type Redis from 'ioredis'
 import { hostname } from 'node:os'
 import { Logger } from '@nestjs/common'
@@ -38,14 +38,14 @@ export interface WorkerHeartbeatPayload {
 const logger = new Logger('WorkerHeartbeat')
 
 /**
- * Publishes what this pod's Bull workers are doing so the admin monitoring page can list every
+ * Publishes what this pod's queue workers are doing so the admin monitoring page can list every
  * pod's workers, not just those of the pod that served the request.
  *
  * The counts are this pod's own and are meant to disappear with it: the key expires
  * HEARTBEAT_TTL_SECONDS after the last write, so a crashed or scaled-down pod falls off the
  * list on its own. `completed` and `failed` are since this pod started, not lifetime totals.
- * Bull's `getWorkers()` is not used because it depends on CLIENT LIST, and returns undefined
- * rather than failing when a managed Redis disallows it.
+ * BullMQ's `getWorkers()` is not used because it depends on CLIENT LIST, which a managed Redis
+ * may disallow.
  */
 export class WorkerHeartbeat {
   private readonly podId = process.env.HOSTNAME || hostname()
@@ -56,34 +56,33 @@ export class WorkerHeartbeat {
 
   constructor(private readonly redis: Redis) {}
 
-  /** Track a queue this pod processes. Call once per queue, after its worker is registered. */
-  track(queue: Bull.Queue, concurrency: number): void {
+  /** Track a worker this pod runs. Call once per queue, as its worker is created. */
+  track(worker: Pick<Worker, 'name' | 'on'>, concurrency: number): void {
     const state: WorkerQueueState = {
-      queue: queue.name,
+      queue: worker.name,
       concurrency,
       active: 0,
       completed: 0,
       failed: 0,
       lastFinishedAt: null,
     }
-    this.states.set(queue.name, state)
+    this.states.set(worker.name, state)
 
-    // Keyed by job id, not counted: Bull's stalled-job check emits a local `failed` for jobs
-    // another pod abandoned, which a plain counter would take as one of this pod's jobs ending.
-    const running = new Set<Bull.JobId>()
-    const finish = (job: Bull.Job | undefined, outcome: 'completed' | 'failed') => {
+    // Keyed by job id, not counted, so a finish only counts for a job this worker started.
+    const running = new Set<string | undefined>()
+    const finish = (job: Job | undefined, outcome: 'completed' | 'failed') => {
       if (!job || !running.delete(job.id)) return
       state.active = running.size
       state[outcome]++
       state.lastFinishedAt = Date.now()
     }
 
-    queue.on('active', (job: Bull.Job) => {
+    worker.on('active', (job: Job) => {
       running.add(job.id)
       state.active = running.size
     })
-    queue.on('completed', (job: Bull.Job) => finish(job, 'completed'))
-    queue.on('failed', (job: Bull.Job) => finish(job, 'failed'))
+    worker.on('completed', (job: Job) => finish(job, 'completed'))
+    worker.on('failed', (job: Job | undefined) => finish(job, 'failed'))
   }
 
   start(): void {

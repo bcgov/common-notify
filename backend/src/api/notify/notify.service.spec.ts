@@ -64,7 +64,7 @@ describe('NotifyService', () => {
       expect(result).toHaveProperty('error')
       expect(result).toHaveProperty('message')
       expect(result).toHaveProperty('timestamp')
-      expect(Object.keys(result).length).toBe(3)
+      expect(Object.keys(result)).toHaveLength(3)
     })
   })
 

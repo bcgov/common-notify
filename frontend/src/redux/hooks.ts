@@ -1,6 +1,6 @@
 import type { TypedUseSelectorHook } from 'react-redux'
-import { useDispatch, useSelector } from 'react-redux'
-import type { RootState, AppDispatch } from './store'
+import { useDispatch, useSelector, useStore } from 'react-redux'
+import type { RootState, AppDispatch, AppStore } from './store'
 
 /**
  * Use throughout your app instead of plain `useDispatch`.
@@ -13,3 +13,9 @@ export const useAppDispatch = () => useDispatch<AppDispatch>()
  * This is type-safe and will auto-complete available state
  */
 export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector
+
+/**
+ * Use throughout your app instead of plain `useStore`. Only for reading state at the moment
+ * of an event (e.g. after an awaited dispatch); render from `useAppSelector`.
+ */
+export const useAppStore = useStore.withTypes<AppStore>()

@@ -8,6 +8,17 @@ $preview-gutter: $spacing-xl * 1.5;
 .bcds-react-aria-Modal:has(.notification-preview) {
   width: 1140px;
   max-width: calc(100vw - #{$preview-gutter});
+  // The modal caps its height at the viewport, but its content overflows rather than shrinks, which
+  // pushed the footer off a short screen. A flex column lets the body give up the height instead.
+  display: flex;
+  flex-direction: column;
+
+  .bcds-react-aria-Dialog--Container {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
 }
 
 .notification-preview {
@@ -128,7 +139,7 @@ $preview-gutter: $spacing-xl * 1.5;
 }
 
 .notification-preview__data-footer {
-  padding-top: $spacing-sm;
+  padding-top: $spacing-md;
 }
 
 .notification-preview__output-pane {
@@ -163,7 +174,7 @@ $preview-gutter: $spacing-xl * 1.5;
 
   dd {
     margin: 0;
-    word-break: break-word;
+    overflow-wrap: anywhere;
   }
 }
 
@@ -190,7 +201,7 @@ $preview-gutter: $spacing-xl * 1.5;
   background: $white;
   font-family: inherit;
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .notification-preview__error {
@@ -224,17 +235,14 @@ $preview-gutter: $spacing-xl * 1.5;
 @media (max-width: $breakpoint-md) {
   .notification-preview__body {
     flex-direction: column;
+    height: auto;
+    max-height: $preview-pane-height;
+    overflow-y: auto;
   }
 
   .notification-preview__data {
     width: 100%;
     border-right: 0;
     border-bottom: 1px solid $border-default;
-  }
-
-  .notification-preview__body {
-    height: auto;
-    max-height: $preview-pane-height;
-    overflow-y: auto;
   }
 }

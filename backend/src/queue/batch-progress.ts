@@ -1,7 +1,7 @@
-import type Bull from 'bull'
+import type { Job } from 'bullmq'
 import { Logger } from '@nestjs/common'
 
-/** How far a merge batch has got, stored as the Bull job's progress. */
+/** How far a merge batch has got, stored as the job's progress. */
 export interface BatchProgress {
   sent: number
   failed: number
@@ -13,15 +13,17 @@ export type BatchProgressReporter = (progress: BatchProgress) => void
 const logger = new Logger('BatchProgress')
 
 /**
- * Report a merge batch's per-recipient progress on its Bull job, so the admin monitoring page
+ * Report a merge batch's per-recipient progress on its job, so the admin monitoring page
  * can show "37 of 100" for a batch that is one job but many emails. Best-effort: the write is
  * not awaited and a failure is only logged, so progress never slows or fails a send.
  */
-export function batchProgressReporter(job: Bull.Job): BatchProgressReporter {
+export function batchProgressReporter(
+  job: Pick<Job, 'id' | 'updateProgress'>,
+): BatchProgressReporter {
   return (progress) => {
     // Deferred through then() so even a synchronous throw lands in catch, not in the send loop.
     Promise.resolve()
-      .then(() => job.progress(progress))
+      .then(() => job.updateProgress(progress))
       .catch((error: Error) => {
         logger.warn(`Failed to record progress for job ${job.id}: ${error.message}`)
       })

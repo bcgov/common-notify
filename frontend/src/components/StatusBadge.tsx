@@ -10,10 +10,10 @@ import '@/scss/components/status-badge.scss'
 export function StatusBadge({
   status,
   statusLabel,
-}: {
+}: Readonly<{
   status?: string | boolean
   statusLabel?: string
-}) {
+}>) {
   let label = ''
   let dotClassName = ''
 
@@ -21,7 +21,7 @@ export function StatusBadge({
     label = status ? 'Enabled' : 'Disabled'
     dotClassName = status ? 'status-badge__dot--enabled' : 'status-badge__dot--disabled'
   } else if (status) {
-    label = statusLabel ? statusLabel : status.charAt(0).toUpperCase() + status.slice(1)
+    label = statusLabel || status.charAt(0).toUpperCase() + status.slice(1)
     // Map status strings to dot class names
     switch (status) {
       case 'completed':

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import reducer, { setPage, setFilter } from './notification.slice'
 import { fetchNotifications } from '../thunks/notification.thunks'
-import { NotificationStatus } from '@/enum/notification-status.enum'
 import { selectTenant } from './tenant.slice'
 import type { Tenant } from '@/interfaces/CstarTenant'
 
@@ -22,10 +21,10 @@ describe('notificationSlice', () => {
         hasLoaded: false,
         currentRequestId: null,
       },
-      setFilter({ field: 'status', values: [NotificationStatus.COMPLETED] }),
+      setFilter({ field: 'status', values: ['completed'] }),
     )
 
-    expect(state.filters.status).toEqual([NotificationStatus.COMPLETED])
+    expect(state.filters.status).toEqual(['completed'])
     expect(state.page).toBe(1)
   })
 
@@ -41,7 +40,7 @@ describe('notificationSlice', () => {
             {
               id: 'notif-1',
               tenantId: 'tenant-1',
-              status: { code: NotificationStatus.QUEUED, displayName: 'Queued' },
+              status: { code: 'queued', displayName: 'Queued' },
               createdAt: '2026-05-12T00:00:00.000Z',
               updatedAt: '2026-05-12T00:00:00.000Z',
             },
@@ -78,7 +77,7 @@ describe('notificationSlice', () => {
             {
               id: 'tenant-a-notif',
               tenantId: 'tenant-a',
-              status: { code: NotificationStatus.COMPLETED, displayName: 'Completed' },
+              status: { code: 'completed', displayName: 'Completed' },
               createdAt: '2026-05-12T00:00:00.000Z',
               updatedAt: '2026-05-12T00:00:00.000Z',
             },
@@ -116,7 +115,7 @@ describe('notificationSlice', () => {
             {
               id: 'tenant-a-notif',
               tenantId: 'tenant-a',
-              status: { code: NotificationStatus.COMPLETED, displayName: 'Completed' },
+              status: { code: 'completed', displayName: 'Completed' },
               createdAt: '2026-05-12T00:00:00.000Z',
               updatedAt: '2026-05-12T00:00:00.000Z',
             },

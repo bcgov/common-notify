@@ -4,6 +4,7 @@ import { CstarModule } from '../../services/cstar/cstar.module'
 import { TenantsModule } from '../admin/tenants/tenants.module'
 import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
+import { TenantSettings } from '../tenant-settings/entities/tenant-settings.entity'
 import { RecipientSafelist } from './entities/recipient-safelist.entity'
 import { SafelistController } from './safelist.controller'
 import { SafelistService } from './safelist.service'
@@ -12,7 +13,7 @@ import { SafelistService } from './safelist.service'
   imports: [
     // NotifyUser is joined by listByTenant but never injected as a repository; its metadata
     // comes from the root DataSource.
-    TypeOrmModule.forFeature([RecipientSafelist, NotifyConfiguration]),
+    TypeOrmModule.forFeature([RecipientSafelist, NotifyConfiguration, TenantSettings]),
     CstarModule,
     TenantsModule,
     FeatureFlagModule,

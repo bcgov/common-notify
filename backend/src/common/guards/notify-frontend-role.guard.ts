@@ -43,8 +43,8 @@ export class NotifyFrontendRoleGuard extends AuthGuard('jwt') {
   constructor(
     private readonly reflector: Reflector,
     configService: ConfigService,
-    private tenantsService: TenantsService,
-    private cstarApiClient: CstarApiClient,
+    private readonly tenantsService: TenantsService,
+    private readonly cstarApiClient: CstarApiClient,
   ) {
     super()
     this.keycloakClientId = configService.getOrThrow('auth.notifyClientId')

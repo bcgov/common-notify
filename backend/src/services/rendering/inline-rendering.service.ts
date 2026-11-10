@@ -13,7 +13,7 @@ import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from './tokens'
 export class InlineRenderingService {
   constructor(
     @Inject(TEMPLATE_RENDERER_REGISTRY_TOKEN)
-    private rendererRegistry: ITemplateRendererRegistry,
+    private readonly rendererRegistry: ITemplateRendererRegistry,
   ) {}
 
   /**

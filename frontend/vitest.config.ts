@@ -21,6 +21,8 @@ export default defineConfig({
     // since parsing CSS is slow
     css: false,
     coverage: {
+      include: ['src/**/*.{ts,tsx,js}'],
+      thresholds: { lines: 80, statements: 80, functions: 80, branches: 80 },
       reporter: ['lcov', 'text-summary', 'text', 'json', 'html'],
       exclude: [
         '**/node_modules/**',

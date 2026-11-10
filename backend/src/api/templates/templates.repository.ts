@@ -131,9 +131,9 @@ export class TemplatesRepository {
     // Case-insensitive search across template title (name) and description.
     // Applied as an OR group since the parsed-query filter mechanism only supports AND.
     if (search) {
-      const escaped = search.replace(/[\\%_]/g, '\\$&')
+      const escaped = search.replace(/[\\%_]/g, String.raw`\$&`)
       queryBuilder.andWhere(
-        `(template.name ILIKE :search ESCAPE '\\' OR template.description ILIKE :search ESCAPE '\\')`,
+        String.raw`(template.name ILIKE :search ESCAPE '\' OR template.description ILIKE :search ESCAPE '\')`,
         { search: `%${escaped}%` },
       )
     }
@@ -165,7 +165,7 @@ export class TemplatesRepository {
       .andWhere('template.active = :active', { active: true })
 
     if (search) {
-      const sanitizedSearch = search.replace(/[%_\\]/g, '\\$&')
+      const sanitizedSearch = search.replace(/[%_\\]/g, String.raw`\$&`)
       queryBuilder.andWhere(`(template.name ILIKE :search OR template.body ILIKE :search)`, {
         search: `%${sanitizedSearch}%`,
       })

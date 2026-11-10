@@ -1,12 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type Bull from 'bull'
+import type { Job, Queue } from 'bullmq'
 import type Redis from 'ioredis'
 import type { Repository } from 'typeorm'
+import { QueueName } from '../../enum/queue-name.enum'
 import { DeliveryReconcilerService } from './delivery-reconciler.service'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import type { NotificationRequestDetail } from '../../api/notification/entities/notification-request-detail.entity'
 import type { NotificationRequest } from '../../api/notification/entities/notification-request.entity'
 import type { NotificationService } from '../../api/notification/notification.service'
+import type { StructuredLoggerService } from '../../common/logger'
 
 const BATCH = {
   batchId: 'req-1-EMAIL-0',
@@ -45,7 +47,7 @@ function setup({
   scheduled = [],
   ingestionJob = null,
 }: {
-  job?: Partial<Bull.Job> | null
+  job?: Partial<Job> | null
   locked?: string | null
   attempt?: number
   /** Stale merge batches, then stale plain-send deliveries: the two detail queries, in order. */
@@ -57,7 +59,7 @@ function setup({
   pending?: object[]
   /** Scheduled sends past their send time; queried after the QUEUED ones. */
   scheduled?: object[]
-  ingestionJob?: Partial<Bull.Job> | null
+  ingestionJob?: Partial<Job> | null
 }) {
   const results = [stale, deliveries]
   const builder: Record<string, unknown> = {}
@@ -98,6 +100,7 @@ function setup({
     createQueryBuilder: vi.fn(() => requestBuilder),
   }
   const ingestionQueue = {
+    name: QueueName.INGESTION,
     getJob: vi.fn().mockResolvedValue(ingestionJob),
     add: vi.fn().mockResolvedValue({}),
   }
@@ -119,20 +122,24 @@ function setup({
     expire: vi.fn().mockResolvedValue(1),
   }
   const queue = {
+    name: QueueName.EMAIL_DELIVERY,
     getJob: vi.fn().mockResolvedValue(job ?? null),
     add: vi.fn().mockResolvedValue({}),
   }
+  const structuredLogger = { logNotificationFailure: vi.fn() }
   const service = new DeliveryReconcilerService(
     detailRepository as unknown as Repository<NotificationRequestDetail>,
     requestRepository as unknown as Repository<NotificationRequest>,
     notificationService as unknown as NotificationService,
     redis as unknown as Redis,
-    queue as unknown as Bull.Queue,
+    queue as unknown as Queue,
     null,
-    ingestionQueue as unknown as Bull.Queue,
+    ingestionQueue as unknown as Queue,
+    structuredLogger as unknown as StructuredLoggerService,
   )
   return {
     service,
+    structuredLogger,
     detailRepository,
     requestRepository,
     notificationService,
@@ -143,28 +150,31 @@ function setup({
   }
 }
 
-const jobIn = (state: string, extra: Partial<Bull.Job> = {}) =>
+const jobIn = (state: string, extra: Partial<Job> = {}) =>
   ({
     getState: vi.fn().mockResolvedValue(state),
     retry: vi.fn().mockResolvedValue(undefined),
     remove: vi.fn().mockResolvedValue(undefined),
     failedReason: 'job stalled more than allowable limit',
     ...extra,
-  }) as unknown as Bull.Job
+  }) as unknown as Job
 
 describe('DeliveryReconcilerService', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it.each(['waiting', 'active', 'delayed'])('leaves a %s batch alone', async (state) => {
-    const job = jobIn(state)
-    const { service, queue, redis } = setup({ job })
+  it.each(['waiting', 'active', 'delayed', 'prioritized'])(
+    'leaves a %s batch alone',
+    async (state) => {
+      const job = jobIn(state)
+      const { service, queue, redis } = setup({ job })
 
-    expect(await service.reconcile()).toEqual({ 'in-progress': 1 })
-    expect(job.retry).not.toHaveBeenCalled()
-    expect(queue.add).not.toHaveBeenCalled()
-    // A long batch still running must not use up its recovery attempts.
-    expect(redis.incr).not.toHaveBeenCalled()
-  })
+      expect(await service.reconcile()).toEqual({ 'in-progress': 1 })
+      expect(job.retry).not.toHaveBeenCalled()
+      expect(queue.add).not.toHaveBeenCalled()
+      // A long batch still running must not use up its recovery attempts.
+      expect(redis.incr).not.toHaveBeenCalled()
+    },
+  )
 
   it('retries a batch whose job failed, keeping its original payload', async () => {
     const job = jobIn('failed')
@@ -179,7 +189,7 @@ describe('DeliveryReconcilerService', () => {
     const { service, queue } = setup({ job: null })
 
     expect(await service.reconcile()).toEqual({ requeued: 1 })
-    const [payload, options] = queue.add.mock.calls[0]
+    const [, payload, options] = queue.add.mock.calls[0]
     expect(payload).toMatchObject({
       notifyId: 'req-1',
       tenantId: 'tenant-1',
@@ -224,6 +234,38 @@ describe('DeliveryReconcilerService', () => {
       updatedBy: 'delivery-reconciler',
     })
     expect(queue.add).not.toHaveBeenCalled()
+  })
+
+  it('logs the settled email send as one delivery failure for the alert to count', async () => {
+    const { service, detailRepository, structuredLogger } = setup({
+      job: jobIn('failed'),
+      attempt: 6,
+    })
+    detailRepository.count.mockResolvedValueOnce(0).mockResolvedValueOnce(0)
+
+    await service.reconcile()
+
+    expect(structuredLogger.logNotificationFailure).toHaveBeenCalledTimes(1)
+    expect(structuredLogger.logNotificationFailure).toHaveBeenCalledWith(
+      'req-1',
+      'tenant-1',
+      'email',
+      expect.stringMatching(/5 recovery/),
+      undefined,
+      'DeliveryReconcilerService',
+    )
+  })
+
+  it('logs no delivery failure while other work on the request is still owed', async () => {
+    const { service, detailRepository, structuredLogger } = setup({
+      job: jobIn('failed'),
+      attempt: 6,
+    })
+    detailRepository.count.mockResolvedValueOnce(3)
+
+    await service.reconcile()
+
+    expect(structuredLogger.logNotificationFailure).not.toHaveBeenCalled()
   })
 
   it('records the pass and what it acted on for the monitoring page', async () => {
@@ -299,6 +341,7 @@ describe('DeliveryReconcilerService', () => {
       expect(await service.reconcile()).toEqual({ requeued: 1 })
       expect(queue.add).not.toHaveBeenCalled()
       expect(ingestionQueue.add).toHaveBeenCalledWith(
+        QueueName.INGESTION,
         expect.objectContaining({ notifyId: 'req-1', tenantId: 'tenant-1' }),
         expect.objectContaining({ jobId: 'req-1', attempts: 3 }),
       )
@@ -347,6 +390,7 @@ describe('DeliveryReconcilerService', () => {
 
       expect(await service.reconcile()).toEqual({ requeued: 1 })
       expect(ingestionQueue.add).toHaveBeenCalledWith(
+        QueueName.INGESTION,
         expect.objectContaining({ notifyId: 'req-1', mailMerge: true, mailMergeChannel: 'EMAIL' }),
         expect.objectContaining({ jobId: 'req-1' }),
       )
@@ -368,15 +412,15 @@ describe('DeliveryReconcilerService', () => {
   describe('requests never queued (PENDING)', () => {
     const PENDING = [{ notifyId: 'req-1', tenantId: 'tenant-1' }]
 
-    it('queues ingestion from the stored request, unnamed, and moves the request to QUEUED', async () => {
+    it('queues ingestion from the stored request and moves the request to QUEUED', async () => {
       const { service, ingestionQueue, notificationService } = setup({
         stale: [],
         pending: PENDING,
       })
 
       expect(await service.reconcile()).toEqual({ requeued: 1 })
-      const [payload, options] = ingestionQueue.add.mock.calls[0]
-      // Unnamed: the ingestion worker registers Bull's default handler; a named job finds none.
+      const [name, payload, options] = ingestionQueue.add.mock.calls[0]
+      expect(name).toBe(QueueName.INGESTION)
       expect(typeof payload).toBe('object')
       expect(payload).toMatchObject({
         notifyId: 'req-1',
@@ -410,7 +454,7 @@ describe('DeliveryReconcilerService', () => {
 
       await service.reconcile()
 
-      const [payload, options] = ingestionQueue.add.mock.calls[0]
+      const [, payload, options] = ingestionQueue.add.mock.calls[0]
       expect(payload.scheduledFor).toBe(sendAt)
       expect(options.delay).toBeGreaterThan(59 * 60_000)
       expect(notificationService.update).toHaveBeenCalledWith('req-1', 'tenant-1', {
@@ -452,7 +496,7 @@ describe('DeliveryReconcilerService', () => {
       requestRepository.findOne.mockResolvedValue(overdueRequest)
 
       expect(await service.reconcile()).toEqual({ requeued: 1 })
-      const [payload, options] = ingestionQueue.add.mock.calls[0]
+      const [, payload, options] = ingestionQueue.add.mock.calls[0]
       expect(payload).toMatchObject({ notifyId: 'req-1', scheduledFor: '2026-10-04T13:00:00Z' })
       expect(options).toMatchObject({ jobId: 'req-1' })
       expect(options).not.toHaveProperty('delay')
@@ -479,7 +523,7 @@ describe('DeliveryReconcilerService', () => {
     })
 
     it('settles the request as failed after the recovery limit', async () => {
-      const { service, ingestionQueue, notificationService } = setup({
+      const { service, ingestionQueue, notificationService, structuredLogger } = setup({
         stale: [],
         scheduled: SCHEDULED,
         attempt: 6,
@@ -487,6 +531,8 @@ describe('DeliveryReconcilerService', () => {
 
       expect(await service.reconcile()).toEqual({ 'gave-up': 1 })
       expect(ingestionQueue.add).not.toHaveBeenCalled()
+      // Never fanned out, so there is no channel to attribute the failure to.
+      expect(structuredLogger.logNotificationFailure).not.toHaveBeenCalled()
       expect(notificationService.update).toHaveBeenCalledWith('req-1', 'tenant-1', {
         status: NotificationStatus.FAILED,
         updatedBy: 'delivery-reconciler',

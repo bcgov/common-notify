@@ -1,0 +1,20 @@
+{{- if and .Values.backend.clamav.enabled .Values.backend.clamav.pdb .Values.backend.clamav.pdb.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}-clamav
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: clamav
+    app.kubernetes.io/name: clamav
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  selector:
+    matchLabels:
+      app: clamav
+      app.kubernetes.io/name: clamav
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  minAvailable: {{ .Values.backend.clamav.pdb.minAvailable }}
+{{- end }}

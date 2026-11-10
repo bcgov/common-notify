@@ -1,5 +1,6 @@
 import Papa from 'papaparse'
 import { parsePhoneNumberFromString } from 'libphonenumber-js'
+import { isValidEmail } from './email'
 
 /**
  * Header the recipient's address goes under, as the design specifies and as the spreadsheet the
@@ -52,31 +53,20 @@ export interface RowIssue {
   detail: string
 }
 
-/**
- * A problem with the file as a whole - wrong columns, no rows, too many rows.
- *
- * These are reported inline under the upload control rather than in the table, because there is no
- * row to point at and because they invalidate every row at once.
- */
-export type FileIssue = string
-
 export interface ValidationResult {
-  fileIssue: FileIssue | null
+  /**
+   * A problem with the file as a whole - wrong columns, no rows, too many rows.
+   *
+   * These are reported inline under the upload control rather than in the table, because there is no
+   * row to point at and because they invalidate every row at once.
+   */
+  fileIssue: string | null
   rowIssues: RowIssue[]
 }
 
 export interface ParsedCsv {
   headers: string[]
   rows: string[][]
-}
-
-// Deliberately permissive: the address is checked properly by the API before anything is sent.
-// This only needs to catch the typos worth showing someone a row number for.
-const EMAIL_PATTERN =
-  /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i
-
-function isValidEmail(value: string): boolean {
-  return value.length <= 254 && !value.includes('..') && EMAIL_PATTERN.test(value)
 }
 
 /**
@@ -172,7 +162,7 @@ export function downloadCsv(filename: string, csv: string): void {
   link.download = filename
   document.body.appendChild(link)
   link.click()
-  document.body.removeChild(link)
+  link.remove()
   URL.revokeObjectURL(url)
 }
 
@@ -208,7 +198,7 @@ export function readFileWithProgress(
     }
     reader.onload = () => {
       onProgress(100)
-      resolve(String(reader.result ?? ''))
+      resolve(typeof reader.result === 'string' ? reader.result : '')
     }
     reader.onerror = () => reject(reader.error ?? new Error('Could not read the file'))
 
@@ -463,7 +453,7 @@ function setParam(params: Record<string, unknown>, key: string, value: string): 
     target = target[segment] as Record<string, unknown>
   }
 
-  const leaf = segments[segments.length - 1]
+  const leaf = segments.at(-1)!
   if (!(leaf in target)) {
     target[leaf] = value
   }

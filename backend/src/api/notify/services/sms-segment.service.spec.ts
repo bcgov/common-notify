@@ -87,3 +87,72 @@ describe('SmsSegmentService.countSegmentsPerRecipient', () => {
     expect(await service.countSegmentsPerRecipient('tenant-1', payload)).toBe(1)
   })
 })
+
+describe('SmsSegmentService.countMergeSegments', () => {
+  const templatesRepository = { findById: vi.fn() }
+  const templatesService = { renderTemplateContent: vi.fn() }
+  const inlineRenderingService = { renderSms: vi.fn() }
+
+  const service = new SmsSegmentService(
+    templatesRepository as unknown as TemplatesRepository,
+    templatesService as unknown as TemplatesService,
+    inlineRenderingService as unknown as InlineRenderingService,
+  )
+
+  const merge = {
+    params: { office: 'Victoria' },
+    sms: { content: { templateId: 'tpl-1' }, params: { office: 'Nanaimo', code: 'X' } },
+  } as unknown as NotifySimpleRequest
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    templatesRepository.findById.mockResolvedValue({ id: 'tpl-1', channelCode: 'SMS' })
+  })
+
+  it('sums each row on its own rendered body', async () => {
+    templatesService.renderTemplateContent.mockImplementation(
+      (_template, params: { name: string }) =>
+        Promise.resolve({ body: params.name === 'Alice' ? 'a'.repeat(400) : 'short' }),
+    )
+
+    // 3 segments + 1 segment; a uniform count would have billed 2 or 6.
+    expect(
+      await service.countMergeSegments('tenant-1', merge, [{ name: 'Alice' }, { name: 'Bob' }]),
+    ).toBe(4)
+  })
+
+  it('looks the template up once however many rows there are', async () => {
+    templatesService.renderTemplateContent.mockResolvedValue({ body: 'short' })
+    const rows = Array.from({ length: 50 }, (_, i) => ({ name: `row-${i}` }))
+
+    expect(await service.countMergeSegments('tenant-1', merge, rows)).toBe(50)
+    expect(templatesRepository.findById).toHaveBeenCalledTimes(1)
+    expect(templatesService.renderTemplateContent).toHaveBeenCalledTimes(50)
+  })
+
+  it("renders each row with its own params over the channel's and the request's", async () => {
+    templatesService.renderTemplateContent.mockResolvedValue({ body: 'short' })
+
+    await service.countMergeSegments('tenant-1', merge, [{ office: 'Surrey' }])
+
+    expect(templatesService.renderTemplateContent).toHaveBeenCalledWith(
+      { id: 'tpl-1', channelCode: 'SMS' },
+      { office: 'Surrey', code: 'X' },
+    )
+  })
+
+  it('bills a row that fails to render as one segment without failing the others', async () => {
+    templatesService.renderTemplateContent
+      .mockResolvedValueOnce({ body: 'a'.repeat(400) })
+      .mockRejectedValueOnce(new Error('missing personalisation'))
+
+    expect(await service.countMergeSegments('tenant-1', merge, [{}, {}])).toBe(4)
+  })
+
+  it('bills one segment per row when the template lookup fails', async () => {
+    templatesRepository.findById.mockRejectedValue(new Error('database down'))
+
+    expect(await service.countMergeSegments('tenant-1', merge, [{}, {}, {}])).toBe(3)
+    expect(templatesService.renderTemplateContent).not.toHaveBeenCalled()
+  })
+})

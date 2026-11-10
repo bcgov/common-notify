@@ -6,7 +6,7 @@ import {
   PayloadTooLargeException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import * as path from 'path'
+import * as path from 'node:path'
 import { In, Repository } from 'typeorm'
 import { NotifySimpleRequest } from '../schemas/notify-simple-request'
 import { NotifyAttachment } from '../schemas/notify-attachment'

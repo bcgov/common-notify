@@ -27,7 +27,7 @@ export class NotifyPreviewInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     if (context.switchToHttp().getRequest().query.preview !== 'true') return next.handle()
-    // Guards have already run. Do not enter next.handle(): that would execute @Queueable.
+    // Guards have already run. Do not enter next.handle(): that would run the send.
     return from(this.preview(context))
   }
 

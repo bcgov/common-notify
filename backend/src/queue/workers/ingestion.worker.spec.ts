@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common'
-import Bull from 'bull'
+import type { Job, Queue } from 'bullmq'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { IngestionWorker } from './ingestion.worker'
 import { IngestionJobPayload, DeliveryJobPayload } from '../queue.types'
@@ -7,18 +7,50 @@ import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { NotificationStatus } from '../../enum/notification-status.enum'
 import { AttachmentService } from '../../api/attachment/attachment.service'
 import { FAILED_JOB_RETENTION } from '../job-retention'
+import { BACKOFF_STRATEGY } from '../job-options'
+import { QueueName } from '../../enum/queue-name.enum'
+import { PhoneNumberService } from '../../api/notify/services/phone-number.service'
+import type { ConfigService } from '@nestjs/config'
+import type { ClamavService } from '../../services/clamav.service'
+import type { NotificationService } from '../../api/notification/notification.service'
+import type { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 
 describe('IngestionWorker', () => {
-  let mockIngestionQueue: Partial<Bull.Queue<IngestionJobPayload>>
-  let mockEmailQueue: Partial<Bull.Queue<DeliveryJobPayload>>
-  let mockSmsQueue: Partial<Bull.Queue<DeliveryJobPayload>>
+  let mockEmailQueue: Partial<Queue<DeliveryJobPayload>>
+  let mockSmsQueue: Partial<Queue<DeliveryJobPayload>>
   let mockNotificationService: any
   let mockRequestDetailService: any
   let mockConfigService: any
   let mockClamavService: any
   let mockAttachmentService: any
-  let processHandler: (job: Bull.Job<IngestionJobPayload>) => Promise<any>
-  let failedCallback: (job: Bull.Job<IngestionJobPayload>, err: Error) => void
+  let processHandler: (job: Job<IngestionJobPayload>) => Promise<any>
+  let failedCallback: (job: Job<IngestionJobPayload>, err: Error) => void
+
+  /** The worker as QueueModule builds it, with its handlers captured for the tests to call. */
+  function initialize(deps: {
+    emailQueue: Queue<DeliveryJobPayload>
+    smsQueue: Queue<DeliveryJobPayload>
+    notificationService: NotificationService
+    requestDetailService: NotificationRequestDetailService
+    configService: ConfigService
+    clamavService?: ClamavService
+    concurrency?: number
+    attachmentService?: AttachmentService
+    phoneNumberService?: PhoneNumberService
+  }) {
+    const worker = new IngestionWorker(
+      deps.emailQueue,
+      deps.smsQueue,
+      deps.notificationService,
+      deps.requestDetailService,
+      deps.configService,
+      deps.phoneNumberService ?? new PhoneNumberService(),
+      deps.clamavService,
+      deps.attachmentService,
+    )
+    processHandler = (job) => worker.process(job)
+    failedCallback = (job, err) => worker.onFailed(job, err)
+  }
 
   beforeEach(() => {
     mockNotificationService = {
@@ -58,24 +90,13 @@ describe('IngestionWorker', () => {
       } as any),
     }
 
-    mockIngestionQueue = {
-      process: vi.fn().mockImplementation((...args) => {
-        const handler = typeof args[0] === 'function' ? args[0] : args[1]
-        processHandler = handler
-        return Promise.resolve()
-      }),
-      on: vi.fn().mockImplementation((event, callback) => {
-        if (event === 'failed') {
-          failedCallback = callback
-        }
-      }),
-    }
-
     mockEmailQueue = {
+      name: QueueName.EMAIL_DELIVERY,
       add: vi.fn().mockResolvedValue({ id: 'email-job-1' }),
     }
 
     mockSmsQueue = {
+      name: QueueName.SMS_DELIVERY,
       add: vi.fn().mockResolvedValue({ id: 'sms-job-1' }),
     }
 
@@ -90,39 +111,10 @@ describe('IngestionWorker', () => {
   })
 
   describe('initialize', () => {
-    it('should register a process handler on the ingestion queue', () => {
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        notificationService: mockNotificationService,
-        requestDetailService: mockRequestDetailService,
-        configService: mockConfigService,
-        clamavService: mockClamavService,
-      })
-
-      expect(mockIngestionQueue.process).toHaveBeenCalled()
-    })
-
-    it('should register event listeners on the ingestion queue', () => {
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        notificationService: mockNotificationService,
-        requestDetailService: mockRequestDetailService,
-        configService: mockConfigService,
-        clamavService: mockClamavService,
-      })
-
-      expect(mockIngestionQueue.on).toHaveBeenCalledWith('failed', expect.any(Function))
-    })
-
     it('should process email delivery job when email channel is requested', async () => {
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+      initialize({
+        emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+        smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
         notificationService: mockNotificationService,
         requestDetailService: mockRequestDetailService,
         configService: mockConfigService,
@@ -141,10 +133,11 @@ describe('IngestionWorker', () => {
           },
           requestedAt: new Date().toISOString(),
         },
-      } as Bull.Job<IngestionJobPayload>)
+      } as Job<IngestionJobPayload>)
 
       expect(result).toEqual({ success: true, deliveryJobsQueued: 1 })
       expect(mockEmailQueue.add).toHaveBeenCalledWith(
+        QueueName.EMAIL_DELIVERY,
         expect.objectContaining({
           notifyId: 'notify-123',
           channel: NotificationChannel.EMAIL,
@@ -157,17 +150,16 @@ describe('IngestionWorker', () => {
     })
 
     it('should process SMS delivery job when SMS channel is requested', async () => {
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+      initialize({
+        emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+        smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
         notificationService: mockNotificationService,
         requestDetailService: mockRequestDetailService,
         configService: mockConfigService,
         clamavService: mockClamavService,
       })
 
-      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+      const job: Partial<Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-456',
           tenantId: 'tenant-456',
@@ -178,10 +170,11 @@ describe('IngestionWorker', () => {
         },
       }
 
-      const result = await processHandler(job as Bull.Job<IngestionJobPayload>)
+      const result = await processHandler(job as Job<IngestionJobPayload>)
 
       expect(result).toEqual({ success: true, deliveryJobsQueued: 1 })
       expect(mockSmsQueue.add).toHaveBeenCalledWith(
+        QueueName.SMS_DELIVERY,
         expect.objectContaining({
           notifyId: 'notify-456',
           channel: NotificationChannel.SMS,
@@ -193,17 +186,16 @@ describe('IngestionWorker', () => {
     })
 
     it('normalizes an SMS recipient once before persistence and delivery fan-out', async () => {
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+      initialize({
+        emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+        smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
         notificationService: mockNotificationService,
         requestDetailService: mockRequestDetailService,
         configService: mockConfigService,
         clamavService: mockClamavService,
       })
 
-      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+      const job: Partial<Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-normalized-sms',
           tenantId: 'tenant-456',
@@ -217,7 +209,7 @@ describe('IngestionWorker', () => {
         },
       }
 
-      await processHandler(job as Bull.Job<IngestionJobPayload>)
+      await processHandler(job as Job<IngestionJobPayload>)
 
       expect(mockRequestDetailService.createPending).toHaveBeenCalledWith(
         'notify-normalized-sms',
@@ -229,6 +221,7 @@ describe('IngestionWorker', () => {
         'tenant-456',
       )
       expect(mockSmsQueue.add).toHaveBeenCalledWith(
+        QueueName.SMS_DELIVERY,
         expect.objectContaining({
           request: expect.objectContaining({
             sms: expect.objectContaining({ recipients: { to: ['+12505551234'] } }),
@@ -240,17 +233,16 @@ describe('IngestionWorker', () => {
     })
 
     it('should process both email and SMS delivery jobs when both channels are requested', async () => {
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+      initialize({
+        emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+        smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
         notificationService: mockNotificationService,
         requestDetailService: mockRequestDetailService,
         configService: mockConfigService,
         clamavService: mockClamavService,
       })
 
-      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+      const job: Partial<Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-789',
           tenantId: 'tenant-789',
@@ -265,7 +257,7 @@ describe('IngestionWorker', () => {
         },
       }
 
-      const result = await processHandler(job as Bull.Job<IngestionJobPayload>)
+      const result = await processHandler(job as Job<IngestionJobPayload>)
 
       expect(result).toEqual({ success: true, deliveryJobsQueued: 2 })
       expect(mockEmailQueue.add).toHaveBeenCalled()
@@ -273,10 +265,9 @@ describe('IngestionWorker', () => {
     })
 
     it('should add delay for scheduled sends', async () => {
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+      initialize({
+        emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+        smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
         notificationService: mockNotificationService,
         requestDetailService: mockRequestDetailService,
         configService: mockConfigService,
@@ -286,7 +277,7 @@ describe('IngestionWorker', () => {
       // Schedule for 1 minute from now
       const scheduledFor = new Date(Date.now() + 60000).toISOString()
 
-      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+      const job: Partial<Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-scheduled',
           tenantId: 'tenant-scheduled',
@@ -301,9 +292,10 @@ describe('IngestionWorker', () => {
         },
       }
 
-      await processHandler(job as Bull.Job<IngestionJobPayload>)
+      await processHandler(job as Job<IngestionJobPayload>)
 
       expect(mockEmailQueue.add).toHaveBeenCalledWith(
+        QueueName.EMAIL_DELIVERY,
         expect.any(Object),
         expect.objectContaining({
           delay: expect.any(Number),
@@ -311,16 +303,15 @@ describe('IngestionWorker', () => {
       )
 
       // Check that delay is positive (close to 60000ms)
-      const callArgs = (mockEmailQueue.add as any).mock.calls[0][1]
+      const callArgs = (mockEmailQueue.add as any).mock.calls[0][2]
       expect(callArgs.delay).toBeGreaterThan(50000)
       expect(callArgs.delay).toBeLessThanOrEqual(60000)
     })
 
     it('should update status to processing for scheduled notifications', async () => {
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+      initialize({
+        emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+        smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
         notificationService: mockNotificationService,
         requestDetailService: mockRequestDetailService,
         configService: mockConfigService,
@@ -329,7 +320,7 @@ describe('IngestionWorker', () => {
 
       const futureDate = new Date(Date.now() + 60000).toISOString()
 
-      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+      const job: Partial<Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-scheduled',
           tenantId: 'tenant-scheduled',
@@ -344,7 +335,7 @@ describe('IngestionWorker', () => {
         },
       }
 
-      await processHandler(job as Bull.Job<IngestionJobPayload>)
+      await processHandler(job as Job<IngestionJobPayload>)
 
       expect(mockNotificationService.update).toHaveBeenCalledWith(
         'notify-scheduled',
@@ -357,17 +348,16 @@ describe('IngestionWorker', () => {
     })
 
     it('should throw error when no channels are specified', async () => {
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+      initialize({
+        emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+        smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
         notificationService: mockNotificationService,
         requestDetailService: mockRequestDetailService,
         configService: mockConfigService,
         clamavService: mockClamavService,
       })
 
-      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+      const job: Partial<Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-no-channel',
           tenantId: 'tenant-no-channel',
@@ -376,23 +366,22 @@ describe('IngestionWorker', () => {
         },
       }
 
-      await expect(processHandler(job as Bull.Job<IngestionJobPayload>)).rejects.toThrow(
+      await expect(processHandler(job as Job<IngestionJobPayload>)).rejects.toThrow(
         'No delivery channels specified - this should have been caught by validateBusinessRules',
       )
     })
 
     it('should throw error when request is missing', async () => {
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+      initialize({
+        emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+        smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
         notificationService: mockNotificationService,
         requestDetailService: mockRequestDetailService,
         configService: mockConfigService,
         clamavService: mockClamavService,
       })
 
-      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+      const job: Partial<Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-no-request',
           tenantId: 'tenant-no-request',
@@ -401,23 +390,22 @@ describe('IngestionWorker', () => {
         },
       }
 
-      await expect(processHandler(job as Bull.Job<IngestionJobPayload>)).rejects.toThrow(
+      await expect(processHandler(job as Job<IngestionJobPayload>)).rejects.toThrow(
         'Invalid request: request payload is missing or invalid',
       )
     })
 
     it('should throw error when notifyId is missing', async () => {
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+      initialize({
+        emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+        smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
         notificationService: mockNotificationService,
         requestDetailService: mockRequestDetailService,
         configService: mockConfigService,
         clamavService: mockClamavService,
       })
 
-      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+      const job: Partial<Job<IngestionJobPayload>> = {
         data: {
           notifyId: undefined as any,
           tenantId: 'tenant-123',
@@ -431,23 +419,22 @@ describe('IngestionWorker', () => {
         },
       }
 
-      await expect(processHandler(job as Bull.Job<IngestionJobPayload>)).rejects.toThrow(
+      await expect(processHandler(job as Job<IngestionJobPayload>)).rejects.toThrow(
         'Invalid ingestion job: notifyId is missing or invalid',
       )
     })
 
     it('should throw error when tenantId is missing', async () => {
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+      initialize({
+        emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+        smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
         notificationService: mockNotificationService,
         requestDetailService: mockRequestDetailService,
         configService: mockConfigService,
         clamavService: mockClamavService,
       })
 
-      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+      const job: Partial<Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-123',
           tenantId: null as any,
@@ -461,23 +448,22 @@ describe('IngestionWorker', () => {
         },
       }
 
-      await expect(processHandler(job as Bull.Job<IngestionJobPayload>)).rejects.toThrow(
+      await expect(processHandler(job as Job<IngestionJobPayload>)).rejects.toThrow(
         'Invalid ingestion job: tenantId is missing or invalid',
       )
     })
 
     it('should throw error when requestedAt is missing', async () => {
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+      initialize({
+        emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+        smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
         notificationService: mockNotificationService,
         requestDetailService: mockRequestDetailService,
         configService: mockConfigService,
         clamavService: mockClamavService,
       })
 
-      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+      const job: Partial<Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-123',
           tenantId: 'tenant-123',
@@ -491,37 +477,22 @@ describe('IngestionWorker', () => {
         },
       }
 
-      await expect(processHandler(job as Bull.Job<IngestionJobPayload>)).rejects.toThrow(
+      await expect(processHandler(job as Job<IngestionJobPayload>)).rejects.toThrow(
         'Invalid ingestion job: requestedAt is missing or invalid',
       )
     })
 
-    it('should register event listeners successfully', () => {
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
-        notificationService: mockNotificationService,
-        requestDetailService: mockRequestDetailService,
-        configService: mockConfigService,
-        clamavService: mockClamavService,
-      })
-
-      expect(mockIngestionQueue.on).toHaveBeenCalledWith('failed', expect.any(Function))
-    })
-
     it('should call failed callback on job error', async () => {
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+      initialize({
+        emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+        smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
         notificationService: mockNotificationService,
         requestDetailService: mockRequestDetailService,
         configService: mockConfigService,
         clamavService: mockClamavService,
       })
 
-      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+      const job: Partial<Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-failed',
           tenantId: 'tenant-failed',
@@ -534,12 +505,12 @@ describe('IngestionWorker', () => {
 
       const error = new Error('Test error')
       try {
-        await processHandler(job as Bull.Job<IngestionJobPayload>)
+        await processHandler(job as Job<IngestionJobPayload>)
       } catch {
         // Expected
       }
 
-      failedCallback(job as Bull.Job<IngestionJobPayload>, error)
+      failedCallback(job as Job<IngestionJobPayload>, error)
 
       // The logger.error should be called - check that it was called at all
       expect(Logger.prototype.error).toHaveBeenCalled()
@@ -551,10 +522,9 @@ describe('IngestionWorker', () => {
     })
 
     it('should include job data in delivery payload', async () => {
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+      initialize({
+        emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+        smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
         notificationService: mockNotificationService,
         requestDetailService: mockRequestDetailService,
         configService: mockConfigService,
@@ -565,7 +535,7 @@ describe('IngestionWorker', () => {
         recipients: { to: ['test@example.com'] },
         content: { subject: 'Test Subject', body: 'Test body' },
       }
-      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+      const job: Partial<Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-data',
           tenantId: 'tenant-data',
@@ -576,9 +546,10 @@ describe('IngestionWorker', () => {
         },
       }
 
-      await processHandler(job as Bull.Job<IngestionJobPayload>)
+      await processHandler(job as Job<IngestionJobPayload>)
 
       expect(mockEmailQueue.add).toHaveBeenCalledWith(
+        QueueName.EMAIL_DELIVERY,
         expect.objectContaining({
           notifyId: 'notify-data',
           tenantId: 'tenant-data',
@@ -591,17 +562,16 @@ describe('IngestionWorker', () => {
     })
 
     it('should set retry and backoff configuration on delivery jobs', async () => {
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+      initialize({
+        emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+        smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
         notificationService: mockNotificationService,
         requestDetailService: mockRequestDetailService,
         configService: mockConfigService,
         clamavService: mockClamavService,
       })
 
-      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+      const job: Partial<Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-retry',
           tenantId: 'tenant-retry',
@@ -615,14 +585,15 @@ describe('IngestionWorker', () => {
         },
       }
 
-      await processHandler(job as Bull.Job<IngestionJobPayload>)
+      await processHandler(job as Job<IngestionJobPayload>)
 
       expect(mockEmailQueue.add).toHaveBeenCalledWith(
+        QueueName.EMAIL_DELIVERY,
         expect.any(Object),
         expect.objectContaining({
           attempts: 3,
           backoff: {
-            type: 'exponential',
+            type: BACKOFF_STRATEGY,
             delay: 2000,
           },
           removeOnComplete: true,
@@ -636,10 +607,9 @@ describe('IngestionWorker', () => {
         new Error('ClamAV is unavailable while fail-closed mode is enabled'),
       )
 
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+      initialize({
+        emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+        smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
         notificationService: mockNotificationService,
         requestDetailService: mockRequestDetailService,
         configService: mockConfigService,
@@ -648,7 +618,7 @@ describe('IngestionWorker', () => {
         attachmentService: mockAttachmentService as AttachmentService,
       })
 
-      const job: Partial<Bull.Job<IngestionJobPayload>> = {
+      const job: Partial<Job<IngestionJobPayload>> = {
         data: {
           notifyId: 'notify-attachment-retry',
           tenantId: 'tenant-attachment-retry',
@@ -667,7 +637,7 @@ describe('IngestionWorker', () => {
         },
       }
 
-      await expect(processHandler(job as Bull.Job<IngestionJobPayload>)).rejects.toThrow(
+      await expect(processHandler(job as Job<IngestionJobPayload>)).rejects.toThrow(
         'Attachment scan failed: ClamAV is unavailable while fail-closed mode is enabled',
       )
 
@@ -683,10 +653,9 @@ describe('IngestionWorker', () => {
     })
 
     it('should scan stored attachment references using attachmentId and tenantId', async () => {
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+      initialize({
+        emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+        smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
         notificationService: mockNotificationService,
         requestDetailService: mockRequestDetailService,
         configService: mockConfigService,
@@ -708,7 +677,7 @@ describe('IngestionWorker', () => {
           },
           requestedAt: new Date().toISOString(),
         },
-      } as any as Bull.Job<IngestionJobPayload>)
+      } as any as Job<IngestionJobPayload>)
 
       expect(result).toEqual({ success: true, deliveryJobsQueued: 1 })
       expect(mockAttachmentService.downloadAttachmentByIdAndTenantId).toHaveBeenCalledWith(
@@ -726,10 +695,9 @@ describe('IngestionWorker', () => {
         new Error('Attachment not found'),
       )
 
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+      initialize({
+        emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+        smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
         notificationService: mockNotificationService,
         requestDetailService: mockRequestDetailService,
         configService: mockConfigService,
@@ -752,7 +720,7 @@ describe('IngestionWorker', () => {
             },
             requestedAt: new Date().toISOString(),
           },
-        } as any as Bull.Job<IngestionJobPayload>),
+        } as any as Job<IngestionJobPayload>),
       ).rejects.toThrow('Attachment scan failed: Attachment not found')
 
       expect(mockEmailQueue.add).not.toHaveBeenCalled()
@@ -767,10 +735,9 @@ describe('IngestionWorker', () => {
     })
 
     it('should fail when processed attachments are not attachmentId references', async () => {
-      IngestionWorker.initialize({
-        ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-        emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-        smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+      initialize({
+        emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+        smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
         notificationService: mockNotificationService,
         requestDetailService: mockRequestDetailService,
         configService: mockConfigService,
@@ -791,7 +758,7 @@ describe('IngestionWorker', () => {
             },
             requestedAt: new Date().toISOString(),
           },
-        } as any as Bull.Job<IngestionJobPayload>),
+        } as any as Job<IngestionJobPayload>),
       ).rejects.toThrow('Invalid processed attachment reference payload')
 
       expect(mockAttachmentService.downloadAttachmentByIdAndTenantId).not.toHaveBeenCalled()
@@ -805,10 +772,9 @@ describe('IngestionWorker', () => {
         mockRequestDetailService.countInFlight.mockImplementation((_id: string, channel: string) =>
           Promise.resolve(channel === NotificationChannel.EMAIL ? 0 : 1),
         )
-        IngestionWorker.initialize({
-          ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-          emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-          smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        initialize({
+          emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+          smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
           notificationService: mockNotificationService,
           requestDetailService: mockRequestDetailService,
           configService: mockConfigService,
@@ -828,7 +794,7 @@ describe('IngestionWorker', () => {
               sms: { recipients: { to: ['+12505550123'] }, content: { body: 'B' } },
             } as any,
           },
-        } as Bull.Job<IngestionJobPayload>)
+        } as Job<IngestionJobPayload>)
 
         expect(mockRequestDetailService.createPending).not.toHaveBeenCalled()
         expect(mockEmailQueue.add).not.toHaveBeenCalled()
@@ -840,10 +806,9 @@ describe('IngestionWorker', () => {
 
     describe('bulk email fan-out', () => {
       it('should fan out a bulk job into one batch and update status to PROCESSING', async () => {
-        IngestionWorker.initialize({
-          ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-          emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-          smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        initialize({
+          emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+          smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
           notificationService: mockNotificationService,
           requestDetailService: mockRequestDetailService,
           configService: mockConfigService,
@@ -854,7 +819,7 @@ describe('IngestionWorker', () => {
           { address: 'alice@example.com', params: {} },
           { address: 'bob@example.com', params: {} },
         ]
-        const job: Partial<Bull.Job<IngestionJobPayload>> = {
+        const job: Partial<Job<IngestionJobPayload>> = {
           data: {
             notifyId: 'notify-bulk',
             tenantId: 'tenant-bulk',
@@ -869,7 +834,7 @@ describe('IngestionWorker', () => {
           },
         }
 
-        const result = await processHandler(job as Bull.Job<IngestionJobPayload>)
+        const result = await processHandler(job as Job<IngestionJobPayload>)
 
         expect(result).toEqual({ success: true, deliveryJobsQueued: 1 })
         expect(mockRequestDetailService.createMergePending).toHaveBeenCalledTimes(1)
@@ -883,6 +848,7 @@ describe('IngestionWorker', () => {
         )
         expect(mockEmailQueue.add).toHaveBeenCalledTimes(1)
         expect(mockEmailQueue.add).toHaveBeenCalledWith(
+          QueueName.EMAIL_DELIVERY,
           expect.objectContaining({
             notifyId: 'notify-bulk',
             tenantId: 'tenant-bulk',
@@ -897,7 +863,7 @@ describe('IngestionWorker', () => {
             removeOnFail: FAILED_JOB_RETENTION,
             attempts: 3,
             backoff: {
-              type: 'exponential',
+              type: BACKOFF_STRATEGY,
               delay: 2000,
             },
           }),
@@ -914,17 +880,16 @@ describe('IngestionWorker', () => {
           return undefined
         })
 
-        IngestionWorker.initialize({
-          ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-          emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-          smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        initialize({
+          emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+          smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
           notificationService: mockNotificationService,
           requestDetailService: mockRequestDetailService,
           configService: mockConfigService,
           clamavService: mockClamavService,
         })
 
-        const job: Partial<Bull.Job<IngestionJobPayload>> = {
+        const job: Partial<Job<IngestionJobPayload>> = {
           data: {
             notifyId: 'notify-bulk-multi',
             tenantId: 'tenant-bulk',
@@ -943,7 +908,7 @@ describe('IngestionWorker', () => {
           },
         }
 
-        const result = await processHandler(job as Bull.Job<IngestionJobPayload>)
+        const result = await processHandler(job as Job<IngestionJobPayload>)
 
         // 3 addresses, batchSize=2 → 2 batches
         expect(result).toEqual({ success: true, deliveryJobsQueued: 2 })
@@ -967,7 +932,7 @@ describe('IngestionWorker', () => {
           'tenant-bulk',
         )
         // Jobs carry the batch id, not its recipients.
-        for (const [payload] of mockEmailQueue.add.mock.calls) {
+        for (const [, payload] of mockEmailQueue.add.mock.calls) {
           expect(payload.mailMergeData).not.toHaveProperty('recipients')
         }
       })
@@ -979,17 +944,16 @@ describe('IngestionWorker', () => {
           params: {},
         }))
 
-        IngestionWorker.initialize({
-          ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-          emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-          smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        initialize({
+          emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+          smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
           notificationService: mockNotificationService,
           requestDetailService: mockRequestDetailService,
           configService: mockConfigService,
           clamavService: mockClamavService,
         })
 
-        const job: Partial<Bull.Job<IngestionJobPayload>> = {
+        const job: Partial<Job<IngestionJobPayload>> = {
           data: {
             notifyId: 'notify-bulk-default',
             tenantId: 'tenant-bulk',
@@ -1004,7 +968,7 @@ describe('IngestionWorker', () => {
           },
         }
 
-        const result = await processHandler(job as Bull.Job<IngestionJobPayload>)
+        const result = await processHandler(job as Job<IngestionJobPayload>)
 
         // 150 addresses with default batchSize=25 → 6 batches
         expect(result).toEqual({ success: true, deliveryJobsQueued: 6 })
@@ -1033,10 +997,9 @@ describe('IngestionWorker', () => {
           new Set(['blocked@example.com']),
         )
 
-        IngestionWorker.initialize({
-          ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-          emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-          smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        initialize({
+          emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+          smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
           notificationService: mockNotificationService,
           requestDetailService: mockRequestDetailService,
           configService: mockConfigService,
@@ -1052,7 +1015,7 @@ describe('IngestionWorker', () => {
             mailMerge: true,
             mailMergeData: { content: { templateId: 'template-uuid' }, params: {} },
           },
-        } as Bull.Job<IngestionJobPayload>)
+        } as Job<IngestionJobPayload>)
 
         expect(result).toEqual({ success: true, deliveryJobsQueued: 1 })
         expect(mockNotificationService.findOne).toHaveBeenCalledWith('notify-db', 'tenant-bulk')
@@ -1076,10 +1039,9 @@ describe('IngestionWorker', () => {
           key === 'queue.batchSize' ? 2 : undefined,
         )
 
-        IngestionWorker.initialize({
-          ingestionQueue: mockIngestionQueue as Bull.Queue<IngestionJobPayload>,
-          emailQueue: mockEmailQueue as Bull.Queue<DeliveryJobPayload>,
-          smsQueue: mockSmsQueue as Bull.Queue<DeliveryJobPayload>,
+        initialize({
+          emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+          smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
           notificationService: mockNotificationService,
           requestDetailService: mockRequestDetailService,
           configService: mockConfigService,
@@ -1102,9 +1064,9 @@ describe('IngestionWorker', () => {
               ],
             },
           },
-        } as Bull.Job<IngestionJobPayload>)
+        } as Job<IngestionJobPayload>)
 
-        // Batch 0 already had rows; only batch 1 is written. Both are (re)queued - Bull ignores a
+        // Batch 0 already had rows; only batch 1 is written. Both are (re)queued - BullMQ ignores a
         // jobId it already holds.
         expect(mockRequestDetailService.createMergePending).toHaveBeenCalledTimes(1)
         expect(mockRequestDetailService.createMergePending).toHaveBeenCalledWith(

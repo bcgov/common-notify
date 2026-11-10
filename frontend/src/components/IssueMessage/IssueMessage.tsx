@@ -17,7 +17,7 @@ interface Props {
  * paragraph there pushes every other row out of view.
  */
 const IssueMessage: FC<Props> = ({ title, detail, className }) => (
-  <span className={`issue-message${className ? ` ${className}` : ''}`}>
+  <span className={['issue-message', className].filter(Boolean).join(' ')}>
     <strong className="issue-message__title">{title}</strong>
     {detail && <span className="issue-message__detail">{detail}</span>}
   </span>

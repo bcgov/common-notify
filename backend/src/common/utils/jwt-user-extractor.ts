@@ -26,7 +26,7 @@ export class JwtUserExtractor {
     try {
       // Extract from JWT in Authorization header
       const authHeader = req.headers.authorization
-      if (authHeader && authHeader.startsWith('Bearer ')) {
+      if (authHeader?.startsWith('Bearer ')) {
         const token = authHeader.substring(7)
         const user = this.extractFromToken(token)
         if (user) return user
@@ -36,6 +36,27 @@ export class JwtUserExtractor {
     }
 
     return 'system'
+  }
+
+  /**
+   * Extract a human-readable name from the JWT, for showing who made a change.
+   * extractUser() is the stable identifier to store; for IDIR that is an opaque
+   * `<guid>@azureidir`, so it is not something to put in front of a person.
+   *
+   * @returns display_name, then name, then email; null if the token has none
+   */
+  static extractDisplayName(req?: express.Request): string | null {
+    const authHeader = req?.headers.authorization
+    if (!authHeader?.startsWith('Bearer ')) return null
+
+    try {
+      const payload = JSON.parse(
+        Buffer.from(authHeader.substring(7).split('.')[1] ?? '', 'base64').toString('utf-8'),
+      )
+      return payload.display_name || payload.name || payload.email || null
+    } catch {
+      return null
+    }
   }
 
   /**

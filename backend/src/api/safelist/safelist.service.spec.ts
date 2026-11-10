@@ -5,6 +5,7 @@ import { vi } from 'vitest'
 import { SafelistService } from './safelist.service'
 import { RecipientSafelist } from './entities/recipient-safelist.entity'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
+import { TenantSettings } from '../tenant-settings/entities/tenant-settings.entity'
 import { FeatureFlagService } from '../feature-flag/feature-flag.service'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 
@@ -23,6 +24,10 @@ describe('SafelistService', () => {
   }
 
   const configurationRepository = {
+    findOne: vi.fn(),
+  }
+
+  const tenantSettingsRepository = {
     findOne: vi.fn(),
   }
 
@@ -64,6 +69,7 @@ describe('SafelistService', () => {
         SafelistService,
         { provide: getRepositoryToken(RecipientSafelist), useValue: safelistRepository },
         { provide: getRepositoryToken(NotifyConfiguration), useValue: configurationRepository },
+        { provide: getRepositoryToken(TenantSettings), useValue: tenantSettingsRepository },
         { provide: FeatureFlagService, useValue: featureFlagService },
       ],
     }).compile()
@@ -72,6 +78,7 @@ describe('SafelistService', () => {
     vi.clearAllMocks()
     featureFlagService.isEnabled.mockResolvedValue(true)
     configurationRepository.findOne.mockResolvedValue({ config: { value: 50 } })
+    tenantSettingsRepository.findOne.mockResolvedValue(null)
     queryBuilder.getRawAndEntities.mockResolvedValue({ entities: [], raw: [] })
   })
 
@@ -345,6 +352,27 @@ describe('SafelistService', () => {
         }),
       ).rejects.toThrow('Safelist is full (2 entries)')
     })
+
+    it("enforces the tenant's own cap over the global one", async () => {
+      safelistRepository.findOne.mockResolvedValue(null)
+      tenantSettingsRepository.findOne.mockResolvedValue({ safelistMaxEntries: 200 })
+      safelistRepository.count.mockResolvedValue(50)
+
+      await expect(
+        service.add(TENANT, {
+          channelCode: NotificationChannel.EMAIL,
+          recipient: 'one.more@gov.bc.ca',
+        }),
+      ).resolves.toBeDefined()
+
+      safelistRepository.count.mockResolvedValue(200)
+      await expect(
+        service.add(TENANT, {
+          channelCode: NotificationChannel.EMAIL,
+          recipient: 'one.more@gov.bc.ca',
+        }),
+      ).rejects.toThrow('Safelist is full (200 entries)')
+    })
   })
 
   describe('remove', () => {
@@ -371,12 +399,34 @@ describe('SafelistService', () => {
   describe('getMaxEntries', () => {
     it('falls back to the default when the configuration row is missing', async () => {
       configurationRepository.findOne.mockResolvedValue(null)
-      expect(await service.getMaxEntries()).toBe(50)
+      expect(await service.getMaxEntries(TENANT)).toBe(50)
     })
 
     it('falls back to the default when the configured value is unusable', async () => {
       configurationRepository.findOne.mockResolvedValue({ config: { value: 'lots' } })
-      expect(await service.getMaxEntries()).toBe(50)
+      expect(await service.getMaxEntries(TENANT)).toBe(50)
+    })
+
+    it("uses the tenant's override when one is set", async () => {
+      configurationRepository.findOne.mockResolvedValue({ config: { value: 20 } })
+      tenantSettingsRepository.findOne.mockResolvedValue({ safelistMaxEntries: 200 })
+
+      expect(await service.getMaxEntries(TENANT)).toBe(200)
+      expect(tenantSettingsRepository.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { tenantId: TENANT, isDeleted: false } }),
+      )
+    })
+
+    it('uses the global cap when the tenant has no override', async () => {
+      configurationRepository.findOne.mockResolvedValue({ config: { value: 20 } })
+      tenantSettingsRepository.findOne.mockResolvedValue({ safelistMaxEntries: null })
+
+      expect(await service.getMaxEntries(TENANT)).toBe(20)
+    })
+
+    it('falls back to the default when the tenant settings read fails', async () => {
+      tenantSettingsRepository.findOne.mockRejectedValue(new Error('db down'))
+      expect(await service.getMaxEntries(TENANT)).toBe(50)
     })
   })
 })

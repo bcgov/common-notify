@@ -12,6 +12,7 @@ import SearchField from '@/components/SearchField'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
 import { ChannelBadge } from '@/components/ChannelBadge'
+import NoDataCard from '@/components/NoDataCard'
 import { showErrorToast } from '@/redux/utils/toastUtils'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
 import '@/scss/components/events.scss'
@@ -90,15 +91,18 @@ const Events: FC = () => {
     filters,
     isLoading,
     hasLoaded,
+    hasNoData,
     error,
   } = useAppSelector((state) => state.events)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const { canEdit } = useCstarRoles()
   const [searchInput, setSearchInput] = useState(search)
+  // A search or filter that matches nothing still shows the table and its empty message.
+  const hasNoEvents = hasNoData && !search && Object.keys(filters).length === 0
 
   useEffect(() => {
     if (selectedTenant) {
-      dispatch(fetchEvents())
+      void dispatch(fetchEvents())
     }
   }, [page, limit, search, sortBy, sortOrder, filters, selectedTenant, dispatch])
 
@@ -115,7 +119,7 @@ const Events: FC = () => {
     // retry path (after a failed load), so that is the only case that dispatches directly -
     // doing both would fire two requests for every search.
     if (searchInput === search) {
-      dispatch(fetchEvents())
+      void dispatch(fetchEvents())
     } else {
       dispatch(setSearch(searchInput))
     }
@@ -133,43 +137,62 @@ const Events: FC = () => {
     dispatch(setFilter({ field: key, values }))
   }
 
+  function clearSearch() {
+    setSearchInput('')
+    dispatch(setSearch(''))
+  }
+
   return (
     <div className="page">
       <PageHeading title="Notification Events" />
 
-      <div className="page__toolbar">
-        <SearchField
-          value={searchInput}
-          onChange={setSearchInput}
-          onSearch={handleSearch}
-          placeholder="Search Notification Events..."
-          ariaLabel="Search events"
-        >
-          <Button onPress={() => navigate({ to: '/events/create' })} isDisabled={!canEdit}>
-            Create New Event
-          </Button>
-        </SearchField>
-      </div>
+      {hasNoEvents ? (
+        <NoDataCard
+          title="No notification events yet."
+          message="Notification events connect your notification templates, recipients, and delivery channels. Create your first event to start sending notifications."
+          actionLabel="Create notification event"
+          actionTo="/events/create"
+          isActionDisabled={!canEdit}
+        />
+      ) : (
+        <>
+          <div className="page__toolbar">
+            <SearchField
+              value={searchInput}
+              onChange={setSearchInput}
+              onSearch={handleSearch}
+              placeholder="Search Notification Events..."
+              ariaLabel="Search events"
+            >
+              <Button onPress={() => navigate({ to: '/events/create' })} isDisabled={!canEdit}>
+                Create New Event
+              </Button>
+            </SearchField>
+          </div>
 
-      <DataTable
-        columns={columns}
-        data={events}
-        keyExtractor={(row) => row.id}
-        emptyMessage="No events found"
-        currentPage={page}
-        pageSize={limit}
-        totalCount={count}
-        isLoading={isLoading && !hasLoaded}
-        sortBy={sortBy ?? undefined}
-        sortOrder={sortOrder}
-        onSort={handleSort}
-        activeFilters={filters}
-        onFilter={handleFilter}
-        onPageChange={(nextPage) => dispatch(setPage(nextPage))}
-        onPageSizeChange={handleLimitChange}
-        pageSizeOptions={[15, 30]}
-        label="Notification Events"
-      />
+          <DataTable
+            columns={columns}
+            data={events}
+            keyExtractor={(row) => row.id}
+            emptyMessage="No events found"
+            search={search}
+            onClearSearch={clearSearch}
+            currentPage={page}
+            pageSize={limit}
+            totalCount={count}
+            isLoading={isLoading && (!hasLoaded || events.length === 0)}
+            sortBy={sortBy ?? undefined}
+            sortOrder={sortOrder}
+            onSort={handleSort}
+            activeFilters={filters}
+            onFilter={handleFilter}
+            onPageChange={(nextPage) => dispatch(setPage(nextPage))}
+            onPageSizeChange={handleLimitChange}
+            pageSizeOptions={[15, 30]}
+            label="Notification Events"
+          />
+        </>
+      )}
     </div>
   )
 }

@@ -1,9 +1,10 @@
-import Bull from 'bull'
+import { Job, Queue, QueueEvents, Worker } from 'bullmq'
 import Redis from 'ioredis'
 import { attachRedisErrorLogging } from '../common/redis/redis-error.util'
-import { REDIS_KEY_PREFIX } from '../common/redis/redis-namespace'
+import { QUEUE_KEY_PREFIX } from '../common/redis/redis-namespace'
 import { QueueName } from '../enum/queue-name.enum'
 import { countAddedJobs } from './queue-metrics'
+import { backoffStrategy } from './job-options'
 
 /** Shape of the `redis` block in configuration.ts. */
 export interface RedisSentinelNode {
@@ -47,7 +48,7 @@ export function buildRedisOptions(
 }
 
 /**
- * Minutes of completed/failed counts Bull keeps per queue, read back with `queue.getMetrics()`.
+ * Minutes of completed/failed counts BullMQ keeps per queue, read back with `queue.getMetrics()`.
  * Each point is one integer in a capped Redis list, so a day of history is a few KB per queue.
  */
 export const QUEUE_METRICS_MAX_DATA_POINTS = Number.parseInt(
@@ -56,8 +57,8 @@ export const QUEUE_METRICS_MAX_DATA_POINTS = Number.parseInt(
 )
 
 /**
- * Times a job may stall (its pod dies or loses its lock mid-job) before Bull fails it instead
- * of retrying. Bull's default of 1 fails a batch interrupted twice, e.g. a pod deleted and then
+ * Times a job may stall (its pod dies or loses its lock mid-job) before BullMQ fails it instead
+ * of retrying. The default of 1 fails a batch interrupted twice, e.g. a pod deleted and then
  * restarted during the same send. A retry is safe: merge batches skip recipients already sent.
  */
 export const QUEUE_MAX_STALLED_COUNT = Number.parseInt(
@@ -65,28 +66,71 @@ export const QUEUE_MAX_STALLED_COUNT = Number.parseInt(
   10,
 )
 
+/** Approximate length the events stream is trimmed to, per queue. */
+export const QUEUE_EVENTS_MAX_LEN = 1000
+
 /**
- * Create a Bull queue with an error listener attached.
+ * BullMQ opens its own connections from these options, one per Queue and two per Worker. Its
+ * workers block on Redis, so a command must never be failed for taking too long.
+ */
+function queueConnection(redisConfig: RedisConfig): Record<string, unknown> {
+  return buildRedisOptions(redisConfig, { enableReadyCheck: false, maxRetriesPerRequest: null })
+}
+
+/**
+ * Create a BullMQ queue - the producer side - with an error listener attached.
  *
  * The listener is not optional: without one, a Redis failure prints the raw ioredis error -
  * which carries the AUTH command's arguments - straight to stderr. See redis-error.util.
+ * `redis` counts each add for the monitoring page's fill rate; omit it to skip counting.
  */
-export function createQueue(name: QueueName, redisConfig: RedisConfig): Bull.Queue {
-  const queue = new Bull(name, {
+export function createQueue<T = unknown>(
+  name: QueueName,
+  redisConfig: RedisConfig,
+  redis?: Redis | null,
+): Queue<T> {
+  const queue = new Queue<T>(name, {
     // Scope the queue to this deployment. Without it every deployment sharing the Redis
     // instance consumes from the same queue, and a job is processed by whichever pod wins the
     // race - which then cannot find the notification in its own database.
-    prefix: REDIS_KEY_PREFIX,
-    redis: buildRedisOptions(redisConfig, {
-      enableReadyCheck: false,
-      maxRetriesPerRequest: null,
-    }),
-    metrics: { maxDataPoints: QUEUE_METRICS_MAX_DATA_POINTS },
-    settings: { maxStalledCount: QUEUE_MAX_STALLED_COUNT },
+    prefix: QUEUE_KEY_PREFIX,
+    connection: queueConnection(redisConfig),
+    // The events stream is only read live, by the monitoring page; the default keeps 10,000
+    // events per queue per deployment in a Redis that refuses writes once it is full.
+    streams: { events: { maxLen: QUEUE_EVENTS_MAX_LEN } },
   })
   attachRedisErrorLogging(queue, `Queue[${name}]`)
-  countAddedJobs(queue)
+  if (redis) countAddedJobs(queue as Queue, redis)
   return queue
+}
+
+/** Create a BullMQ worker for a queue, with the same error-logging guarantee. */
+export function createWorker<T>(
+  name: QueueName,
+  processor: (job: Job<T>) => Promise<unknown>,
+  redisConfig: RedisConfig,
+  concurrency: number,
+): Worker<T> {
+  const worker = new Worker<T>(name, processor, {
+    prefix: QUEUE_KEY_PREFIX,
+    connection: queueConnection(redisConfig),
+    concurrency,
+    maxStalledCount: QUEUE_MAX_STALLED_COUNT,
+    metrics: { maxDataPoints: QUEUE_METRICS_MAX_DATA_POINTS },
+    settings: { backoffStrategy },
+  })
+  attachRedisErrorLogging(worker, `Worker[${name}]`)
+  return worker
+}
+
+/** Listen to a queue's events stream, from every pod, with the same error-logging guarantee. */
+export function createQueueEvents(name: QueueName, redisConfig: RedisConfig): QueueEvents {
+  const events = new QueueEvents(name, {
+    prefix: QUEUE_KEY_PREFIX,
+    connection: queueConnection(redisConfig),
+  })
+  attachRedisErrorLogging(events, `QueueEvents[${name}]`)
+  return events
 }
 
 /** Create a plain Redis client with the same error-logging guarantee. */

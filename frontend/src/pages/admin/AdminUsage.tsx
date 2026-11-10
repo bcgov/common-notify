@@ -3,9 +3,15 @@ import type { FC } from 'react'
 import type { AdminTenantUsageRow } from '@/api/apiKeyUsage.api'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
 import { fetchAllTenantsUsage, updateTenantLimits } from '@/redux/thunks/apiKeyUsage.thunks'
-import { setAdminPage, setAdminLimit } from '@/redux/slices/apiKeyUsage.slice'
+import {
+  setAdminPage,
+  setAdminLimit,
+  setAdminSearch,
+  setAdminFilter,
+} from '@/redux/slices/apiKeyUsage.slice'
 import UserService from '@/service/user-service'
 import PageHeading from '@/components/PageHeading'
+import SearchField from '@/components/SearchField'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
 import NotAuthorized from '@/components/NotAuthorized'
@@ -26,19 +32,22 @@ const AdminUsage: FC = () => {
     adminLimit,
     adminCount,
     adminSearch,
+    adminFilters,
     adminUpdatingKey,
+    adminError,
   } = useAppSelector((state) => state.apiKeyUsage)
   const isAdmin = UserService.hasRole('NOTIFY_ADMIN')
+  const [searchInput, setSearchInput] = useState(adminSearch)
   const [editingRow, setEditingRow] = useState<AdminTenantUsageRow | null>(null)
   const [dailyLimit, setDailyLimit] = useState(0)
   const [annualLimit, setAnnualLimit] = useState(0)
 
-  // Server-side: refetch whenever the page, page size, or committed search changes.
+  // Server-side: refetch whenever the page, page size, committed search or filters change.
   useEffect(() => {
     if (isAdmin) {
       dispatch(fetchAllTenantsUsage())
     }
-  }, [isAdmin, adminPage, adminLimit, adminSearch, dispatch])
+  }, [isAdmin, adminPage, adminLimit, adminSearch, adminFilters, dispatch])
 
   if (!isAdmin) {
     return <NotAuthorized />
@@ -48,6 +57,19 @@ const AdminUsage: FC = () => {
 
   function handleLimitChange(newLimit: number) {
     dispatch(setAdminLimit(newLimit))
+  }
+
+  function handleSearch() {
+    dispatch(setAdminSearch(searchInput.trim()))
+  }
+
+  function clearSearch() {
+    setSearchInput('')
+    dispatch(setAdminSearch(''))
+  }
+
+  function handleFilter(key: string, values: string[]) {
+    dispatch(setAdminFilter({ field: key, values }))
   }
 
   function openEdit(row: AdminTenantUsageRow) {
@@ -98,6 +120,10 @@ const AdminUsage: FC = () => {
     {
       key: 'channel',
       label: 'Channel',
+      filterOptions: [
+        { label: 'Email', value: 'EMAIL' },
+        { label: 'SMS', value: 'SMS' },
+      ],
       render: (_, row) => <span>{formatChannel(row.channel)}</span>,
     },
     {
@@ -141,6 +167,17 @@ const AdminUsage: FC = () => {
   return (
     <div className="page">
       <PageHeading title="Tenant Usage & Limits" />
+      {adminError && <div role="alert">{adminError}</div>}
+
+      <div className="page__toolbar">
+        <SearchField
+          value={searchInput}
+          onChange={setSearchInput}
+          onSearch={handleSearch}
+          placeholder="Search tenants..."
+          ariaLabel="Search tenants"
+        />
+      </div>
 
       <DataTable
         columns={columns}
@@ -148,6 +185,10 @@ const AdminUsage: FC = () => {
         keyExtractor={(row) => rowKeyOf(row)}
         isLoading={adminLoading}
         emptyMessage="No tenant usage data found."
+        search={adminSearch}
+        onClearSearch={clearSearch}
+        activeFilters={adminFilters}
+        onFilter={handleFilter}
         currentPage={adminPage}
         pageSize={adminLimit}
         totalCount={adminCount}

@@ -244,6 +244,31 @@ describe('TemplatesRepository', () => {
       expect(results).toEqual([])
       expect(total).toBe(0)
     })
+
+    it('escapes LIKE wildcards in the name and description search', async () => {
+      const mockQueryBuilder = {
+        leftJoinAndSelect: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        andWhere: vi.fn().mockReturnThis(),
+        skip: vi.fn().mockReturnThis(),
+        take: vi.fn().mockReturnThis(),
+        addOrderBy: vi.fn().mockReturnThis(),
+        getManyAndCount: vi.fn().mockResolvedValue([[], 0]),
+      }
+
+      mockTemplateRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any)
+
+      await repository.findWithQuery(
+        'tenant-123',
+        { page: 1, limit: 10, filters: [], sorts: [] },
+        '50%_a\\b',
+      )
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        "(template.name ILIKE :search ESCAPE '\\' OR template.description ILIKE :search ESCAPE '\\')",
+        { search: '%50\\%\\_a\\\\b%' },
+      )
+    })
   })
 
   describe('findByTenantId', () => {
@@ -307,6 +332,27 @@ describe('TemplatesRepository', () => {
 
       expect(results).toEqual([])
       expect(total).toBe(0)
+    })
+
+    it('escapes LIKE wildcards in the name and body search', async () => {
+      const mockQueryBuilder = {
+        leftJoinAndSelect: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        andWhere: vi.fn().mockReturnThis(),
+        orderBy: vi.fn().mockReturnThis(),
+        take: vi.fn().mockReturnThis(),
+        skip: vi.fn().mockReturnThis(),
+        getManyAndCount: vi.fn().mockResolvedValue([[], 0]),
+      }
+
+      mockTemplateRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any)
+
+      await repository.findByTenantId('tenant-123', 20, 0, '50%_a\\b')
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        '(template.name ILIKE :search OR template.body ILIKE :search)',
+        { search: '%50\\%\\_a\\\\b%' },
+      )
     })
   })
 

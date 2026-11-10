@@ -103,7 +103,14 @@ jobs:
           oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
           oc_server: ${{ inputs.oc_server }}
           environment: ${{ inputs.environment }}
-          values_file: charts/crunchy/values.yml
+          values_file: ${{ inputs.environment == 'PROD' && 'charts/crunchy/values-prod.yml' || inputs.environment == 'DEV' && 'charts/crunchy/values-dev.yml' || 'charts/crunchy/values.yml' }}
+          # action-crunchy enables the S3 repo only when all four are non-empty, so an
+          # environment without a bucket and credentials keeps the PVC repo alone.
+          # Credentials come from environment secrets and never reach the chart.
+          s3_access_key: ${{ inputs.environment == 'PROD' && secrets.S3_ACCESS_KEY_PROD || inputs.environment == 'TEST' && secrets.S3_ACCESS_KEY_TEST || '' }}
+          s3_secret_key: ${{ inputs.environment == 'PROD' && secrets.S3_SECRET_KEY_PROD || inputs.environment == 'TEST' && secrets.S3_SECRET_KEY_TEST || '' }}
+          s3_bucket: ${{ inputs.environment == 'PROD' && 'notify-crunchydb-prod' || inputs.environment == 'TEST' && 'notify-crunchydb-test' || '' }}
+          s3_endpoint: commonservices.objectstore.gov.bc.ca
           triggers: ${{ inputs.db_triggers }}
 
       - uses: actions/checkout@v7
@@ -118,7 +125,10 @@ jobs:
           oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}
           oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
           oc_server: ${{ inputs.oc_server }}
+          #-- the default 5 only waits ~80s; the API drops runner connections for longer
+          login_attempts: 8
           triggers: ${{ inputs.redis_triggers }}
+          diff_branch: ${{ github.event_name == 'pull_request' && github.event.repository.default_branch || 'HEAD^' }}
           ref: ${{ github.ref }}
           commands: |
             # Deploy Redis using Bitnami Helm chart
@@ -146,12 +156,23 @@ jobs:
             fi
 
             # Deploy Redis (async - let Kubernetes manage pod startup)
+            # Bitnami refuses to upgrade without the existing password and would
+            # otherwise regenerate one, breaking the backend's secretKeyRef.
+            REDIS_PASSWORD=$(oc get secret ${RELEASE_NAME} \
+              -o jsonpath='{.data.redis-password}' 2>/dev/null | base64 -d || true)
+            PASSWORD_ARG=""
+            if [ -n "${REDIS_PASSWORD}" ]; then
+              echo "::add-mask::${REDIS_PASSWORD}"
+              PASSWORD_ARG="--set global.redis.password=${REDIS_PASSWORD}"
+            fi
+
             helm upgrade --install \
               ${RELEASE_NAME} \
               bitnami/redis \
               --version 25.4.1 \
               -f ${VALUES_FILE} \
               ${VALUES_OVERRIDE} \
+              ${PASSWORD_ARG} \
               --timeout 5m
 
             echo "✓ Redis deployment initiated successfully"
@@ -194,6 +215,8 @@ jobs:
           oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}
           oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
           oc_server: ${{ inputs.oc_server }}
+          #-- the default 5 only waits ~80s; the API drops runner connections for longer
+          login_attempts: 8
           triggers: ${{ inputs.triggers }}
           commands: |
             # Interrupt any previous deployments (PR only)
@@ -216,6 +239,8 @@ jobs:
           oc_namespace: ${{ secrets.oc_namespace || secrets.OC_NAMESPACE || secrets.OC_DEV_NAMESPACE }}
           oc_token: ${{ secrets.oc_token || secrets.OC_TOKEN || secrets.OC_DEV_TOKEN }}
           oc_server: ${{ inputs.oc_server }}
+          #-- the default 5 only waits ~80s; the API drops runner connections for longer
+          login_attempts: 8
           triggers: ${{ inputs.triggers }}
           ref: ${{ github.ref }}
           commands: |

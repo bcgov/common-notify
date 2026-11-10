@@ -1,7 +1,7 @@
 import type { FC } from 'react'
 import { useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useAppDispatch, useAppSelector } from '@/redux/hooks'
+import { useAppDispatch, useAppSelector, useAppStore } from '@/redux/hooks'
 import { selectTenant } from '@/redux/slices/tenant.slice'
 import { fetchCstarRoles } from '@/redux/thunks/cstar.thunks'
 import type { Tenant } from '@/interfaces/CstarTenant'
@@ -31,6 +31,7 @@ interface Props {
 
 const TenantSwitcher: FC<Props> = ({ className = '' }) => {
   const dispatch = useAppDispatch()
+  const store = useAppStore()
   const navigate = useNavigate()
 
   const tenants = useAppSelector((state) => state.cstar.tenants)
@@ -56,6 +57,12 @@ const TenantSwitcher: FC<Props> = ({ className = '' }) => {
     dispatch(selectTenant(tenant))
     // Fetch user's roles in the selected tenant
     dispatch(fetchCstarRoles({ tenantId: tenant.id })).then((result) => {
+      // The user switched again before these roles arrived; they say nothing about the
+      // tenant now selected, so don't redirect on them.
+      if (store.getState().tenant.selectedTenant?.id !== tenant.id) {
+        return
+      }
+
       // Check if the action was rejected (error fetching roles) or returned empty roles
       if (
         result.type === 'cstar/fetchRoles/rejected' ||

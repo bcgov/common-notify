@@ -22,6 +22,11 @@ describe('EmailLogoController', () => {
   } as unknown as Response
   const controller = new EmailLogoController(emailLogoService, emailLogoStorage)
 
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(response.type).mockReturnValue(response)
+  })
+
   it('keeps public access, immutable caching, and cross-origin image access', () => {
     const handler = EmailLogoController.prototype.getImage
     expect(Reflect.getMetadata(IS_PUBLIC_KEY, handler)).toBe(true)
@@ -31,11 +36,6 @@ describe('EmailLogoController', () => {
         { name: 'Cross-Origin-Resource-Policy', value: 'cross-origin' },
       ]),
     )
-  })
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    vi.mocked(response.type).mockReturnValue(response)
   })
 
   it('serves an approved logo using object storage content type metadata', async () => {

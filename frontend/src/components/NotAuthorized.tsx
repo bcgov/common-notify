@@ -30,11 +30,9 @@ const NotAuthorized: FC<NotAuthorizedProps> = ({ cstarUrl }) => {
       </ul>
       <p>Please contact your administrator or appropriate access authority to request access.</p>
       {cstarUrl && (
-        <>
-          <Button id="cstarBtn" onClick={handleCstarClick}>
-            Open CSTAR
-          </Button>
-        </>
+        <Button id="cstarBtn" onClick={handleCstarClick}>
+          Open CSTAR
+        </Button>
       )}
     </div>
   )

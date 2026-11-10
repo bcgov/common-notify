@@ -5,6 +5,7 @@ import {
   updateEmailSettings,
 } from '../thunks/settings.thunks'
 import type { ApprovedEmailLogo, EmailSettingsValues } from '@/interfaces/tenant-settings.interface'
+import { selectTenant } from './tenant.slice'
 
 /** Matches the tenant_settings column defaults, used until a row exists for the tenant. */
 export const defaultEmailSettings: EmailSettingsValues = {
@@ -38,6 +39,8 @@ export const emailSettingsSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
+      // Reset on tenant switch; tenantGuard drops the old tenant's in-flight results.
+      .addCase(selectTenant, () => initialState)
       // A new load starts: drop the previous tenant's values and any stale save error, so
       // the section can only ever mount against data for the tenant now on screen.
       .addCase(fetchSettings.pending, (state) => {

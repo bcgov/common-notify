@@ -7,8 +7,17 @@ import Dashboard from '@/pages/dashboard/Dashboard'
 import codeTablesReducer from '@/redux/slices/codeTables.slice'
 import notificationReducer from '@/redux/slices/notification.slice'
 import tenantReducer from '@/redux/slices/tenant.slice'
+import userReducer from '@/redux/slices/user.slice'
 import type { CodeTablesState } from '@/interfaces/CodeTables'
 import type { PaginatedNotificationResponse } from '@/interfaces/PaginatedNotificationResponse'
+import type * as Router from '@tanstack/react-router'
+
+const navigateMock = vi.fn()
+
+vi.mock('@tanstack/react-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof Router>()),
+  useNavigate: () => navigateMock,
+}))
 
 vi.mock('@/pages/dashboard/sections/NotificationTemplatesSection', () => ({
   NotificationTemplatesSection: () => <div data-testid="notification-templates-section" />,
@@ -83,6 +92,7 @@ describe('Dashboard with CodeTables', () => {
         codeTables: codeTablesReducer,
         notification: notificationReducer,
         tenant: tenantReducer,
+        user: userReducer,
       },
       preloadedState: initialState,
     } as any)
@@ -192,6 +202,82 @@ describe('Dashboard with CodeTables', () => {
 
     // Component should still render with fallback or empty state
     expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeTruthy()
+  })
+
+  it('shows the no-data card instead of the search and table when nothing has been sent', async () => {
+    const store = createStore({
+      ...preloadedState,
+      notification: { ...baseNotificationState, hasLoaded: true, hasNoData: true },
+      user: { current: { cstarRoles: ['NOTIFY_TEMPLATE_EDITOR'] } },
+    })
+
+    render(
+      <Provider store={store}>
+        <Dashboard />
+      </Provider>,
+    )
+
+    expect(screen.getByText('No notifications yet.')).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Create notification event' }))
+
+    expect(navigateMock).toHaveBeenCalledWith({ to: '/events/create' })
+  })
+
+  it('keeps the no-data card up while a revisit refetches', () => {
+    const store = createStore({
+      ...preloadedState,
+      notification: { ...baseNotificationState, hasLoaded: true, hasNoData: true, isLoading: true },
+    })
+
+    render(
+      <Provider store={store}>
+        <Dashboard />
+      </Provider>,
+    )
+
+    expect(screen.getByText('No notifications yet.')).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+  })
+
+  it('holds off on the no-data card while notifications are refetching', () => {
+    const store = createStore({
+      ...preloadedState,
+      notification: { ...baseNotificationState, hasLoaded: true, isLoading: true },
+    })
+
+    render(
+      <Provider store={store}>
+        <Dashboard />
+      </Provider>,
+    )
+
+    expect(screen.queryByText('No notifications yet.')).not.toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: 'Loading...' })).toBeInTheDocument()
+  })
+
+  it('offers to clear a filter that matches no notifications', async () => {
+    const store = createStore({
+      ...preloadedState,
+      notification: { ...baseNotificationState, hasLoaded: true, filters: { status: ['failed'] } },
+    })
+
+    render(
+      <Provider store={store}>
+        <Dashboard />
+      </Provider>,
+    )
+
+    expect(screen.queryByText('No notifications yet.')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('cell', { name: /^No data match the filters applied./ }),
+    ).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
+
+    expect(store.getState().notification.filters).toEqual({})
   })
 
   it('should reflect updated code table statuses in the column filter options', async () => {

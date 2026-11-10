@@ -3,6 +3,7 @@ import axios from 'axios'
 import config from '@/config'
 import UserService from '@/service/user-service'
 import { showErrorToast } from '@/redux/utils/toastUtils'
+import { getApiResponseMessage } from '@/utils/apiErrorMessage'
 import { trackRequestEnd, trackRequestStart } from '@/redux/utils/globalLoading'
 
 declare module 'axios' {
@@ -103,15 +104,14 @@ if (!responseInterceptorRegistered) {
       if (!config?.skipGlobalLoading) {
         trackRequestEnd()
       }
-      if (response && response.status === STATUS_CODES.Unauthorized) {
+      if (response?.status === STATUS_CODES.Unauthorized) {
         // 401 = unauthorized
         // This could be either:
         // 1. Expired token - redirect to Keycloak to refresh
         // 2. Missing tenant context - show error to user
         // 3. Admin endpoint user lacks permission - fail silently
 
-        const responseData = (response.data as any) || {}
-        const errorMessage = responseData.message || ''
+        const errorMessage = getApiResponseMessage(error) || ''
         const url = config?.url || ''
 
         // Don't redirect for admin endpoints, let them fail silently.  We don't care if non-adin users can't list all tenants since they don't need (and shouldn't see) a list of tenants
@@ -130,7 +130,7 @@ if (!responseInterceptorRegistered) {
 
         // For other 401 errors, let the error propagate (token refresh is handled elsewhere)
         return Promise.reject(error)
-      } else if (response && response.status === STATUS_CODES.Forbidden) {
+      } else if (response?.status === STATUS_CODES.Forbidden) {
         // 403 = authenticated but lacks permission: show toast instead of redirecting
         // But don't show if we're already on the not-authorized page
         if (!window.location.pathname.includes('/not-authorized')) {
@@ -196,7 +196,7 @@ export const post = async <T, M = object>(
   const { url, requiresAuthentication, params, data } = parameters
   if (requiresAuthentication) await setAuthHeader()
   // Use 'data' if provided (for POST body), otherwise use 'params' (legacy)
-  const bodyData = data || params
+  const bodyData = data ?? params
   return axios
     .post(url, bodyData, buildConfig(parameters))
     .then((response: AxiosResponse) => response.data as T)

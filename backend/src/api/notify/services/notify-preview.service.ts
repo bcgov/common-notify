@@ -140,14 +140,19 @@ export class NotifyPreviewService {
   ): Promise<NotifyPreviewResponse> {
     this.assertPreviewable(request, original)
 
-    const result: NotifyPreviewResponse = {}
-    for (const name of CHANNELS) {
-      const channel = request[name]
-      if (!channel) continue
+    const names = CHANNELS.filter((name) => request[name])
+    const renders = await Promise.all(
+      names.map((name) => {
+        const channel = request[name]!
+        const params = { ...request.params, ...channel.params }
+        return this.renderContent(tenantId, name, channel.content!, params)
+      }),
+    )
 
-      const content = channel.content!
-      const params = { ...request.params, ...channel.params }
-      const rendered = await this.renderContent(tenantId, name, content, params)
+    const result: NotifyPreviewResponse = {}
+    for (const [i, name] of names.entries()) {
+      const content = request[name]!.content!
+      const rendered = renders[i]
 
       if (name === 'sms') {
         result.sms = this.smsPreview(request, rendered)

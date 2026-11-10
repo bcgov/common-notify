@@ -1,26 +1,27 @@
 import { describe, it, expect, vi } from 'vitest'
-import type Bull from 'bull'
+import type { Queue } from 'bullmq'
+import type Redis from 'ioredis'
 import {
   MONITORING_WINDOW_MINUTES,
   addedCounterKey,
-  alignBullMetrics,
+  alignQueueMetrics,
   countAddedJobs,
   minuteOf,
 } from './queue-metrics'
 
 const MINUTE = 60_000
 
-describe('alignBullMetrics', () => {
+describe('alignQueueMetrics', () => {
   const now = 1_000 * MINUTE + 30_000
 
   it('returns a zeroed window when the queue has never finished a job', () => {
-    const series = alignBullMetrics({ meta: { count: 0, prevTS: 0, prevCount: 0 }, data: [] }, now)
+    const series = alignQueueMetrics({ meta: { count: 0, prevTS: 0, prevCount: 0 }, data: [] }, now)
     expect(series).toHaveLength(MONITORING_WINDOW_MINUTES)
     expect(series.every((value) => value === 0)).toBe(true)
   })
 
   it('puts unflushed jobs in the current minute and flushed points behind it', () => {
-    const series = alignBullMetrics(
+    const series = alignQueueMetrics(
       { meta: { count: 12, prevTS: now - 5_000, prevCount: 9 }, data: ['4', '7'] },
       now,
     )
@@ -30,8 +31,8 @@ describe('alignBullMetrics', () => {
   })
 
   it('anchors points to the last flush, not to now, when the queue has gone quiet', () => {
-    // Last job finished three minutes ago; Bull has not written a point since.
-    const series = alignBullMetrics(
+    // Last job finished three minutes ago; BullMQ has not written a point since.
+    const series = alignQueueMetrics(
       { meta: { count: 10, prevTS: now - 3 * MINUTE, prevCount: 8 }, data: ['5'] },
       now,
     )
@@ -51,16 +52,16 @@ describe('countAddedJobs', () => {
     const queue = {
       name: 'email-delivery',
       add: vi.fn().mockResolvedValue(job),
-      client: { multi: vi.fn(() => multi) },
     }
-    return { queue, multi, job, exec }
+    const redis = { multi: vi.fn(() => multi) }
+    return { queue, redis, multi, job, exec }
   }
 
   it('increments the current minute counter after a job is added', async () => {
-    const { queue, multi, job } = fakeQueue()
-    countAddedJobs(queue as unknown as Bull.Queue)
+    const { queue, redis, multi, job } = fakeQueue()
+    countAddedJobs(queue as unknown as Queue, redis as unknown as Redis)
 
-    await expect(queue.add({ notifyId: 'n1' })).resolves.toBe(job)
+    await expect(queue.add('email-delivery', { notifyId: 'n1' })).resolves.toBe(job)
 
     const key = addedCounterKey('email-delivery', minuteOf(Date.now()))
     expect(multi.incr).toHaveBeenCalledWith(key)
@@ -68,19 +69,19 @@ describe('countAddedJobs', () => {
   })
 
   it('does not fail the add when counting fails', async () => {
-    const { queue, job, exec } = fakeQueue()
+    const { queue, redis, job, exec } = fakeQueue()
     exec.mockRejectedValue(new Error('redis down'))
-    countAddedJobs(queue as unknown as Bull.Queue)
+    countAddedJobs(queue as unknown as Queue, redis as unknown as Redis)
 
-    await expect(queue.add({})).resolves.toBe(job)
+    await expect(queue.add('email-delivery', {})).resolves.toBe(job)
   })
 
   it('does not count a job whose add failed', async () => {
-    const { queue, multi } = fakeQueue()
+    const { queue, redis, multi } = fakeQueue()
     queue.add.mockRejectedValue(new Error('OOM command not allowed'))
-    countAddedJobs(queue as unknown as Bull.Queue)
+    countAddedJobs(queue as unknown as Queue, redis as unknown as Redis)
 
-    await expect(queue.add({})).rejects.toThrow('OOM')
+    await expect(queue.add('email-delivery', {})).rejects.toThrow('OOM')
     expect(multi.incr).not.toHaveBeenCalled()
   })
 })

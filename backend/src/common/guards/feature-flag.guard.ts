@@ -33,9 +33,9 @@ export class FeatureFlagGuard implements CanActivate {
   private readonly logger = new Logger(FeatureFlagGuard.name)
 
   constructor(
-    private reflector: Reflector,
-    private featureFlagService: FeatureFlagService,
-    private tenantsService: TenantsService,
+    private readonly reflector: Reflector,
+    private readonly featureFlagService: FeatureFlagService,
+    private readonly tenantsService: TenantsService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -83,9 +83,8 @@ export class FeatureFlagGuard implements CanActivate {
       const isEnabled = await this.featureFlagService.isEnabled(featureFlagCode, tenantId)
 
       if (!isEnabled) {
-        this.logger.warn(
-          `Access denied: Feature flag "${featureFlagCode}" is disabled${tenantId ? ` for tenant ${tenantId}` : ' globally'}`,
-        )
+        const scope = tenantId ? `for tenant ${tenantId}` : 'globally'
+        this.logger.warn(`Access denied: Feature flag "${featureFlagCode}" is disabled ${scope}`)
         throw new ForbiddenException(
           `Feature "${featureFlagCode}" is not enabled${tenantId ? ' for your tenant' : ''}`,
         )

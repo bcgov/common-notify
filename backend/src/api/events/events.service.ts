@@ -156,9 +156,9 @@ export class EventsService {
 
     // Applied as an OR group since the parsed-query filter mechanism only supports AND.
     if (search) {
-      const escaped = search.replace(/[\\%_]/g, '\\$&')
+      const escaped = search.replace(/[\\%_]/g, String.raw`\$&`)
       queryBuilder.andWhere(
-        `(event.name ILIKE :search ESCAPE '\\' OR event.description ILIKE :search ESCAPE '\\')`,
+        String.raw`(event.name ILIKE :search ESCAPE '\' OR event.description ILIKE :search ESCAPE '\')`,
         { search: `%${escaped}%` },
       )
     }

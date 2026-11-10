@@ -11,11 +11,11 @@ import { Logger } from '@nestjs/common'
  *
  * If nothing listens for a client's `error` event, Node's default handler prints that whole
  * object to stderr, putting the credential into container logs and anything shipping them.
- * Every Redis client and Bull queue must therefore have an error listener attached, and errors
+ * Every Redis client and BullMQ queue or worker must therefore have an error listener attached, and errors
  * must be formatted through formatRedisError rather than logged as objects.
  */
 
-/** An object that emits Node-style events; Redis clients and Bull queues both qualify. */
+/** An object that emits Node-style events; Redis clients and BullMQ queues and workers all qualify. */
 interface ErrorEmitter {
   on(event: 'error', listener: (error: unknown) => void): unknown
 }

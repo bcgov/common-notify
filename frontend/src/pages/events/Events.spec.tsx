@@ -181,11 +181,85 @@ describe('Events', () => {
       expect(await screen.findByText('Loading...')).toBeInTheDocument()
     })
 
-    it('says so when the tenant has no events', async () => {
+    it('shows the no-data card instead of the table when the tenant has no events', async () => {
       vi.mocked(getEvents).mockResolvedValue(pageOf([]))
       renderPage()
 
-      expect(await screen.findByRole('cell', { name: 'No events found' })).toBeInTheDocument()
+      expect(await screen.findByText('No notification events yet.')).toBeInTheDocument()
+      expect(screen.queryByRole('table')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Create New Event' })).not.toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Create notification event' }))
+
+      expect(navigateMock).toHaveBeenCalledWith({ to: '/events/create' })
+    })
+
+    it('offers to clear a search that matches no events', async () => {
+      renderPage()
+      await waitFor(() => expect(getEvents).toHaveBeenCalledTimes(1))
+      vi.mocked(getEvents).mockResolvedValue(pageOf([]))
+
+      await userEvent.type(searchBox(), 'nothing{Enter}')
+
+      expect(
+        await screen.findByRole('cell', { name: /^No results found. Try a different search./ }),
+      ).toBeInTheDocument()
+      expect(screen.queryByText('No notification events yet.')).not.toBeInTheDocument()
+
+      vi.mocked(getEvents).mockResolvedValue(pageOf([event()]))
+      await userEvent.click(screen.getByRole('button', { name: 'Clear search' }))
+
+      expect(await screen.findByRole('link', { name: 'Permit renewal' })).toBeInTheDocument()
+      expect(getEvents).toHaveBeenLastCalledWith(1, 15, undefined, undefined, undefined)
+      expect(searchBox()).toHaveValue('')
+    })
+
+    it('shows loading, not the no-data card, while a cleared search refetches', async () => {
+      renderPage()
+      await waitFor(() => expect(getEvents).toHaveBeenCalledTimes(1))
+      vi.mocked(getEvents).mockResolvedValue(pageOf([]))
+      await userEvent.type(searchBox(), 'nothing{Enter}')
+      await screen.findByRole('button', { name: 'Clear search' })
+
+      let resolveRefetch!: (value: ReturnType<typeof pageOf>) => void
+      vi.mocked(getEvents).mockReturnValue(new Promise((resolve) => (resolveRefetch = resolve)))
+      await userEvent.click(screen.getByRole('button', { name: 'Clear search' }))
+
+      expect(await screen.findByRole('cell', { name: 'Loading...' })).toBeInTheDocument()
+      expect(screen.queryByText('No notification events yet.')).not.toBeInTheDocument()
+
+      await act(async () => resolveRefetch(pageOf([event()])))
+
+      expect(await screen.findByRole('link', { name: 'Permit renewal' })).toBeInTheDocument()
+    })
+
+    it('offers to clear the search before the filters when both are applied', async () => {
+      renderPage()
+      await screen.findByRole('link', { name: 'Permit renewal' })
+      vi.mocked(getEvents).mockResolvedValue(pageOf([]))
+
+      await userEvent.click(screen.getByRole('button', { name: 'Column options for Event Status' }))
+      await userEvent.hover(await screen.findByRole('menuitem', { name: /Filter by/ }))
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Draft' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Apply' }))
+
+      expect(
+        await screen.findByRole('cell', { name: /^No data match the filters applied./ }),
+      ).toBeInTheDocument()
+
+      await userEvent.type(searchBox(), 'nothing{Enter}')
+
+      expect(
+        await screen.findByRole('cell', { name: /^No results found. Try a different search./ }),
+      ).toBeInTheDocument()
+
+      // Clearing the search leaves the filter as the reason the table is empty.
+      await userEvent.click(screen.getByRole('button', { name: 'Clear search' }))
+      await userEvent.click(await screen.findByRole('button', { name: 'Clear filters' }))
+
+      await waitFor(() =>
+        expect(getEvents).toHaveBeenLastCalledWith(1, 15, undefined, undefined, undefined),
+      )
     })
 
     it('surfaces a failed load as a toast, since the table can only show an empty state', async () => {

@@ -1,10 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { ConfigService } from '@nestjs/config'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { EventEmitter } from 'node:events'
+import * as net from 'node:net'
 import { ClamavService } from './clamav.service'
 
 // Mock the net module
-vi.mock('net', () => ({
+vi.mock('node:net', () => ({
   createConnection: vi.fn(),
 }))
 
@@ -159,6 +161,115 @@ describe('ClamavService', () => {
         isInfected: false,
         viruses: [],
       })
+    })
+  })
+
+  describe('recovery after ClamAV was unavailable', () => {
+    type Outcome = 'ok' | 'error'
+
+    /** A clamd socket that answers PING with PONG and a scan with OK, or fails to connect. */
+    function fakeSocket(outcome: Outcome, onConnect: () => void) {
+      const socket = Object.assign(new EventEmitter(), {
+        destroy: vi.fn(),
+        write: vi.fn(() => setImmediate(() => socket.emit('data', Buffer.from('PONG')))),
+        end: vi.fn(() =>
+          setImmediate(() => {
+            socket.emit('data', Buffer.from('stream: OK\n'))
+            socket.emit('end')
+          }),
+        ),
+      })
+      setImmediate(() =>
+        outcome === 'ok' ? onConnect() : socket.emit('error', new Error('ECONNREFUSED')),
+      )
+      return socket
+    }
+
+    /** Each connection takes the next outcome; the last one repeats. */
+    function connectionsWill(...outcomes: Outcome[]) {
+      const connect = (_opts: unknown, cb: () => void) =>
+        fakeSocket(outcomes.length > 1 ? outcomes.shift()! : outcomes[0], cb)
+      vi.mocked(net.createConnection).mockImplementation(
+        connect as unknown as typeof net.createConnection,
+      )
+    }
+
+    async function buildService(failClosed: boolean): Promise<ClamavService> {
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          ClamavService,
+          {
+            provide: ConfigService,
+            useValue: {
+              get: vi.fn(
+                (key: string) =>
+                  ({
+                    CLAMAV_HOST: 'localhost',
+                    CLAMAV_PORT: '3310',
+                    CLAMAV_TIMEOUT: '5000',
+                    CLAMAV_ENABLED: 'true',
+                    CLAMAV_FAIL_CLOSED: String(failClosed),
+                  })[key],
+              ),
+            },
+          },
+        ],
+      }).compile()
+      return module.get<ClamavService>(ClamavService)
+    }
+
+    beforeEach(() => {
+      vi.mocked(net.createConnection).mockReset()
+    })
+
+    it('scans once ClamAV comes up after the startup check failed', async () => {
+      const svc = await buildService(true)
+      connectionsWill('error')
+      await svc.onModuleInit()
+      expect(svc.getStatus().healthy).toBe(false)
+
+      connectionsWill('ok')
+      await expect(svc.scanBuffer(Buffer.from('x'), 'a.txt')).resolves.toMatchObject({
+        isInfected: false,
+      })
+      expect(svc.getStatus().healthy).toBe(true)
+    })
+
+    it('scans again after one dropped scan connection', async () => {
+      const svc = await buildService(true)
+      connectionsWill('ok')
+      await svc.onModuleInit()
+
+      connectionsWill('error')
+      await expect(svc.scanBuffer(Buffer.from('x'), 'a.txt')).rejects.toThrow('ECONNREFUSED')
+      expect(svc.getStatus().healthy).toBe(false)
+
+      connectionsWill('ok')
+      await expect(svc.scanBuffer(Buffer.from('x'), 'a.txt')).resolves.toMatchObject({
+        isInfected: false,
+      })
+    })
+
+    it('still throws in fail-closed mode while ClamAV stays down', async () => {
+      const svc = await buildService(true)
+      connectionsWill('error')
+      await svc.onModuleInit()
+
+      await expect(svc.scanBuffer(Buffer.from('x'), 'a.txt')).rejects.toThrow(
+        'ClamAV is unavailable while fail-closed mode is enabled',
+      )
+    })
+
+    it('still skips the scan in fail-open mode while ClamAV stays down', async () => {
+      const svc = await buildService(false)
+      connectionsWill('error')
+      await svc.onModuleInit()
+
+      await expect(svc.scanBuffer(Buffer.from('x'), 'a.txt')).resolves.toMatchObject({
+        isInfected: false,
+        viruses: [],
+      })
+      expect(svc.getStatus().healthy).toBe(false)
     })
   })
 

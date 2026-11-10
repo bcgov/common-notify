@@ -68,7 +68,7 @@ describe('AppController (e2e)', () => {
 
   it('creates each module once', () => {
     // A static module registered twice runs its lifecycle hooks twice. QueueModule did: every
-    // pod started two sets of Bull workers and two heartbeats under one pod name, which made
+    // pod started two sets of queue workers and two heartbeats under one pod name, which made
     // the monitoring page report running jobs as stalled. forwardRef() inside a global dynamic
     // module (GcNotifyModule.forRoot) produced the orphaned copies.
     // TypeOrmModule repeats legitimately: each forFeature() call is its own dynamic module.

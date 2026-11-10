@@ -22,7 +22,7 @@ interface AlertProps {
  */
 export const Alert: FC<AlertProps> = ({ variant = 'info', children, className = '', role }) => (
   <div
-    className={`alert alert-${variant}${className ? ` ${className}` : ''}`}
+    className={['alert', `alert-${variant}`, className].filter(Boolean).join(' ')}
     role={role ?? (variant === 'danger' ? 'alert' : 'status')}
   >
     {children}
