@@ -76,15 +76,18 @@ const adminItems = {
   groups: [
     {
       label: 'Monitor',
-      links: [{ label: 'Monitoring', to: '/admin/monitoring' }],
-    },
-    {
-      label: 'Report',
-      links: [{ label: 'Usage & Limits', to: '/admin/usage' }],
+      links: [
+        { label: 'Overview', to: '/admin', exact: true },
+        { label: 'System', to: '/admin/monitoring' },
+        { label: 'Notifications', to: '/admin/notifications' },
+      ],
     },
     {
       label: 'Manage',
-      links: [{ label: 'Feature Flags', to: '/admin/feature-flags' }],
+      links: [
+        { label: 'Tenants', to: '/admin/tenants' },
+        { label: 'Feature Flags', to: '/admin/feature-flags' },
+      ],
     },
   ],
 } as const satisfies {

@@ -112,8 +112,16 @@ export interface SendInProgress {
 /** Totals over the last hour, for the summary cards. */
 export interface MonitoringOverview {
   windowMinutes: number
-  /** From the request being accepted (or a scheduled send falling due) to the provider accepting it. */
-  deliveryTime: { medianMs: number; p95Ms: number; messages: number } | null
+  /** Recipients since Pacific midnight and the 1st of the month; up to a minute stale. */
+  totals: {
+    dayStart: string
+    monthStart: string
+    sentToday: number
+    sentThisMonth: number
+    failedToday: number
+    /** The most recent failure this month; null when there has been none. */
+    lastFailureAt: string | null
+  }
   messagesSent: number
   messagesFailed: number
   /**

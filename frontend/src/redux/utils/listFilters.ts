@@ -9,3 +9,12 @@ export function toFilterParams(filters: Record<string, string[]>): string[] | un
     .map(([field, values]) => `${field}:in:${values.join('|')}`)
   return params.length > 0 ? params : undefined
 }
+
+/** A DataTable sort as the `sort` param: `field`, `-field` for descending, or undefined for none. */
+export function toSortParam(
+  sortBy: string | null | undefined,
+  sortOrder: 'asc' | 'desc' | null | undefined,
+): string | undefined {
+  if (!sortBy || !sortOrder) return undefined
+  return sortOrder === 'desc' ? `-${sortBy}` : sortBy
+}

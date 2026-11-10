@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getApiErrorMessage, getApiResponseMessage } from './apiErrorMessage'
+import { getApiErrorMessage, getApiResponseMessage, toReadableError } from './apiErrorMessage'
 
 /** An axios-shaped rejection. */
 const httpError = (data?: unknown) =>
@@ -73,5 +73,35 @@ describe('getApiErrorMessage', () => {
   it("defaults to 'Unknown error'", () => {
     expect(getApiErrorMessage(undefined)).toBe('Unknown error')
     expect(getApiErrorMessage(new Error(''))).toBe('Unknown error')
+  })
+})
+
+describe('toReadableError', () => {
+  const failed = (status: number, message = 'Server message') => ({
+    response: { status, data: { message } },
+  })
+
+  it.each([401, 403])('reports %i as a permission problem', (status) => {
+    expect(toReadableError(failed(status), 'usage').message).toBe(
+      'You do not have permission to access usage',
+    )
+  })
+
+  it('reports 404 as not found only for a single record, keeping the gateway message otherwise', () => {
+    expect(toReadableError(failed(404), 'notification', { notFound: true }).message).toBe(
+      'The notification could not be found',
+    )
+    expect(
+      toReadableError(failed(404, 'no Route matched with those values'), 'notifications').message,
+    ).toBe('Failed to load notifications: no Route matched with those values')
+  })
+
+  it("passes on the server's message, else the error's own", () => {
+    expect(toReadableError(failed(500, 'database is down'), 'usage').message).toBe(
+      'Failed to load usage: database is down',
+    )
+    expect(toReadableError(new Error('Network Error'), 'usage').message).toBe(
+      'Failed to load usage: Network Error',
+    )
   })
 })

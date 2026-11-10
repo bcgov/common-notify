@@ -6,6 +6,8 @@ import type { LinkProps } from '@tanstack/react-router'
 export interface SidebarNavLink {
   label: string
   to: NonNullable<LinkProps['to']>
+  /** Active only on this exact path, not its children: for a section's own landing page. */
+  exact?: boolean
 }
 
 export interface SidebarNavGroupProps {
@@ -29,7 +31,12 @@ const SidebarNavGroup: FC<SidebarNavGroupProps> = ({ label, links }) => {
       <ul className="sidebar__group-list" aria-labelledby={labelId}>
         {links.map((link) => (
           <li key={link.to}>
-            <Link to={link.to} className="sidebar__subitem" activeProps={{ className: 'active' }}>
+            <Link
+              to={link.to}
+              className="sidebar__subitem"
+              activeProps={{ className: 'active' }}
+              activeOptions={{ exact: link.exact ?? false }}
+            >
               <span className="sidebar__label">{link.label}</span>
             </Link>
           </li>

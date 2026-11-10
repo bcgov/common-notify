@@ -10,6 +10,7 @@ import MarkdownIt from 'markdown-it'
 const markdown = new MarkdownIt({
   html: false,
   linkify: true, // converts urls and links to clickable links
+  breaks: true, // a single newline is a line break, as authors expect and GC Notify renders
   typographer: true, // enables smart quotes and other typographic replacements
 })
 

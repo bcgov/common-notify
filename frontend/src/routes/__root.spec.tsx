@@ -1,3 +1,4 @@
+import UserService from '@/service/user-service'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { configureStore } from '@reduxjs/toolkit'
 import { render, waitFor } from '@testing-library/react'
@@ -172,5 +173,17 @@ describe('RootLayout - tenant authorization check', () => {
     renderRoot(freshLoginStore())
 
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith({ to: '/not-authorized' }))
+  })
+
+  it('leaves an admin with no tenants to the admin section, not /not-authorized', async () => {
+    vi.mocked(UserService.hasRole).mockReturnValue(true)
+    vi.mocked(cstarApi.fetchUserTenants).mockResolvedValue({ data: { tenants: [] } } as any)
+
+    const store = freshLoginStore()
+    renderRoot(store)
+
+    await waitFor(() => expect(store.getState().cstar.hasLoaded).toBe(true))
+    expect(mockNavigate).not.toHaveBeenCalled()
+    vi.mocked(UserService.hasRole).mockReturnValue(false)
   })
 })

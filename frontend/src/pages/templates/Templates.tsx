@@ -15,6 +15,7 @@ import GenericModal from '@/components/GenericModal'
 import NoDataCard from '@/components/NoDataCard'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
+import { channelFilterOptions } from '@/utils/channels'
 import '@/scss/components/templates.scss'
 
 const baseColumns: TableColumn<TemplateResponse>[] = [
@@ -36,10 +37,7 @@ const baseColumns: TableColumn<TemplateResponse>[] = [
     key: 'channelCode',
     label: 'Template Type',
     sortable: true,
-    filterOptions: [
-      { label: 'Email', value: 'EMAIL' },
-      { label: 'SMS', value: 'SMS' },
-    ],
+    filterOptions: channelFilterOptions(['EMAIL', 'SMS']),
     render: (_, row) => {
       const channelCode = row.channelCode === 'EMAIL' ? 'Email' : row.channelCode
       return <span>{channelCode}</span>

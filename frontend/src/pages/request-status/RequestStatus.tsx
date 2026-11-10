@@ -25,6 +25,7 @@ import RequestStatusSummary from '@/components/RequestStatusSummary'
 import PageHeading from '@/components/PageHeading'
 import PageSubHeading from '@/components/PageSubHeading'
 import { showErrorToast } from '@/redux/utils/toastUtils'
+import { channelFilterOptions } from '@/utils/channels'
 
 interface RequestStatusProps {
   notificationRequestId: string
@@ -48,11 +49,7 @@ const columns: TableColumn<NotificationRequestDetail>[] = [
     label: 'Channel',
     sortable: true,
     width: '162px',
-    filterOptions: [
-      { label: 'Email', value: 'EMAIL' },
-      { label: 'SMS', value: 'SMS' },
-      { label: 'MsgApp', value: 'MSGAPP' },
-    ],
+    filterOptions: channelFilterOptions(),
     render: (_, row) => <ChannelBadge channels={[row.channel]} />,
   },
   {

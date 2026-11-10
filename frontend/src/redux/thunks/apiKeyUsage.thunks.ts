@@ -15,7 +15,7 @@ import type {
   AdminTenantUsageRow,
 } from '@/api/apiKeyUsage.api'
 import type { RootState } from '../store'
-import { toFilterParams } from '../utils/listFilters'
+import { toFilterParams, toSortParam } from '../utils/listFilters'
 
 const emptyUsage: TenantUsageResponse = { tenantId: '', fiscalYearStart: '', channels: [] }
 
@@ -53,12 +53,14 @@ export const fetchAllTenantsUsage = createAsyncThunk<
   { state: RootState; rejectValue: string }
 >('apiKeyUsage/fetchAllTenants', async (_, { getState, rejectWithValue }) => {
   try {
-    const { adminPage, adminLimit, adminSearch, adminFilters } = getState().apiKeyUsage
+    const { adminPage, adminLimit, adminSearch, adminFilters, adminSortBy, adminSortOrder } =
+      getState().apiKeyUsage
     return await getAllTenantsUsage(
       adminPage,
       adminLimit,
       adminSearch || undefined,
       toFilterParams(adminFilters),
+      toSortParam(adminSortBy, adminSortOrder),
     )
   } catch (error) {
     return rejectWithValue(error instanceof Error ? error.message : 'Failed to load tenant usage')
