@@ -2,6 +2,7 @@ import { BadGatewayException, ForbiddenException, Injectable } from '@nestjs/com
 import { DataSource } from 'typeorm'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import { isIP } from 'node:net'
 
 @Injectable()
 export class McpClientService {
@@ -29,11 +30,43 @@ export class McpClientService {
     ) {
       throw new ForbiddenException('MCP parameter is not permitted')
     }
+    if (
+      typeof server.credential_env !== 'string' ||
+      !/^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*_MCP_API_KEY$/.test(server.credential_env)
+    ) {
+      throw new ForbiddenException('MCP credential is not permitted')
+    }
+    let destination: URL
+    try {
+      destination = new URL(server.url)
+    } catch {
+      throw new ForbiddenException('MCP destination is not permitted')
+    }
+    const hostname = destination.hostname.toLowerCase()
+    const allowedHosts = (process.env.MCP_ALLOWED_HOSTS ?? '')
+      .split(',')
+      .map((host) => host.trim().toLowerCase())
+      .filter(Boolean)
+    const internalHost =
+      !hostname.includes('.') ||
+      hostname.endsWith('.svc') ||
+      hostname.endsWith('.svc.cluster.local')
+    if (
+      !hostname ||
+      isIP(hostname.replace(/^\[|\]$/g, '')) !== 0 ||
+      (hostname === 'localhost' && process.env.NODE_ENV === 'production') ||
+      !(
+        (internalHost && ['http:', 'https:'].includes(destination.protocol)) ||
+        (allowedHosts.includes(hostname) && destination.protocol === 'https:')
+      )
+    ) {
+      throw new ForbiddenException('MCP destination is not permitted')
+    }
     const credential = process.env[server.credential_env]
     if (!credential) throw new BadGatewayException('MCP credentials are not configured')
     const client = new Client({ name: 'notify', version: '1.0.0' })
     const deadline = AbortSignal.timeout(15000)
-    const transport = new StreamableHTTPClientTransport(new URL(server.url), {
+    const transport = new StreamableHTTPClientTransport(destination, {
       requestInit: {
         headers: { Authorization: `Bearer ${credential}`, 'x-tenant-id': tenantId },
         signal: deadline,
