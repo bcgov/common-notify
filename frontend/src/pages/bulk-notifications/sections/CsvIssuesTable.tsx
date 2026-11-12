@@ -66,7 +66,7 @@ interface Props {
  * The row-level problems found in an uploaded CSV: a count the user can act on, and the sortable
  * table beneath it.
  *
- * Each row states the problem as a title with the fix beneath it.
+ * Each row states the problem as a title, with the fix beneath it when there is one to give.
  *
  * Sort order is local because it is presentation only - the page decides which rows are wrong,
  * this decides how they are read. Renders nothing when the file is clean, so the caller does not

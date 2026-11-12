@@ -5,11 +5,7 @@ import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest'
 import { GcNotifyInternalExecutionService } from './gc-notify-internal-execution.service'
 import { TemplatesRepository } from '../templates/templates.repository'
 import { TemplatesService } from '../templates/templates.service'
-import {
-  MAIL_MERGE_ERRORS_OMITTED,
-  NotificationService,
-} from '../notification/notification.service'
-import { MAIL_MERGE_MAX_REPORTED_ERRORS } from '../notify/schemas/mail-merge.constants'
+import { NotificationService } from '../notification/notification.service'
 import { NotificationRequestDetailService } from '../notification/notification-request-detail.service'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { AttachmentValidationService } from '../notify/services/attachment-validation.service'
@@ -1020,45 +1016,23 @@ describe('GcNotifyInternalExecutionService', () => {
         ])
       })
 
-      it('reports each blank printed value by row, counting a short row and whitespace as blank', async () => {
+      it('accepts blank printed values, including whitespace and a short row, which print nothing', async () => {
         withTemplate({ body: 'Hi ((first_name)) from ((city))' })
 
-        await expect(
-          rejection([
-            ['email address', 'first_name', 'city'],
-            ['alice@example.com', 'Alice', 'Victoria'],
-            ['bob@example.com', '   ', 'Nanaimo'],
-            ['carol@example.com', 'Carol'],
-          ]),
-        ).resolves.toEqual([
-          { error: 'ValidationError', message: 'Row 2 - first_name: Missing' },
-          { error: 'ValidationError', message: 'Row 3 - city: Missing' },
-        ])
-      })
+        await service.sendBulk(
+          {
+            ...bulkBody,
+            rows: [
+              ['first_name', 'email address', 'city'],
+              ['Alice', 'alice@example.com', 'Victoria'],
+              ['   ', 'bob@example.com', 'Nanaimo'],
+              ['Carol', 'carol@example.com'],
+            ],
+          },
+          TENANT_ID,
+        )
 
-      it('reads values from the right column when the recipient was not first', async () => {
-        withTemplate({ body: 'Hi ((first_name)) from ((city))' })
-
-        await expect(
-          rejection([
-            ['first_name', 'email address', 'city'],
-            ['', 'alice@example.com', 'Victoria'],
-          ]),
-        ).resolves.toEqual([{ error: 'ValidationError', message: 'Row 1 - first_name: Missing' }])
-      })
-
-      it('caps the reported row errors so a large file cannot produce an unbounded response', async () => {
-        withTemplate({ body: 'Hi ((first_name))' })
-        const rows = [
-          ['email address', 'first_name'],
-          ...Array.from({ length: 150 }, (_, i) => [`user${i}@example.com`, '']),
-        ]
-
-        const errors = await rejection(rows)
-
-        expect(errors).toHaveLength(MAIL_MERGE_MAX_REPORTED_ERRORS + 1)
-        expect(errors[0].message).toBe('Row 1 - first_name: Missing')
-        expect(errors.at(-1).message).toBe(MAIL_MERGE_ERRORS_OMITTED)
+        expect(acceptMerge).toHaveBeenCalledTimes(1)
       })
 
       it('accepts a blank value for a placeholder that is only tested', async () => {
