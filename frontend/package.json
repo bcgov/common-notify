@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@bcgov/bc-sans": "^2.1.0",
-    "@bcgov/design-system-react-components": "^0.8.1",
+    "@bcgov/design-system-react-components": "^0.9.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@internationalized/date": "3.12.4",
@@ -34,7 +34,7 @@
     "libphonenumber-js": "^1.13.11",
     "papaparse": "^5.7.0",
     "react": "^19.0.0",
-    "react-aria-components": "1.17.0",
+    "react-aria-components": "1.22.1",
     "react-bootstrap": "^2.10.9",
     "react-dom": "^19.0.0",
     "react-redux": "^9.2.0",
@@ -42,7 +42,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
-    "@playwright/test": "^1.51.0",
+    "@playwright/test": "^1.65.0",
     "@tanstack/router-plugin": "^1.114.27",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.0.0",
