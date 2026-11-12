@@ -607,6 +607,30 @@ describe('EventsEmailTestSend', () => {
       expect(sendEventTestEmailMock).not.toHaveBeenCalled()
     })
 
+    it('warns about an empty placeholder but still sends the row', async () => {
+      renderPage()
+      await chooseManyRecipients()
+      await upload('email,firstName\na@gov.bc.ca,')
+
+      expect(await screen.findByText('1 item requires attention.')).toBeInTheDocument()
+      expect(screen.queryByText('All required data passed validation.')).not.toBeInTheDocument()
+
+      await userEvent.click(sendButton(1))
+
+      await waitFor(() =>
+        expect(sendEventTestEmailMock).toHaveBeenCalledWith(
+          'event-1',
+          {},
+          {
+            mergeArray: [
+              ['to', 'firstName'],
+              ['a@gov.bc.ca', ''],
+            ],
+          },
+        ),
+      )
+    })
+
     it('ignores problems on rows past the first five, which are never sent', async () => {
       renderPage()
       await chooseManyRecipients()

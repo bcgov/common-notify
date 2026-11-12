@@ -1,7 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { ProgressCircle } from '@bcgov/design-system-react-components'
 import BulkNotifications from '@/pages/bulk-notifications/BulkNotifications'
-import NotFound from '@/components/NotFound'
+import FeatureAccessGate from '@/components/FeatureAccessGate'
 import { useBulkNotificationsAccess } from '@/hooks/useBulkNotificationsAccess'
 
 export const Route = createFileRoute('/bulk-notifications/')({
@@ -9,24 +8,11 @@ export const Route = createFileRoute('/bulk-notifications/')({
 })
 
 function BulkNotificationsPage() {
-  const { isResolved, canAccess } = useBulkNotificationsAccess()
+  const access = useBulkNotificationsAccess()
 
-  // Roles and the tenant's flags both land after the first render. Rendering the page
-  // before they do is the empty shell this replaced; rendering the 404 before they do
-  // flashes it at users who turn out to have access.
-  if (!isResolved) {
-    return (
-      <div className="page-loading">
-        <ProgressCircle isIndeterminate valueLabel="Loading..." />
-      </div>
-    )
-  }
-
-  // Same answer the sidebar gives by omitting the link: as far as this user is
-  // concerned in this tenant, the screen does not exist.
-  if (!canAccess) {
-    return <NotFound />
-  }
-
-  return <BulkNotifications />
+  return (
+    <FeatureAccessGate {...access}>
+      <BulkNotifications />
+    </FeatureAccessGate>
+  )
 }

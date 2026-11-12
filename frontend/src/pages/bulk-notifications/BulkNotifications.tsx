@@ -25,6 +25,7 @@ import {
   buildSampleCsv,
   csvFilenameFor,
   downloadCsv,
+  hasBlockingIssue,
   toMergeArray,
   MAX_FILE_BYTES,
 } from '@/utils/bulkNotificationsCsv'
@@ -151,7 +152,7 @@ const BulkNotifications: FC = () => {
     csv.readProgress === 100 &&
     csv.parsed !== null &&
     csv.fileIssue === null &&
-    csv.rowIssues.length === 0
+    !hasBlockingIssue(csv.rowIssues)
 
   const handleTemplateChange = (templateId: string) => {
     setSelectedTemplateId(templateId)
@@ -316,7 +317,7 @@ const BulkNotifications: FC = () => {
 
           <CsvIssuesTable issues={csv.rowIssues} />
 
-          {isValid && (
+          {isValid && csv.rowIssues.length === 0 && (
             <InlineAlert
               variant="success"
               title="All required data passed validation."

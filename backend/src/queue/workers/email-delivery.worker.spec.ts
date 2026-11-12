@@ -1626,6 +1626,9 @@ describe('EmailDeliveryWorker', () => {
         expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
           expect.anything(),
           expect.objectContaining({ name: 'Bob' }),
+          undefined,
+          // A blank cell in a merge row must not fail that recipient.
+          { allowEmptyValues: true },
         )
         expect(result).toMatchObject({ success: true, sent: 1, failed: 0 })
       })

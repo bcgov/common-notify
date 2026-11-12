@@ -4,19 +4,23 @@ import type { EventEmailSettings } from '@/api/events.api'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchApprovedEmailLogos, fetchSettings } from '@/redux/thunks/settings.thunks'
 import { DEFAULT_EMAIL_HEADER_TITLE, resolveEmailHeaderTitle } from '@/utils/emailHeaderTitle'
+import '@/scss/components/email-header.scss'
 
-interface EventsEmailHeaderProps {
-  /** Only the header fields, so a tab can preview header settings it hasn't saved yet. */
+interface EmailHeaderProps {
+  /**
+   * Only the header fields, so a tab can preview header settings it hasn't saved yet. A send with
+   * no event behind it passes `useCustomHeader: false` to get the tenant's header.
+   */
   emailSettings: Pick<EventEmailSettings, 'useCustomHeader' | 'headerLogoId' | 'headerTitle'>
 }
 
 /**
- * The banner an event's email is sent under, above the template body.
+ * The banner an email is sent under, above the template body.
  *
- * Its own component because the header appears in two previews - the card on the page and the
- * modal over it - and both need the same logo lookup.
+ * Its own component because the header appears in several previews - the card on the event page,
+ * and the modals for events and batch sends - and all need the same logo lookup.
  */
-const EventsEmailHeader: FC<EventsEmailHeaderProps> = ({ emailSettings }) => {
+const EmailHeader: FC<EmailHeaderProps> = ({ emailSettings }) => {
   const dispatch = useAppDispatch()
   const approvedLogos = useAppSelector((state) => state.emailSettings.approvedLogos)
   const tenantEmailLogoId = useAppSelector((state) => state.emailSettings.emailLogoId)
@@ -55,18 +59,18 @@ const EventsEmailHeader: FC<EventsEmailHeaderProps> = ({ emailSettings }) => {
   if (!headerLogo && !headerTitle) return null
 
   return (
-    <div className="events__header-preview-row">
+    <div className="email-header">
       {headerLogo && (
         <img
           alt={logoAlt}
-          className="events__header-preview-logo"
+          className="email-header__logo"
           loading="lazy"
           src={headerLogo.imageUrl}
         />
       )}
-      {headerTitle && <span className="events__header-preview-title">{headerTitle}</span>}
+      {headerTitle && <span className="email-header__title">{headerTitle}</span>}
     </div>
   )
 }
 
-export default EventsEmailHeader
+export default EmailHeader
