@@ -36,7 +36,7 @@ const CreateEvent: FC = () => {
       <PageHeading
         title="Create New Event"
         breadcrumbs={[
-          { label: 'Home', to: '/dashboard' },
+          { label: 'Home', to: '/' },
           { label: 'Event', to: '/events' },
           { label: 'Create New Event' },
         ]}

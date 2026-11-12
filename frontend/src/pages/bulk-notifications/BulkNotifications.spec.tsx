@@ -17,7 +17,7 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 // SMS availability is a feature flag; default it on and let one test turn it off.
-const featureFlagMock = vi.fn(() => true)
+const featureFlagMock = vi.fn<(code: string) => boolean>(() => true)
 vi.mock('@/config/featureFlags/useFeatureFlag', () => ({
   useFeatureFlag: (code: string) => featureFlagMock(code),
 }))
@@ -50,6 +50,9 @@ vi.mock('@/api/bulkNotifications.api', async () => {
     sendBulkNotifications: (...args: unknown[]) => sendBulkMock(...args),
   }
 })
+
+// The header reads the store; it has its own spec.
+vi.mock('@/components/EmailHeader', () => ({ default: () => <div>Email header</div> }))
 
 // The design system's Select and Button are react-aria components; swapped for plain markup so the
 // test drives the page, not the library.
@@ -103,15 +106,42 @@ vi.mock('@bcgov/design-system-react-components', () => {
   )
 
   const Dialog = ({ children }: { children: ReactNode }) => <div>{children}</div>
-  const Modal = ({ isOpen, children }: { isOpen: boolean; children: ReactNode }) =>
-    isOpen ? <div>{children}</div> : null
+  // The dismiss button stands in for Escape or a click outside, which the real modal handles.
+  const Modal = ({
+    isOpen,
+    onOpenChange,
+    children,
+  }: {
+    isOpen: boolean
+    onOpenChange?: (open: boolean) => void
+    children: ReactNode
+  }) =>
+    isOpen ? (
+      <div>
+        <button type="button" onClick={() => onOpenChange?.(false)}>
+          Dismiss modal
+        </button>
+        {children}
+      </div>
+    ) : null
   const TextArea = ({ value, ...props }: { value: string; [key: string]: unknown }) => (
     <textarea readOnly value={value} {...props} />
   )
-  const TextField = ({ label, value }: { label: string; value: string }) => (
+  const TextField = ({
+    label,
+    value,
+    isInvalid,
+    errorMessage,
+  }: {
+    label: string
+    value: string
+    isInvalid?: boolean
+    errorMessage?: string
+  }) => (
     <label>
       <span>{label}</span>
       <input readOnly value={value} />
+      {isInvalid && errorMessage ? <span>{errorMessage}</span> : null}
     </label>
   )
 
@@ -168,14 +198,23 @@ vi.mock('@bcgov/design-system-react-components', () => {
     title,
     description,
     variant,
+    isCloseable,
+    onClose,
   }: {
     title?: string
     description?: string
     variant?: string
+    isCloseable?: boolean
+    onClose?: () => void
   }) => (
     <div role="status" data-variant={variant}>
       <strong>{title}</strong>
       <span>{description}</span>
+      {isCloseable ? (
+        <button type="button" onClick={onClose}>
+          Close this alert
+        </button>
+      ) : null}
     </div>
   )
 
@@ -422,6 +461,33 @@ describe('BulkNotifications', () => {
     expect(screen.getByRole('button', { name: 'Send notifications' })).toBeDisabled()
   })
 
+  it('warns about empty placeholders but still lets the file be sent', async () => {
+    renderPage()
+    await chooseTemplate()
+
+    await userEvent.upload(
+      screen.getByLabelText('Upload CSV file (required)'),
+      csv('email,permitType,firstName\nalice@gov.bc.ca,,Alice'),
+    )
+
+    expect(await screen.findByText('1 item requires attention.')).toBeInTheDocument()
+    expect(screen.getByText('Missing or invalid value')).toBeInTheDocument()
+    expect(screen.queryByText('All required data passed validation.')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Send notifications' }))
+
+    await waitFor(() =>
+      expect(sendBulkMock).toHaveBeenCalledWith(
+        'template-1',
+        [
+          ['to', 'permitType', 'firstName'],
+          ['alice@gov.bc.ca', '', 'Alice'],
+        ],
+        'email',
+      ),
+    )
+  })
+
   it('rejects a structurally wrong file outright, in the design wording', async () => {
     renderPage()
     await chooseTemplate()
@@ -622,6 +688,81 @@ describe('BulkNotifications', () => {
     expect(await screen.findByText('Your parking permit')).toBeInTheDocument()
     // The sender comes from the preview response, so it is the address the send will really use.
     expect(screen.getByText('notify_noreply@gov.bc.ca')).toBeInTheDocument()
+  })
+
+  it('previews the email under its header, in the same frame as the event previews', async () => {
+    previewTemplateMock.mockResolvedValue({
+      subject: 'Your parking permit',
+      body: 'Hello Alice',
+      html: '<p>Hello Alice</p>',
+    })
+    renderPage()
+    await chooseTemplate()
+
+    await userEvent.upload(
+      screen.getByLabelText('Upload CSV file (required)'),
+      csv('email,permitType,firstName\nalice@gov.bc.ca,parking,Alice'),
+    )
+    await screen.findByText('All required data passed validation.')
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }))
+
+    const frame = await screen.findByTitle('Rendered email')
+    expect(frame.getAttribute('srcdoc')).toContain('<p>Hello Alice</p>')
+    expect(screen.getByText('Email header')).toBeInTheDocument()
+    expect(screen.queryByText(/Some fields are empty/)).not.toBeInTheDocument()
+    expect(screen.queryByText('This field is empty.')).not.toBeInTheDocument()
+  })
+
+  it('warns about empty fields anywhere in the file, flagging them only on their row', async () => {
+    renderPage()
+    await chooseTemplate()
+
+    await userEvent.upload(
+      screen.getByLabelText('Upload CSV file (required)'),
+      csv('email,permitType,firstName\nalice@gov.bc.ca,parking,Alice\nbob@gov.bc.ca,parking,'),
+    )
+    await screen.findByText('1 item requires attention.')
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }))
+
+    // The first row is complete, but the send as a whole is not.
+    expect(await screen.findByText(/^Some fields are empty\. You can still send/)).toBeVisible()
+    expect(screen.queryByText('This field is empty.')).not.toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Send notification (2)' })).toBeEnabled()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+    expect(await screen.findByText('Email notification 2 of 2')).toBeInTheDocument()
+    expect(screen.getByText('This field is empty.')).toBeInTheDocument()
+    expect(screen.getByText(/^Some fields are empty/)).toBeVisible()
+  })
+
+  it('keeps the empty field warning dismissed until the preview is reopened', async () => {
+    renderPage()
+    await chooseTemplate()
+
+    await userEvent.upload(
+      screen.getByLabelText('Upload CSV file (required)'),
+      csv('email,permitType,firstName\nalice@gov.bc.ca,parking,\nbob@gov.bc.ca,parking,'),
+    )
+    await screen.findByText('2 items require attention.')
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    await screen.findByText(/^Some fields are empty/)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close this alert' }))
+
+    expect(screen.queryByText(/^Some fields are empty/)).not.toBeInTheDocument()
+    // The field stays flagged: only the banner was dismissed.
+    expect(screen.getByText('This field is empty.')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(await screen.findByText('Email notification 2 of 2')).toBeInTheDocument()
+    expect(screen.queryByText(/^Some fields are empty/)).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss modal' }))
+    expect(screen.queryByText('Email notification 2 of 2')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }))
+
+    expect(await screen.findByText(/^Some fields are empty/)).toBeVisible()
   })
 
   it('lets a template editor send, the same as an operations admin', async () => {

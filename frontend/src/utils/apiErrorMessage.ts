@@ -40,3 +40,27 @@ export function getApiErrorMessage(
 ): string {
   return getApiResponseMessage(err, options) || (err instanceof Error && err.message) || fallback
 }
+
+/**
+ * A failed request as an error to show the user: a permission message for 401/403, otherwise
+ * "Failed to load <resource>: <the backend's message>".
+ *
+ * @param options.notFound For a request for one record: report a 404 as "The <resource> could not
+ *   be found". Off by default, because a 404 on a list is a missing route (the gateway's "no Route
+ *   matched"), and that message is what tells you so.
+ */
+export function toReadableError(
+  error: unknown,
+  resource: string,
+  options: { notFound?: boolean } = {},
+): Error {
+  // Status numbers, not common/api's STATUS_CODES: that module imports this one.
+  const status = (error as AxiosError | undefined)?.response?.status
+  if (status === 401 || status === 403) {
+    return new Error(`You do not have permission to access ${resource}`)
+  }
+  if (status === 404 && options.notFound) {
+    return new Error(`The ${resource} could not be found`)
+  }
+  return new Error(`Failed to load ${resource}: ${getApiErrorMessage(error)}`)
+}

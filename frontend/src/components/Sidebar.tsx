@@ -6,6 +6,7 @@ import '@/scss/components/sidebar.scss'
 import { useAppSelector } from '@/redux/hooks'
 import UserService from '@/service/user-service'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
+import { useDashboardAccess } from '@/hooks/useDashboardAccess'
 import { useBulkNotificationsAccess } from '@/hooks/useBulkNotificationsAccess'
 import { useFeatureFlag } from '@/config/featureFlags/useFeatureFlag'
 import { SsoRole } from '@/enum/sso-role.enum'
@@ -75,15 +76,18 @@ const adminItems = {
   groups: [
     {
       label: 'Monitor',
-      links: [{ label: 'Monitoring', to: '/admin/monitoring' }],
-    },
-    {
-      label: 'Report',
-      links: [{ label: 'Usage & Limits', to: '/admin/usage' }],
+      links: [
+        { label: 'Overview', to: '/admin', exact: true },
+        { label: 'System', to: '/admin/monitoring' },
+        { label: 'Notifications', to: '/admin/notifications' },
+      ],
     },
     {
       label: 'Manage',
-      links: [{ label: 'Feature Flags', to: '/admin/feature-flags' }],
+      links: [
+        { label: 'Tenants', to: '/admin/tenants' },
+        { label: 'Feature Flags', to: '/admin/feature-flags' },
+      ],
     },
   ],
 } as const satisfies {
@@ -114,6 +118,7 @@ const Sidebar: FC = () => {
   const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
   // Same check the /bulk-notifications route makes, so a hidden link and a typed URL agree.
   const { canAccess: canBulkNotify } = useBulkNotificationsAccess()
+  const { canAccess: canDashboard } = useDashboardAccess()
   // Events are behind a feature flag; hide the nav item until it is enabled for the tenant
   const eventsEnabled = useFeatureFlag('events', selectedTenant?.id)
 
@@ -160,7 +165,7 @@ const Sidebar: FC = () => {
           // visibility on it means a rename silently hides the link.
           const shouldShow =
             (item.to === '/' && hasTenantRole) ||
-            (item.to === '/dashboard' && hasTenantRole) ||
+            (item.to === '/dashboard' && canDashboard) ||
             (item.to === '/events' && hasTenantRole && eventsEnabled) ||
             (item.to === '/templates' && hasTenantRole) ||
             (item.to === '/bulk-notifications' && canBulkNotify) ||

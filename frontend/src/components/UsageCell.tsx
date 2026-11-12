@@ -3,8 +3,9 @@ import { percentOf } from '@/utils/usage'
 
 interface UsageCellProps {
   used: number
-  limit: number
-  thresholdPercent: number
+  /** Null when no limit is configured: usage is shown against "Not set". */
+  limit: number | null
+  thresholdPercent: number | null
 }
 
 /**
@@ -12,6 +13,13 @@ interface UsageCellProps {
  * has reached or exceeded the warning threshold. Shared by the tenant and admin usage screens.
  */
 const UsageCell: FC<UsageCellProps> = ({ used, limit, thresholdPercent }) => {
+  if (limit === null || thresholdPercent === null) {
+    return (
+      <span>
+        {used.toLocaleString()} / <span className="text-muted">Not set</span>
+      </span>
+    )
+  }
   const pct = percentOf(used, limit)
   const warn = pct >= thresholdPercent
   return (

@@ -25,6 +25,8 @@ import RequestStatusSummary from '@/components/RequestStatusSummary'
 import PageHeading from '@/components/PageHeading'
 import PageSubHeading from '@/components/PageSubHeading'
 import { showErrorToast } from '@/redux/utils/toastUtils'
+import { channelFilterOptions } from '@/utils/channels'
+import { useDashboardAccess } from '@/hooks/useDashboardAccess'
 
 interface RequestStatusProps {
   notificationRequestId: string
@@ -48,11 +50,7 @@ const columns: TableColumn<NotificationRequestDetail>[] = [
     label: 'Channel',
     sortable: true,
     width: '162px',
-    filterOptions: [
-      { label: 'Email', value: 'EMAIL' },
-      { label: 'SMS', value: 'SMS' },
-      { label: 'MsgApp', value: 'MSGAPP' },
-    ],
+    filterOptions: channelFilterOptions(),
     render: (_, row) => <ChannelBadge channels={[row.channel]} />,
   },
   {
@@ -92,6 +90,8 @@ const RequestStatus: FC<RequestStatusProps> = ({ notificationRequestId }) => {
     hasLoaded,
     error,
   } = useAppSelector((state) => state.notificationDetail)
+  // The Dashboard crumb would lead to a 404 for tenants without the dashboard flag.
+  const { canAccess: canDashboard } = useDashboardAccess()
   const [searchInput, setSearchInput] = useState(search)
 
   useEffect(() => {
@@ -138,7 +138,7 @@ const RequestStatus: FC<RequestStatusProps> = ({ notificationRequestId }) => {
         title={notificationRequest?.requestRoute ?? ''}
         breadcrumbs={[
           { label: 'Home', to: '/' },
-          { label: 'Dashboard', to: '/dashboard' },
+          ...(canDashboard ? [{ label: 'Dashboard', to: '/dashboard' as const }] : []),
           {
             label: 'Request Status',
           },

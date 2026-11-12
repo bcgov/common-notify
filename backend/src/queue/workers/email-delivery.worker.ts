@@ -170,7 +170,10 @@ export class EmailDeliveryWorker extends DeliveryWorker {
               template,
               this.applyGcNotifyEmailRendering(
                 template,
-                await this.templatesService.renderTemplateContent(template, params),
+                // A blank merge cell prints nothing; allowing for that is up to the template.
+                await this.templatesService.renderTemplateContent(template, params, undefined, {
+                  allowEmptyValues: true,
+                }),
               ),
               settings.headerOverride,
             )

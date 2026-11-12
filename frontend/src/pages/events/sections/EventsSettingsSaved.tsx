@@ -119,7 +119,7 @@ const EventsSettingsSaved: FC<EventsSettingsSavedProps> = ({ eventId, channel })
       <PageHeading
         title={event?.name ?? 'Event'}
         breadcrumbs={[
-          ...(isSms ? [] : [{ label: 'Home', to: '/dashboard' as const }]),
+          ...(isSms ? [] : [{ label: 'Home', to: '/' as const }]),
           { label: 'Event', to: '/events' },
           { label: event?.name ?? 'Event' },
           { label: 'Saved' },

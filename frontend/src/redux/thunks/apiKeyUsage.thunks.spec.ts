@@ -64,6 +64,24 @@ describe('apiKeyUsage thunks', () => {
       )
     }
   })
+  it('fetchAllTenantsUsage sends the sort, descending with a leading minus', async () => {
+    vi.mocked(api.getAllTenantsUsage).mockResolvedValue({ id: 'response' } as never)
+    const sorted = {
+      ...state,
+      apiKeyUsage: { ...state.apiKeyUsage, adminSortBy: 'usedThisYear', adminSortOrder: 'desc' },
+    } as RootState
+    await fetchAllTenantsUsage(undefined)(dispatch, () => sorted, undefined)
+    expect(api.getAllTenantsUsage).toHaveBeenLastCalledWith(
+      2,
+      30,
+      'Ministry',
+      undefined,
+      '-usedThisYear',
+    )
+
+    await fetchAllTenantsUsage(undefined)(dispatch, () => state, undefined)
+    expect(api.getAllTenantsUsage).toHaveBeenLastCalledWith(2, 30, 'Ministry', undefined, undefined)
+  })
   it('updateTenantLimits returns results and readable errors', async () => {
     vi.mocked(api.updateTenantLimits).mockResolvedValue({ id: 'response' } as never)
     let result = await updateTenantLimits({
@@ -123,13 +141,13 @@ describe('apiKeyUsage thunks', () => {
   })
   it('forwards committed pagination and omits empty searches', async () => {
     await fetchAllTenantsUsage()(dispatch, () => state, undefined)
-    expect(api.getAllTenantsUsage).toHaveBeenCalledWith(2, 30, 'Ministry', undefined)
+    expect(api.getAllTenantsUsage).toHaveBeenCalledWith(2, 30, 'Ministry', undefined, undefined)
     await fetchAllTenantsUsage()(
       dispatch,
       () => ({ ...state, apiKeyUsage: { ...state.apiKeyUsage, adminSearch: '' } }),
       undefined,
     )
-    expect(api.getAllTenantsUsage).toHaveBeenLastCalledWith(2, 30, undefined, undefined)
+    expect(api.getAllTenantsUsage).toHaveBeenLastCalledWith(2, 30, undefined, undefined, undefined)
   })
   it('forwards the committed channel filter', async () => {
     await fetchAllTenantsUsage()(
@@ -140,6 +158,12 @@ describe('apiKeyUsage thunks', () => {
       }),
       undefined,
     )
-    expect(api.getAllTenantsUsage).toHaveBeenCalledWith(2, 30, 'Ministry', ['channel:in:SMS'])
+    expect(api.getAllTenantsUsage).toHaveBeenCalledWith(
+      2,
+      30,
+      'Ministry',
+      ['channel:in:SMS'],
+      undefined,
+    )
   })
 })
