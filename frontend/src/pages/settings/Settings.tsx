@@ -63,7 +63,7 @@ const Settings: FC = () => {
 
   return (
     <div className="settings">
-      <Breadcrumb items={[{ label: 'Home', to: '/dashboard' }, { label: 'Settings' }]} />
+      <Breadcrumb items={[{ label: 'Home', to: '/' }, { label: 'Settings' }]} />
 
       <h1 className="settings__title">{selectedTenant?.name}</h1>
 

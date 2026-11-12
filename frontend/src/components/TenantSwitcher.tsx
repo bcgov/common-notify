@@ -72,8 +72,7 @@ const TenantSwitcher: FC<Props> = ({ className = '' }) => {
         // (even if they're NOTIFY_ADMIN - admin role doesn't grant tenant access)
         navigate({ to: '/not-authorized' })
       } else if (result.payload && Array.isArray(result.payload) && result.payload.length > 0) {
-        // User has roles in this tenant, navigate to dashboard
-        navigate({ to: '/dashboard' })
+        navigate({ to: '/' })
       }
     })
   }

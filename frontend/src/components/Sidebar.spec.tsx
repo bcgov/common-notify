@@ -73,7 +73,7 @@ function makeStore(
         current: cstarRoles.length > 0 ? ({ cstarRoles } as any) : null,
         isLoading: false,
         rolesLoading: false,
-        rolesTenantId: null,
+        rolesTenantId: 'tenant-1',
         error: null,
         rolesError: null,
       },
@@ -113,10 +113,16 @@ describe('Sidebar', () => {
   })
 
   it('renders primary nav items when user has CSTAR roles', () => {
-    renderSidebar(null, ['NOTIFY_VIEWER'])
+    renderSidebar(null, ['NOTIFY_VIEWER'], { dashboard: true })
 
     expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /templates/i })).toBeInTheDocument()
+  })
+
+  it('hides Dashboard when the dashboard feature flag is disabled', () => {
+    renderSidebar(null, ['NOTIFY_VIEWER'], { dashboard: false })
+
+    expect(screen.queryByRole('link', { name: /dashboard/i })).not.toBeInTheDocument()
   })
 
   it('hides Events when the events feature flag is disabled', () => {
