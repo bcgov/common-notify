@@ -92,6 +92,56 @@ lowercased; empty by default). IPv4/IPv6 literals are rejected even if allowlist
 also rejected when `NODE_ENV=production`. Malformed URLs and other schemes are rejected before
 connecting; redirects remain disabled.
 
+## Local demo: real login, fictional groups and emails
+
+Authentication is unchanged: Keycloak validates login, CSTAR supplies your tenants,
+Notify syncs those tenants to its database, and CSTAR roles authorize event access.
+The mock replaces only the adapter's group/member client. It does not invent login
+permissions, grant access to other tenants, or change production configuration.
+
+1. Sign in normally at `http://localhost:3000` and select your real tenant.
+   Obtain its **external CSTAR tenant ID** from the response to
+   `/api/v1/frontend/auth/tenants` (the tenant object's `id`), or from the local
+   `notify.tenant.external_id` column. Do not use Notify's internal database UUID.
+2. In PowerShell at the repo root, enable fixtures for that tenant:
+
+   ```powershell
+   $env:CSTAR_MOCK_MODE = 'true'
+   $env:CSTAR_MOCK_TENANT_IDS = '<external-cstar-tenant-id>'
+   docker compose -f .devcontainer/docker-compose.yml up -d --build cstar-mcp backend frontend
+   docker compose -f .devcontainer/docker-compose.yml run --rm kong-routes
+   ```
+
+   Compose supplies `NODE_ENV=development`; the adapter refuses mock mode in other
+   environments. Multiple demo tenants can be configured with comma-separated IDs.
+   No CSTAR service-account credentials are needed for fixture lookup. The shared
+   MCP bearer key is still required and uses the local Compose default if unset.
+   Flyway V78 must already have created the registry tables.
+3. With an SSO NOTIFY_ADMIN account, open **Admin > MCP Servers > Edit cstar**.
+   Verify URL `http://cstar-mcp:3101/mcp`, credential reference `CSTAR_MCP_API_KEY`,
+   enabled tools `list_groups` (no parameters) and `get_recipients` (`groupIds`).
+   Check **Server enabled** and **Save server**. This replaces the manual SQL step.
+   Non-admin users cannot edit the registry, even by calling the API directly.
+4. Open **Notification Events**, create an event, then open **Email Notification**.
+   Choose **CSTAR Group(s)**, enable **To**, and select **Demo Operations** and
+   **Demo Communications**. Click **Preview group recipients**. Three unique
+   fictional `example.invalid` emails appear; Sam belongs to both groups but is
+   returned once. The preview makes a real MCP call but sends no notification.
+5. Select a sender and template as normal and save the email settings. This calls
+   `list_groups` again to verify ownership and stores only group IDs. Reopen the
+   event to demonstrate persistence. **Test Send** still uses its explicitly chosen
+   test recipient rather than expanding groups; the new preview demonstrates
+   `get_recipients` without attempting delivery to fictional addresses.
+6. Disable the registry server in Admin and repeat discovery/preview to show a
+   failure; re-enable it to restore the flow. Initial picker loading retains the
+   existing UI's silent error handling; preview has an explicit error message.
+
+Fixtures are tenant-specific, include an empty group, and reject another tenant's
+IDs. No fixture values are inserted into CSTAR or the Notify tenant directory.
+To return to live lookup, unset `CSTAR_MOCK_MODE` and `CSTAR_MOCK_TENANT_IDS`, supply
+real service-account settings, and recreate the adapter with Compose.
+The adapter's `/health` remains a process check, not proof of CSTAR availability.
+
 ## OpenShift handoff
 
 Build/publish `cstar/Dockerfile`, then provision Secret `cstar-mcp-secrets` with the adapter

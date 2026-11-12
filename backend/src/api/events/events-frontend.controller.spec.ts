@@ -25,6 +25,7 @@ describe('EventsFrontendController', () => {
   }
 
   const mockEventsService = {
+    previewGroupRecipients: vi.fn(),
     listEvents: vi.fn(),
     getEvent: vi.fn(),
     createEvent: vi.fn(),
@@ -34,6 +35,17 @@ describe('EventsFrontendController', () => {
     updateSmsChannelSetting: vi.fn(),
     deactivateSmsChannel: vi.fn(),
   }
+
+  it('previews recipients using the authenticated tenant external ID, without sending', async () => {
+    mockEventsService.previewGroupRecipients.mockResolvedValue({ emails: ['alex@example.invalid'] })
+    const request = { tenant: { id: tenantId, externalId: 'cstar-tenant-a' } } as any
+    await expect(
+      controller.previewGroupRecipients(request, { groupIds: ['group-a'] }),
+    ).resolves.toEqual({ emails: ['alex@example.invalid'] })
+    expect(mockEventsService.previewGroupRecipients).toHaveBeenCalledWith('cstar-tenant-a', [
+      'group-a',
+    ])
+  })
 
   // Bypasses authentication and populates request.tenant, mirroring what
   // NotifyFrontendRoleGuard does after validating the tenant against CSTAR.

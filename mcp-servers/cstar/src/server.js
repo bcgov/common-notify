@@ -4,9 +4,10 @@ import { pathToFileURL } from 'node:url'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { z } from 'zod'
-import { CstarClient, validateIdentifier } from './cstar.js'
+import { validateIdentifier } from './cstar.js'
+import { createCstarClient } from './mock-cstar.js'
 
-export function createApp(config = process.env, cstar = new CstarClient(config)) {
+export function createApp(config = process.env, cstar = createCstarClient(config)) {
   if (!config.MCP_API_KEY || config.MCP_API_KEY.length < 32)
     throw new Error('MCP_API_KEY must have at least 32 characters')
   const app = express()

@@ -331,6 +331,11 @@ export class EventsService {
     }
   }
 
+  /** Read-only resolution for the UI: never creates or queues a notification. */
+  async previewGroupRecipients(tenantExternalId: string, groupIds: string[]) {
+    return { emails: await this.mcpGroups.getGroupMemberEmails(tenantExternalId, groupIds) }
+  }
+
   /**
    * Update an event's EMAIL channel settings (Email Notification tab)
    *

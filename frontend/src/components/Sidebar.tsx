@@ -81,6 +81,10 @@ const adminItems = {
       label: 'Monitoring',
       to: '/admin/monitoring',
     },
+    {
+      label: 'MCP Servers',
+      to: '/admin/mcp-servers',
+    },
   ],
 } as const
 
@@ -221,6 +225,15 @@ const Sidebar: FC = () => {
                     activeProps={{ className: 'active' }}
                   >
                     <span className="sidebar__label">Monitoring</span>
+                  </Link>
+                )}
+                {isAdmin && (
+                  <Link
+                    to="/admin/mcp-servers"
+                    className="sidebar__subitem"
+                    activeProps={{ className: 'active' }}
+                  >
+                    <span className="sidebar__label">MCP Servers</span>
                   </Link>
                 )}
               </div>

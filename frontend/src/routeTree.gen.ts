@@ -17,6 +17,7 @@ import { Route as TemplateCreateRouteImport } from './routes/template-create'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as UsageRouteImport } from './routes/usage'
 import { Route as AdminFeatureFlagsRouteImport } from './routes/admin/feature-flags'
+import { Route as AdminMcpServersRouteImport } from './routes/admin/mcp-servers'
 import { Route as AdminMonitoringRouteImport } from './routes/admin/monitoring'
 import { Route as AdminUsageRouteImport } from './routes/admin/usage'
 import { Route as BulkNotificationsIndexRouteImport } from './routes/bulk-notifications/index'
@@ -66,6 +67,11 @@ const UsageRoute = UsageRouteImport.update({
 const AdminFeatureFlagsRoute = AdminFeatureFlagsRouteImport.update({
   id: '/admin/feature-flags',
   path: '/admin/feature-flags',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminMcpServersRoute = AdminMcpServersRouteImport.update({
+  id: '/admin/mcp-servers',
+  path: '/admin/mcp-servers',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminMonitoringRoute = AdminMonitoringRouteImport.update({
@@ -130,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/templates': typeof TemplatesRoute
   '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
+  '/admin/mcp-servers': typeof AdminMcpServersRoute
   '/admin/monitoring': typeof AdminMonitoringRoute
   '/admin/usage': typeof AdminUsageRoute
   '/events/create': typeof EventsCreateRoute
@@ -150,6 +157,7 @@ export interface FileRoutesByTo {
   '/templates': typeof TemplatesRoute
   '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
+  '/admin/mcp-servers': typeof AdminMcpServersRoute
   '/admin/monitoring': typeof AdminMonitoringRoute
   '/admin/usage': typeof AdminUsageRoute
   '/events/create': typeof EventsCreateRoute
@@ -171,6 +179,7 @@ export interface FileRoutesById {
   '/templates': typeof TemplatesRoute
   '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
+  '/admin/mcp-servers': typeof AdminMcpServersRoute
   '/admin/monitoring': typeof AdminMonitoringRoute
   '/admin/usage': typeof AdminUsageRoute
   '/events/create': typeof EventsCreateRoute
@@ -193,6 +202,7 @@ export interface FileRouteTypes {
     | '/templates'
     | '/usage'
     | '/admin/feature-flags'
+    | '/admin/mcp-servers'
     | '/admin/monitoring'
     | '/admin/usage'
     | '/events/create'
@@ -213,6 +223,7 @@ export interface FileRouteTypes {
     | '/templates'
     | '/usage'
     | '/admin/feature-flags'
+    | '/admin/mcp-servers'
     | '/admin/monitoring'
     | '/admin/usage'
     | '/events/create'
@@ -233,6 +244,7 @@ export interface FileRouteTypes {
     | '/templates'
     | '/usage'
     | '/admin/feature-flags'
+    | '/admin/mcp-servers'
     | '/admin/monitoring'
     | '/admin/usage'
     | '/events/create'
@@ -254,6 +266,7 @@ export interface RootRouteChildren {
   TemplatesRoute: typeof TemplatesRoute
   UsageRoute: typeof UsageRoute
   AdminFeatureFlagsRoute: typeof AdminFeatureFlagsRoute
+  AdminMcpServersRoute: typeof AdminMcpServersRoute
   AdminMonitoringRoute: typeof AdminMonitoringRoute
   AdminUsageRoute: typeof AdminUsageRoute
   EventsCreateRoute: typeof EventsCreateRoute
@@ -322,6 +335,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/feature-flags'
       fullPath: '/admin/feature-flags'
       preLoaderRoute: typeof AdminFeatureFlagsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/mcp-servers': {
+      id: '/admin/mcp-servers'
+      path: '/admin/mcp-servers'
+      fullPath: '/admin/mcp-servers'
+      preLoaderRoute: typeof AdminMcpServersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/monitoring': {
@@ -406,6 +426,7 @@ const rootRouteChildren: RootRouteChildren = {
   TemplatesRoute: TemplatesRoute,
   UsageRoute: UsageRoute,
   AdminFeatureFlagsRoute: AdminFeatureFlagsRoute,
+  AdminMcpServersRoute: AdminMcpServersRoute,
   AdminMonitoringRoute: AdminMonitoringRoute,
   AdminUsageRoute: AdminUsageRoute,
   EventsCreateRoute: EventsCreateRoute,

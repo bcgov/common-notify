@@ -119,6 +119,9 @@ services:
     build: ../mcp-servers/cstar
     ports: ["3101:3101"]
     environment:
+      NODE_ENV: development
+      CSTAR_MOCK_MODE: ${CSTAR_MOCK_MODE:-false}
+      CSTAR_MOCK_TENANT_IDS: ${CSTAR_MOCK_TENANT_IDS:-}
       MCP_API_KEY: ${CSTAR_MCP_API_KEY:-local-cstar-mcp-key-change-before-deployment}
       CSTAR_API_URL: ${CSTAR_API_URL:-}
       CSTAR_TOKEN_URL: ${CSTAR_TOKEN_URL:-}
