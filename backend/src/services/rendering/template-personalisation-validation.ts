@@ -10,6 +10,13 @@ const LEGACY_GC_NOTIFY_PLACEHOLDER_REGEX = /\(\(([a-zA-Z_]\w*)(?:\?\?[^)]*)?\)\)
 
 type MustacheToken = [string, string, number?, number?, MustacheToken[]?]
 
+/**
+ * Whether a placeholder the template prints may be given a blank value, which prints nothing.
+ * Applies to every send unless a caller says otherwise; set to false to require every printed
+ * value again. A key left out of the personalisation altogether is rejected either way.
+ */
+export const ALLOW_EMPTY_PERSONALISATION_VALUES = true
+
 export function extractTemplatePersonalisationKeys(
   template: Template,
   personalisation?: Record<string, unknown>,

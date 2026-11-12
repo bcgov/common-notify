@@ -11,7 +11,7 @@ vi.mock('@/api/templates.api', async (importOriginal) => ({
   previewTemplate: vi.fn(),
 }))
 // The header reads the store; it has its own spec.
-vi.mock('./EventsEmailHeader', () => ({ default: () => <div>Email header</div> }))
+vi.mock('@/components/EmailHeader', () => ({ default: () => <div>Email header</div> }))
 
 const template = {
   id: 'template',

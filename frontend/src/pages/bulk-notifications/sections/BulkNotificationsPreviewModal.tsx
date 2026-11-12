@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FC } from 'react'
-import { Button } from '@bcgov/design-system-react-components'
+import { Button, InlineAlert } from '@bcgov/design-system-react-components'
 import { previewTemplate } from '@/api/templates.api'
+import EmailBodyFrame from '@/components/EmailBodyFrame'
+import EmailHeader from '@/components/EmailHeader'
 import NotificationPreviewModal from '@/components/NotificationPreviewModal'
 import SmsPreview from '@/components/SmsPreview'
 import { rowParams, rowRecipient, rowVariables } from '@/utils/bulkNotificationsCsv'
@@ -16,6 +18,9 @@ interface BulkNotificationsPreviewModalProps {
   isSending?: boolean
   onSend: () => void
 }
+
+// A batch send has no event to override the header, so it goes out under the tenant's.
+const TENANT_HEADER = { useCustomHeader: false, headerLogoId: null, headerTitle: null }
 
 /**
  * Shows one recipient's email exactly as it will be sent, with that row's values substituted.
@@ -41,6 +46,7 @@ const BulkNotificationsPreviewModal: FC<BulkNotificationsPreviewModalProps> = ({
   const [bodyText, setBodyText] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isNoticeDismissed, setNoticeDismissed] = useState(false)
 
   const renderRow = useCallback(
     async (index: number) => {
@@ -71,16 +77,43 @@ const BulkNotificationsPreviewModal: FC<BulkNotificationsPreviewModalProps> = ({
 
   // Start each visit at the first recipient rather than wherever the last visit ended.
   useEffect(() => {
-    if (isOpen) setRowIndex(0)
+    if (isOpen) {
+      setRowIndex(0)
+      setNoticeDismissed(false)
+    }
   }, [isOpen])
 
-  const variables = rowVariables(parsed, rowIndex, channel)
+  // A blank cell is never read as a boolean, so anything empty here is a text value.
+  const variables = rowVariables(parsed, rowIndex, channel).map((variable) => ({
+    ...variable,
+    isInvalid: !variable.value,
+    errorMessage: 'This field is empty.',
+  }))
+  // The banner speaks for the whole send, so any row with a blank shows it, whichever is on screen.
+  const hasEmptyField = useMemo(
+    () =>
+      parsed.rows.some((_, index) =>
+        rowVariables(parsed, index, channel).some((variable) => !variable.value),
+      ),
+    [parsed, channel],
+  )
+  const isEmail = channel === 'email'
 
   return (
     <NotificationPreviewModal
       isOpen={isOpen}
       onClose={onClose}
       title="Batch Notification Preview"
+      notice={
+        hasEmptyField && !isNoticeDismissed ? (
+          <InlineAlert
+            variant="warning"
+            description="Some fields are empty. You can still send notifications, but recipients may receive messages with missing information. To avoid this, update your CSV file and upload the revised version before sending."
+            isCloseable
+            onClose={() => setNoticeDismissed(true)}
+          />
+        ) : undefined
+      }
       variables={variables}
       variablesIntro="Provide values for all variables in your template."
       stepper={{
@@ -93,6 +126,14 @@ const BulkNotificationsPreviewModal: FC<BulkNotificationsPreviewModalProps> = ({
       from={fromAddress}
       to={rowRecipient(parsed, rowIndex, channel)}
       subject={subject}
+      outputHeader={isEmail ? <EmailHeader emailSettings={TENANT_HEADER} /> : undefined}
+      // The same frame as the event previews. Only once a render has succeeded, so the modal's own
+      // loading and error states still show.
+      bodyOverride={
+        isEmail && !loading && !error && bodyHtml !== undefined ? (
+          <EmailBodyFrame html={bodyHtml} />
+        ) : undefined
+      }
       bodyHtml={bodyHtml}
       bodyText={bodyText}
       smsPreview={channel === 'sms' ? <SmsPreview body={bodyText} showParts /> : undefined}

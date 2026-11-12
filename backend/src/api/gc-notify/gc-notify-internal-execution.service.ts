@@ -31,7 +31,10 @@ import {
   toGcNotifyEmailHtml,
   toGcNotifySubject,
 } from '../../services/rendering/gc-notify-markdown'
-import { analyseTemplatePersonalisation } from '../../services/rendering/template-personalisation-validation'
+import {
+  ALLOW_EMPTY_PERSONALISATION_VALUES,
+  analyseTemplatePersonalisation,
+} from '../../services/rendering/template-personalisation-validation'
 import { QueueName } from '../../enum/queue-name.enum'
 import { IngestionJobPayload } from '../../queue/queue.types'
 import { CreateEmailNotificationRequest } from './schemas/create-email-notification-request'
@@ -494,7 +497,8 @@ export class GcNotifyInternalExecutionService {
    * the request had already been accepted with a 201. The same rules as
    * TemplatesService.validateTemplatePersonalisation, read from the columns as
    * parseMailMergeRecipients does: trimmed names, the first of a repeated column, and column 0 is
-   * the recipient rather than personalisation. A placeholder that is only tested may be blank.
+   * the recipient rather than personalisation. A blank cell prints nothing and is accepted while
+   * ALLOW_EMPTY_PERSONALISATION_VALUES is on; a placeholder that is only tested may always be blank.
    */
   private assertPersonalisationSupplied(template: Template, mergeArray: string[][]): void {
     const { required, printed } = analyseTemplatePersonalisation(template)
@@ -514,6 +518,8 @@ export class GcNotifyInternalExecutionService {
         ],
       })
     }
+
+    if (ALLOW_EMPTY_PERSONALISATION_VALUES) return
 
     const printedColumns = required
       .filter((key) => printed.has(key))

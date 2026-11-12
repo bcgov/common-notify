@@ -2,7 +2,7 @@ import type { FC, ReactNode } from 'react'
 import type { EventEmailSettings } from '@/api/events.api'
 import type { TemplateResponse } from '@/api/templates.api'
 import EmailBodyFrame from '@/components/EmailBodyFrame'
-import EventsEmailHeader from './EventsEmailHeader'
+import EmailHeader from '@/components/EmailHeader'
 
 /** A template rendered with a set of values, as the preview endpoint returns it. */
 export interface RenderedNotification {
@@ -60,7 +60,7 @@ const EventsEmailPreview: FC<EventsEmailPreviewProps> = ({
         <strong>Subject line:</strong> {rendered ? rendered.subject : template.subject}
       </p>
 
-      <EventsEmailHeader emailSettings={emailSettings} />
+      <EmailHeader emailSettings={emailSettings} />
       {body}
     </div>
   )

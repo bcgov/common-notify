@@ -31,6 +31,7 @@ import {
 } from './email-template-layout.service'
 import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import {
+  ALLOW_EMPTY_PERSONALISATION_VALUES,
   analyseTemplatePersonalisation,
   describeTemplatePlaceholders,
 } from '../../services/rendering/template-personalisation-validation'
@@ -357,8 +358,9 @@ export class TemplatesService {
    * @param template The template to render
    * @param personalisation The data to use for rendering (e.g., request.params)
    * @param bodyType Optional override for body content type. Ignored for SMS templates.
-   * @param options.allowEmptyValues Accept null or blank values for required placeholders. Only
-   *   for previews; anything that is sent must have every value filled in.
+   * @param options.allowEmptyValues Accept null or blank values for required placeholders, which
+   *   print nothing. Defaults to ALLOW_EMPTY_PERSONALISATION_VALUES; pass false to require every
+   *   printed value.
    * @returns Object with rendered subject, body, and bodyType
    */
   public async renderTemplateContent(
@@ -372,7 +374,7 @@ export class TemplatesService {
     this.validateTemplatePersonalisation(
       template,
       normalizedPersonalisation,
-      options.allowEmptyValues ?? false,
+      options.allowEmptyValues ?? ALLOW_EMPTY_PERSONALISATION_VALUES,
     )
 
     // Get the renderer for this template's engine
@@ -495,10 +497,10 @@ export class TemplatesService {
   ): void {
     const { required, printed } = analyseTemplatePersonalisation(template, personalisation)
 
-    // A printed value that is empty leaves as much of a gap in the sent message as an absent key,
-    // so both are missing. A value that is only tested (`{{#if notes}}`) may be blank: that is how
-    // a CSV cell or API caller says "skip this section". Previews allow blanks everywhere, since
-    // they render a template while its values are still being filled in.
+    // An absent key is always missing: some engines would print the raw placeholder for it. A
+    // blank value prints nothing, and is accepted unless the caller asks for every printed value
+    // to be filled in. A value that is only tested (`{{#if notes}}`) may be blank either way: that
+    // is how an API caller says "skip this section".
     const missingKeys = required.filter(
       (key) =>
         !Object.hasOwn(personalisation, key) ||
