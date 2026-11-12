@@ -50,7 +50,8 @@ export function isNotSentNetworkError(error: unknown): boolean {
 /**
  * An SDK error from a provider, as a TransientDeliveryError when it means the provider took
  * nothing: an HTTP status of 408, 429 or 5xx (`statusCode` on Azure's RestError, `status` on
- * Twilio's RestException), or a network error before the request was sent. Null otherwise.
+ * Twilio's RestException, `$metadata.httpStatusCode` on an AWS ServiceException), or a network
+ * error before the request was sent. Null otherwise.
  */
 export function transientFromProviderError(
   error: unknown,
@@ -59,12 +60,14 @@ export function transientFromProviderError(
   if (isTransientDeliveryError(error)) return error
   // Our own exceptions have a runtime `status` too; only a raw SDK error is classified here.
   if (error instanceof HttpException) return null
-  const { statusCode, status, message } = (error ?? {}) as {
+  const { statusCode, status, $metadata, message } = (error ?? {}) as {
     statusCode?: unknown
     status?: unknown
+    $metadata?: { httpStatusCode?: unknown }
     message?: unknown
   }
-  const httpStatus = typeof statusCode === 'number' ? statusCode : status
+  const httpStatus =
+    typeof statusCode === 'number' ? statusCode : (status ?? $metadata?.httpStatusCode)
   const text = typeof message === 'string' ? message : describeError(error)
   if (typeof httpStatus === 'number' && isTransientHttpStatus(httpStatus)) {
     return new TransientDeliveryError(`${label}: upstream ${httpStatus} - ${text}`, 502)

@@ -503,7 +503,7 @@ export function buildOverview(
   }
 }
 
-const SMS_PROVIDER_NAMES: Record<string, string> = { acs: 'ACS', twilio: 'Twilio' }
+const SMS_PROVIDER_NAMES: Record<string, string> = { acs: 'ACS', twilio: 'Twilio', aws: 'AWS SMS' }
 
 export function buildProviderStats(
   provider: Pick<ProviderStatsDto, 'name' | 'channel' | 'inFlight' | 'limit'>,
@@ -928,7 +928,7 @@ export class MonitoringService {
       // Leases are scored by expiry; an expired one is a pod that died, not a call in flight.
       redis.zcount(CHES_IN_FLIGHT_KEY, now, '+inf').catch(() => 0),
     ])
-    const smsAdapter = (this.configService?.get<string>('delivery.sms') ?? 'acs').split(':')[0]
+    const smsAdapter = (this.configService?.get<string>('delivery.sms') ?? 'aws').split(':')[0]
     return [
       buildProviderStats(
         {

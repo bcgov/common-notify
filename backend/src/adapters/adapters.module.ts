@@ -5,6 +5,7 @@ import { NodemailerEmailTransport } from './implementations/delivery/email/nodem
 import { LogEmailTransport } from './implementations/delivery/email/log/log-email.adapter'
 import { TwilioSmsTransport } from './implementations/delivery/sms/twilio/twilio-sms.adapter'
 import { AcsSmsTransport } from './implementations/delivery/sms/acs/acs-sms.adapter'
+import { AwsSmsTransport } from './implementations/delivery/sms/aws/aws-sms.adapter'
 import { SmsCircuitBreaker } from './implementations/delivery/sms/sms-circuit-breaker'
 import {
   EMAIL_ADAPTER,
@@ -38,6 +39,7 @@ export class AdaptersModule {
         LogEmailTransport,
         TwilioSmsTransport,
         AcsSmsTransport,
+        AwsSmsTransport,
         SmsCircuitBreaker,
         {
           provide: EMAIL_ADAPTER_MAP,
@@ -57,11 +59,13 @@ export class AdaptersModule {
           useFactory: (
             twilio: TwilioSmsTransport,
             acs: AcsSmsTransport,
+            aws: AwsSmsTransport,
           ): Record<string, ISmsTransport> => ({
             twilio,
             acs,
+            aws,
           }),
-          inject: [TwilioSmsTransport, AcsSmsTransport],
+          inject: [TwilioSmsTransport, AcsSmsTransport, AwsSmsTransport],
         },
         {
           provide: EMAIL_ADAPTER,
@@ -87,13 +91,13 @@ export class AdaptersModule {
             configService: ConfigService,
             breaker: SmsCircuitBreaker,
           ): ISmsTransport => {
-            const key = configService.get<string>('delivery.sms') ?? 'acs'
+            const key = configService.get<string>('delivery.sms') ?? 'aws'
             // As above: a `:passthrough` suffix names no ISmsTransport, so fall back for DI.
             if (key?.includes(':passthrough')) {
-              return breaker.wrap(map['acs'])
+              return breaker.wrap(map['aws'])
             }
             const provider = key?.includes(':') ? key.split(':')[0] : key
-            return breaker.wrap(map[provider] ?? map['acs'])
+            return breaker.wrap(map[provider] ?? map['aws'])
           },
           inject: [SMS_ADAPTER_MAP, ConfigService, SmsCircuitBreaker],
         },
