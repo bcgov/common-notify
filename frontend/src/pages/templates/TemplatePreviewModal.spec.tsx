@@ -153,7 +153,7 @@ describe('TemplatePreviewModal apply flow', () => {
     )
   })
 
-  it('enables apply after a value is entered and surfaces missing-field validation', async () => {
+  it('renders with empty fields, flagging them only once the preview is applied', async () => {
     render(
       <TemplatePreviewModal
         isOpen
@@ -165,23 +165,33 @@ describe('TemplatePreviewModal apply flow', () => {
       />,
     )
 
-    const applyButton = screen.getByRole('button', { name: /apply to preview/i })
-    expect(applyButton).toBeDisabled()
+    expect(screen.getByText('Show preview')).toBeTruthy()
+    expect(screen.queryByText('Subject line:')).toBeNull()
+
+    const applyButton = screen.getByRole('button', { name: /apply to template/i })
+    expect(applyButton).toBeEnabled()
+    expect(previewTemplateBodyMock).not.toHaveBeenCalled()
+    expect(screen.queryByText('This field is empty.')).toBeNull()
 
     const [firstNameInput, lastNameInput] = screen
       .getAllByRole('textbox')
       .filter((element) => element.tagName === 'INPUT')
 
     fireEvent.change(firstNameInput, { target: { value: 'Ada' } })
-
-    expect(applyButton).toBeEnabled()
-
     fireEvent.click(applyButton)
 
-    expect(previewTemplateBodyMock).not.toHaveBeenCalled()
-    expect(screen.getByText('Enter a value to generate the preview')).toBeTruthy()
+    await waitFor(() => {
+      expect(previewTemplateBodyMock).toHaveBeenCalledWith(
+        expect.objectContaining({ params: { firstName: 'Ada', lastName: '' } }),
+      )
+    })
+    expect(await screen.findByText('rendered:Ada:')).toBeTruthy()
+    expect(screen.getAllByText('This field is empty.')).toHaveLength(1)
 
     fireEvent.change(lastNameInput, { target: { value: 'Lovelace' } })
+    expect(screen.queryByText('This field is empty.')).toBeNull()
+
+    await waitFor(() => expect(applyButton).toBeEnabled())
     fireEvent.click(applyButton)
 
     await waitFor(() => {

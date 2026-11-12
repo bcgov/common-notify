@@ -5,7 +5,7 @@ import type { EventEmailSettings } from '@/api/events.api'
 import type { TemplateResponse } from '@/api/templates.api'
 
 // The header reads the store; it has its own spec.
-vi.mock('./EventsEmailHeader', () => ({ default: () => <div>Email header</div> }))
+vi.mock('@/components/EmailHeader', () => ({ default: () => <div>Email header</div> }))
 
 const emailSettings = { senderEmail: 'permits@gov.bc.ca' } as EventEmailSettings
 const template = { subject: 'Permit for {{name}}', body: 'Hello {{name}}' } as TemplateResponse

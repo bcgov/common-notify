@@ -293,7 +293,7 @@ const EditEvent: FC<EditEventProps> = ({
       <PageHeading
         title={event?.name ?? 'Event'}
         breadcrumbs={[
-          ...(selectedTab === 'sms' ? [] : [{ label: 'Home', to: '/dashboard' as const }]),
+          ...(selectedTab === 'sms' ? [] : [{ label: 'Home', to: '/' as const }]),
           { label: 'Event', to: '/events' },
           { label: event?.name ?? 'Event' },
         ]}

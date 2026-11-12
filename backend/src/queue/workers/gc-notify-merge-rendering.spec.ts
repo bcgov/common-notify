@@ -271,6 +271,13 @@ describe('GC Notify merge rendering', () => {
       expect(body).toContain('VIP section')
     })
 
+    it('sends a row with a blank value, printing nothing for that placeholder', async () => {
+      const { body } = await deliverMerge({ first_name: '', vip: 'n' }, false)
+
+      expect(body).toContain('Hello ,')
+      expect(body).not.toContain('first_name')
+    })
+
     it('does not use the GC Notify engine for an SMS merge', async () => {
       templatesRepository.findById.mockResolvedValue(storedTemplate({ channelCode: 'SMS' }))
       requestDetailService.findBatchRecipients.mockResolvedValue([

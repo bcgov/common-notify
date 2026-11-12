@@ -68,13 +68,13 @@ describe('TenantSwitcher', () => {
     localStorage.clear()
   })
 
-  it('goes to the dashboard when the user has roles in the new tenant', async () => {
+  it('goes home when the user has roles in the new tenant', async () => {
     vi.mocked(cstarApi.fetchUserRoles).mockResolvedValue({ data: { roles: ['viewer'] } } as never)
     renderSwitcher()
 
     await switchTo(tenantB)
 
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/dashboard' }))
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/' }))
   })
 
   it('goes to not-authorized when the user has no roles in the new tenant', async () => {
@@ -97,7 +97,7 @@ describe('TenantSwitcher', () => {
     await switchTo(tenantB)
     await switchTo(tenantC)
     rolesC.resolve({ data: { roles: ['viewer'] } } as never)
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/dashboard' }))
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/' }))
 
     rolesB.reject(new Error('CSTAR unavailable'))
     await waitFor(() => expect(cstarApi.fetchUserRoles).toHaveBeenCalledTimes(2))
