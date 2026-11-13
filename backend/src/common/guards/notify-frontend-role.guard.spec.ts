@@ -651,4 +651,185 @@ describe('NotifyFrontendRoleGuard', () => {
       expect(result).toBe(true)
     })
   })
+
+  describe('exact outcomes', () => {
+    const mockTenant = createMockTenant('tenant-uuid-iii', 'bc-health')
+    let request: any
+
+    const contextFor = (requiredRoles: string[] | null, user: Record<string, unknown> = {}) => {
+      request = {
+        user: {
+          azp: 'notify-client-123',
+          iss: 'https://dev.loginproxy.gov.bc.ca/auth/realms/standard',
+          idir_user_guid: 'guid-iii',
+          client_roles: [],
+          ...user,
+        },
+        headers: { 'x-tenant-id': 'bc-health', authorization: 'Bearer token-iii' },
+      }
+      vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(requiredRoles)
+      return {
+        switchToHttp: () => ({ getRequest: () => request }),
+        getHandler: () => ({}),
+        getClass: () => ({}),
+      } as unknown as ExecutionContext
+    }
+
+    const expectRejection = async (
+      promise: Promise<boolean>,
+      type: new (...args: any[]) => Error,
+      message: string,
+    ) => {
+      const error = await promise.catch((e: unknown) => e)
+      expect(error).toBeInstanceOf(type)
+      expect((error as Error).message).toBe(message)
+    }
+
+    beforeEach(() => {
+      mockTenantsService.findByExternalId.mockResolvedValue(mockTenant)
+      mockCstarApiClient.getUserTenants.mockResolvedValue(['bc-health'])
+      mockCstarApiClient.getUserRoles.mockResolvedValue(['NOTIFY_VIEWER'])
+    })
+
+    it('attaches tenant, user GUID and client ID to the request on success', async () => {
+      const result = await guard.canActivate(contextFor(['NOTIFY_VIEWER']))
+
+      expect(result).toBe(true)
+      expect(request.tenant).toBe(mockTenant)
+      expect(request.userGuid).toBe('guid-iii')
+      expect(request.clientId).toBe('notify-client-123')
+      expect(mockCstarApiClient.getUserTenants).toHaveBeenCalledWith('guid-iii', 'Bearer token-iii')
+      expect(mockCstarApiClient.getUserRoles).toHaveBeenCalledWith(
+        'bc-health',
+        'guid-iii',
+        'Bearer token-iii',
+      )
+    })
+
+    it('checks client ID before issuer and header', async () => {
+      const context = contextFor(null, { azp: 'other', iss: 'other' })
+      delete request.headers['x-tenant-id']
+
+      await expectRejection(guard.canActivate(context), ForbiddenException, 'Invalid client ID')
+    })
+
+    it('checks issuer before header', async () => {
+      const context = contextFor(null, { iss: 'other' })
+      delete request.headers['x-tenant-id']
+
+      await expectRejection(guard.canActivate(context), ForbiddenException, 'Invalid token issuer')
+    })
+
+    it('rejects a missing header without looking up the tenant', async () => {
+      const context = contextFor(null)
+      delete request.headers['x-tenant-id']
+
+      await expectRejection(
+        guard.canActivate(context),
+        BadRequestException,
+        'x-tenant-id header is required for frontend requests',
+      )
+      expect(mockTenantsService.findByExternalId).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['is not found', () => mockTenantsService.findByExternalId.mockResolvedValue(null)],
+      [
+        'lookup throws',
+        () => mockTenantsService.findByExternalId.mockRejectedValue(new Error('db down')),
+      ],
+    ])('rejects with BadRequest when the tenant %s', async (_case, arrange) => {
+      arrange()
+
+      await expectRejection(
+        guard.canActivate(contextFor(null)),
+        BadRequestException,
+        'Tenant with ID "bc-health" does not exist. Please verify the tenant ID and try again.',
+      )
+      expect(mockCstarApiClient.getUserTenants).not.toHaveBeenCalled()
+    })
+
+    it('rejects a user who is not a member of the tenant', async () => {
+      mockCstarApiClient.getUserTenants.mockResolvedValue([{ id: 'other-tenant' }])
+
+      await expectRejection(
+        guard.canActivate(contextFor(null)),
+        ForbiddenException,
+        'User does not have access to this tenant',
+      )
+    })
+
+    it('passes an UnauthorizedException from the tenant check through unchanged', async () => {
+      mockCstarApiClient.getUserTenants.mockRejectedValue(
+        new UnauthorizedException('CSTAR token expired'),
+      )
+
+      await expectRejection(
+        guard.canActivate(contextFor(null)),
+        UnauthorizedException,
+        'CSTAR token expired',
+      )
+    })
+
+    it('flattens any other tenant check failure to Unauthorized', async () => {
+      mockCstarApiClient.getUserTenants.mockRejectedValue(new Error('CSTAR unavailable'))
+
+      await expectRejection(
+        guard.canActivate(contextFor(null)),
+        UnauthorizedException,
+        'Failed to verify tenant access',
+      )
+    })
+
+    it('allows a user with the required SSO role without asking CSTAR for roles', async () => {
+      const result = await guard.canActivate(
+        contextFor(['NOTIFY_ADMIN'], { client_roles: ['NOTIFY_ADMIN'] }),
+      )
+
+      expect(result).toBe(true)
+      expect(mockCstarApiClient.getUserRoles).not.toHaveBeenCalled()
+    })
+
+    it('rejects a user missing the required SSO role before checking CSTAR roles', async () => {
+      await expectRejection(
+        guard.canActivate(contextFor(['NOTIFY_ADMIN', 'NOTIFY_VIEWER'])),
+        ForbiddenException,
+        'User does not have required SSO role',
+      )
+      expect(mockCstarApiClient.getUserRoles).not.toHaveBeenCalled()
+    })
+
+    it('requires both the SSO and the CSTAR role when both kinds are listed', async () => {
+      mockCstarApiClient.getUserRoles.mockResolvedValue([])
+
+      await expectRejection(
+        guard.canActivate(
+          contextFor(['NOTIFY_ADMIN', 'NOTIFY_VIEWER'], { client_roles: ['NOTIFY_ADMIN'] }),
+        ),
+        ForbiddenException,
+        'User does not have required CSTAR role',
+      )
+    })
+
+    it('treats a missing client_roles claim as no SSO roles', async () => {
+      await expectRejection(
+        guard.canActivate(contextFor(['NOTIFY_ADMIN'], { client_roles: undefined })),
+        ForbiddenException,
+        'User does not have required SSO role',
+      )
+    })
+
+    it.each([
+      ['an Error', new Error('CSTAR unavailable')],
+      ['an UnauthorizedException', new UnauthorizedException('CSTAR token expired')],
+    ])('flattens %s from the CSTAR role lookup to Unauthorized', async (_case, failure) => {
+      mockCstarApiClient.getUserRoles.mockRejectedValue(failure)
+
+      await expectRejection(
+        guard.canActivate(contextFor(['NOTIFY_VIEWER'])),
+        UnauthorizedException,
+        'Failed to verify user CSTAR role',
+      )
+    })
+  })
 })
