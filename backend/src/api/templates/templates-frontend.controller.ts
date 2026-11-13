@@ -281,7 +281,7 @@ export class TemplatesFrontendController {
   ): Promise<TemplateResponseDto> {
     const tenant = await this.requireTenantContext(req)
     const user = JwtUserExtractor.extractUser(req)
-    const userName = JwtUserExtractor.extractDisplayName(req)
+    const userName = JwtUserExtractor.extractFullName(req)
     return this.templatesService.createTemplate(tenant.id, createTemplateDto, user, userName)
   }
 
@@ -328,7 +328,7 @@ export class TemplatesFrontendController {
   ): Promise<TemplateResponseDto> {
     const tenant = await this.requireTenantContext(req)
     const user = JwtUserExtractor.extractUser(req)
-    const userName = JwtUserExtractor.extractDisplayName(req)
+    const userName = JwtUserExtractor.extractFullName(req)
     return this.templatesService.updateTemplate(
       tenant.id,
       templateId,

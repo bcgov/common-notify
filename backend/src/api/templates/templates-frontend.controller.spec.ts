@@ -71,7 +71,12 @@ describe('TemplatesFrontendController', () => {
     it('should pass the stable user id and the display name from the token', async () => {
       await controller.createTemplate(
         createMockRequest(
-          bearerWithClaims({ preferred_username: 'guid@azureidir', display_name: 'Falk, Barrett' }),
+          bearerWithClaims({
+            preferred_username: 'guid@azureidir',
+            display_name: 'Falk, Barrett CITZ:EX',
+            given_name: 'Barrett',
+            family_name: 'Falk',
+          }),
         ),
         createDto,
       )
@@ -80,7 +85,7 @@ describe('TemplatesFrontendController', () => {
         tenantId,
         createDto,
         'guid@azureidir',
-        'Falk, Barrett',
+        'Barrett Falk',
       )
     })
 
@@ -105,7 +110,12 @@ describe('TemplatesFrontendController', () => {
     it('should pass the stable user id and the display name from the token', async () => {
       await controller.updateTemplate(
         createMockRequest(
-          bearerWithClaims({ preferred_username: 'guid@azureidir', display_name: 'Falk, Barrett' }),
+          bearerWithClaims({
+            preferred_username: 'guid@azureidir',
+            display_name: 'Falk, Barrett CITZ:EX',
+            given_name: 'Barrett',
+            family_name: 'Falk',
+          }),
         ),
         templateId,
         updateDto,
@@ -116,7 +126,7 @@ describe('TemplatesFrontendController', () => {
         templateId,
         updateDto,
         'guid@azureidir',
-        'Falk, Barrett',
+        'Barrett Falk',
       )
     })
   })

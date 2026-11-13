@@ -6,10 +6,9 @@ const PreviousVersionSmsEstimate: FC<{ body: string }> = ({ body }) => {
   const { characters, segments } = segmentSms(body)
   return (
     <p className="previous-template-version__sms-estimate">
-      Estimated character count: {characters}/1000 characters maximum - this is excluding the values
-      of the variables
+      Estimated characters: {characters}/1000 (excluding variable values)
       <br />
-      Estimated parts: {Math.max(1, segments)}
+      Estimated SMS parts: {Math.max(1, segments)}
     </p>
   )
 }

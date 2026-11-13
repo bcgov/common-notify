@@ -140,13 +140,13 @@ export class TemplateResponseDto {
 
   /**
    * Display name of the user who last updated this template
-   * @example "Falk, Barrett"
+   * @example "Barrett Falk"
    */
   @ApiPropertyOptional({
     description: 'Display name of the user who last updated this template, if one was recorded.',
     type: String,
     nullable: true,
-    example: 'Falk, Barrett',
+    example: 'Barrett Falk',
   })
   updatedByName?: string | null
 

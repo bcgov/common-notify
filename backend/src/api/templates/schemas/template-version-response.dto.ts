@@ -28,7 +28,7 @@ export class TemplateVersionResponseDto {
 
   /**
    * Display name of the user who made this version, if one was recorded
-   * @example "Falk, Barrett"
+   * @example "Barrett Falk"
    */
   createdByName?: string | null
 

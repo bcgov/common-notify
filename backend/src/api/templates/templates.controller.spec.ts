@@ -353,7 +353,12 @@ describe('TemplatesController', () => {
 
       await controller.createTemplate(
         createMockRequest(
-          bearerWithClaims({ preferred_username: 'guid@azureidir', display_name: 'Falk, Barrett' }),
+          bearerWithClaims({
+            preferred_username: 'guid@azureidir',
+            display_name: 'Falk, Barrett CITZ:EX',
+            given_name: 'Barrett',
+            family_name: 'Falk',
+          }),
         ),
         createDto,
       )
@@ -362,7 +367,7 @@ describe('TemplatesController', () => {
         'tenant-123',
         createDto,
         'guid@azureidir',
-        'Falk, Barrett',
+        'Barrett Falk',
       )
     })
 
@@ -433,7 +438,12 @@ describe('TemplatesController', () => {
 
       await controller.updateTemplate(
         createMockRequest(
-          bearerWithClaims({ preferred_username: 'guid@azureidir', display_name: 'Falk, Barrett' }),
+          bearerWithClaims({
+            preferred_username: 'guid@azureidir',
+            display_name: 'Falk, Barrett CITZ:EX',
+            given_name: 'Barrett',
+            family_name: 'Falk',
+          }),
         ),
         'template-123',
         updateDto,
@@ -444,7 +454,7 @@ describe('TemplatesController', () => {
         'template-123',
         updateDto,
         'guid@azureidir',
-        'Falk, Barrett',
+        'Barrett Falk',
       )
     })
 

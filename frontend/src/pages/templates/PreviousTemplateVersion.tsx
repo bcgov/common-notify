@@ -60,7 +60,7 @@ const PreviousVersionContent: FC<{ templateId: string; isSms: boolean }> = ({
       <h3 className="previous-template-version__name">{version.name}</h3>
       <p className="previous-template-version__edited">
         Edit made on {editedOn}
-        {version.createdByName ? `, by ${version.createdByName}.` : '.'}
+        {version.createdByName ? `, by ${version.createdByName}` : ''}
       </p>
       <EmailTemplatePreview subject={version.subject} body={version.body} />
       {isSms && <PreviousVersionSmsEstimate body={version.body} />}

@@ -943,17 +943,17 @@ describe('TemplatesService', () => {
       mockRepository.create.mockResolvedValue({ ...mockTemplate, ...createDto })
       mockRepository.createVersion.mockResolvedValue({})
 
-      await service.createTemplate('tenant-123', createDto, 'user-123', 'Falk, Barrett')
+      await service.createTemplate('tenant-123', createDto, 'user-123', 'Barrett Falk')
 
       expect(mockRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           createdBy: 'user-123',
-          createdByName: 'Falk, Barrett',
-          updatedByName: 'Falk, Barrett',
+          createdByName: 'Barrett Falk',
+          updatedByName: 'Barrett Falk',
         }),
       )
       expect(mockRepository.createVersion).toHaveBeenCalledWith(
-        expect.objectContaining({ createdBy: 'user-123', createdByName: 'Falk, Barrett' }),
+        expect.objectContaining({ createdBy: 'user-123', createdByName: 'Barrett Falk' }),
       )
     })
 
@@ -1027,27 +1027,27 @@ describe('TemplatesService', () => {
         'template-123',
         { name: 'Renamed' },
         'user-123',
-        'Falk, Barrett',
+        'Barrett Falk',
       )
 
       expect(mockRepository.update).toHaveBeenCalledWith(
-        expect.objectContaining({ updatedBy: 'user-123', updatedByName: 'Falk, Barrett' }),
+        expect.objectContaining({ updatedBy: 'user-123', updatedByName: 'Barrett Falk' }),
       )
     })
 
     it('should return the display name in the response', async () => {
       mockRepository.findById.mockResolvedValue({ ...mockTemplate })
-      mockRepository.update.mockResolvedValue({ ...mockTemplate, updatedByName: 'Falk, Barrett' })
+      mockRepository.update.mockResolvedValue({ ...mockTemplate, updatedByName: 'Barrett Falk' })
 
       const result = await service.updateTemplate(
         'tenant-123',
         'template-123',
         { name: 'Renamed' },
         'user-123',
-        'Falk, Barrett',
+        'Barrett Falk',
       )
 
-      expect(result.updatedByName).toBe('Falk, Barrett')
+      expect(result.updatedByName).toBe('Barrett Falk')
     })
 
     it("should clear the previous editor's name when the token carried none", async () => {

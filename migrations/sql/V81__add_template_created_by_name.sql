@@ -31,11 +31,11 @@ ALTER TABLE notify.template ADD COLUMN updated_by_name VARCHAR(200);
 
 ALTER TABLE notify.template_version ADD COLUMN created_by_name VARCHAR(200);
 
-COMMENT ON COLUMN notify.template.created_by_name IS 'Display name of the user who created the template (JWT display_name), at the time they created it. NULL if the token carried none.';
+COMMENT ON COLUMN notify.template.created_by_name IS 'Display name of the user who created the template (JWT given_name and family_name, falling back to display_name), at the time they created it. NULL if the token carried none.';
 
-COMMENT ON COLUMN notify.template.updated_by_name IS 'Display name of the user who last updated the template (JWT display_name), at the time they updated it. NULL if the token carried none.';
+COMMENT ON COLUMN notify.template.updated_by_name IS 'Display name of the user who last updated the template (JWT given_name and family_name, falling back to display_name), at the time they updated it. NULL if the token carried none.';
 
-COMMENT ON COLUMN notify.template_version.created_by_name IS 'Display name of the user who made this version (JWT display_name), at the time they made it. Copied from template.updated_by_name by the version trigger. NULL if the token carried none.';
+COMMENT ON COLUMN notify.template_version.created_by_name IS 'Display name of the user who made this version (JWT given_name and family_name, falling back to display_name), at the time they made it. Copied from template.updated_by_name by the version trigger. NULL if the token carried none.';
 
 CREATE OR REPLACE FUNCTION notify.create_template_version_on_update()
 RETURNS TRIGGER AS $$
