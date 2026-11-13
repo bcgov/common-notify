@@ -6,7 +6,7 @@ import EventsChannelActiveSwitch from '../components/EventsChannelActiveSwitch'
 import EventsTemplateSelect from '../components/EventsTemplateSelect'
 import EventsEmailSenderField from '../components/EventsEmailSenderField'
 import EventsEmailRecipientFields from '../components/EventsEmailRecipientFields'
-import EventsEmailTemplatePreview from '../components/EventsEmailTemplatePreview'
+import EmailTemplatePreview from '@/components/EmailTemplatePreview'
 import EventsEmailHeaderFields from '../components/EventsEmailHeaderFields'
 import { useChannelDeactivation } from '../hooks/useChannelDeactivation'
 import { useEmailHeader } from '../hooks/useEmailHeader'
@@ -239,7 +239,8 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
           />
 
           {selectedTemplate && (
-            <EventsEmailTemplatePreview
+            <EmailTemplatePreview
+              label="Template Preview"
               subject={selectedTemplate.subject}
               body={selectedTemplate.body}
               isDisabled={areFieldsDisabled}

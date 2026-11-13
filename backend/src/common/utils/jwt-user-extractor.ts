@@ -60,6 +60,27 @@ export class JwtUserExtractor {
   }
 
   /**
+   * Extract "given_name family_name" from the JWT, for showing who made a change.
+   * IDIR display_name reads "Falk, Barrett CITZ:EX", which is awkward in a sentence.
+   *
+   * @returns given_name and family_name joined by a space; extractDisplayName() if the token has neither
+   */
+  static extractFullName(req?: express.Request): string | null {
+    const authHeader = req?.headers.authorization
+    if (!authHeader?.startsWith('Bearer ')) return null
+
+    try {
+      const payload = JSON.parse(
+        Buffer.from(authHeader.substring(7).split('.')[1] ?? '', 'base64').toString('utf-8'),
+      )
+      const fullName = [payload.given_name, payload.family_name].filter(Boolean).join(' ')
+      return fullName || this.extractDisplayName(req)
+    } catch {
+      return null
+    }
+  }
+
+  /**
    * Extract user identifier from JWT token payload
    * @param token JWT token string
    * @returns User identifier or null if extraction fails

@@ -33,6 +33,7 @@ export interface TemplateResponse {
   createdBy: string
   createdAt: string
   updatedBy: string
+  updatedByName?: string | null
   updatedAt: string
   placeholders?: TemplatePlaceholders
 }
@@ -119,6 +120,50 @@ export async function getTemplateById(templateId: string) {
 
     throw new Error(
       `Failed to fetch template: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    )
+  }
+}
+
+/** A template as it read at an earlier version. */
+export interface TemplateVersionResponse {
+  version: number
+  name: string
+  subject?: string | null
+  body: string
+  createdByName?: string | null
+  createdAt: string
+}
+
+/**
+ * Get the version a template had before its current one
+ *
+ * @param templateId Template ID
+ * @returns The previous version
+ * @throws Error if the template has no previous version or the fetch fails
+ */
+export async function getPreviousTemplateVersion(
+  templateId: string,
+): Promise<TemplateVersionResponse> {
+  try {
+    const params = generateApiParameters(
+      `/api/v1/frontend/templates/${templateId}/previous-version`,
+    )
+    // The modal renders its own progress indicator; see previewTemplate.
+    return await get<TemplateVersionResponse>({ ...params, skipGlobalLoading: true })
+  } catch (error) {
+    const axiosError = error as AxiosError
+
+    if (axiosError.response?.status === STATUS_CODES.NotFound) {
+      throw new Error('No previous version of this template was found')
+    }
+    if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
+      throw new Error('You are not authorized to view this template')
+    }
+
+    throw new Error(
+      `Failed to fetch previous version: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`,
     )
   }
 }
