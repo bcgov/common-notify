@@ -1,12 +1,12 @@
 @import '../variables.scss';
 
 .sidebar {
-  width: 296px;
+  width: 308px;
   // Never let the flex row steal width from the nav. Without this the sidebar
   // is the only shrinkable item beside `.layout-content`, so a page with a wide
   // table squeezes the nav narrower and shifts every page's content with it.
   flex-shrink: 0;
-  padding: 24px;
+  padding: 24px 20px;
   // No margin-right: the 64px between the nav and page content is $page-gutter in
   // page.scss, so a single value owns that gap on both sides of every page.
   transition: width 0.3s ease;
@@ -25,10 +25,12 @@
   border-right: 1px solid $border-default;
 
   &--collapsed {
-    width: 93px;
+    width: 88px;
 
     .sidebar__item {
       gap: 0;
+      padding-inline: 0;
+      justify-content: center;
     }
 
     .sidebar__label {
@@ -49,7 +51,7 @@
     justify-content: center;
     cursor: pointer;
 
-    width: 36px;
+    width: 37px;
     height: 84px;
     border-radius: 8px;
 
@@ -60,7 +62,6 @@
     color: $dark-text;
     font: inherit;
     padding: 0;
-    box-shadow: 2px 0 6px rgba(0, 0, 0, 0.08);
 
     &:hover {
       background-color: darken($secondary-color, 5%);
@@ -79,20 +80,24 @@
   &__nav {
     display: flex;
     flex-direction: column;
-    gap: var(--layout-margin-small, 8px);
+    gap: var(--layout-margin-medium, 16px);
     // Takes the space between the toggle and the footer, and scrolls within it when
     // the link list is taller than the viewport. This is what keeps the footer at the
     // bottom of the screen rather than at the bottom of the page's content.
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
+    padding: 5px;
+    margin: -5px;
   }
 
   &__item {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 10px;
+    height: 40px;
+    flex-shrink: 0;
+    padding: 0 16px;
     border-radius: 6px;
     text-decoration: none;
     color: $dark-text;
@@ -108,7 +113,7 @@
       gap 0.3s ease;
 
     &:hover {
-      background-color: rgba($primary-color, 0.08);
+      background-color: #eceae8;
     }
 
     // Pressed feedback is the background alone. The outline is the keyboard focus
@@ -117,19 +122,19 @@
     // read as a glitch on every click. `__subitem` below has only ever had the
     // :focus-visible half; this matches it.
     &:active {
-      background-color: rgba($primary-color, 0.08);
+      background-color: #eceae8;
     }
 
     &:focus-visible {
       outline: 2px solid $border-active;
-      outline-offset: 0;
-      background-color: rgba($primary-color, 0.08);
+      outline-offset: 3px;
+      background-color: #eceae8;
     }
 
     &.active {
       border-radius: var(--layout-borderRadius-medium, 4px);
       background: var(--surface-color-background-lightBlue, #f1f8fe);
-      font-weight: 500;
+      font-weight: 400;
     }
 
     &[aria-disabled='true'],
@@ -142,11 +147,17 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 24px;
+    font-size: 20px;
     color: inherit;
-    width: 24px;
-    height: 24px;
-    min-width: 24px;
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+
+    svg {
+      font-size: inherit;
+      width: 20px;
+      height: 20px;
+    }
   }
 
   &__label {
@@ -174,7 +185,7 @@
   &__bottom {
     display: flex;
     flex-direction: column;
-    gap: $spacing-xs;
+    gap: $spacing-md;
     padding-top: $spacing-md;
     border-top: 1px solid $border-default;
   }
@@ -183,7 +194,7 @@
     display: flex;
     flex-direction: column;
     gap: $spacing-xs;
-    padding: 10px;
+    padding: 0 16px;
   }
 
   &__role-heading {
@@ -199,6 +210,7 @@
 
     .sidebar__label {
       margin-left: 0;
+      font-size: $font-size-sm;
     }
   }
 
@@ -263,20 +275,19 @@
       color 0.2s ease;
 
     &:hover {
-      background-color: rgba($primary-color, 0.08);
+      background-color: #eceae8;
       color: $dark-text;
     }
 
     &:focus-visible {
       outline: 2px solid $border-active;
-      outline-offset: 0;
-      background-color: rgba($primary-color, 0.08);
+      outline-offset: 3px;
+      background-color: #eceae8;
     }
 
     &.active {
-      background-color: rgba($primary-color, 0.15);
-      color: $primary-color;
-      font-weight: 500;
+      background: var(--surface-color-background-lightBlue, #f1f8fe);
+      font-weight: 400;
     }
   }
 }

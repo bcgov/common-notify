@@ -13,17 +13,18 @@ import { SsoRole } from '@/enum/sso-role.enum'
 
 // Icons
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
+import SpaceDashboardOutlinedIcon from '@mui/icons-material/SpaceDashboardOutlined'
+import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined'
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined'
-import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
-// import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
+import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
+import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
 import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined'
-import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
-import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
+import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
+// import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
-import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
-import WorkspacesOutlinedIcon from '@mui/icons-material/WorkspacesOutlined'
 import { CSTAR_ROLE_DISPLAY } from '@/enum/cstar-role.enum'
 import { Button, Tooltip, SvgInfoIcon } from '@bcgov/design-system-react-components'
 import TooltipTrigger from '@/components/TooltipTrigger'
@@ -39,22 +40,22 @@ const navItems = [
   {
     label: 'Dashboard',
     to: '/dashboard',
-    icon: <WorkspacesOutlinedIcon />,
+    icon: <SpaceDashboardOutlinedIcon />,
   },
   {
     label: 'Notification Events',
     to: '/events',
-    icon: <WorkspacesOutlinedIcon />,
+    icon: <FolderOutlinedIcon />,
   },
   {
-    label: 'Send Batch Notification',
+    label: 'Send Batch Notifications',
     to: '/bulk-notifications',
     icon: <SendOutlinedIcon />,
   },
   {
-    label: 'Templates',
+    label: 'Notification Templates',
     to: '/templates',
-    icon: <FolderOutlinedIcon />,
+    icon: <InsertDriveFileOutlinedIcon />,
   },
   {
     label: 'Usage & Limits',
