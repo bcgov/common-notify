@@ -74,7 +74,7 @@ describe('PreviousTemplateVersion', () => {
 
     expect(getPreviousTemplateVersionMock).toHaveBeenCalledWith('template-123')
     expect(await screen.findByRole('heading', { name: 'New Order Ready' })).toBeTruthy()
-    expect(screen.getByText(/^Edit made on .*, by Barrett Falk\.$/)).toBeTruthy()
+    expect(screen.getByText(/^Edit made on .*, by Barrett Falk$/)).toBeTruthy()
     expect(screen.getByText('Pizza Pizza')).toBeTruthy()
     expect(screen.getByText('Hello {{first name}},')).toBeTruthy()
     expect(screen.queryByText('Template Preview')).toBeNull()
@@ -102,7 +102,7 @@ describe('PreviousTemplateVersion', () => {
     await openModal()
     await screen.findByRole('heading', { name: 'New Order Ready' })
 
-    expect(screen.queryByText(/Estimated character count/)).toBeNull()
+    expect(screen.queryByText(/Estimated characters/)).toBeNull()
   })
 
   it('shows the SMS estimate below the body of an SMS template', async () => {
@@ -114,9 +114,9 @@ describe('PreviousTemplateVersion', () => {
 
     await openModal()
 
-    const estimate = await screen.findByText(/Estimated character count/)
-    expect(estimate.textContent).toContain('21/1000 characters maximum')
-    expect(estimate.textContent).toContain('Estimated parts: 1')
+    const estimate = await screen.findByText(/Estimated characters/)
+    expect(estimate.textContent).toContain('21/1000 (excluding variable values)')
+    expect(estimate.textContent).toContain('Estimated SMS parts: 1')
     expect(screen.queryByText('Body text:')).toBeNull()
   })
 
