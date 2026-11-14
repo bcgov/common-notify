@@ -351,6 +351,74 @@
                                     </td>
                                     <td><p>Soft delete flag. When true, the tenant is considered inactive and excluded from normal queries.</p></td>
                                 </tr>
+                                <tr>
+                                    <td><span id="disabled_reason">disabled_reason</span></td>
+                                    <td>varchar</td>
+                                    <td>500</td>
+                                    <td title='nullable'>√</td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>Why an admin disabled sending for this tenant. Shown to admins and in the error a rejected send returns. NULL while status is active.</p></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="disabled_by">disabled_by</span></td>
+                                    <td>varchar</td>
+                                    <td>200</td>
+                                    <td title='nullable'>√</td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>Stable identifier of the admin who disabled sending (JWT preferred_username). NULL while status is active.</p></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="disabled_by_name">disabled_by_name</span></td>
+                                    <td>varchar</td>
+                                    <td>200</td>
+                                    <td title='nullable'>√</td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>Display name of that admin at the time. NULL while status is active or if the token carried none.</p></td>
+                                </tr>
+                                <tr>
+                                    <td><span id="disabled_at">disabled_at</span></td>
+                                    <td>timestamptz</td>
+                                    <td>35,6</td>
+                                    <td title='nullable'>√</td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td><p>When sending was disabled. NULL while status is active.</p></td>
+                                </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -434,48 +502,48 @@
                                 <div class="tab-content no-padding">
                                     <div class="chart tab-pane active" id="oneDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="oneDegreeRelationshipsDiagram" name="oneDegreeRelationshipsDiagram">
-<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="646,5,871,211">
-<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="284,801,564,1164">
+<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="698,5,923,211">
+<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="284,801,616,1281">
 <area shape="rect" id="node10" href="tenant_status_code.html" target="_top" title="tenant_status_code" alt="" coords="5,921,240,1039">
-<area shape="rect" id="node3" href="attachment.html" target="_top" title="attachment" alt="" coords="672,228,845,404">
-<area shape="rect" id="node4" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="628,421,889,597">
-<area shape="rect" id="node5" href="feature_flag.html" target="_top" title="feature_flag" alt="" coords="671,615,846,791">
-<area shape="rect" id="node6" href="notification_event.html" target="_top" title="notification_event" alt="" coords="646,880,871,1027">
-<area shape="rect" id="node7" href="notification_request.html" target="_top" title="notification_request" alt="" coords="953,733,1195,1027">
-<area shape="rect" id="node8" href="provisioned_phone_number.html" target="_top" title="provisioned_phone_number" alt="" coords="608,1080,909,1256">
-<area shape="rect" id="node9" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="650,1273,867,1479">
-<area shape="rect" id="node11" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="619,1496,899,1672">
-<area shape="rect" id="node12" href="webhook_config.html" target="_top" title="webhook_config" alt="" coords="970,481,1178,716">
-<area shape="rect" id="node13" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="1239,675,1493,909">
+<area shape="rect" id="node3" href="attachment.html" target="_top" title="attachment" alt="" coords="724,228,897,404">
+<area shape="rect" id="node4" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="680,421,941,597">
+<area shape="rect" id="node5" href="feature_flag.html" target="_top" title="feature_flag" alt="" coords="723,615,898,791">
+<area shape="rect" id="node6" href="notification_event.html" target="_top" title="notification_event" alt="" coords="698,880,923,1027">
+<area shape="rect" id="node7" href="notification_request.html" target="_top" title="notification_request" alt="" coords="1005,704,1247,1027">
+<area shape="rect" id="node8" href="provisioned_phone_number.html" target="_top" title="provisioned_phone_number" alt="" coords="660,1080,961,1256">
+<area shape="rect" id="node9" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="702,1273,919,1479">
+<area shape="rect" id="node11" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="671,1496,951,1672">
+<area shape="rect" id="node12" href="webhook_config.html" target="_top" title="webhook_config" alt="" coords="1022,452,1230,687">
+<area shape="rect" id="node13" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="1291,645,1545,880">
 </map>
                                         <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/tenant.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                     <div class="chart tab-pane " id="twodegreesDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="twoDegreesRelationshipsDiagram" name="twoDegreesRelationshipsDiagram">
-<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="646,199,871,404">
-<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="284,1012,564,1375">
+<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="698,199,923,404">
+<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="284,1012,616,1492">
 <area shape="rect" id="node20" href="tenant_status_code.html" target="_top" title="tenant_status_code" alt="" coords="5,1132,240,1249">
-<area shape="rect" id="node3" href="api_key_limit.html" target="_top" title="api_key_limit" alt="" coords="1002,516,1185,604">
-<area shape="rect" id="node4" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="615,615,903,703">
-<area shape="rect" id="node5" href="api_key_limit_alert.html" target="_top" title="api_key_limit_alert" alt="" coords="979,283,1207,371">
-<area shape="rect" id="node6" href="api_key_limit_alert_log.html" target="_top" title="api_key_limit_alert_log" alt="" coords="1295,615,1553,703">
-<area shape="rect" id="node7" href="notification_request.html" target="_top" title="notification_request" alt="" coords="973,1020,1214,1108">
-<area shape="rect" id="node12" href="notification_event.html" target="_top" title="notification_event" alt="" coords="646,1091,871,1179">
-<area shape="rect" id="node17" href="notification_status_code.html" target="_top" title="notification_status_code" alt="" coords="622,913,895,1001">
-<area shape="rect" id="node8" href="api_key_usage.html" target="_top" title="api_key_usage" alt="" coords="997,396,1189,484">
-<area shape="rect" id="node9" href="attachment.html" target="_top" title="attachment" alt="" coords="672,421,845,597">
-<area shape="rect" id="node10" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="628,720,889,896">
-<area shape="rect" id="node11" href="event_channel_setting.html" target="_top" title="event_channel_setting" alt="" coords="965,1161,1222,1249">
-<area shape="rect" id="node13" href="provisioned_phone_number.html" target="_top" title="provisioned_phone_number" alt="" coords="608,1196,909,1372">
-<area shape="rect" id="node14" href="email_logo.html" target="_top" title="email_logo" alt="" coords="677,1389,841,1477">
-<area shape="rect" id="node15" href="feature_flag.html" target="_top" title="feature_flag" alt="" coords="671,5,846,181">
-<area shape="rect" id="node16" href="feature_flag_code.html" target="_top" title="feature_flag_code" alt="" coords="314,37,534,125">
-<area shape="rect" id="node18" href="notification_request_detail.html" target="_top" title="notification_request_detail" alt="" coords="1277,724,1571,812">
-<area shape="rect" id="node19" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="985,797,1202,1003">
-<area shape="rect" id="node21" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="953,1333,1233,1509">
-<area shape="rect" id="node22" href="webhook_config.html" target="_top" title="webhook_config" alt="" coords="989,1549,1197,1637">
-<area shape="rect" id="node23" href="webhook_type.html" target="_top" title="webhook_type" alt="" coords="661,1531,856,1619">
-<area shape="rect" id="node24" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="1297,1549,1551,1637">
+<area shape="rect" id="node3" href="api_key_limit.html" target="_top" title="api_key_limit" alt="" coords="1054,516,1237,604">
+<area shape="rect" id="node4" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="667,615,955,703">
+<area shape="rect" id="node5" href="api_key_limit_alert.html" target="_top" title="api_key_limit_alert" alt="" coords="1031,283,1259,371">
+<area shape="rect" id="node6" href="api_key_limit_alert_log.html" target="_top" title="api_key_limit_alert_log" alt="" coords="1347,615,1605,703">
+<area shape="rect" id="node7" href="notification_request.html" target="_top" title="notification_request" alt="" coords="1025,1020,1266,1108">
+<area shape="rect" id="node12" href="notification_event.html" target="_top" title="notification_event" alt="" coords="698,1091,923,1179">
+<area shape="rect" id="node17" href="notification_status_code.html" target="_top" title="notification_status_code" alt="" coords="674,913,947,1001">
+<area shape="rect" id="node8" href="api_key_usage.html" target="_top" title="api_key_usage" alt="" coords="1049,396,1241,484">
+<area shape="rect" id="node9" href="attachment.html" target="_top" title="attachment" alt="" coords="724,421,897,597">
+<area shape="rect" id="node10" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="680,720,941,896">
+<area shape="rect" id="node11" href="event_channel_setting.html" target="_top" title="event_channel_setting" alt="" coords="1017,1161,1274,1249">
+<area shape="rect" id="node13" href="provisioned_phone_number.html" target="_top" title="provisioned_phone_number" alt="" coords="660,1196,961,1372">
+<area shape="rect" id="node14" href="email_logo.html" target="_top" title="email_logo" alt="" coords="729,1389,893,1477">
+<area shape="rect" id="node15" href="feature_flag.html" target="_top" title="feature_flag" alt="" coords="723,5,898,181">
+<area shape="rect" id="node16" href="feature_flag_code.html" target="_top" title="feature_flag_code" alt="" coords="340,37,560,125">
+<area shape="rect" id="node18" href="notification_request_detail.html" target="_top" title="notification_request_detail" alt="" coords="1329,724,1623,812">
+<area shape="rect" id="node19" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="1037,797,1254,1003">
+<area shape="rect" id="node21" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="1005,1333,1285,1509">
+<area shape="rect" id="node22" href="webhook_config.html" target="_top" title="webhook_config" alt="" coords="1041,1549,1249,1637">
+<area shape="rect" id="node23" href="webhook_type.html" target="_top" title="webhook_type" alt="" coords="713,1531,908,1619">
+<area shape="rect" id="node24" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="1349,1549,1603,1637">
 </map>
                                         <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/tenant.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>

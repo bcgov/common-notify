@@ -401,12 +401,12 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td>chk_provisioned_phone_number_e164</td>
-                                    <td>((phone_number)::text ~ &#39;^\+[1-9][0-9]{1,14}$&#39;::text)</td>
-                                </tr>
-                                <tr>
                                     <td>chk_provisioned_phone_number_allocation</td>
                                     <td>(((tenant_id IS NULL) AND (allocated_at IS NULL)) OR ((tenant_id IS NOT NULL) AND (allocated_at IS NOT NULL)))</td>
+                                </tr>
+                                <tr>
+                                    <td>chk_provisioned_phone_number_e164</td>
+                                    <td>((phone_number)::text ~ &#39;^\+[1-9][0-9]{1,14}$&#39;::text)</td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -431,16 +431,16 @@
                                 <div class="tab-content no-padding">
                                     <div class="chart tab-pane active" id="oneDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="oneDegreeRelationshipsDiagram" name="oneDegreeRelationshipsDiagram">
-<area shape="rect" id="node1" href="event_channel_setting.html" target="_top" title="event_channel_setting" alt="" coords="644,5,901,269">
-<area shape="rect" id="node2" href="provisioned_phone_number.html" target="_top" title="provisioned_phone_number" alt="" coords="191,120,600,512">
-<area shape="rect" id="node3" href="tenant.html" target="_top" title="tenant" alt="" coords="5,240,147,416">
+<area shape="rect" id="node1" href="event_channel_setting.html" target="_top" title="event_channel_setting" alt="" coords="696,5,953,269">
+<area shape="rect" id="node2" href="provisioned_phone_number.html" target="_top" title="provisioned_phone_number" alt="" coords="243,120,652,512">
+<area shape="rect" id="node3" href="tenant.html" target="_top" title="tenant" alt="" coords="5,240,199,416">
 </map>
                                         <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/provisioned_phone_number.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                     <div class="chart tab-pane " id="twodegreesDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="twoDegreesRelationshipsDiagram" name="twoDegreesRelationshipsDiagram">
 <area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="708,846,933,934">
-<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="357,949,499,1125">
+<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="331,949,525,1125">
 <area shape="rect" id="node16" href="tenant_status_code.html" target="_top" title="tenant_status_code" alt="" coords="5,1010,240,1098">
 <area shape="rect" id="node3" href="attachment.html" target="_top" title="attachment" alt="" coords="734,951,907,1039">
 <area shape="rect" id="node4" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="690,1162,951,1250">

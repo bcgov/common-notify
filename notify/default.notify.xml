@@ -776,6 +776,9 @@
          <index name="idx_notification_request_channel_codes" unique="false">
             <column ascending="true" name="channel_codes"/>
          </index>
+         <index name="idx_notification_request_created_at" unique="false">
+            <column ascending="false" name="created_at"/>
+         </index>
          <index name="idx_notification_request_delayed_send" unique="false">
             <column ascending="true" name="delayed_send_time"/>
          </index>
@@ -1163,6 +1166,10 @@
          <column autoUpdated="false" defaultValue="now()" digits="6" id="7" name="updated_at" nullable="false" remarks="Timestamp with timezone when the tenant record was last updated. Automatically maintained by trg_tenant_updated_at trigger." size="35" type="timestamptz" typeCode="93"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="8" name="updated_by" nullable="true" remarks="Identifier of the user or process that last updated this record." size="200" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="false" digits="0" id="9" name="is_deleted" nullable="false" remarks="Soft delete flag. When true, the tenant is considered inactive and excluded from normal queries." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="10" name="disabled_reason" nullable="true" remarks="Why an admin disabled sending for this tenant. Shown to admins and in the error a rejected send returns. NULL while status is active." size="500" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="11" name="disabled_by" nullable="true" remarks="Stable identifier of the admin who disabled sending (JWT preferred_username). NULL while status is active." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="12" name="disabled_by_name" nullable="true" remarks="Display name of that admin at the time. NULL while status is active or if the token carried none." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="13" name="disabled_at" nullable="true" remarks="When sending was disabled. NULL while status is active." size="35" type="timestamptz" typeCode="93"/>
          <primaryKey column="id" sequenceNumberInPK="1"/>
          <index name="tenant_pkey" unique="true">
             <column ascending="true" name="id"/>
@@ -1178,6 +1185,23 @@
          </index>
          <index name="tenant_slug_key" unique="true">
             <column ascending="true" name="slug"/>
+         </index>
+      </table>
+      <table name="tenant_sending_history" remarks="Audit trail of an admin enabling or disabling sending for a tenant. One row per change, written in the same transaction as the change. Append-only." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="tenant_id" nullable="false" remarks="The tenant that changed. Not a foreign key: the tenant may since have been deleted." size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="enabled" nullable="false" remarks="Whether the tenant could send after the change." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="reason" nullable="true" remarks="The reason given when disabling. NULL when enabling." size="500" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="created_by" nullable="false" remarks="Stable identifier of the admin who made the change (JWT preferred_username)." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="created_by_name" nullable="true" remarks="Display name of the admin at the time of the change. NULL if the token carried none." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="6" name="created_at" nullable="false" remarks="When the change was made." size="35" type="timestamptz" typeCode="93"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="tenant_sending_history_pkey" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_tenant_sending_history_tenant_created_at" unique="false">
+            <column ascending="true" name="tenant_id"/>
+            <column ascending="false" name="created_at"/>
          </index>
       </table>
       <table name="tenant_settings" remarks="Tenant-scoped configuration settings, one row per tenant. Column-per-setting; grows over time (alert email, header image, from-name, etc.)." schema="notify" type="TABLE">

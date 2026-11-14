@@ -47,3 +47,4 @@ notification_event_type_code
 notification_request_history
 provisioned_phone_number_history
 recipient_safelist_history
+tenant_sending_history
