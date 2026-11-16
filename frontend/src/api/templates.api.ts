@@ -1,6 +1,6 @@
 import type { AxiosError } from 'axios'
 import { getApiErrorMessage } from '@/utils/apiErrorMessage'
-import { get, post, deleteMethod, generateApiParameters, STATUS_CODES } from '@/common/api'
+import { get, post, put, deleteMethod, generateApiParameters, STATUS_CODES } from '@/common/api'
 import type { PaginatedTemplateResponse } from '@/interfaces/PaginatedNotificationResponse'
 
 export enum NotificationChannel {
@@ -51,6 +51,32 @@ export interface TemplatePlaceholders {
 export interface GetTemplatesResponse {
   templates: TemplateResponse[]
   count: number
+}
+
+export interface TemplatePreviewData {
+  params: Record<string, string>
+}
+
+export async function getTemplatePreviewData(templateId: string): Promise<TemplatePreviewData> {
+  try {
+    return await get<TemplatePreviewData>(
+      generateApiParameters(`/api/v1/frontend/templates/${templateId}/preview-data`),
+    )
+  } catch (error) {
+    throw new Error(`Failed to load preview values: ${getApiErrorMessage(error)}`)
+  }
+}
+
+export async function saveTemplatePreviewData(
+  templateId: string,
+  params: Record<string, string>,
+): Promise<TemplatePreviewData> {
+  try {
+    const request = generateApiParameters(`/api/v1/frontend/templates/${templateId}/preview-data`)
+    return await put<TemplatePreviewData>({ ...request, params: { params } })
+  } catch (error) {
+    throw new Error(`Failed to save preview values: ${getApiErrorMessage(error)}`)
+  }
 }
 
 /**

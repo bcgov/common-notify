@@ -113,6 +113,7 @@ export interface TemplateFormData {
 }
 
 interface TemplateFormCommonProps {
+  templateId?: string
   isReadOnly?: boolean
   onSave: (values: TemplateFormData) => Promise<void>
   onCancel: () => void
@@ -138,6 +139,7 @@ const TemplateForm: FC<TemplateFormProps> = ({
   onSave,
   onCancel,
   children,
+  templateId,
 }) => {
   const [saving, setSaving] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -357,6 +359,8 @@ const TemplateForm: FC<TemplateFormProps> = ({
         subject={formData.subject}
         channelCode={formData.channelCode as NotificationChannel}
         engineCode={formData.engineCode as TemplateEngine}
+        templateId={mode === 'edit' ? templateId : undefined}
+        canSave={!isReadOnly}
         draftValues={mode === 'create' ? previewParams : undefined}
         onDraftValuesChange={mode === 'create' ? setPreviewParams : undefined}
       />

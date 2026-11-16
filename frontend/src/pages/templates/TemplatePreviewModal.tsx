@@ -1,13 +1,17 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FC, ReactNode } from 'react'
 import { Button } from '@bcgov/design-system-react-components'
 import EmailBodyFrame from '@/components/EmailBodyFrame'
 import NotificationPreviewModal from '@/components/NotificationPreviewModal'
 import TabBar from '@/components/TabBar'
 import type { TemplateEngine } from '@/api/templates.api'
-import { previewTemplateBody, NotificationChannel } from '@/api/templates.api'
-import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import { setPreviewValues } from '@/redux/slices/templates.slice'
+import {
+  previewTemplateBody,
+  getTemplatePreviewData,
+  saveTemplatePreviewData,
+  NotificationChannel,
+} from '@/api/templates.api'
+import { useAppSelector } from '@/redux/hooks'
 import { detectVariables } from '@/utils/templateVariables'
 import '@/scss/components/templates.scss'
 
@@ -18,6 +22,8 @@ interface TemplatePreviewModalProps {
   subject?: string
   channelCode: NotificationChannel
   engineCode: TemplateEngine
+  templateId?: string
+  canSave?: boolean
   draftValues?: Record<string, string>
   onDraftValuesChange?: (values: Record<string, string>) => void
 }
@@ -29,6 +35,8 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
   subject,
   channelCode,
   engineCode,
+  templateId,
+  canSave = false,
   draftValues,
   onDraftValuesChange,
 }) => {
@@ -37,8 +45,9 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
     [subject, body, engineCode],
   )
 
-  const dispatch = useAppDispatch()
-  const savedValues = useAppSelector((s) => s.templates.previewValues)
+  const tenantId = useAppSelector((s) => s.tenant.selectedTenant?.id)
+  const session = useRef(0)
+  const applying = useRef(false)
 
   const [values, setValues] = useState<Record<string, string>>({})
   const [activeTab, setActiveTab] = useState<'rendered' | 'raw'>('rendered')
@@ -46,6 +55,9 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
   const [renderedHtml, setRenderedHtml] = useState<string | undefined>()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [loadingValues, setLoadingValues] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [loadAttempt, setLoadAttempt] = useState(0)
   // Whether a render has been generated; when false the Rendered tab shows a
   // placeholder instead of stale/empty output.
   const [hasApplied, setHasApplied] = useState(false)
@@ -54,7 +66,10 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
 
   const isMissing = (name: string) => !(values[name] ?? '').trim()
 
-  const runPreview = async (vals: Record<string, string>) => {
+  const runPreview = async (vals: Record<string, string>, persist = false) => {
+    if (applying.current) return
+    applying.current = true
+    const currentSession = session.current
     const params: Record<string, string> = {}
     variables.forEach((v) => {
       const raw = vals[v.name] ?? ''
@@ -66,6 +81,10 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
     setLoading(true)
     setError(null)
     try {
+      if (persist && templateId && canSave) {
+        await saveTemplatePreviewData(templateId, vals)
+        if (session.current !== currentSession) return
+      }
       const result = await previewTemplateBody({
         body,
         subject: channelCode === NotificationChannel.EMAIL ? subject : undefined,
@@ -73,48 +92,81 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
         engineCode,
         params,
       })
+      if (session.current !== currentSession) return
       setRendered(result.body)
       setRenderedHtml(result.html)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to render preview')
+      if (session.current === currentSession) {
+        setError(err instanceof Error ? err.message : 'Failed to render preview')
+      }
     } finally {
-      setLoading(false)
+      if (session.current === currentSession) {
+        applying.current = false
+        setLoading(false)
+      }
     }
   }
 
-  // When the modal opens, seed default values and render an initial preview
+  // Each visit reloads shared values. Draft changes stay in the parent form.
   useEffect(() => {
+    const currentSession = ++session.current
+    applying.current = false
+    setLoading(false)
     if (!isOpen) return
-    const initial: Record<string, string> = {}
-    variables.forEach((v) => {
-      initial[v.name] = (draftValues ?? savedValues)[v.name] ?? (v.type === 'boolean' ? 'true' : '')
-    })
-    setValues(initial)
-    onDraftValuesChange?.(initial)
+    setValues({})
     setActiveTab('raw')
     setShowErrors(false)
-    // Only render up front when every value is present; otherwise the Rendered tab
-    // shows its placeholder until the user applies what they have.
-    const missing = variables.some((v) => v.type !== 'boolean' && !(initial[v.name] ?? '').trim())
-    if (missing) {
-      setHasApplied(false)
-      setRendered('')
-      setRenderedHtml(undefined)
-      setError(null)
-    } else {
-      setHasApplied(true)
-      void runPreview(initial)
+    setHasApplied(false)
+    setRendered('')
+    setRenderedHtml(undefined)
+    setError(null)
+    setLoadError(null)
+    setLoadingValues(true)
+
+    const initialize = async () => {
+      try {
+        const saved = templateId
+          ? (await getTemplatePreviewData(templateId)).params
+          : (draftValues ?? {})
+        if (session.current !== currentSession) return
+        const initial = Object.fromEntries(
+          variables.map((v) => [
+            v.name,
+            Object.prototype.hasOwnProperty.call(saved, v.name)
+              ? saved[v.name]
+              : v.type === 'boolean'
+                ? 'true'
+                : '',
+          ]),
+        )
+        setValues(initial)
+        onDraftValuesChange?.(initial)
+        const missing = variables.some(
+          (v) => v.type !== 'boolean' && !(initial[v.name] ?? '').trim(),
+        )
+        if (!missing) {
+          setHasApplied(true)
+          void runPreview(initial)
+        }
+      } catch (err) {
+        if (session.current === currentSession) {
+          setLoadError(err instanceof Error ? err.message : 'Failed to load preview values')
+        }
+      } finally {
+        if (session.current === currentSession) setLoadingValues(false)
+      }
     }
+    void initialize()
+    return () => {
+      session.current++
+    }
+    // Initialize from the current content and draft on opening, without resetting typed values.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen])
+  }, [isOpen, templateId, tenantId, loadAttempt])
 
   const handleValueChange = (name: string) => (value: string) => {
     setValues((prev) => ({ ...prev, [name]: value }))
-    if (onDraftValuesChange) {
-      onDraftValuesChange({ ...values, [name]: value })
-    } else {
-      dispatch(setPreviewValues({ [name]: value }))
-    }
+    onDraftValuesChange?.({ ...values, [name]: value })
   }
 
   let renderedOverride: ReactNode
@@ -140,6 +192,18 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
       onClose={onClose}
       title="Email Notification Preview"
       className="template-preview"
+      notice={
+        loadError ? (
+          <div role="alert">
+            <p>{loadError}</p>
+            <Button type="button" variant="secondary" onPress={() => setLoadAttempt((n) => n + 1)}>
+              Retry loading values
+            </Button>
+          </div>
+        ) : loadingValues ? (
+          <p role="status">Loading preview values...</p>
+        ) : undefined
+      }
       variables={variables.map((variable) => ({
         name: variable.name,
         value: values[variable.name] ?? '',
@@ -148,7 +212,7 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
         errorMessage: 'This field is empty.',
       }))}
       variablesIntro="Enter values for all variables to view the rendered template."
-      isEditable
+      isEditable={!loadingValues && !loadError}
       onVariableChange={(name, value) => handleValueChange(name)(value)}
       footer={
         <Button
@@ -159,9 +223,9 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
             // Empty fields are flagged but still render, printing nothing.
             setShowErrors(true)
             setHasApplied(true)
-            void runPreview(values)
+            void runPreview(values, true)
           }}
-          isDisabled={loading}
+          isDisabled={loading || loadingValues || !!loadError}
         >
           {loading ? 'Applying...' : 'Apply to template'}
         </Button>
