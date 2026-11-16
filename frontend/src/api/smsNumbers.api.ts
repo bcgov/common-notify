@@ -1,5 +1,8 @@
 import { get, post, put, patch, deleteMethod, generateApiParameters } from '@/common/api'
 import { getApiErrorMessage, toReadableError } from '@/utils/apiErrorMessage'
+import type { PaginatedResponse } from '@/interfaces/PaginatedNotificationResponse'
+import { toListQueryString } from './listQuery'
+import type { ListQuery } from './listQuery'
 
 /**
  * SMS numbers: the admin inventory and assignments (/api/v1/frontend/admin/sms-numbers,
@@ -23,8 +26,6 @@ export interface SmsNumber {
   phoneNumber: string
   providerCode: string
   numberTypeCode: string
-  /** The provider's own id for the number, for finding it in their console. */
-  providerReference: string | null
   description: string | null
   /** What a tenant without a number of its own sends from, through this number's provider. */
   isDefault: boolean
@@ -35,13 +36,10 @@ export interface SmsNumberInput {
   phoneNumber: string
   providerCode: string
   numberTypeCode: string
-  providerReference?: string | null
   description?: string | null
 }
 
-export type SmsNumberUpdate = Partial<
-  Pick<SmsNumberInput, 'numberTypeCode' | 'providerReference' | 'description'>
->
+export type SmsNumberUpdate = Partial<Pick<SmsNumberInput, 'numberTypeCode' | 'description'>>
 
 export interface SmsNumberRequest {
   id: string
@@ -178,12 +176,17 @@ export async function unassignSmsNumber(tenantId: string, smsNumberId: string): 
   }
 }
 
+/**
+ * A page of requests, newest first. Filter on status with `statusCode:in:pending|approved`;
+ * `search` matches tenant names.
+ */
 export async function getSmsNumberRequests(
-  status?: SmsNumberRequestStatus,
-): Promise<SmsNumberRequest[]> {
+  query: ListQuery = {},
+): Promise<PaginatedResponse<SmsNumberRequest>> {
   try {
-    const query = status ? `?status=${encodeURIComponent(status)}` : ''
-    return await get<SmsNumberRequest[]>(generateApiParameters(`${ADMIN_URL}/requests${query}`))
+    return await get<PaginatedResponse<SmsNumberRequest>>(
+      generateApiParameters(`${ADMIN_URL}/requests?${toListQueryString(query)}`),
+    )
   } catch (error) {
     throw toReadableError(error, 'SMS number requests')
   }

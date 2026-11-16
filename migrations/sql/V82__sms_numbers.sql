@@ -85,7 +85,6 @@ CREATE TABLE IF NOT EXISTS notify.sms_number (
   phone_number VARCHAR(16) NOT NULL,
   provider_code VARCHAR(20) NOT NULL REFERENCES notify.sms_provider_code (code),
   number_type_code VARCHAR(20) NOT NULL REFERENCES notify.sms_number_type_code (code),
-  provider_reference VARCHAR(200),
   description VARCHAR(500),
   is_default BOOLEAN NOT NULL DEFAULT FALSE,
   is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
@@ -114,7 +113,6 @@ WHERE
 COMMENT ON TABLE notify.sms_number IS 'The SMS numbers Notify owns, each with the provider it is hosted by. Maintained by Notify admins.';
 COMMENT ON COLUMN notify.sms_number.phone_number IS 'E.164, or a 5-6 digit short code. Sent as the origination identity.';
 COMMENT ON COLUMN notify.sms_number.provider_code IS 'The provider hosting the number. Only a send through that provider uses it.';
-COMMENT ON COLUMN notify.sms_number.provider_reference IS 'The provider''s own id for the number (an AWS phone number id, say), for finding it in the provider''s console. Not used to send.';
 COMMENT ON COLUMN notify.sms_number.description IS 'Admin notes on the number.';
 COMMENT ON COLUMN notify.sms_number.is_default IS 'The number a tenant with none of its own sends from, when SMS goes through this number''s provider. At most one per provider. Each environment sets its own.';
 COMMENT ON COLUMN notify.sms_number.is_deleted IS 'Soft delete. A number assigned to a tenant, or the default, cannot be deleted.';

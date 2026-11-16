@@ -132,12 +132,11 @@ export class SmsNumbersService {
       phone_number: string
       provider_code: string
       number_type_code: string
-      provider_reference: string | null
       description: string | null
       is_default: boolean
       tenants: Array<{ tenantId: string; tenantName: string }> | null
     }> = await this.numberRepository.query(
-      `SELECT n.id, n.phone_number, n.provider_code, n.number_type_code, n.provider_reference,
+      `SELECT n.id, n.phone_number, n.provider_code, n.number_type_code,
               n.description, n.is_default,
               json_agg(json_build_object('tenantId', t.id, 'tenantName', t.name) ORDER BY t.name)
                 FILTER (WHERE t.id IS NOT NULL) AS tenants
@@ -153,7 +152,6 @@ export class SmsNumbersService {
       phoneNumber: row.phone_number,
       providerCode: row.provider_code,
       numberTypeCode: row.number_type_code,
-      providerReference: row.provider_reference,
       description: row.description,
       isDefault: row.is_default,
       tenants: row.tenants ?? [],
@@ -192,7 +190,6 @@ export class SmsNumbersService {
         phoneNumber: dto.phoneNumber,
         providerCode: dto.providerCode,
         numberTypeCode: dto.numberTypeCode,
-        providerReference: dto.providerReference ?? null,
         description: dto.description ?? null,
         createdBy: actor.id,
         updatedBy: actor.id,
@@ -208,7 +205,6 @@ export class SmsNumbersService {
   ): Promise<SmsNumberDto> {
     const number = await this.findNumber(id)
     if (dto.numberTypeCode !== undefined) number.numberTypeCode = dto.numberTypeCode
-    if (dto.providerReference !== undefined) number.providerReference = dto.providerReference
     if (dto.description !== undefined) number.description = dto.description
     number.updatedBy = actor.id
     await this.numberRepository.save(number)
@@ -364,7 +360,6 @@ function toDto(number: SmsNumber, tenants: SmsNumberDto['tenants']): SmsNumberDt
     phoneNumber: number.phoneNumber,
     providerCode: number.providerCode,
     numberTypeCode: number.numberTypeCode,
-    providerReference: number.providerReference,
     description: number.description,
     isDefault: number.isDefault,
     tenants,

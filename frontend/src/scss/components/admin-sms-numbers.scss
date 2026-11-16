@@ -22,8 +22,47 @@
   list-style: none;
 }
 
-.admin-sms-numbers__default {
+// The default numbers summary above the Numbers table.
+.sms-defaults__help {
+  margin: 0 0 $spacing-sm;
+  color: $text-secondary;
+}
+
+.sms-defaults__list {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  margin: 0;
+}
+
+.sms-defaults__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: $spacing-xs $spacing-md;
+}
+
+.sms-defaults__provider {
+  display: flex;
+  flex-direction: column;
+  min-width: 14rem;
+  font-weight: 600;
+}
+
+.sms-defaults__active {
   color: $text-secondary;
   font-size: $font-size-sm;
-  font-weight: 600;
+  font-weight: normal;
+}
+
+.sms-defaults__value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: $spacing-sm;
+  margin: 0;
+}
+
+.sms-defaults__unset {
+  color: $text-secondary;
 }

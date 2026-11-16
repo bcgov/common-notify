@@ -11,12 +11,9 @@ import {
   MaxLength,
   ValidateIf,
 } from 'class-validator'
-import {
-  SMS_NUMBER_PATTERN,
-  SMS_NUMBER_TYPE_CODES,
-  SMS_PROVIDER_CODES,
-  SmsNumberRequestStatus,
-} from '../sms-number-codes'
+import { SMS_NUMBER_PATTERN, SMS_NUMBER_TYPE_CODES, SMS_PROVIDER_CODES } from '../sms-number-codes'
+import { PaginatedResponse } from '../../../common/schemas/paginated-response'
+import type { QueryableFieldsConfig } from '../../../common/query/list-query.types'
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value)
 /** An optional text field: blank is stored as null. */
@@ -41,18 +38,6 @@ export class CreateSmsNumberDto {
   @IsIn(SMS_NUMBER_TYPE_CODES)
   numberTypeCode: string
 
-  @ApiPropertyOptional({
-    description: "The provider's own id for the number",
-    maxLength: 200,
-    nullable: true,
-    type: String,
-  })
-  @IsOptional()
-  @Transform(trimToNull)
-  @IsString()
-  @MaxLength(200)
-  providerReference?: string | null
-
   @ApiPropertyOptional({ maxLength: 500, nullable: true, type: String })
   @IsOptional()
   @Transform(trimToNull)
@@ -66,7 +51,7 @@ export class CreateSmsNumberDto {
  * silently move every tenant assigned to it, so a different number is added and assigned instead.
  */
 export class UpdateSmsNumberDto extends PartialType(
-  PickType(CreateSmsNumberDto, ['numberTypeCode', 'providerReference', 'description'] as const),
+  PickType(CreateSmsNumberDto, ['numberTypeCode', 'description'] as const),
 ) {}
 
 /** Assigns a number to a tenant, replacing its number for that number's provider. */
@@ -124,9 +109,6 @@ export class SmsNumberDto {
 
   @ApiProperty()
   numberTypeCode: string
-
-  @ApiProperty({ nullable: true, type: String })
-  providerReference: string | null
 
   @ApiProperty({ nullable: true, type: String })
   description: string | null
@@ -225,11 +207,15 @@ export class SmsNumberCodesDto {
   defaultNumberAssignable: boolean
 }
 
-export class ListSmsNumberRequestsQueryDto {
-  @ApiPropertyOptional({ enum: Object.values(SmsNumberRequestStatus) })
-  @IsOptional()
-  @IsIn(Object.values(SmsNumberRequestStatus))
-  status?: SmsNumberRequestStatus
+/** One page of requests for the admin table. */
+export class PaginatedSmsNumberRequestsDto extends PaginatedResponse(SmsNumberRequestDto) {}
+
+/** The requests table filters on status (`statusCode:in:pending|approved`); search is tenant name. */
+export const smsNumberRequestListQueryConfig: QueryableFieldsConfig = {
+  sortableFields: {},
+  filterableFields: {
+    statusCode: { column: 'r.status_code', operators: ['eq', 'in'] },
+  },
 }
 
 /**

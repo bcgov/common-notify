@@ -43,6 +43,7 @@ function smsNumbersMigration(): string {
 
 const PARKS = '7f1d5c9e-0000-4000-8000-0000000000a1'
 const ROADS = '7f1d5c9e-0000-4000-8000-0000000000a2'
+const LANDS = '7f1d5c9e-0000-4000-8000-0000000000a3'
 const admin = { id: 'padmin', name: 'Pat Admin' }
 const tenantUser = { id: 'tuser', name: 'Terry User' }
 /** What config says; flipped per test to stand in for prod. */
@@ -81,8 +82,8 @@ describe('SMS numbers (database)', () => {
       );`)
     await dataSource.query(smsNumbersMigration())
     await dataSource.query(
-      `INSERT INTO notify.tenant (id, name) VALUES ($1, 'Parks'), ($2, 'Roads')`,
-      [PARKS, ROADS],
+      `INSERT INTO notify.tenant (id, name) VALUES ($1, 'Parks'), ($2, 'Roads'), ($3, '100% Parks')`,
+      [PARKS, ROADS, LANDS],
     )
 
     numbers = new SmsNumbersService(
@@ -388,7 +389,7 @@ describe('SMS numbers (database)', () => {
       await numbers.assign(PARKS, second.id, admin)
       await numbers.unassign(ROADS, first.id, admin)
 
-      const byId = new Map((await requests.list()).map((r) => [r.id, r]))
+      const byId = new Map((await requests.list()).data.map((r) => [r.id, r]))
       expect(byId.get(replaced.id)).toMatchObject({
         statusCode: 'released',
         releasedBy: 'Pat Admin',
@@ -486,6 +487,37 @@ describe('SMS numbers (database)', () => {
       })
     })
 
+    it('pages, filters by status and searches tenant names for the admin table', async () => {
+      const parks = await requests.create(PARKS, tenantUser)
+      await requests.reject(parks.id, 'No', admin)
+      await requests.create(PARKS, tenantUser)
+      await requests.create(ROADS, tenantUser)
+      await requests.create(LANDS, tenantUser)
+
+      // Newest first, two to a page.
+      const first = await requests.list({ page: 1, limit: 2 })
+      expect(first).toMatchObject({ count: 4, page: 1, limit: 2, totalPages: 2 })
+      expect(first.data.map((r) => r.tenantName)).toEqual(['100% Parks', 'Roads'])
+      expect((await requests.list({ page: 2, limit: 2 })).data).toHaveLength(2)
+
+      // Several statuses, and none meaning all.
+      await expect(requests.list({ statuses: ['rejected'] })).resolves.toMatchObject({ count: 1 })
+      await expect(requests.list({ statuses: ['rejected', 'pending'] })).resolves.toMatchObject({
+        count: 4,
+      })
+      await expect(requests.list({ statuses: [] })).resolves.toMatchObject({ count: 4 })
+
+      // Case-insensitive, and a % in the search is a literal, not a wildcard.
+      const parksOnly = await requests.list({ search: 'parks', statuses: ['pending'] })
+      expect(parksOnly.data.map((r) => r.tenantName).sort()).toEqual(['100% Parks', 'Parks'])
+      const literal = await requests.list({ search: '100%' })
+      expect(literal.data.map((r) => r.tenantName)).toEqual(['100% Parks'])
+      await expect(requests.list({ search: 'nobody' })).resolves.toMatchObject({
+        count: 0,
+        data: [],
+      })
+    })
+
     it('shows a tenant its latest request, and admins every request by status', async () => {
       await expect(requests.findLatestForTenant(PARKS)).resolves.toBeNull()
       const first = await requests.create(PARKS, tenantUser)
@@ -494,11 +526,9 @@ describe('SMS numbers (database)', () => {
       await requests.create(ROADS, tenantUser)
 
       await expect(requests.findLatestForTenant(PARKS)).resolves.toMatchObject({ id: second.id })
-      expect((await requests.list('pending')).map((r) => r.tenantName).sort()).toEqual([
-        'Parks',
-        'Roads',
-      ])
-      await expect(requests.list()).resolves.toHaveLength(3)
+      const pending = await requests.list({ statuses: ['pending'] })
+      expect(pending.data.map((r) => r.tenantName).sort()).toEqual(['Parks', 'Roads'])
+      await expect(requests.list()).resolves.toMatchObject({ count: 3 })
     })
   })
 })

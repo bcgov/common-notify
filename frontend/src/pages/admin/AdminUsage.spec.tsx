@@ -141,7 +141,6 @@ describe('AdminUsage', () => {
       'SMS: 0',
       'SMS: 0 / Not set',
       'SMS: 0 / Not set',
-      'SMS: Not set',
       '',
     ])
     await userEvent.click(screen.getByRole('button', { name: 'Actions for Test Tenant' }))

@@ -2,67 +2,32 @@ import { useCallback, useEffect, useState } from 'react'
 import type { FC } from 'react'
 import { Button } from '@bcgov/design-system-react-components'
 import PageHeading from '@/components/PageHeading'
-import PageSubHeading from '@/components/PageSubHeading'
+import TabBar from '@/components/TabBar'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
 import RowActionsMenu from '@/components/RowActionsMenu'
 import type { RowActionGroup } from '@/components/RowActionsMenu'
-import SmsRequestStatusBadge from '@/components/SmsRequestStatusBadge'
-import { getSmsNumberCodes, getSmsNumberRequests, getSmsNumbers } from '@/api/smsNumbers.api'
-import type { SmsNumber, SmsNumberCodes, SmsNumberRequest } from '@/api/smsNumbers.api'
+import { getSmsNumberCodes, getSmsNumbers } from '@/api/smsNumbers.api'
+import type { SmsNumber, SmsNumberCodes } from '@/api/smsNumbers.api'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchNotifyTenantOptions } from '@/redux/thunks/adminTenants.thunks'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
-import { formatDate } from '@/utils/dates'
 import SmsNumberDialogs from './SmsNumberDialogs'
+import SmsNumberRequestsTable from './SmsNumberRequestsTable'
+import SmsDefaultNumbersSummary from './SmsDefaultNumbersSummary'
+import SmsDefaultTag from './SmsDefaultTag'
 import type { SmsNumberAction, SmsNumberDialog } from './smsNumberDialog'
 import { codeLabel } from './smsNumberLabels'
 import '@/scss/components/admin-sms-numbers.scss'
 
-/** What can be done with a request in each status. A decided or released one is a record only. */
-const REQUEST_ACTIONS: Partial<Record<string, RowActionGroup['actions']>> = {
-  pending: [
-    { id: 'approve', label: 'Approve and assign a number' },
-    { id: 'reject', label: 'Reject' },
-  ],
-  approved: [{ id: 'release', label: 'Release number' }],
-}
+type SmsNumbersTab = 'requests' | 'numbers'
 
-/** Pending requests first, each group newest first. */
-const byPendingThenNewest = (a: SmsNumberRequest, b: SmsNumberRequest) =>
-  Number(b.statusCode === 'pending') - Number(a.statusCode === 'pending') ||
-  b.requestedAt.localeCompare(a.requestedAt)
+const NUMBERS_PAGE_SIZES = [15, 30]
 
-/** "By Pat Admin, Nov 17, 2026": who did something and when. */
-const ByWhen: FC<{ verb: string; by: string | null; at: string }> = ({ verb, by, at }) => (
-  <span className="admin-sms-numbers__detail">
-    {verb}
-    {by ? ` by ${by}` : ''} <time dateTime={at}>{formatDate(at)}</time>
-  </span>
-)
-
-/**
- * Who decided a request and when, what came of it, and who released the number if anyone has. A
- * cancelled request was never decided, so shows who cancelled it.
- */
-const RequestDecision: FC<{ request: SmsNumberRequest }> = ({ request }) => {
-  if (request.cancelledAt) {
-    return <ByWhen verb="Cancelled" by={request.cancelledBy} at={request.cancelledAt} />
-  }
-  if (!request.decidedAt) return <span className="admin-sms-numbers__detail">Not yet decided</span>
-  const verb = request.statusCode === 'rejected' ? 'Rejected' : 'Approved'
-  return (
-    <div className="admin-sms-numbers__stack">
-      {request.phoneNumber && <span>{request.phoneNumber}</span>}
-      {request.usesDefaultNumber && <span>Default number</span>}
-      {request.decisionReason && <span>{request.decisionReason}</span>}
-      <ByWhen verb={verb} by={request.decidedBy} at={request.decidedAt} />
-      {request.releasedAt && (
-        <ByWhen verb="Released" by={request.releasedBy} at={request.releasedAt} />
-      )}
-    </div>
-  )
-}
+const TABS: { id: SmsNumbersTab; label: string }[] = [
+  { id: 'requests', label: 'Requests' },
+  { id: 'numbers', label: 'Numbers' },
+]
 
 /**
  * SMS numbers: tenants' requests for one, and the inventory of numbers with the tenants assigned
@@ -72,23 +37,22 @@ const AdminSmsNumbers: FC = () => {
   const dispatch = useAppDispatch()
   const tenants = useAppSelector((state) => state.adminTenants.notifyOptions)
   const [numbers, setNumbers] = useState<SmsNumber[]>([])
-  const [requests, setRequests] = useState<SmsNumberRequest[]>([])
+  // Bumped after a save, so the requests table loads its current page again.
+  const [requestsReloadKey, setRequestsReloadKey] = useState(0)
+  const [numbersPage, setNumbersPage] = useState(1)
+  const [numbersLimit, setNumbersLimit] = useState(NUMBERS_PAGE_SIZES[0])
   const [codes, setCodes] = useState<SmsNumberCodes | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dialog, setDialog] = useState<SmsNumberDialog | null>(null)
   const [busy, setBusy] = useState(false)
+  const [tab, setTab] = useState<SmsNumbersTab>('requests')
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [nextNumbers, nextRequests, nextCodes] = await Promise.all([
-        getSmsNumbers(),
-        getSmsNumberRequests(),
-        getSmsNumberCodes(),
-      ])
+      const [nextNumbers, nextCodes] = await Promise.all([getSmsNumbers(), getSmsNumberCodes()])
       setNumbers(nextNumbers)
-      setRequests([...nextRequests].sort(byPendingThenNewest))
       setCodes(nextCodes)
       setError(null)
     } catch (loadError) {
@@ -97,6 +61,12 @@ const AdminSmsNumbers: FC = () => {
       setLoading(false)
     }
   }, [])
+
+  /** After a save: the numbers and codes, and the requests table's current page. */
+  const reload = useCallback(async () => {
+    setRequestsReloadKey((key) => key + 1)
+    await load()
+  }, [load])
 
   useEffect(() => {
     load()
@@ -112,7 +82,7 @@ const AdminSmsNumbers: FC = () => {
       await action()
       showSuccessToast(success)
       close()
-      await load()
+      await reload()
     } catch (actionError) {
       showErrorToast(actionError instanceof Error ? actionError.message : 'Something went wrong')
     } finally {
@@ -155,52 +125,6 @@ const AdminSmsNumbers: FC = () => {
     setDialog({ kind: actionId as SmsNumberAction, number })
   }
 
-  const requestColumns: TableColumn<SmsNumberRequest>[] = [
-    {
-      key: 'tenantName',
-      label: 'Tenant',
-      render: (_, request) => <span className="fw-semibold">{request.tenantName}</span>,
-    },
-    {
-      key: 'statusCode',
-      label: 'Status',
-      render: (_, request) => <SmsRequestStatusBadge status={request.statusCode} />,
-    },
-    {
-      key: 'requestedAt',
-      label: 'Requested',
-      render: (_, request) => (
-        <div className="admin-sms-numbers__stack">
-          <time dateTime={request.requestedAt}>{formatDate(request.requestedAt)}</time>
-          {request.requestedBy && (
-            <span className="admin-sms-numbers__detail">By {request.requestedBy}</span>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'decidedAt',
-      label: 'Decision',
-      render: (_, request) => <RequestDecision request={request} />,
-    },
-    {
-      key: 'id',
-      label: 'Actions',
-      render: (_, request) => {
-        const actions = REQUEST_ACTIONS[request.statusCode]
-        return actions ? (
-          <RowActionsMenu
-            label={`Actions for ${request.tenantName}'s request`}
-            groups={[{ id: 'request', actions }]}
-            onAction={(actionId) =>
-              setDialog({ kind: actionId as 'approve' | 'reject' | 'release', request })
-            }
-          />
-        ) : null
-      },
-    },
-  ]
-
   const numberColumns: TableColumn<SmsNumber>[] = [
     {
       key: 'phoneNumber',
@@ -208,7 +132,7 @@ const AdminSmsNumbers: FC = () => {
       render: (_, number) => (
         <div className="admin-sms-numbers__stack">
           <span className="fw-semibold admin-sms-numbers__number">{number.phoneNumber}</span>
-          {number.isDefault && <span className="admin-sms-numbers__default">Default</span>}
+          {number.isDefault && <SmsDefaultTag />}
           <span className="admin-sms-numbers__detail">
             {codeLabel(codes?.numberTypes ?? [], number.numberTypeCode)}
           </span>
@@ -243,15 +167,8 @@ const AdminSmsNumbers: FC = () => {
     },
     {
       key: 'description',
-      label: 'Details',
-      render: (_, number) => (
-        <div className="admin-sms-numbers__stack">
-          {number.description && <span>{number.description}</span>}
-          {number.providerReference && (
-            <span className="admin-sms-numbers__detail">{number.providerReference}</span>
-          )}
-        </div>
-      ),
+      label: 'Description',
+      render: (_, number) => number.description ?? '',
     },
     {
       key: 'id',
@@ -266,53 +183,61 @@ const AdminSmsNumbers: FC = () => {
     },
   ]
 
-  const pendingCount = requests.filter((request) => request.statusCode === 'pending').length
+  // The inventory is small and the dialogs need all of it, so it is paged here, not by the API.
+  const numbersOnPage = numbers.slice((numbersPage - 1) * numbersLimit, numbersPage * numbersLimit)
 
   return (
     <div className="page">
-      <PageHeading
-        title="SMS Numbers"
-        meta={
-          loading ? undefined : `${pendingCount} pending request(s), ${numbers.length} number(s)`
-        }
-      />
+      <PageHeading title="SMS Numbers" />
       {error && <div role="alert">{error}</div>}
 
-      <section className="page__section" aria-labelledby="sms-requests-heading">
-        <PageSubHeading title="Requests" id="sms-requests-heading" />
-        <DataTable
-          columns={requestColumns}
-          data={requests}
-          keyExtractor={(request) => request.id}
-          multiline
-          isLoading={loading}
-          emptyMessage="No tenant has requested an SMS number."
-          label="SMS number requests"
-        />
-      </section>
+      <TabBar label="SMS number views" items={TABS} selected={tab} onSelect={setTab} />
 
-      <section className="page__section" aria-labelledby="sms-numbers-heading">
-        <PageSubHeading title="Numbers" id="sms-numbers-heading" />
-        <div className="page__toolbar">
-          <Button
-            variant="primary"
-            size="small"
-            isDisabled={!codes}
-            onPress={() => setDialog({ kind: 'add' })}
-          >
-            Add number
-          </Button>
-        </div>
-        <DataTable
-          columns={numberColumns}
-          data={numbers}
-          keyExtractor={(number) => number.id}
-          multiline
-          isLoading={loading}
-          emptyMessage="No SMS numbers yet."
-          label="SMS numbers"
+      {tab === 'requests' ? (
+        <SmsNumberRequestsTable
+          statuses={codes?.requestStatuses}
+          reloadKey={requestsReloadKey}
+          onAction={(kind, request) => setDialog({ kind, request })}
         />
-      </section>
+      ) : (
+        <>
+          {codes && (
+            <SmsDefaultNumbersSummary
+              codes={codes}
+              numbers={numbers}
+              onChange={(providerCode) => setDialog({ kind: 'chooseDefault', providerCode })}
+            />
+          )}
+          <div className="page__toolbar">
+            <Button
+              variant="primary"
+              size="small"
+              isDisabled={!codes}
+              onPress={() => setDialog({ kind: 'add' })}
+            >
+              Add number
+            </Button>
+          </div>
+          <DataTable
+            columns={numberColumns}
+            data={numbersOnPage}
+            keyExtractor={(number) => number.id}
+            multiline
+            isLoading={loading}
+            emptyMessage="No SMS numbers yet."
+            currentPage={numbersPage}
+            pageSize={numbersLimit}
+            totalCount={numbers.length}
+            onPageChange={setNumbersPage}
+            onPageSizeChange={(size) => {
+              setNumbersLimit(size)
+              setNumbersPage(1)
+            }}
+            pageSizeOptions={NUMBERS_PAGE_SIZES}
+            label="SMS numbers"
+          />
+        </>
+      )}
 
       {dialog && (
         <SmsNumberDialogs
@@ -322,7 +247,7 @@ const AdminSmsNumbers: FC = () => {
           tenants={tenants}
           busy={busy}
           onClose={close}
-          onSaved={load}
+          onSaved={reload}
           onConfirm={runConfirmed}
         />
       )}

@@ -10,6 +10,12 @@ const BADGES: Record<string, { status: string; label: string }> = {
   cancelled: { status: 'cancelled', label: 'Cancelled' },
 }
 
+/** How a request status reads, e.g. "Pending"; a status added later reads as its code. */
+export const smsRequestStatusLabel = (status: string): string => BADGES[status]?.label ?? status
+
+/** The statuses this badge knows, in workflow order, for when the code table is not loaded. */
+export const SMS_REQUEST_STATUSES = Object.keys(BADGES)
+
 /** The status of an SMS number request. A status added later shows with a neutral colour. */
 const SmsRequestStatusBadge: FC<{ status: string }> = ({ status }) => {
   const badge = BADGES[status]

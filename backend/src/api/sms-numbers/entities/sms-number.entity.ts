@@ -16,10 +16,6 @@ export class SmsNumber {
   @Column({ type: 'varchar', length: 20, name: 'number_type_code' })
   numberTypeCode: string
 
-  /** The provider's own id for the number, for finding it in their console. */
-  @Column({ type: 'varchar', length: 200, nullable: true, name: 'provider_reference' })
-  providerReference: string | null
-
   @Column({ type: 'varchar', length: 500, nullable: true })
   description: string | null
 

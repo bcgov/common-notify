@@ -326,23 +326,6 @@ const AdminUsage: FC = () => {
       ),
     },
     {
-      key: 'channels',
-      id: 'threshold',
-      label: 'Alert threshold',
-      render: (_, tenant) => (
-        <ChannelValues
-          rows={tenant.channels}
-          render={(row) =>
-            row.warnThresholdPercent === null ? (
-              <span className="text-muted">Not set</span>
-            ) : (
-              `${row.warnThresholdPercent}%`
-            )
-          }
-        />
-      ),
-    },
-    {
       key: 'tenantId',
       label: 'Actions',
       render: (_, tenant) => (

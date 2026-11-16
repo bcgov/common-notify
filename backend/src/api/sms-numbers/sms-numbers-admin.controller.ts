@@ -27,13 +27,16 @@ import { Roles } from '../../common/decorators/roles.decorator'
 import { NotifyAdminGuard } from '../../common/guards/notify-admin.guard'
 import { JwtUserExtractor } from '../../common/utils/jwt-user-extractor'
 import { SsoRole } from '../../enum/sso-role.enum'
+import { SearchableListQueryDto } from '../../common/query/searchable-list-query.dto'
+import { parseListQuery } from '../../common/query/list-query.parser'
 import { SmsNumberRequestsService } from './sms-number-requests.service'
 import { SmsNumberActor, SmsNumbersService } from './sms-numbers.service'
 import {
   ApproveSmsNumberRequestDto,
   AssignSmsNumberDto,
   CreateSmsNumberDto,
-  ListSmsNumberRequestsQueryDto,
+  PaginatedSmsNumberRequestsDto,
+  smsNumberRequestListQueryConfig,
   RejectSmsNumberRequestDto,
   SmsNumberCodesDto,
   SmsNumberDto,
@@ -91,7 +94,7 @@ export class SmsNumbersAdminController {
 
   @Version('1')
   @Patch(':id')
-  @ApiOperation({ summary: "Update a number's type, provider reference or description" })
+  @ApiOperation({ summary: "Update a number's type or description" })
   @ApiOkResponse({ type: SmsNumberDto })
   updateNumber(
     @Req() req: Request,
@@ -156,10 +159,17 @@ export class SmsNumbersAdminController {
 
   @Version('1')
   @Get('requests')
-  @ApiOperation({ summary: "Tenants' SMS number requests, newest first" })
-  @ApiOkResponse({ type: [SmsNumberRequestDto] })
-  listRequests(@Query() query: ListSmsNumberRequestsQueryDto): Promise<SmsNumberRequestDto[]> {
-    return this.requestsService.list(query.status)
+  @ApiOperation({
+    summary: "A page of tenants' SMS number requests, newest first, by status and tenant name",
+  })
+  @ApiOkResponse({ type: PaginatedSmsNumberRequestsDto })
+  listRequests(@Query() query: SearchableListQueryDto): Promise<PaginatedSmsNumberRequestsDto> {
+    const { page, limit, filters } = parseListQuery(query, smsNumberRequestListQueryConfig)
+    const statuses = filters
+      .filter((filter) => filter.field === 'statusCode')
+      .flatMap((filter) => (Array.isArray(filter.value) ? filter.value : [filter.value]))
+      .map(String)
+    return this.requestsService.list({ statuses, search: query.search, page, limit })
   }
 
   @Version('1')

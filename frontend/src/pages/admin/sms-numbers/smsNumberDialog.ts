@@ -9,3 +9,4 @@ export type SmsNumberDialog =
   | { kind: SmsNumberAction; number: SmsNumber }
   | { kind: 'unassign'; number: SmsNumber; tenant: SmsNumberTenant }
   | { kind: 'approve' | 'reject' | 'release'; request: SmsNumberRequest }
+  | { kind: 'chooseDefault'; providerCode: string }

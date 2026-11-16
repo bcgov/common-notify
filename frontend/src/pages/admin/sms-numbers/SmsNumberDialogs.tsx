@@ -9,6 +9,7 @@ import {
 } from '@/api/smsNumbers.api'
 import type { SmsNumber, SmsNumberCodes } from '@/api/smsNumbers.api'
 import AssignSmsNumberDialog from './AssignSmsNumberDialog'
+import ChooseDefaultNumberDialog from './ChooseDefaultNumberDialog'
 import RejectSmsNumberRequestDialog from './RejectSmsNumberRequestDialog'
 import SmsNumberFormDialog from './SmsNumberFormDialog'
 import type { SmsNumberDialog } from './smsNumberDialog'
@@ -140,6 +141,16 @@ const SmsNumberDialogs: FC<SmsNumberDialogsProps> = ({
             through {codeLabel(providers, dialog.number.providerCode)}.
           </p>
         </ConfirmDialog>
+      )
+    case 'chooseDefault':
+      return (
+        <ChooseDefaultNumberDialog
+          key={dialog.providerCode}
+          providerName={codeLabel(providers, dialog.providerCode)}
+          numbers={numbers.filter((number) => number.providerCode === dialog.providerCode)}
+          onClose={onClose}
+          onSaved={onSaved}
+        />
       )
     case 'makeDefault': {
       const current = numbers.find(

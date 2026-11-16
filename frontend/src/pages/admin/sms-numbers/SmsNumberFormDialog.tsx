@@ -27,7 +27,6 @@ const SmsNumberFormDialog: FC<SmsNumberFormDialogProps> = ({ codes, number, onCl
   const [phoneNumber, setPhoneNumber] = useState(number?.phoneNumber ?? '')
   const [providerCode, setProviderCode] = useState(number?.providerCode ?? codes.activeProvider)
   const [numberTypeCode, setNumberTypeCode] = useState(number?.numberTypeCode ?? 'long_code')
-  const [providerReference, setProviderReference] = useState(number?.providerReference ?? '')
   const [description, setDescription] = useState(number?.description ?? '')
   const [showErrors, setShowErrors] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -43,7 +42,6 @@ const SmsNumberFormDialog: FC<SmsNumberFormDialogProps> = ({ codes, number, onCl
     try {
       const details = {
         numberTypeCode,
-        providerReference: providerReference.trim() || null,
         description: description.trim() || null,
       }
       if (number) {
@@ -99,14 +97,6 @@ const SmsNumberFormDialog: FC<SmsNumberFormDialogProps> = ({ codes, number, onCl
           onChange={(key) => key != null && setNumberTypeCode(String(key))}
           isDisabled={saving}
           isRequired
-        />
-        <TextField
-          label="Provider reference"
-          description="The provider's own id for the number, to find it in their console"
-          value={providerReference}
-          onChange={(value) => setProviderReference(value)}
-          maxLength={200}
-          isDisabled={saving}
         />
         <TextArea
           label="Description"

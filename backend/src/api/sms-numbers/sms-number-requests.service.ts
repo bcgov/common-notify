@@ -10,7 +10,16 @@ import { SmsNumberRequest } from './entities/sms-number-request.entity'
 import { SmsNumberRequestHistory } from './entities/sms-number-request-history.entity'
 import { SmsNumberRequestStatus } from './sms-number-codes'
 import { SmsNumberActor, SmsNumbersService } from './sms-numbers.service'
-import { SmsNumberRequestDto } from './schemas/sms-number.dto'
+import { PaginatedSmsNumberRequestsDto, SmsNumberRequestDto } from './schemas/sms-number.dto'
+import { escapeLikePattern } from '../../common/query/typeorm-list-query.util'
+
+/** What the admin requests table asks for: one page, some statuses, a tenant search. */
+export interface SmsNumberRequestListQuery {
+  statuses?: string[]
+  search?: string
+  page?: number
+  limit?: number
+}
 
 /** Postgres unique_violation: here, a second pending request for a tenant. */
 const UNIQUE_VIOLATION = '23505'
@@ -75,15 +84,29 @@ export class SmsNumberRequestsService {
     return rows[0] ? toDto(rows[0]) : null
   }
 
-  /** Every request, newest first, optionally only those with one status. */
-  async list(statusCode?: string): Promise<SmsNumberRequestDto[]> {
-    const rows: RequestRow[] = await this.requestRepository.query(
-      `SELECT ${REQUEST_COLUMNS} ${REQUEST_FROM}
-        WHERE ($1::varchar IS NULL OR r.status_code = $1)
-        ORDER BY r.created_at DESC`,
-      [statusCode ?? null],
-    )
-    return rows.map(toDto)
+  /**
+   * A page of requests, newest first. `statuses` empty means every status; `search` matches
+   * tenant names, case-insensitively.
+   */
+  async list(query: SmsNumberRequestListQuery = {}): Promise<PaginatedSmsNumberRequestsDto> {
+    const page = query.page ?? 1
+    const limit = query.limit ?? 10
+    const search = query.search?.trim()
+    const where = `WHERE (cardinality($1::text[]) = 0 OR r.status_code = ANY($1))
+                     AND ($2::text IS NULL OR t.name ILIKE $2 ESCAPE '\\')`
+    const params = [query.statuses ?? [], search ? `%${escapeLikePattern(search)}%` : null]
+
+    const [rows, [{ total }]]: [RequestRow[], Array<{ total: string }>] = await Promise.all([
+      this.requestRepository.query(
+        `SELECT ${REQUEST_COLUMNS} ${REQUEST_FROM} ${where}
+          ORDER BY r.created_at DESC, r.id
+          LIMIT $3 OFFSET $4`,
+        [...params, limit, (page - 1) * limit],
+      ),
+      this.requestRepository.query(`SELECT count(*) AS total ${REQUEST_FROM} ${where}`, params),
+    ])
+    const count = Number(total)
+    return { data: rows.map(toDto), count, page, limit, totalPages: Math.ceil(count / limit) }
   }
 
   async create(tenantId: string, actor: SmsNumberActor): Promise<SmsNumberRequestDto> {

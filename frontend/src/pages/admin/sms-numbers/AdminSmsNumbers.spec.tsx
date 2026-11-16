@@ -56,7 +56,6 @@ const awsNumber: SmsNumber = {
   phoneNumber: '+15814360804',
   providerCode: 'aws',
   numberTypeCode: 'long_code',
-  providerReference: 'phone-c3f9',
   description: 'Shared default',
   isDefault: true,
   tenants: [{ tenantId: 'tenant-parks', tenantName: 'Parks' }],
@@ -66,7 +65,6 @@ const twilioNumber: SmsNumber = {
   id: 'num-twilio',
   phoneNumber: '+15551230000',
   providerCode: 'twilio',
-  providerReference: null,
   description: null,
   isDefault: false,
   tenants: [],
@@ -91,6 +89,18 @@ const request = (overrides: Partial<SmsNumberRequest>): SmsNumberRequest => ({
 })
 const code = (value: string, description: string) => ({ code: value, description })
 
+/** A requests page as the API returns it. */
+const pageOf = (data: SmsNumberRequest[], count = data.length) => ({
+  data,
+  count,
+  page: 1,
+  limit: 15,
+  totalPages: Math.ceil(count / 15),
+})
+
+/** The query the requests table last asked for. */
+const lastRequestsQuery = () => vi.mocked(getSmsNumberRequests).mock.lastCall?.[0]
+
 function setup({
   numbers = [awsNumber, twilioNumber],
   requests = [
@@ -106,13 +116,16 @@ function setup({
     request({}),
   ],
   defaultNumberAssignable = false,
+  requestCount,
 }: {
   numbers?: SmsNumber[]
   requests?: SmsNumberRequest[]
   defaultNumberAssignable?: boolean
+  /** The total across every page, when more than this page holds. */
+  requestCount?: number
 } = {}) {
   vi.mocked(getSmsNumbers).mockResolvedValue(numbers)
-  vi.mocked(getSmsNumberRequests).mockResolvedValue(requests)
+  vi.mocked(getSmsNumberRequests).mockResolvedValue(pageOf(requests, requestCount))
   vi.mocked(getSmsNumberCodes).mockResolvedValue({
     providers: [code('aws', 'AWS End User Messaging'), code('twilio', 'Twilio')],
     numberTypes: [code('long_code', 'Long code'), code('short_code', 'Short code')],
@@ -122,6 +135,11 @@ function setup({
     defaultNumberAssignable,
   })
   return render(<AdminSmsNumbers />)
+}
+
+/** The Numbers table is on its own tab; Requests is shown first. */
+async function openNumbersTab() {
+  await userEvent.click(await screen.findByRole('radio', { name: 'Numbers' }))
 }
 
 async function chooseAction(menuLabel: string, action: string) {
@@ -137,19 +155,25 @@ async function chooseOption(fieldLabel: RegExp, option: string) {
 describe('AdminSmsNumbers', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('lists pending requests first, then the numbers with their tenants', async () => {
+  it('asks for pending requests by default, then shows the numbers on their own tab', async () => {
     setup()
 
     const requests = await screen.findByRole('table', { name: 'SMS number requests' })
-    const rows = within(requests).getAllByRole('row').slice(1)
-    expect(rows.map((row) => within(row).getAllByRole('cell')[0].textContent)).toEqual([
-      'Roads',
-      'Parks',
-    ])
-    expect(within(rows[0]).getByText('Pending')).toBeInTheDocument()
-    expect(within(rows[1]).getByText('Approved')).toBeInTheDocument()
+    await within(requests).findByRole('row', { name: /Roads/ })
+    expect(lastRequestsQuery()).toEqual({
+      page: 1,
+      limit: 15,
+      search: undefined,
+      filter: ['statusCode:in:pending'],
+    })
+    expect(within(requests).getByRole('row', { name: /Parks/ })).toBeInTheDocument()
 
+    // Requests show first; the numbers are on their own tab.
+    expect(screen.queryByRole('table', { name: 'SMS numbers' })).not.toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Requests' })).toBeChecked()
+    await openNumbersTab()
     const numbers = screen.getByRole('table', { name: 'SMS numbers' })
+    expect(screen.queryByRole('table', { name: 'SMS number requests' })).not.toBeInTheDocument()
     const awsRow = within(numbers).getByRole('row', { name: /\+15814360804/ })
     expect(within(awsRow).getByText('Sending now')).toBeInTheDocument()
     expect(within(awsRow).getByText('Default')).toBeInTheDocument()
@@ -158,7 +182,60 @@ describe('AdminSmsNumbers', () => {
     expect(within(twilioRow).getByText('Not assigned')).toBeInTheDocument()
     expect(within(twilioRow).queryByText('Sending now')).not.toBeInTheDocument()
     expect(within(twilioRow).queryByText('Default')).not.toBeInTheDocument()
-    expect(screen.getByText('1 pending request(s), 2 number(s)')).toBeInTheDocument()
+  })
+
+  it('filters requests on other statuses from the Status column', async () => {
+    setup()
+    await screen.findByRole('table', { name: 'SMS number requests' })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Column options for Status' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: /Filter by/ }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Approved' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }))
+
+    await waitFor(() =>
+      expect(lastRequestsQuery()).toMatchObject({
+        page: 1,
+        filter: ['statusCode:in:pending|approved'],
+      }),
+    )
+  })
+
+  it('searches requests by tenant name, suggesting tenants as you type', async () => {
+    setup()
+    await screen.findByRole('table', { name: 'SMS number requests' })
+
+    await userEvent.type(screen.getByRole('combobox', { name: 'Search requests by tenant' }), 'Ro')
+    await userEvent.click(await screen.findByRole('option', { name: 'Roads' }))
+
+    await waitFor(() => expect(lastRequestsQuery()).toMatchObject({ page: 1, search: 'Roads' }))
+  })
+
+  it('pages through requests', async () => {
+    setup({ requests: [request({})], requestCount: 40 })
+    expect(await screen.findAllByText(/of 40 items/)).not.toHaveLength(0)
+    // One request on arrival, not a second when the numbers finish loading.
+    expect(getSmsNumberRequests).toHaveBeenCalledTimes(1)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Next page' }))
+
+    await waitFor(() => expect(lastRequestsQuery()).toMatchObject({ page: 2 }))
+  })
+
+  it('pages the numbers table', async () => {
+    const many = Array.from({ length: 20 }, (_, i) => ({
+      ...twilioNumber,
+      id: `num-${i}`,
+      phoneNumber: `+1555123${String(i).padStart(4, '0')}`,
+    }))
+    setup({ numbers: many })
+    await openNumbersTab()
+
+    const table = await screen.findByRole('table', { name: 'SMS numbers' })
+    const numberRows = () => within(table).queryAllByRole('row', { name: /\+1555123/ })
+    expect(numberRows()).toHaveLength(15)
+    await userEvent.click(screen.getByRole('button', { name: 'Next page' }))
+    expect(numberRows()).toHaveLength(5)
   })
 
   it('shows who decided a request and who released its number, and when', async () => {
@@ -191,7 +268,7 @@ describe('AdminSmsNumbers', () => {
     })
 
     const table = await screen.findByRole('table', { name: 'SMS number requests' })
-    const released = within(table).getByRole('row', { name: /Roads/ })
+    const released = await within(table).findByRole('row', { name: /Roads/ })
     expect(within(released).getByText(/Approved by Pat Admin/)).toBeInTheDocument()
     expect(within(released).getByText(/Released by Terry User/)).toBeInTheDocument()
     const rejected = within(table).getByRole('row', { name: /Parks/ })
@@ -275,6 +352,7 @@ describe('AdminSmsNumbers', () => {
   it('adds a number, checking its format first', async () => {
     vi.mocked(createSmsNumber).mockResolvedValue(twilioNumber)
     setup()
+    await openNumbersTab()
 
     await userEvent.click(await screen.findByRole('button', { name: 'Add number' }))
     const dialog = await screen.findByRole('dialog')
@@ -294,7 +372,6 @@ describe('AdminSmsNumbers', () => {
         phoneNumber: '+15550001111',
         providerCode: 'aws',
         numberTypeCode: 'long_code',
-        providerReference: null,
         description: null,
       }),
     )
@@ -303,6 +380,7 @@ describe('AdminSmsNumbers', () => {
   it('assigns a number to a tenant that does not have it yet', async () => {
     vi.mocked(assignSmsNumber).mockResolvedValue()
     setup()
+    await openNumbersTab()
 
     await chooseAction('Actions for +15814360804', 'Assign to a tenant')
     await userEvent.click(screen.getByRole('button', { name: /Tenant/ }))
@@ -317,6 +395,7 @@ describe('AdminSmsNumbers', () => {
   it('unassigns a number from one tenant', async () => {
     vi.mocked(unassignSmsNumber).mockResolvedValue()
     setup()
+    await openNumbersTab()
 
     await chooseAction('Actions for +15814360804', 'Unassign from Parks')
     await userEvent.click(screen.getByRole('button', { name: 'Unassign' }))
@@ -335,6 +414,7 @@ describe('AdminSmsNumbers', () => {
       ],
     })
 
+    await openNumbersTab()
     await chooseAction('Actions for +15551230000', 'Make the default')
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('through Twilio, instead of +15551230001')
@@ -347,6 +427,7 @@ describe('AdminSmsNumbers', () => {
   it('stops using a number as the default', async () => {
     vi.mocked(clearDefaultSmsNumber).mockResolvedValue()
     setup()
+    await openNumbersTab()
 
     await chooseAction('Actions for +15814360804', 'Stop using as the default')
     const dialog = await screen.findByRole('dialog')
@@ -360,6 +441,7 @@ describe('AdminSmsNumbers', () => {
       new Error('Failed to remove the number: +15814360804 is assigned to 1 tenant(s)'),
     )
     setup()
+    await openNumbersTab()
 
     await chooseAction('Actions for +15814360804', 'Remove')
     expect(screen.getByText(/Stop using it as the default first/)).toBeInTheDocument()
@@ -372,11 +454,67 @@ describe('AdminSmsNumbers', () => {
     )
   })
 
-  it('shows empty tables, and a failed load as an alert', async () => {
-    setup({ numbers: [], requests: [] })
-    expect(await screen.findAllByText('No tenant has requested an SMS number.')).not.toHaveLength(0)
-    expect(screen.getAllByText('No SMS numbers yet.')).not.toHaveLength(0)
+  it("summarises each provider's default above the numbers, including one not set", async () => {
+    setup()
+    await openNumbersTab()
 
+    const summary = await screen.findByRole('region', { name: 'Default numbers' })
+    // AWS is sending now and has a default; Twilio has numbers but no default.
+    expect(within(summary).getByText('AWS End User Messaging')).toBeInTheDocument()
+    expect(within(summary).getByText('Sending now')).toBeInTheDocument()
+    expect(within(summary).getByText('+15814360804')).toBeInTheDocument()
+    expect(within(summary).getByText('Not set')).toBeInTheDocument()
+  })
+
+  it('says what sends instead when the active provider has no default', async () => {
+    setup({ numbers: [{ ...awsNumber, isDefault: false }] })
+    await openNumbersTab()
+
+    const summary = await screen.findByRole('region', { name: 'Default numbers' })
+    expect(summary).toHaveTextContent(
+      "Not set. Tenants without a number send from +15550009999, this environment's configured number.",
+    )
+  })
+
+  it("changes a provider's default from the summary, or clears it", async () => {
+    vi.mocked(setDefaultSmsNumber).mockResolvedValue({ ...twilioNumber, isDefault: true })
+    vi.mocked(clearDefaultSmsNumber).mockResolvedValue()
+    setup()
+    await openNumbersTab()
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Change the Twilio default number' }),
+    )
+    await chooseOption(/Default number/, '+15551230000')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(setDefaultSmsNumber).toHaveBeenCalledWith('num-twilio'))
+    expect(showSuccessToast).toHaveBeenCalledWith('+15551230000 is now the Twilio default')
+
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: 'Change the AWS End User Messaging default number',
+      }),
+    )
+    await chooseOption(/Default number/, 'No default')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(clearDefaultSmsNumber).toHaveBeenCalledWith('num-aws'))
+  })
+
+  it('shows the empty state, offering to clear the pending filter or a search', async () => {
+    setup({ numbers: [], requests: [] })
+
+    // Pending is a filter, so an empty first page offers to clear it and see the rest.
+    expect(await screen.findAllByText('No data match the filters applied.')).not.toHaveLength(0)
+    await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
+    await waitFor(() => expect(lastRequestsQuery()).toMatchObject({ filter: undefined }))
+    expect(await screen.findAllByText('No tenant has requested an SMS number.')).not.toHaveLength(0)
+
+    await openNumbersTab()
+    expect(screen.getAllByText('No SMS numbers yet.')).not.toHaveLength(0)
+  })
+
+  it('shows a failed load as an alert', async () => {
+    setup()
     vi.mocked(getSmsNumbers).mockRejectedValue(new Error('Failed to load SMS numbers: down'))
     render(<AdminSmsNumbers />)
     expect(await screen.findByRole('alert')).toHaveTextContent('Failed to load SMS numbers: down')
