@@ -7,12 +7,12 @@ import { toListQueryString } from './listQuery'
  * API Key Usage / Limits API
  *
  * Frontend-facing endpoints for the authenticated tenant's notification limits and usage.
- * Backed by /api/v1/frontend/api-key-usage (NotifyFrontendRoleGuard + CSTAR roles).
+ * Backed by /api/v1/frontend/usage (NotifyFrontendRoleGuard + CSTAR roles).
  * The selected tenant is resolved server-side from the X-Tenant-ID header, which the
  * axios request interceptor attaches automatically.
  */
 
-const BASE_URL = '/api/v1/frontend/api-key-usage'
+const BASE_URL = '/api/v1/frontend/usage'
 
 export interface ChannelUsage {
   channel: string
@@ -134,7 +134,7 @@ export async function updateApiKeyThreshold(
  * Get a paginated page of usage vs limits across tenants (one row per tenant × channel),
  * optionally filtered by tenant name and `field:in:values` filters, and sorted by a usage total
  * (`usedToday`, or `-usedToday` for descending). Pagination is by tenant.
- * Requires NOTIFY_ADMIN. Backed by /api/v1/frontend/admin/api-key-usage.
+ * Requires NOTIFY_ADMIN. Backed by /api/v1/frontend/admin/usage.
  */
 export async function getAllTenantsUsage(
   page: number = 1,
@@ -145,7 +145,7 @@ export async function getAllTenantsUsage(
 ): Promise<PaginatedAdminUsageResponse> {
   try {
     const qs = toListQueryString({ page, limit, search, sort, filter })
-    const params = generateApiParameters(`/api/v1/frontend/admin/api-key-usage?${qs}`)
+    const params = generateApiParameters(`/api/v1/frontend/admin/usage?${qs}`)
     return await get<PaginatedAdminUsageResponse>(params)
   } catch (error) {
     throw toReadableError(error, 'tenant usage')
@@ -160,7 +160,7 @@ export async function setTenantSending(
 ): Promise<{ sendingEnabled: boolean }> {
   try {
     const params = generateApiParameters(
-      `/api/v1/frontend/admin/api-key-usage/tenants/${encodeURIComponent(tenantId)}/sending`,
+      `/api/v1/frontend/admin/usage/tenants/${encodeURIComponent(tenantId)}/sending`,
       enabled ? { enabled } : { enabled, reason },
     )
     return await patch<{ sendingEnabled: boolean }>(params)
@@ -172,7 +172,7 @@ export async function setTenantSending(
 /** How many tenants use Notify. Requires NOTIFY_ADMIN. */
 export async function getAdminUsageSummary(): Promise<AdminUsageSummary> {
   try {
-    const params = generateApiParameters('/api/v1/frontend/admin/api-key-usage/summary')
+    const params = generateApiParameters('/api/v1/frontend/admin/usage/summary')
     return await get<AdminUsageSummary>(params)
   } catch (error) {
     throw toReadableError(error, 'tenant summary')
@@ -182,7 +182,7 @@ export async function getAdminUsageSummary(): Promise<AdminUsageSummary> {
 /** Every tenant the admin usage table can list, by name: the options for its search. */
 export async function getAdminUsageTenants(): Promise<AdminTenantOption[]> {
   try {
-    const params = generateApiParameters('/api/v1/frontend/admin/api-key-usage/tenants')
+    const params = generateApiParameters('/api/v1/frontend/admin/usage/tenants')
     return await get<AdminTenantOption[]>(params)
   } catch (error) {
     throw toReadableError(error, 'tenants')
@@ -197,7 +197,7 @@ export async function updateTenantLimits(
   data: UpdateTenantLimitsRequest,
 ): Promise<AdminTenantUsageRow[]> {
   try {
-    const params = generateApiParameters('/api/v1/frontend/admin/api-key-usage/limits', data)
+    const params = generateApiParameters('/api/v1/frontend/admin/usage/limits', data)
     return await patch<AdminTenantUsageRow[]>(params)
   } catch (error) {
     throw toReadableError(error, 'tenant limits')

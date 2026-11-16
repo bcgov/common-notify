@@ -144,7 +144,7 @@ describe('apiKeyUsage API', () => {
   it('getAdminUsageSummary reads the summary endpoint and translates failures', async () => {
     await expect(api.getAdminUsageSummary()).resolves.toEqual({ ok: true })
     expect(vi.mocked(get).mock.lastCall![0]).toMatchObject({
-      url: '/api/v1/frontend/admin/api-key-usage/summary',
+      url: '/api/v1/frontend/admin/usage/summary',
     })
     vi.mocked(get).mockRejectedValue({ response: { status: 500, data: { message: 'down' } } })
     await expect(api.getAdminUsageSummary()).rejects.toThrow('Failed to load tenant summary: down')
@@ -152,7 +152,7 @@ describe('apiKeyUsage API', () => {
   it('setTenantSending sends the reason only when disabling', async () => {
     await api.setTenantSending('tenant 1', false, 'Unpaid invoice')
     expect(vi.mocked(patch).mock.lastCall![0]).toMatchObject({
-      url: '/api/v1/frontend/admin/api-key-usage/tenants/tenant%201/sending',
+      url: '/api/v1/frontend/admin/usage/tenants/tenant%201/sending',
       params: { enabled: false, reason: 'Unpaid invoice' },
     })
     await api.setTenantSending('tenant-1', true, 'ignored')

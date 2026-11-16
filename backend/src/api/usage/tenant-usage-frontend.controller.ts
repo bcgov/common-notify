@@ -18,7 +18,7 @@ import { TenantUsageResponseDto, UsageHistoryEntryDto } from './schemas/tenant-u
  * Frontend API Controller for notification limits and usage.
  *
  * ARCHITECTURAL NOTE: Like NotificationFrontendController, this controller is the
- * frontend-facing surface ( /api/v1/frontend/api-key-usage ). It is called by the
+ * frontend-facing surface ( /api/v1/frontend/usage ). It is called by the
  * Notify web app with a user JWT — never with a service API key. The
  * NotifyFrontendRoleGuard authenticates the user, resolves the tenant from the
  * x-tenant-id header (attached as request.tenant), and enforces CSTAR roles.
@@ -26,10 +26,10 @@ import { TenantUsageResponseDto, UsageHistoryEntryDto } from './schemas/tenant-u
  * Any tenant role may read the stats; only NOTIFY_OPERATIONS_ADMIN may change the
  * alert threshold.
  */
-@ApiTags('api-key-usage')
+@ApiTags('usage')
 // Not part of the service API; kept out of the published spec.
 @ApiExcludeController()
-@Controller('frontend/api-key-usage')
+@Controller('frontend/usage')
 @UseGuards(NotifyFrontendRoleGuard)
 @ApiBearerAuth()
 export class TenantUsageFrontendController {

@@ -12,7 +12,7 @@ import { TenantsService } from '../admin/tenants/tenants.service'
  * Driven over HTTP, through the global ValidationPipe as app.ts installs it, because the query
  * string is what is under test and the DTO's transforms only run inside that pipe.
  */
-describe('TenantUsageAdminController GET /frontend/admin/api-key-usage', () => {
+describe('TenantUsageAdminController GET /frontend/admin/usage', () => {
   let app: INestApplication
   let getAllTenantsUsage: ReturnType<typeof vi.fn>
   let getAdminUsageSummary: ReturnType<typeof vi.fn>
@@ -55,7 +55,7 @@ describe('TenantUsageAdminController GET /frontend/admin/api-key-usage', () => {
     await app.close()
   })
 
-  const url = '/v1/frontend/admin/api-key-usage'
+  const url = '/v1/frontend/admin/usage'
 
   it('passes the page, search and no filters when none are given', async () => {
     await request(app.getHttpServer())

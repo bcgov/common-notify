@@ -39,14 +39,14 @@ import { JwtUserExtractor } from '../../common/utils/jwt-user-extractor'
 /**
  * Admin API Controller for notification usage across all tenants.
  *
- * Route: /api/v1/frontend/admin/api-key-usage
+ * Route: /api/v1/frontend/admin/usage
  * Guarded by NotifyAdminGuard + NOTIFY_ADMIN (SSO role) — NOT tenant-scoped, so no
  * x-tenant-id header is required. Mirrors the feature-flag admin controller.
  */
-@ApiTags('api-key-usage')
+@ApiTags('usage')
 // Not part of the service API; kept out of the published spec.
 @ApiExcludeController()
-@Controller('frontend/admin/api-key-usage')
+@Controller('frontend/admin/usage')
 @UseGuards(NotifyAdminGuard)
 @ApiBearerAuth()
 export class TenantUsageAdminController {
