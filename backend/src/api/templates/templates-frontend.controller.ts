@@ -35,6 +35,7 @@ import { PreviewTemplateDto } from './schemas/preview-template.dto'
 import { PreviewTemplateBodyDto } from './schemas/preview-template-body.dto'
 import { TemplateResponseDto } from './schemas/template-response.dto'
 import { TemplateUsageResponseDto } from './schemas/template-usage-response.dto'
+import { TemplateVersionResponseDto } from './schemas/template-version-response.dto'
 import { UpdateTemplateDto } from './schemas/update-template.dto'
 import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
 import { TemplateListQueryDto } from './schemas/template-list-query.dto'
@@ -241,6 +242,29 @@ export class TemplatesFrontendController {
   }
 
   /**
+   * Get the version a template had before its current one
+   *
+   * @param req Request, used to resolve the authenticated tenant context
+   * @param templateId Template ID
+   * @returns The previous version; 404 if the template has none
+   */
+  @Version('1')
+  @Get(':templateId/previous-version')
+  @HttpCode(200)
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
+  async getPreviousVersion(
+    @Req() req: Request,
+    @Param('templateId', new ParseUUIDPipe()) templateId: string,
+  ): Promise<TemplateVersionResponseDto> {
+    const tenant = await this.requireTenantContext(req)
+    return this.templatesService.getPreviousVersion(tenant.id, templateId)
+  }
+
+  /**
    * Create a new template
    *
    * @param tenant Current tenant from JWT
@@ -257,7 +281,8 @@ export class TemplatesFrontendController {
   ): Promise<TemplateResponseDto> {
     const tenant = await this.requireTenantContext(req)
     const user = JwtUserExtractor.extractUser(req)
-    return this.templatesService.createTemplate(tenant.id, createTemplateDto, user)
+    const userName = JwtUserExtractor.extractFullName(req)
+    return this.templatesService.createTemplate(tenant.id, createTemplateDto, user, userName)
   }
 
   /**
@@ -303,7 +328,14 @@ export class TemplatesFrontendController {
   ): Promise<TemplateResponseDto> {
     const tenant = await this.requireTenantContext(req)
     const user = JwtUserExtractor.extractUser(req)
-    return this.templatesService.updateTemplate(tenant.id, templateId, updateTemplateDto, user)
+    const userName = JwtUserExtractor.extractFullName(req)
+    return this.templatesService.updateTemplate(
+      tenant.id,
+      templateId,
+      updateTemplateDto,
+      user,
+      userName,
+    )
   }
 
   /**

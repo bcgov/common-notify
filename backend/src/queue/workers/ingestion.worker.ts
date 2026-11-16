@@ -14,6 +14,8 @@ import { AttachmentService } from '../../api/attachment/attachment.service'
 import { PhoneNumberService } from '../../api/notify/services/phone-number.service'
 import { mergeJobDataFromRequest } from '../merge-batch-builder'
 import { DELIVERY_JOB_OPTIONS } from '../job-options'
+import { TenantsService } from '../../api/admin/tenants/tenants.service'
+import { describeError } from '../../common/utils/describe-error'
 
 type IngestionRequest = IngestionJobPayload['request']
 
@@ -69,9 +71,38 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
     private readonly requestDetailService: NotificationRequestDetailService,
     private readonly configService: ConfigService,
     private readonly phoneNumberService: PhoneNumberService,
+    private readonly tenantsService: TenantsService,
     @Optional() private readonly clamavService?: ClamavService,
     @Optional() private readonly attachmentService?: AttachmentService,
   ) {}
+
+  /**
+   * A scheduled send whose tenant an admin disabled before it came due is cancelled, the same
+   * as a cancel through the API. Only scheduled sends: one accepted for now was accepted while
+   * the tenant could send, and is seconds from going out.
+   */
+  private async cancelledForDisabledTenant({
+    notifyId,
+    tenantId,
+    scheduledFor,
+  }: IngestionJobPayload): Promise<boolean> {
+    if (!scheduledFor || !(await this.tenantsService.isSendingDisabled(tenantId))) return false
+    try {
+      await this.notificationService.cancelOrRescheduleNotification(
+        notifyId,
+        tenantId,
+        'tenant-disabled',
+        'cancel',
+      )
+    } catch (error) {
+      // Already cancelled or otherwise settled: either way, it must not be sent.
+      this.logger.warn(
+        `[${notifyId}] Could not mark scheduled send cancelled: ${describeError(error)}`,
+      )
+    }
+    this.logger.warn(`[${notifyId}] Scheduled send not sent: sending is disabled for ${tenantId}`)
+    return true
+  }
 
   async process(job: Job<IngestionJobPayload>): Promise<unknown> {
     const { notifyId, tenantId } = job.data
@@ -82,6 +113,10 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
     try {
       this.logger.log(`[${notifyId}] [IngestionWorker] Starting to process job ${job.id}`)
       assertIngestionJob(job.data)
+
+      if (await this.cancelledForDisabledTenant(job.data)) {
+        return { success: false, reason: 'Sending is disabled for this tenant' }
+      }
 
       if (job.data.mailMerge && job.data.mailMergeData) {
         return await this.fanOutMerge(job.data)

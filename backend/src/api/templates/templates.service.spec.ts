@@ -92,6 +92,7 @@ describe('TemplatesService', () => {
     findEventsUsingTemplate: vi.fn(),
     softDelete: vi.fn(),
     createVersion: vi.fn(),
+    findPreviousVersion: vi.fn(),
   }
 
   const mockTenantsService = {
@@ -424,7 +425,7 @@ describe('TemplatesService', () => {
       ['an empty string', ''],
       ['a whitespace-only string', '   '],
       ['null', null],
-    ])('should reject %s as missing personalisation', async (_label, value) => {
+    ])('should reject %s as missing when blank values are not allowed', async (_label, value) => {
       const template: Template = {
         ...mockTemplate,
         subject: 'Hello {{name}}',
@@ -432,7 +433,9 @@ describe('TemplatesService', () => {
       }
 
       await expect(
-        service.renderTemplateContent(template, { name: 'Alice', status: value }),
+        service.renderTemplateContent(template, { name: 'Alice', status: value }, undefined, {
+          allowEmptyValues: false,
+        }),
       ).rejects.toThrow('Missing personalisation for template ID template-123: status')
     })
 
@@ -451,28 +454,32 @@ describe('TemplatesService', () => {
       expect(result.body).toBe('Hello Alice')
     })
 
-    it('should reject a blank value that is both tested and printed outside the test', async () => {
+    it('should reject a blank value that is both tested and printed outside the test, when blanks are not allowed', async () => {
       const template: Template = {
         ...mockTemplate,
         subject: 'Static subject',
         body: '{{#unless notes}}No notes.{{/unless}} Notes: {{notes}}',
       }
 
-      await expect(service.renderTemplateContent(template, { notes: '' })).rejects.toThrow(
-        'Missing personalisation for template ID template-123: notes',
-      )
+      await expect(
+        service.renderTemplateContent(template, { notes: '' }, undefined, {
+          allowEmptyValues: false,
+        }),
+      ).rejects.toThrow('Missing personalisation for template ID template-123: notes')
     })
 
-    it('should reject a blank value passed to a helper, since the helper prints it', async () => {
+    it('should reject a blank value passed to a helper, since the helper prints it, when blanks are not allowed', async () => {
       const template: Template = {
         ...mockTemplate,
         subject: 'Static subject',
         body: 'Due {{formatDate dueDate}}',
       }
 
-      await expect(service.renderTemplateContent(template, { dueDate: '' })).rejects.toThrow(
-        'Missing personalisation for template ID template-123: dueDate',
-      )
+      await expect(
+        service.renderTemplateContent(template, { dueDate: '' }, undefined, {
+          allowEmptyValues: false,
+        }),
+      ).rejects.toThrow('Missing personalisation for template ID template-123: dueDate')
     })
 
     it('should still require a value that is only tested to be supplied', async () => {
@@ -487,49 +494,78 @@ describe('TemplatesService', () => {
       )
     })
 
-    it('should accept a blank Mustache section value and reject a blank printed one', async () => {
+    it('should accept a blank Mustache section value and reject a blank printed one when blanks are not allowed', async () => {
       const template: Template = {
         ...mockMustacheTemplate,
         subject: 'Static subject',
         body: 'Hello {{name}}{{#notes}}. Notes: {{notes}}{{/notes}}',
       }
+      const strict = { allowEmptyValues: false }
 
-      const result = await service.renderTemplateContent(template, { name: 'Alice', notes: '' })
+      const result = await service.renderTemplateContent(
+        template,
+        { name: 'Alice', notes: '' },
+        undefined,
+        strict,
+      )
       expect(result.body).toBe('Hello Alice')
 
       await expect(
-        service.renderTemplateContent(template, { name: '', notes: 'x' }),
+        service.renderTemplateContent(template, { name: '', notes: 'x' }, undefined, strict),
       ).rejects.toThrow('Missing personalisation for template ID template-123: name')
     })
 
-    it('should accept a blank Legacy GC Notify ?? condition and reject a blank printed value', async () => {
+    it('should accept a blank Legacy GC Notify ?? condition and reject a blank printed value when blanks are not allowed', async () => {
       const template: Template = {
         ...mockLegacyTemplate,
         subject: 'Static subject',
         body: 'Hello ((name))((urgent??. This is urgent))',
       }
+      const strict = { allowEmptyValues: false }
 
-      const result = await service.renderTemplateContent(template, { name: 'Alice', urgent: '' })
+      const result = await service.renderTemplateContent(
+        template,
+        { name: 'Alice', urgent: '' },
+        undefined,
+        strict,
+      )
       expect(result.body).toBe('Hello Alice')
 
       await expect(
-        service.renderTemplateContent(template, { name: ' ', urgent: 'yes' }),
+        service.renderTemplateContent(template, { name: ' ', urgent: 'yes' }, undefined, strict),
       ).rejects.toThrow('Missing personalisation for template ID template-123: name')
     })
 
-    it('should accept empty values when allowEmptyValues is set', async () => {
+    it.each([
+      ['an empty string', ''],
+      ['a whitespace-only string', '   '],
+      ['null', null],
+    ])(
+      'should accept %s for a printed value by default, printing nothing',
+      async (_label, value) => {
+        const template: Template = {
+          ...mockTemplate,
+          subject: 'Static subject',
+          body: 'Status: {{status}}',
+        }
+
+        const result = await service.renderTemplateContent(template, { status: value })
+
+        expect(result.body.trim()).toBe('Status:')
+        expect(result.bodyType).toBe('markdown')
+      },
+    )
+
+    it('should accept a blank Legacy GC Notify value by default rather than leave the placeholder', async () => {
       const template: Template = {
-        ...mockTemplate,
+        ...mockLegacyTemplate,
         subject: 'Static subject',
-        body: 'Status: {{status}}',
+        body: 'Hello ((name)).',
       }
 
-      const result = await service.renderTemplateContent(template, { status: '' }, undefined, {
-        allowEmptyValues: true,
-      })
+      const result = await service.renderTemplateContent(template, { name: '' })
 
-      expect(result.body).toBe('Status: ')
-      expect(result.bodyType).toBe('markdown')
+      expect(result.body).toBe('Hello .')
     })
 
     it('should ignore extra unused personalisation keys', async () => {
@@ -812,6 +848,56 @@ describe('TemplatesService', () => {
     })
   })
 
+  describe('getPreviousVersion', () => {
+    it('should return the version before the current one', async () => {
+      const createdAt = new Date('2026-06-12T12:00:00Z')
+      mockRepository.findById.mockResolvedValue({ ...mockTemplate, version: 4 })
+      mockRepository.findPreviousVersion.mockResolvedValue({
+        id: 'version-3',
+        templateId: 'template-123',
+        version: 3,
+        name: 'New Order Ready',
+        subject: 'Pizza Pizza',
+        body: 'Hello {{name}}',
+        createdBy: 'guid@azureidir',
+        createdByName: 'Isabella Samantha',
+        createdAt,
+      })
+
+      const result = await service.getPreviousVersion('tenant-123', 'template-123')
+
+      expect(mockRepository.findPreviousVersion).toHaveBeenCalledWith('template-123', 4)
+      expect(result).toEqual({
+        version: 3,
+        name: 'New Order Ready',
+        subject: 'Pizza Pizza',
+        body: 'Hello {{name}}',
+        createdByName: 'Isabella Samantha',
+        createdAt,
+      })
+    })
+
+    it("should not read another tenant's history", async () => {
+      mockRepository.findById.mockResolvedValue(null)
+
+      await expect(service.getPreviousVersion('other-tenant', 'template-123')).rejects.toThrow(
+        NotFoundException,
+      )
+
+      expect(mockRepository.findById).toHaveBeenCalledWith('other-tenant', 'template-123')
+      expect(mockRepository.findPreviousVersion).not.toHaveBeenCalled()
+    })
+
+    it('should 404 when the template has no earlier version', async () => {
+      mockRepository.findById.mockResolvedValue({ ...mockTemplate, version: 1 })
+      mockRepository.findPreviousVersion.mockResolvedValue(null)
+
+      await expect(service.getPreviousVersion('tenant-123', 'template-123')).rejects.toThrow(
+        'has no previous version',
+      )
+    })
+  })
+
   describe('createTemplate', () => {
     it('should create template with bodyType field', async () => {
       const createDto = {
@@ -842,6 +928,32 @@ describe('TemplatesService', () => {
         expect.objectContaining({
           bodyType: 'markdown',
         }),
+      )
+    })
+
+    it('should store the display name on the template and its first version', async () => {
+      const createDto = {
+        name: 'Test Template',
+        channelCode: NotificationChannel.EMAIL,
+        subject: 'Subject',
+        body: 'Body',
+      }
+
+      mockRepository.findByName.mockResolvedValue(null)
+      mockRepository.create.mockResolvedValue({ ...mockTemplate, ...createDto })
+      mockRepository.createVersion.mockResolvedValue({})
+
+      await service.createTemplate('tenant-123', createDto, 'user-123', 'Barrett Falk')
+
+      expect(mockRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          createdBy: 'user-123',
+          createdByName: 'Barrett Falk',
+          updatedByName: 'Barrett Falk',
+        }),
+      )
+      expect(mockRepository.createVersion).toHaveBeenCalledWith(
+        expect.objectContaining({ createdBy: 'user-123', createdByName: 'Barrett Falk' }),
       )
     })
 
@@ -906,6 +1018,49 @@ describe('TemplatesService', () => {
   })
 
   describe('updateTemplate', () => {
+    it('should save the display name for the version trigger to copy', async () => {
+      mockRepository.findById.mockResolvedValue({ ...mockTemplate })
+      mockRepository.update.mockResolvedValue({ ...mockTemplate })
+
+      await service.updateTemplate(
+        'tenant-123',
+        'template-123',
+        { name: 'Renamed' },
+        'user-123',
+        'Barrett Falk',
+      )
+
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        expect.objectContaining({ updatedBy: 'user-123', updatedByName: 'Barrett Falk' }),
+      )
+    })
+
+    it('should return the display name in the response', async () => {
+      mockRepository.findById.mockResolvedValue({ ...mockTemplate })
+      mockRepository.update.mockResolvedValue({ ...mockTemplate, updatedByName: 'Barrett Falk' })
+
+      const result = await service.updateTemplate(
+        'tenant-123',
+        'template-123',
+        { name: 'Renamed' },
+        'user-123',
+        'Barrett Falk',
+      )
+
+      expect(result.updatedByName).toBe('Barrett Falk')
+    })
+
+    it("should clear the previous editor's name when the token carried none", async () => {
+      mockRepository.findById.mockResolvedValue({ ...mockTemplate, updatedByName: 'Someone Else' })
+      mockRepository.update.mockResolvedValue({ ...mockTemplate })
+
+      await service.updateTemplate('tenant-123', 'template-123', { name: 'Renamed' }, 'user-123')
+
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        expect.objectContaining({ updatedBy: 'user-123', updatedByName: null }),
+      )
+    })
+
     it('should update bodyType field', async () => {
       const updateDto = {
         bodyType: 'markdown' as const,

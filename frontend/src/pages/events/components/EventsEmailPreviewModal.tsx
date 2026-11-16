@@ -4,16 +4,16 @@ import { Button, InlineAlert } from '@bcgov/design-system-react-components'
 import { previewTemplate } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
 import EmailBodyFrame from '@/components/EmailBodyFrame'
+import EmailHeader from '@/components/EmailHeader'
 import NotificationPreviewModal from '@/components/NotificationPreviewModal'
 import { detectVariables } from '@/utils/templateVariables'
-import EventsEmailHeader from './EventsEmailHeader'
 
 interface EventsEmailPreviewModalProps {
   isOpen: boolean
   onClose: () => void
   template: TemplateResponse
   /** The tab's header settings, shown above the body as the email will carry them. */
-  header: ComponentProps<typeof EventsEmailHeader>['emailSettings']
+  header: ComponentProps<typeof EmailHeader>['emailSettings']
   /** The tab's sender email, shown as the From address it is being configured to send from. */
   senderEmail: string
   /** The tab's recipients, each list shown as its own envelope line. */
@@ -135,7 +135,7 @@ const EventsEmailPreviewModal: FC<EventsEmailPreviewModalProps> = ({
       cc={ccAddresses.join(', ') || undefined}
       bcc={bccAddresses.join(', ') || undefined}
       subject={subject}
-      outputHeader={<EventsEmailHeader emailSettings={header} />}
+      outputHeader={<EmailHeader emailSettings={header} />}
       // The same frame as the test send preview. Only once a render has succeeded, so the
       // modal's own loading and error states still show.
       bodyOverride={

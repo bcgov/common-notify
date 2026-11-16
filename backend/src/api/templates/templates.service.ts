@@ -19,6 +19,7 @@ import type { NotifyContent } from '../notify/schemas/notify-content'
 import { TemplateResponseDto } from './schemas/template-response.dto'
 import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
 import { TemplateUsageResponseDto } from './schemas/template-usage-response.dto'
+import { TemplateVersionResponseDto } from './schemas/template-version-response.dto'
 import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from '../../services/rendering/tokens'
 import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { TemplateDefinition } from '../../adapters/interfaces'
@@ -31,6 +32,7 @@ import {
 } from './email-template-layout.service'
 import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import {
+  ALLOW_EMPTY_PERSONALISATION_VALUES,
   analyseTemplatePersonalisation,
   describeTemplatePlaceholders,
 } from '../../services/rendering/template-personalisation-validation'
@@ -104,15 +106,49 @@ export class TemplatesService {
   }
 
   /**
+   * Get the version a template had before its current one
+   * The template is looked up first because version rows carry no tenant: this is what stops one
+   * tenant reading another's history.
+   */
+  async getPreviousVersion(
+    tenantId: string,
+    templateId: string,
+  ): Promise<TemplateVersionResponseDto> {
+    const template = await this.templatesRepository.findById(tenantId, templateId)
+    if (!template) {
+      throw new NotFoundException(`Template ${templateId} not found`)
+    }
+
+    const previous = await this.templatesRepository.findPreviousVersion(
+      templateId,
+      template.version,
+    )
+    if (!previous) {
+      throw new NotFoundException(`Template ${templateId} has no previous version`)
+    }
+
+    return {
+      version: previous.version,
+      name: previous.name,
+      subject: previous.subject,
+      body: previous.body,
+      createdByName: previous.createdByName,
+      createdAt: previous.createdAt,
+    }
+  }
+
+  /**
    * Create a new template
    * @param tenantId The tenant ID
    * @param createDto Template creation data
    * @param userId User creating the template (for audit trail)
+   * @param userName Display name of that user, if their token carried one
    */
   async createTemplate(
     tenantId: string,
     createDto: CreateTemplateDto,
     userId: string = 'system',
+    userName: string | null = null,
   ): Promise<TemplateResponseDto> {
     // Validate channel-specific required fields
     if (createDto.channelCode === NotificationChannel.EMAIL && !createDto.subject) {
@@ -141,7 +177,9 @@ export class TemplatesService {
       version: 1,
       active: true,
       createdBy: userId,
+      createdByName: userName,
       updatedBy: userId,
+      updatedByName: userName,
     })
 
     // Create a version record
@@ -156,6 +194,7 @@ export class TemplatesService {
       engineCode: template.engineCode,
       bodyType: template.bodyType,
       createdBy: userId,
+      createdByName: userName,
     })
 
     return this.toResponseDto(template)
@@ -167,12 +206,14 @@ export class TemplatesService {
    * @param templateId The template ID
    * @param updateDto Template update data
    * @param userId User updating the template (for audit trail)
+   * @param userName Display name of that user, if their token carried one
    */
   async updateTemplate(
     tenantId: string,
     templateId: string,
     updateDto: UpdateTemplateDto,
     userId: string = 'system',
+    userName: string | null = null,
   ): Promise<TemplateResponseDto> {
     const template = await this.templatesRepository.findById(tenantId, templateId)
     if (!template) {
@@ -213,6 +254,8 @@ export class TemplatesService {
       template.bodyType = updateDto.bodyType ?? template.bodyType ?? 'markdown'
     }
     template.updatedBy = userId
+    // Null clears the previous editor's name, so the new version is not credited to them.
+    template.updatedByName = userName
 
     const updated = await this.templatesRepository.update(template)
 
@@ -357,8 +400,9 @@ export class TemplatesService {
    * @param template The template to render
    * @param personalisation The data to use for rendering (e.g., request.params)
    * @param bodyType Optional override for body content type. Ignored for SMS templates.
-   * @param options.allowEmptyValues Accept null or blank values for required placeholders. Only
-   *   for previews; anything that is sent must have every value filled in.
+   * @param options.allowEmptyValues Accept null or blank values for required placeholders, which
+   *   print nothing. Defaults to ALLOW_EMPTY_PERSONALISATION_VALUES; pass false to require every
+   *   printed value.
    * @returns Object with rendered subject, body, and bodyType
    */
   public async renderTemplateContent(
@@ -372,7 +416,7 @@ export class TemplatesService {
     this.validateTemplatePersonalisation(
       template,
       normalizedPersonalisation,
-      options.allowEmptyValues ?? false,
+      options.allowEmptyValues ?? ALLOW_EMPTY_PERSONALISATION_VALUES,
     )
 
     // Get the renderer for this template's engine
@@ -495,10 +539,10 @@ export class TemplatesService {
   ): void {
     const { required, printed } = analyseTemplatePersonalisation(template, personalisation)
 
-    // A printed value that is empty leaves as much of a gap in the sent message as an absent key,
-    // so both are missing. A value that is only tested (`{{#if notes}}`) may be blank: that is how
-    // a CSV cell or API caller says "skip this section". Previews allow blanks everywhere, since
-    // they render a template while its values are still being filled in.
+    // An absent key is always missing: some engines would print the raw placeholder for it. A
+    // blank value prints nothing, and is accepted unless the caller asks for every printed value
+    // to be filled in. A value that is only tested (`{{#if notes}}`) may be blank either way: that
+    // is how an API caller says "skip this section".
     const missingKeys = required.filter(
       (key) =>
         !Object.hasOwn(personalisation, key) ||
@@ -532,6 +576,7 @@ export class TemplatesService {
       createdBy: template.createdBy,
       createdAt: template.createdAt,
       updatedBy: template.updatedBy,
+      updatedByName: template.updatedByName,
       updatedAt: template.updatedAt,
     }
   }

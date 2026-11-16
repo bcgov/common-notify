@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { Tenant } from './api/admin/tenants/entities/tenant.entity'
 import { TenantStatusCode } from './api/admin/tenants/entities/tenant-status-code.entity'
+import { TenantSendingHistory } from './api/admin/tenants/entities/tenant-sending-history.entity'
 import { NotifyUser } from './api/admin/users/entities/notify-user.entity'
 import { Template } from './api/templates/entities/template.entity'
 import { TemplateVersion } from './api/templates/entities/template-version.entity'
@@ -55,6 +56,7 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
       entities: [
         Tenant,
         TenantStatusCode,
+        TenantSendingHistory,
         NotifyUser,
         NotificationRequest,
         NotificationRequestDetail,

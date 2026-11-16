@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildSampleCsv,
   csvFilenameFor,
+  hasBlockingIssue,
   parseCsv,
   rowParams,
   rowRecipient,
@@ -120,18 +121,40 @@ describe('validateCsv file-level problems', () => {
 })
 
 describe('validateCsv row-level problems', () => {
-  it('reports an empty cell with a dash for the value, as the table renders it', () => {
+  it('warns about an empty placeholder with a dash for the value, as the table renders it', () => {
     const parsed = { headers: ['email', 'firstName'], rows: [['alice@gov.bc.ca', '']] }
 
-    const [issue] = validateCsv(parsed, placeholders, 'email').rowIssues
+    const { rowIssues } = validateCsv(parsed, placeholders, 'email')
 
-    expect(issue).toMatchObject({
-      row: 2,
-      column: 'firstName',
-      title: 'Missing or invalid value',
-    })
-    expect(issue.value).toBeUndefined()
-    expect(issue.detail).toContain("The 'firstName' column is empty")
+    expect(rowIssues).toEqual([
+      { row: 2, column: 'firstName', title: 'Missing or invalid value', isWarning: true },
+    ])
+    expect(hasBlockingIssue(rowIssues)).toBe(false)
+  })
+
+  it('blocks on an empty recipient, since the row has nobody to send to', () => {
+    const parsed = { headers: ['email', 'firstName'], rows: [['', 'Alice']] }
+
+    const { rowIssues } = validateCsv(parsed, placeholders, 'email')
+
+    expect(rowIssues).toHaveLength(1)
+    expect(rowIssues[0]).toMatchObject({ row: 2, column: 'email' })
+    expect(rowIssues[0].detail).toContain("The 'email' column is empty")
+    expect(hasBlockingIssue(rowIssues)).toBe(true)
+  })
+
+  it('still finds a blocking problem after more warnings than the cap', () => {
+    const rows = Array.from({ length: 200 }, (_, i) => [`p${i}@gov.bc.ca`, ''])
+    rows.push(['not-an-email', 'Name'])
+
+    const { rowIssues } = validateCsv(
+      { headers: ['email', 'firstName'], rows },
+      placeholders,
+      'email',
+    )
+
+    expect(rowIssues).toHaveLength(100)
+    expect(hasBlockingIssue(rowIssues)).toBe(true)
   })
 
   it('reports a malformed address with the value it found', () => {

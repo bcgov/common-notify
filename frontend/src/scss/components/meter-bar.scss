@@ -7,6 +7,7 @@
   border-radius: 6px;
   background-color: $light-bg;
   overflow: hidden;
+  position: relative;
 
   .meter-bar__fill {
     height: 100%;
@@ -22,5 +23,15 @@
     &--critical {
       background-color: $danger-color;
     }
+  }
+
+  // Sits over the fill, so it uses the dark border colour to stay visible on green, yellow or red.
+  .meter-bar__marker {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    margin-left: -1px;
+    background-color: $border-dark;
   }
 }

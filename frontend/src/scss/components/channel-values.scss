@@ -1,0 +1,19 @@
+@import '../variables';
+
+.channel-values {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// A fixed line height and no wrapping keep each channel on the same line in every cell of the
+// row; a value that wrapped would push the channels below it out of line with their labels.
+.channel-values__item {
+  display: flex;
+  align-items: center;
+  min-height: 1.75rem;
+  white-space: nowrap;
+}

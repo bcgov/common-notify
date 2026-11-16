@@ -108,6 +108,7 @@ const mockFeatureFlagService = {
 }
 
 const mockTenantsService = {
+  assertCanSend: vi.fn().mockResolvedValue(undefined),
   findById: vi.fn().mockResolvedValue({
     id: 'test-tenant-id',
     name: 'test-tenant',

@@ -1,21 +1,24 @@
 import type { FC } from 'react'
 import SummaryCard from '@/components/SummaryCard'
-import MeterBar from '@/components/MeterBar'
-import { StatusBadge } from '@/components/StatusBadge'
 import type {
   MessageChannelStats,
   MonitoringOverview,
-  RedisStats,
 } from '@/interfaces/queueMonitoring.interface'
-import { HEALTH_LABELS, formatBytes, formatDuration } from '@/utils/monitoring'
+import { backlogSummary, formatAgo, formatDuration } from '@/utils/monitoring'
 
 interface OverviewCardsProps {
   overview: MonitoringOverview
   messages: MessageChannelStats[]
-  redis: RedisStats
+  now: number
 }
 
-/** The four headline numbers: how fast, how much, how far behind, and how close to full. */
+/** The totals' day and month boundaries are Pacific, so the label is too. */
+const MONTH_DAY = new Intl.DateTimeFormat('en-CA', {
+  month: 'long',
+  day: 'numeric',
+  timeZone: 'America/Vancouver',
+})
+
 /** What the backlog card says under its count: nothing waiting, stalled, or an estimate. */
 function backlogLabel(pending: number, stuck: boolean, clears: number | null): string {
   if (pending === 0) return 'Nothing waiting'
@@ -23,43 +26,24 @@ function backlogLabel(pending: number, stuck: boolean, clears: number | null): s
   return `Clears in ~${(clears ?? 0).toLocaleString()} min`
 }
 
-const OverviewCards: FC<OverviewCardsProps> = ({ overview, messages, redis }) => {
-  const pending = messages.reduce((sum, m) => sum + m.pending, 0)
-  const oldest = messages.reduce<number | null>(
-    (max, m) => (m.oldestPendingAgeMs === null ? max : Math.max(max ?? 0, m.oldestPendingAgeMs)),
-    null,
-  )
-  const clears = messages.reduce<number | null>((max, m) => {
-    if (m.estimatedClearMinutes === null || m.estimatedClearMinutes === 0) return max
-    return Math.max(max ?? 0, m.estimatedClearMinutes)
-  }, null)
-  const stuck = messages.some((m) => m.pending > 0 && m.estimatedClearMinutes === null)
-  const memoryText =
-    redis.maxMemoryBytes === null
-      ? `${formatBytes(redis.usedMemoryBytes)} used, no cap set`
-      : `${formatBytes(redis.usedMemoryBytes)} of ${formatBytes(redis.maxMemoryBytes)}`
+/** Failed as a share of everything that finished today, to one decimal place. */
+function failureShare(failed: number, sent: number): number {
+  const finished = failed + sent
+  return finished > 0 ? Math.round((failed / finished) * 1000) / 10 : 0
+}
+
+/** The headline numbers: the last hour, what is waiting, today and this month, and failures. */
+const OverviewCards: FC<OverviewCardsProps> = ({ overview, messages, now }) => {
+  const {
+    pending,
+    oldestPendingAgeMs: oldest,
+    clearsInMinutes: clears,
+    stuck,
+  } = backlogSummary(messages)
+  const { totals } = overview
 
   return (
     <div className="summary-card-grid">
-      <SummaryCard
-        title="Delivery time"
-        value={
-          overview.deliveryTime ? `${formatDuration(overview.deliveryTime.medianMs)} median` : '—'
-        }
-      >
-        {overview.deliveryTime ? (
-          <>
-            <p>95% within {formatDuration(overview.deliveryTime.p95Ms)}</p>
-            <p>
-              Accepted to handed to the provider, {overview.deliveryTime.messages.toLocaleString()}{' '}
-              messages in the last hour
-            </p>
-          </>
-        ) : (
-          <p>Nothing sent in the last hour</p>
-        )}
-      </SummaryCard>
-
       <SummaryCard title="Last hour" value={`${overview.messagesSent.toLocaleString()} sent`}>
         <p>
           {overview.sendingRate
@@ -77,20 +61,22 @@ const OverviewCards: FC<OverviewCardsProps> = ({ overview, messages, redis }) =>
         <p>{backlogLabel(pending, stuck, clears)}</p>
       </SummaryCard>
 
-      <SummaryCard
-        title="Redis memory"
-        value={redis.usedMemoryPercent === null ? '—' : `${redis.usedMemoryPercent}%`}
-      >
-        {redis.usedMemoryPercent !== null && (
-          <MeterBar
-            label="Redis memory used"
-            percent={redis.usedMemoryPercent}
-            valueText={`${memoryText} (${redis.usedMemoryPercent}%)`}
-            status={redis.status}
-          />
-        )}
-        <p>{memoryText}</p>
-        <StatusBadge status={redis.status} statusLabel={HEALTH_LABELS[redis.status]} />
+      <SummaryCard title="Today" value={`${totals.sentToday.toLocaleString()} sent`}>
+        <p>Since midnight, Pacific time</p>
+      </SummaryCard>
+
+      <SummaryCard title="This month" value={`${totals.sentThisMonth.toLocaleString()} sent`}>
+        <p>Since {MONTH_DAY.format(new Date(totals.monthStart))}</p>
+      </SummaryCard>
+
+      <SummaryCard title="Failures" value={`${totals.failedToday.toLocaleString()} today`}>
+        <p>{failureShare(totals.failedToday, totals.sentToday)}% of today’s messages</p>
+        <p>{overview.messagesFailed.toLocaleString()} in the last hour</p>
+        <p>
+          {totals.lastFailureAt
+            ? `Last failure ${formatAgo(totals.lastFailureAt, now)}`
+            : 'None this month'}
+        </p>
       </SummaryCard>
     </div>
   )
