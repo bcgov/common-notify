@@ -85,6 +85,19 @@ export class SmsNumbersService {
   }
 
   /**
+   * The number this tenant's SMS goes out from right now: its own for the active provider, else
+   * that provider's default, else DEFAULT_SMS_FROM_NUMBER. What a send through the active
+   * transport resolves to, for showing a tenant its sender.
+   */
+  async resolveSenderNumber(tenantId: string): Promise<string | null> {
+    return (
+      (await this.getFromNumber(tenantId, this.activeProvider())) ??
+      this.configService?.get<string>('defaults.sms.fromNumber') ??
+      null
+    )
+  }
+
+  /**
    * Makes this the number a tenant without one of its own sends from through its provider,
    * replacing that provider's previous default.
    */
