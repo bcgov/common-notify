@@ -20,11 +20,17 @@ interface SmsNumberRequestFieldProps {
   canEdit: boolean
 }
 
+/** " by Terry User", or nothing when no one is recorded. */
+const byWhom = (name: string | null): string => (name ? ` by ${name}` : '')
+
+/** " on Nov 18, 2026", or nothing when no date is recorded. */
+const onDate = (iso: string | null): string => (iso ? ` on ${formatDate(iso)}` : '')
+
 /** What a request's status means for the tenant. */
 function describe(request: SmsNumberRequest): string {
   switch (request.statusCode) {
     case 'pending':
-      return `Requested${request.requestedBy ? ` by ${request.requestedBy}` : ''} on ${formatDate(request.requestedAt)}. A Notify administrator will review it.`
+      return `Requested${byWhom(request.requestedBy)}${onDate(request.requestedAt)}. A Notify administrator will review it.`
     case 'approved':
       return request.usesDefaultNumber
         ? 'Your SMS is sent from the shared Notify number in this environment.'
@@ -32,9 +38,9 @@ function describe(request: SmsNumberRequest): string {
     case 'rejected':
       return request.decisionReason ?? 'Your request was not approved.'
     case 'cancelled':
-      return `Cancelled${request.cancelledBy ? ` by ${request.cancelledBy}` : ''}${request.cancelledAt ? ` on ${formatDate(request.cancelledAt)}` : ''}. SMS is sent from the shared Notify number.`
+      return `Cancelled${byWhom(request.cancelledBy)}${onDate(request.cancelledAt)}. SMS is sent from the shared Notify number.`
     case 'released':
-      return `${request.phoneNumber ?? 'Your number'} was released${request.releasedAt ? ` on ${formatDate(request.releasedAt)}` : ''}. SMS is sent from the shared Notify number.`
+      return `${request.phoneNumber ?? 'Your number'} was released${onDate(request.releasedAt)}. SMS is sent from the shared Notify number.`
     default:
       return ''
   }
