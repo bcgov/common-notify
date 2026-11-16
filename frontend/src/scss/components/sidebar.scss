@@ -26,6 +26,7 @@
 
   &--collapsed {
     width: 88px;
+    padding-inline: 24px;
 
     .sidebar__item {
       gap: 0;
@@ -98,7 +99,7 @@
     height: 40px;
     flex-shrink: 0;
     padding: 0 16px;
-    border-radius: 6px;
+    border-radius: 4px;
     text-decoration: none;
     color: $dark-text;
     border: none;

@@ -42,6 +42,11 @@ const navItems = [
     icon: <SpaceDashboardOutlinedIcon />,
   },
   {
+    label: 'Notification Templates',
+    to: '/templates',
+    icon: <InsertDriveFileOutlinedIcon />,
+  },
+  {
     label: 'Notification Events',
     to: '/events',
     icon: <FolderOutlinedIcon />,
@@ -50,11 +55,6 @@ const navItems = [
     label: 'Send Batch Notifications',
     to: '/bulk-notifications',
     icon: <SendOutlinedIcon />,
-  },
-  {
-    label: 'Notification Templates',
-    to: '/templates',
-    icon: <InsertDriveFileOutlinedIcon />,
   },
   {
     label: 'Usage & Limits',
@@ -189,7 +189,7 @@ const Sidebar: FC = () => {
                 beside it. Passing className replaces the design system's own classes, so
                 there is deliberately no variant here — it would have no effect. */}
             <Button
-              className="sidebar__item"
+              className={`sidebar__item${onAdminPage ? ' active' : ''}`}
               aria-label={collapsed ? adminItems.label : undefined}
               aria-expanded={!collapsed && adminExpanded}
               aria-controls={adminExpanded && !collapsed ? adminMenuId : undefined}
