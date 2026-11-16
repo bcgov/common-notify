@@ -11,21 +11,22 @@ import type * as TemplatesApi from '@/api/templates.api'
 import TemplatePreviewModal from './TemplatePreviewModal'
 
 const previewTemplateBodyMock = vi.fn()
-const dispatchMock = vi.fn()
+const getPreviewDataMock = vi.fn()
+const savePreviewDataMock = vi.fn()
 
 vi.mock('@/api/templates.api', async () => {
   const actual = await vi.importActual<typeof TemplatesApi>('@/api/templates.api')
   return {
     ...actual,
     previewTemplateBody: (...args: unknown[]) => previewTemplateBodyMock(...args),
+    getTemplatePreviewData: (...args: unknown[]) => getPreviewDataMock(...args),
+    saveTemplatePreviewData: (...args: unknown[]) => savePreviewDataMock(...args),
   }
 })
 
 vi.mock('@/redux/hooks', () => ({
-  useAppDispatch: () => dispatchMock,
-  useAppSelector: (
-    selector: (state: { templates: { previewValues: Record<string, string> } }) => unknown,
-  ) => selector({ templates: { previewValues: {} } }),
+  useAppSelector: (selector: (state: { tenant: { selectedTenant: { id: string } } }) => unknown) =>
+    selector({ tenant: { selectedTenant: { id: 'tenant-a' } } }),
 }))
 
 vi.mock('@bcgov/design-system-react-components', async () => {
@@ -141,8 +142,115 @@ vi.mock('@bcgov/design-system-react-components', async () => {
 })
 
 describe('TemplatePreviewModal apply flow', () => {
+  const props = {
+    isOpen: true,
+    onClose: vi.fn(),
+    body: 'Hello {{firstName}}',
+    subject: '{{lastName}}',
+    channelCode: NotificationChannel.EMAIL,
+    engineCode: TemplateEngine.HANDLEBARS,
+    templateId: 'template-a',
+    canSave: true,
+  }
+
+  it('saves on Apply and restores values after remounting', async () => {
+    let saved = { firstName: 'Jane', lastName: 'Doe' }
+    getPreviewDataMock.mockImplementation(async () => ({ params: saved }))
+    savePreviewDataMock.mockImplementation(async (_id, params) => {
+      saved = params
+      return { params }
+    })
+    const view = render(<TemplatePreviewModal {...props} />)
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: /firstName/ })).toHaveValue('Jane'),
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Apply to template/i })).toBeEnabled(),
+    )
+    fireEvent.change(screen.getByRole('textbox', { name: /firstName/ }), {
+      target: { value: 'Ada' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Apply to template/i }))
+    await waitFor(() =>
+      expect(savePreviewDataMock).toHaveBeenCalledWith('template-a', {
+        firstName: 'Ada',
+        lastName: 'Doe',
+      }),
+    )
+    view.unmount()
+    render(<TemplatePreviewModal {...props} />)
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: /firstName/ })).toHaveValue('Ada'),
+    )
+  })
+
+  it('allows viewer rendering without saving', async () => {
+    getPreviewDataMock.mockResolvedValue({ params: { firstName: 'Jane', lastName: 'Doe' } })
+    render(<TemplatePreviewModal {...props} canSave={false} />)
+    const button = screen.getByRole('button', { name: /Apply to template/i })
+    await waitFor(() => expect(button).toBeEnabled())
+    fireEvent.click(button)
+    await waitFor(() => expect(previewTemplateBodyMock).toHaveBeenCalled())
+    expect(savePreviewDataMock).not.toHaveBeenCalled()
+  })
+
+  it('announces load errors and retries before enabling Apply', async () => {
+    getPreviewDataMock
+      .mockRejectedValueOnce(new Error('Cannot load values'))
+      .mockResolvedValueOnce({ params: { firstName: 'Jane' } })
+    render(<TemplatePreviewModal {...props} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Cannot load values')
+    expect(screen.getByRole('button', { name: /Apply to template/i })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: /Retry loading/ }))
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: /firstName/ })).toHaveValue('Jane'),
+    )
+  })
+
+  it('keeps entered values after a save error and retries on Apply', async () => {
+    savePreviewDataMock
+      .mockRejectedValueOnce(new Error('Cannot save values'))
+      .mockResolvedValueOnce({ params: {} })
+    render(<TemplatePreviewModal {...props} />)
+    const button = screen.getByRole('button', { name: /Apply to template/i })
+    await waitFor(() => expect(button).toBeEnabled())
+    fireEvent.change(screen.getByRole('textbox', { name: /firstName/ }), {
+      target: { value: 'Ada' },
+    })
+    fireEvent.click(button)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Cannot save values')
+    expect(screen.getByRole('textbox', { name: /firstName/ })).toHaveValue('Ada')
+    fireEvent.click(button)
+    await waitFor(() => expect(savePreviewDataMock).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+  })
+
+  it('ignores a late load after switching templates', async () => {
+    let resolveFirst!: (value: { params: Record<string, string> }) => void
+    getPreviewDataMock
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirst = resolve
+          }),
+      )
+      .mockResolvedValueOnce({ params: { firstName: 'Second' } })
+    const view = render(<TemplatePreviewModal {...props} />)
+    view.rerender(<TemplatePreviewModal {...props} templateId="template-b" />)
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: /firstName/ })).toHaveValue('Second'),
+    )
+    resolveFirst({ params: { firstName: 'First' } })
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: /firstName/ })).toHaveValue('Second'),
+    )
+    expect(savePreviewDataMock).not.toHaveBeenCalled()
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
+    getPreviewDataMock.mockResolvedValue({ params: {} })
+    savePreviewDataMock.mockResolvedValue({ params: {} })
     previewTemplateBodyMock.mockImplementation(
       async ({ params }: PreviewTemplateBodyData): Promise<PreviewTemplateBodyResponse> => ({
         channelCode: NotificationChannel.EMAIL,

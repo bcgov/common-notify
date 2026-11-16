@@ -142,6 +142,7 @@ const VariableField: FC<{
       <div className="notification-preview__field-toggle">
         <ToggleButtonGroup
           label={variable.name}
+          aria-label={variable.name}
           size="small"
           selectionMode="single"
           disallowEmptySelection
