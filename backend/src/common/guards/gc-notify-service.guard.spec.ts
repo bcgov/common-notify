@@ -17,7 +17,6 @@ type MockRequest = {
   tenantId?: string
   tenantExternalId?: string
   gcNotifyAuthHeader?: string
-  apiKeyConsumerId?: string
 }
 
 const VALID_AUTH_HEADER = 'ApiKey-v1 test-key-value'
@@ -101,8 +100,6 @@ describe('GcNotifyServiceGuard', () => {
       expect(result).toBe(true)
       // Nothing forwards upstream any more, so the value is validated and discarded.
       expect(request.gcNotifyAuthHeader).toBeUndefined()
-      // Sends on these routes count against the key, which needs the consumer id.
-      expect(request.apiKeyConsumerId).toBe('consumer-1')
     })
   })
 

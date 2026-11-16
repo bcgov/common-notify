@@ -48,13 +48,11 @@ import { EventNotificationResolver } from '../events/event-notification.resolver
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 
 // Mock AuthGuard to bypass authentication in tests
-let mockApiKeyConsumerId: string | undefined
 const mockAuthGuard: CanActivate = {
   canActivate: (context: ExecutionContext) => {
     const request = context.switchToHttp().getRequest()
     // Attach a mock tenant to the request
     request.tenant = { id: 'test-tenant-id', name: 'test-tenant' }
-    request.apiKeyConsumerId = mockApiKeyConsumerId
     return true
   },
 }
@@ -178,7 +176,6 @@ describe('Notify Controllers', () => {
     )
     mockNotificationService.create.mockResolvedValue({ id: 'mock-notification-id' })
     mockNotificationService.update.mockResolvedValue(undefined)
-    mockApiKeyConsumerId = undefined
     mockApiKeyUsageService.recordUsage.mockResolvedValue([])
     mockApiKeyUsageService.assertWithinLimits.mockResolvedValue(undefined)
     mockLimitAlertNotificationService.processAcceptedUsage.mockResolvedValue(undefined)
@@ -282,7 +279,6 @@ describe('Notify Controllers', () => {
       ['/email', '?preview=false'],
       ['/email', '?preview=1'],
     ])('keeps real sends active on %s%s', async (path, query) => {
-      mockApiKeyConsumerId = 'consumer-standard'
       const channel = {
         recipients: { to: ['test@example.com'] },
         content: { subject: 'Test', body: 'Hello' },
@@ -422,7 +418,6 @@ describe('Notify Controllers', () => {
       }
 
       it('forwards exact standard-send usage results and the tenant ID', async () => {
-        mockApiKeyConsumerId = 'consumer-standard'
         mockApiKeyUsageService.recordUsage.mockResolvedValue([
           {
             periodTypeCode: UsagePeriodType.DAY,
@@ -462,7 +457,6 @@ describe('Notify Controllers', () => {
       })
 
       it('forwards exact email-merge usage results', async () => {
-        mockApiKeyConsumerId = 'consumer-merge'
         mockApiKeyUsageService.recordUsage.mockResolvedValue([
           {
             periodTypeCode: UsagePeriodType.DAY,
@@ -504,7 +498,6 @@ describe('Notify Controllers', () => {
         }
 
         it('bills each recipient for every segment of a multi-segment SMS', async () => {
-          mockApiKeyConsumerId = 'consumer-sms'
           mockSmsSegmentService.countSegmentsPerRecipient.mockResolvedValue(3)
 
           await request(app.getHttpServer()).post('/api/v1/notifysimple').send(smsBody).expect(202)
@@ -527,7 +520,6 @@ describe('Notify Controllers', () => {
         })
 
         it('bills a single segment when segment counting fails', async () => {
-          mockApiKeyConsumerId = 'consumer-sms-failure'
           mockSmsSegmentService.countSegmentsPerRecipient.mockRejectedValue(
             new Error('render blew up'),
           )
@@ -542,8 +534,6 @@ describe('Notify Controllers', () => {
         })
 
         it('does not count segments for a request with no SMS recipients', async () => {
-          mockApiKeyConsumerId = 'consumer-email-only'
-
           await request(app.getHttpServer())
             .post('/api/v1/notifysimple')
             .send(standardBody)
@@ -554,7 +544,6 @@ describe('Notify Controllers', () => {
       })
 
       it('does not process alerts when recorded usage is empty', async () => {
-        mockApiKeyConsumerId = 'consumer-empty'
         mockApiKeyUsageService.recordUsage.mockResolvedValue([])
 
         await request(app.getHttpServer())
@@ -590,7 +579,6 @@ describe('Notify Controllers', () => {
       })
 
       it('does not fail the original response when orchestration rejects', async () => {
-        mockApiKeyConsumerId = 'consumer-failure'
         mockApiKeyUsageService.recordUsage.mockResolvedValue([
           {
             periodTypeCode: UsagePeriodType.DAY,
@@ -611,7 +599,6 @@ describe('Notify Controllers', () => {
       })
 
       it('does not fail when the optional orchestration service is unavailable', async () => {
-        mockApiKeyConsumerId = 'consumer-no-provider'
         mockApiKeyUsageService.recordUsage.mockResolvedValue([
           {
             periodTypeCode: UsagePeriodType.DAY,
@@ -635,8 +622,7 @@ describe('Notify Controllers', () => {
       })
 
       it('processes a successful channel when another usage write fails', async () => {
-        mockApiKeyConsumerId = 'consumer-partial'
-        mockApiKeyUsageService.recordUsage.mockImplementation((_consumerId, channel) => {
+        mockApiKeyUsageService.recordUsage.mockImplementation((_tenantId, channel) => {
           if (channel === NotificationChannel.EMAIL) {
             return Promise.reject(new Error('email usage write failed'))
           }
@@ -706,7 +692,6 @@ describe('Notify Controllers', () => {
         mockNotificationService.create.mockImplementation(async (dto: { id?: string }) => ({
           id: dto.id ?? 'db-generated-id',
         }))
-        mockApiKeyConsumerId = 'consumer-1'
       })
 
       const expectNothingAccepted = () => {
@@ -1404,7 +1389,6 @@ describe('Notify Controllers', () => {
 
         it('should enforce limits on segments, not on recipients', async () => {
           mockSmsSegmentService.countMergeSegments.mockResolvedValue(8)
-          mockApiKeyConsumerId = 'consumer-1'
 
           await request(app.getHttpServer())
             .post('/api/v1/notifysimple/sms')
