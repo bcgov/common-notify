@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common'
+import { ForbiddenException, HttpException, HttpStatus } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { NotifySubmissionService } from './notify-submission.service'
@@ -32,9 +32,21 @@ describe('NotifySubmissionService', () => {
   } as unknown as NotifySimpleRequest
 
   const tenants = { assertCanSend: vi.fn().mockResolvedValue(undefined) }
+  const usage = {
+    assertWithinLimits: vi.fn(),
+    recordUsage: vi.fn(),
+  }
 
   beforeEach(async () => {
     limitAlerts.processAcceptedUsage.mockReset()
+    usage.assertWithinLimits.mockReset().mockResolvedValue(undefined)
+    usage.recordUsage.mockReset().mockResolvedValue([
+      {
+        periodTypeCode: UsagePeriodType.DAY,
+        periodStart: new Date('2026-01-01'),
+        sentCount: 90,
+      },
+    ])
 
     const module = await Test.createTestingModule({
       providers: [
@@ -50,19 +62,7 @@ describe('NotifySubmissionService', () => {
             update: vi.fn(),
           },
         },
-        {
-          provide: ApiKeyUsageService,
-          useValue: {
-            assertWithinLimits: vi.fn(),
-            recordUsage: vi.fn().mockResolvedValue([
-              {
-                periodTypeCode: UsagePeriodType.DAY,
-                periodStart: new Date('2026-01-01'),
-                sentCount: 90,
-              },
-            ]),
-          },
-        },
+        { provide: ApiKeyUsageService, useValue: usage },
         { provide: SafelistService, useValue: { findBlocked: vi.fn().mockResolvedValue([]) } },
         { provide: NotificationDedupService, useValue: { enabled: false } },
         { provide: LimitAlertNotificationService, useValue: limitAlerts },
@@ -79,19 +79,18 @@ describe('NotifySubmissionService', () => {
     service = module.get(NotifySubmissionService)
   })
 
-  const merge = (apiKeyConsumerId?: string) =>
+  const merge = () =>
     service.acceptMerge({
       tenantId: 'tenant-1',
       dto,
       channel: NotificationChannel.EMAIL,
-      apiKeyConsumerId,
     })
 
   it('sends limit alerts for the usage an accepted merge records', async () => {
-    const response = await merge('consumer-1')
+    const response = await merge()
     expect(response).toMatchObject({ notifyId: 'notif-1', recipientCount: 1 })
     expect(limitAlerts.processAcceptedUsage).toHaveBeenCalledWith({
-      apiKeyConsumerId: 'consumer-1',
+      tenantId: 'tenant-1',
       usageResults: [expect.objectContaining({ channelCode: NotificationChannel.EMAIL })],
     })
   })
@@ -101,13 +100,27 @@ describe('NotifySubmissionService', () => {
       new ForbiddenException('Sending is disabled for this tenant by the Notify team: Billing'),
     )
 
-    await expect(merge('consumer-1')).rejects.toBeInstanceOf(ForbiddenException)
+    await expect(merge()).rejects.toBeInstanceOf(ForbiddenException)
     expect(tenants.assertCanSend).toHaveBeenCalledWith('tenant-1')
     expect(limitAlerts.processAcceptedUsage).not.toHaveBeenCalled()
   })
 
-  it('sends no alert when the request has no API key to attribute usage to', async () => {
-    await merge(undefined)
+  // A merge from the UI's bulk send carries no API key; it is still the tenant's usage.
+  it("checks and counts a merge against the tenant's limits, with or without an API key", async () => {
+    await merge()
+
+    const entries = [{ channel: NotificationChannel.EMAIL, count: 1 }]
+    expect(usage.assertWithinLimits).toHaveBeenCalledWith('tenant-1', entries)
+    expect(usage.recordUsage).toHaveBeenCalledWith('tenant-1', NotificationChannel.EMAIL, 1)
+  })
+
+  it('rejects a merge over the tenant limit before anything is created or counted', async () => {
+    usage.assertWithinLimits.mockRejectedValueOnce(
+      new HttpException('EMAIL daily notification limit reached', HttpStatus.TOO_MANY_REQUESTS),
+    )
+
+    await expect(merge()).rejects.toMatchObject({ status: HttpStatus.TOO_MANY_REQUESTS })
+    expect(usage.recordUsage).not.toHaveBeenCalled()
     expect(limitAlerts.processAcceptedUsage).not.toHaveBeenCalled()
   })
 })

@@ -10,6 +10,7 @@ import { Repository } from 'typeorm'
 import { Tenant } from './entities/tenant.entity'
 import { TenantSendingHistory } from './entities/tenant-sending-history.entity'
 import { CreateTenantDto } from './schemas/create-tenant.dto'
+import { seedTenantLimitDefaults } from '../../api-keys/tenant-limit-defaults'
 
 /**
  * TenantsService
@@ -89,6 +90,7 @@ export class TenantsService {
       })
 
       const savedTenant = await this.tenantRepository.save(tenant)
+      await seedTenantLimitDefaults(this.tenantRepository.manager, savedTenant.id)
       this.logger.debug(`Created tenant: ${name} (id: ${savedTenant.id})`)
 
       return {
@@ -234,6 +236,7 @@ export class TenantsService {
       })
 
       const savedTenant = await this.tenantRepository.save(tenant)
+      await seedTenantLimitDefaults(this.tenantRepository.manager, savedTenant.id)
       this.logger.debug(`Created tenant from CSTAR: ${name} (externalId: ${externalId})`)
       return savedTenant
     } catch (error) {

@@ -46,7 +46,7 @@ export interface AdminTenantUsageRow {
   tenantId: string
   tenantName: string
   channel: string
-  /** The limit fields are null when the tenant has no limit on this channel, e.g. no API key. */
+  /** The limit fields are null when the tenant has no limit configured on this channel. */
   rateLimitPerMinute: number | null
   dailyLimit: number | null
   annualLimit: number | null

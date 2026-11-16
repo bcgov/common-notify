@@ -5,6 +5,9 @@ import { vi } from 'vitest'
 import { TenantsService, sendingDisabledMessage } from './tenants.service'
 import { TenantSendingHistory } from './entities/tenant-sending-history.entity'
 import { Tenant } from './entities/tenant.entity'
+import { seedTenantLimitDefaults } from '../../api-keys/tenant-limit-defaults'
+
+vi.mock('../../api-keys/tenant-limit-defaults', () => ({ seedTenantLimitDefaults: vi.fn() }))
 
 describe('TenantsService', () => {
   let service: TenantsService
@@ -40,6 +43,7 @@ describe('TenantsService', () => {
     create: vi.fn(),
     save: vi.fn(),
     update: vi.fn(),
+    manager: {} as unknown,
   }
 
   beforeEach(async () => {
@@ -82,6 +86,7 @@ describe('TenantsService', () => {
         }),
       )
       expect(mockRepository.save).toHaveBeenCalled()
+      expect(seedTenantLimitDefaults).toHaveBeenCalledWith(mockRepository.manager, mockTenant.id)
     })
 
     it('should auto-generate slug from name if not provided', async () => {
@@ -415,6 +420,16 @@ describe('TenantsService', () => {
           NotFoundException,
         )
       })
+    })
+
+    it('gives a tenant first synced from CSTAR the default limits', async () => {
+      mockRepository.findOne.mockResolvedValue(null)
+      mockRepository.create.mockReturnValue(mockTenant)
+      mockRepository.save.mockResolvedValue(mockTenant)
+
+      await service.upsertFromCstar({ id: 'ext-123', name: 'test-tenant' })
+
+      expect(seedTenantLimitDefaults).toHaveBeenCalledWith(mockRepository.manager, mockTenant.id)
     })
 
     it("updates only CSTAR's fields on sync, so it can't undo a disable", async () => {

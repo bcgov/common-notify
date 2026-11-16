@@ -1,23 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { In, Repository } from 'typeorm'
+import { Repository } from 'typeorm'
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 import { TenantSettings } from '../tenant-settings/entities/tenant-settings.entity'
-import { ApiKeyConsumer } from './entities/api-key-consumer.entity'
-import { ApiKeyLimit } from './entities/api-key-limit.entity'
-import { ApiKeyLimitAlert } from './entities/api-key-limit-alert.entity'
+import { TenantLimit } from './entities/tenant-limit.entity'
+import { TenantLimitAlert } from './entities/tenant-limit-alert.entity'
 import {
-  ApiKeyLimitAlertLog,
+  TenantLimitAlertLog,
   LimitAlertLevel,
   LimitAlertPeriod,
-} from './entities/api-key-limit-alert-log.entity'
+} from './entities/tenant-limit-alert-log.entity'
 import { RecordedUsageResult } from './api-key-usage.service'
 import { evaluateLimitAlerts } from './limit-alert.evaluator'
 import type { LimitAlertToFire } from './limit-alert.evaluator'
-import { lowestLimitsByChannel, lowestThresholdsByChannel } from './tenant-limits'
 
 export interface ProcessLimitAlertUsageInput {
-  apiKeyConsumerId: string
+  tenantId: string
   usageResults: Array<RecordedUsageResult & { channelCode: string }>
 }
 
@@ -25,7 +23,6 @@ export interface ClaimedLimitAlert {
   alertLogId: string
   tenantId: string
   recipientEmail: string
-  apiKeyConsumerId: string
   channelCode: string
   periodTypeCode: LimitAlertPeriod
   alertLevel: LimitAlertLevel
@@ -40,78 +37,52 @@ export class LimitAlertService {
   private readonly logger = new Logger(LimitAlertService.name)
 
   constructor(
-    @InjectRepository(ApiKeyConsumer)
-    private readonly apiKeyConsumerRepository: Repository<ApiKeyConsumer>,
-    @InjectRepository(ApiKeyLimit)
-    private readonly apiKeyLimitRepository: Repository<ApiKeyLimit>,
-    @InjectRepository(ApiKeyLimitAlert)
-    private readonly apiKeyLimitAlertRepository: Repository<ApiKeyLimitAlert>,
-    @InjectRepository(ApiKeyLimitAlertLog)
-    private readonly apiKeyLimitAlertLogRepository: Repository<ApiKeyLimitAlertLog>,
+    @InjectRepository(TenantLimit)
+    private readonly tenantLimitRepository: Repository<TenantLimit>,
+    @InjectRepository(TenantLimitAlert)
+    private readonly tenantLimitAlertRepository: Repository<TenantLimitAlert>,
+    @InjectRepository(TenantLimitAlertLog)
+    private readonly tenantLimitAlertLogRepository: Repository<TenantLimitAlertLog>,
     @InjectRepository(TenantSettings)
     private readonly tenantSettingsRepository: Repository<TenantSettings>,
   ) {}
 
   /**
-   * Evaluate supplied post-increment DAY/YEAR counts and atomically claim new alerts.
-   *
-   * Limits are tenant-wide: the counts are the tenant's totals, each channel is measured against
-   * the lowest limit and threshold across the tenant's API keys, and claims are recorded against
-   * the tenant's earliest-bound key so a tenant gets one alert per period and level no matter
-   * which of its keys crosses it.
+   * Evaluate supplied post-increment DAY/YEAR tenant totals and atomically claim new alerts, so
+   * a tenant gets one alert per channel, period and level.
    *
    * Alert configuration is not guaranteed to exist for every limit row. A channel with no
    * enabled configuration row is resolved as alerts disabled; no threshold is invented.
    */
   async evaluateAndClaim(input: ProcessLimitAlertUsageInput): Promise<ClaimedLimitAlert[]> {
-    if (!input.apiKeyConsumerId || input.usageResults.length === 0) return []
-
-    const consumer = await this.apiKeyConsumerRepository.findOne({
-      where: { id: input.apiKeyConsumerId },
-    })
-    if (!consumer) {
-      this.logger.warn(
-        `No API key consumer found for limit alert evaluation: ${input.apiKeyConsumerId}`,
-      )
-      return []
-    }
+    const { tenantId } = input
+    if (!tenantId || input.usageResults.length === 0) return []
 
     const settings = await this.tenantSettingsRepository.findOne({
-      where: { tenantId: consumer.tenantId, isDeleted: false },
+      where: { tenantId, isDeleted: false },
     })
     if (!settings?.alertEmail) {
-      this.logger.warn(`No active alert email configured for tenant ${consumer.tenantId}`)
+      this.logger.warn(`No active alert email configured for tenant ${tenantId}`)
       return []
     }
-
-    const tenantConsumers = await this.apiKeyConsumerRepository.find({
-      where: { tenantId: consumer.tenantId },
-      order: { createdAt: 'ASC' },
-    })
-    const tenantConsumerIds =
-      tenantConsumers.length > 0 ? tenantConsumers.map(({ id }) => id) : [consumer.id]
 
     const usageByChannel = this.groupUsageByChannel(input.usageResults)
     const recipientEmail = settings.alertEmail
 
     const claimedByChannel = await Promise.all(
       [...usageByChannel].map(async ([channelCode, usage]): Promise<ClaimedLimitAlert[]> => {
-        const where = { apiKeyConsumerId: In(tenantConsumerIds), channelCode }
-        const [limits, alertConfigs] = await Promise.all([
-          this.apiKeyLimitRepository.find({ where }),
-          this.apiKeyLimitAlertRepository.find({ where }),
+        const where = { tenantId, channelCode }
+        const [limit, alertConfig] = await Promise.all([
+          this.tenantLimitRepository.findOne({ where }),
+          this.tenantLimitAlertRepository.findOne({ where }),
         ])
-        const limit = lowestLimitsByChannel(limits).get(channelCode)
-        const warnThresholdPercent = lowestThresholdsByChannel(
-          alertConfigs.filter((alertConfig) => alertConfig.alertsEnabled),
-        ).get(channelCode)
 
-        if (!limit || warnThresholdPercent === undefined) return []
+        if (!limit || !alertConfig?.alertsEnabled) return []
 
         const candidates = evaluateLimitAlerts({
           channelCode,
           alertsEnabled: true,
-          warnThresholdPercent,
+          warnThresholdPercent: alertConfig.warnThresholdPercent,
           dailyLimit: limit.dailyLimit,
           annualLimit: limit.annualLimit,
           dayUsage: usage.get(UsagePeriodType.DAY)?.sentCount,
@@ -125,14 +96,13 @@ export class LimitAlertService {
                 ? usage.get(UsagePeriodType.DAY)
                 : usage.get(UsagePeriodType.YEAR)
             const periodStart = usageResult!.periodStart
-            const claim = await this.claim(tenantConsumerIds[0], candidate, periodStart)
+            const claim = await this.claim(tenantId, candidate, periodStart)
             if (!claim) return null
 
             return {
               alertLogId: claim.id,
-              tenantId: consumer.tenantId,
+              tenantId,
               recipientEmail,
-              apiKeyConsumerId: input.apiKeyConsumerId,
               channelCode: candidate.channelCode,
               periodTypeCode: candidate.periodTypeCode,
               alertLevel: candidate.alertLevel,
@@ -151,11 +121,11 @@ export class LimitAlertService {
   }
 
   async markNotificationCreated(alertLogId: string, notificationRequestId: string): Promise<void> {
-    await this.apiKeyLimitAlertLogRepository.update({ id: alertLogId }, { notificationRequestId })
+    await this.tenantLimitAlertLogRepository.update({ id: alertLogId }, { notificationRequestId })
   }
 
   async markEnqueued(alertLogId: string): Promise<void> {
-    await this.apiKeyLimitAlertLogRepository.update({ id: alertLogId }, { enqueuedAt: new Date() })
+    await this.tenantLimitAlertLogRepository.update({ id: alertLogId }, { enqueuedAt: new Date() })
   }
 
   private groupUsageByChannel(
@@ -176,18 +146,18 @@ export class LimitAlertService {
   }
 
   private async claim(
-    apiKeyConsumerId: string,
+    tenantId: string,
     candidate: LimitAlertToFire,
     periodStart: Date,
   ): Promise<{ id: string } | null> {
-    const rows = await this.apiKeyLimitAlertLogRepository.query(
+    const rows = await this.tenantLimitAlertLogRepository.query(
       `
-      INSERT INTO notify.api_key_limit_alert_log
-        (api_key_consumer_id, channel_code, period_type_code, period_start, alert_level)
+      INSERT INTO notify.tenant_limit_alert_log
+        (tenant_id, channel_code, period_type_code, period_start, alert_level)
       VALUES
         ($1, $2, $3, $4, $5)
       ON CONFLICT (
-        api_key_consumer_id,
+        tenant_id,
         channel_code,
         period_type_code,
         period_start,
@@ -197,7 +167,7 @@ export class LimitAlertService {
       RETURNING id
       `,
       [
-        apiKeyConsumerId,
+        tenantId,
         candidate.channelCode,
         candidate.periodTypeCode,
         periodStart,

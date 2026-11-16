@@ -45,7 +45,7 @@ function tenantActionGroups(tenant: AdminTenantUsage) {
   return [
     {
       id: 'limits',
-      // Limits are created when an API key is bound, so a channel without them has nothing to edit.
+      // Limits are created with the tenant, so a channel without them has nothing to edit.
       actions: tenant.channels
         .filter((row) => row.dailyLimit !== null && row.annualLimit !== null)
         .map((row) => ({

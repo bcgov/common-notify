@@ -69,14 +69,14 @@ export class LimitAlertNotificationService {
   ) {}
 
   async processAcceptedUsage(input: ProcessLimitAlertNotificationsInput): Promise<void> {
-    if (!input.apiKeyConsumerId || input.usageResults.length === 0) return
+    if (!input.tenantId || input.usageResults.length === 0) return
 
     let claims: ClaimedLimitAlert[]
     try {
       claims = await this.limitAlertService.evaluateAndClaim(input)
     } catch (error) {
       this.logger.error(
-        `Failed to evaluate limit alerts for API key consumer ${input.apiKeyConsumerId}: ${
+        `Failed to evaluate limit alerts for tenant ${input.tenantId}: ${
           error instanceof Error ? error.message : String(error)
         }`,
       )
@@ -89,7 +89,7 @@ export class LimitAlertNotificationService {
           await this.createAndEnqueue(claim)
         } catch (error) {
           this.logger.error(
-            `Failed to process limit alert ${claim.alertLogId} for API key consumer ${claim.apiKeyConsumerId}: ${
+            `Failed to process limit alert ${claim.alertLogId} for tenant ${claim.tenantId}: ${
               error instanceof Error ? error.message : String(error)
             }`,
           )

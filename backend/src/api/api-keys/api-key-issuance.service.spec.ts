@@ -5,7 +5,6 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { ApiKeyIssuanceService, MAX_KEYS_PER_TENANT } from './api-key-issuance.service'
 import { ApiKeyConsumer, ApiKeyIssuedVia } from './entities/api-key-consumer.entity'
-import { ApiKeysService } from './api-keys.service'
 import { CREDENTIAL_ISSUER } from '../../services/credential-issuer/credential-issuer.interface'
 import type { Tenant } from '../admin/tenants/entities/tenant.entity'
 
@@ -37,7 +36,6 @@ describe('ApiKeyIssuanceService', () => {
     issue: ReturnType<typeof vi.fn>
     regenerate: ReturnType<typeof vi.fn>
   }
-  let apiKeysService: { ensureDefaults: ReturnType<typeof vi.fn> }
   let aclGroupConfig: string | undefined
 
   beforeEach(async () => {
@@ -58,14 +56,11 @@ describe('ApiKeyIssuanceService', () => {
       regenerate: vi.fn().mockResolvedValue({ ...ISSUED_CREDENTIAL, apiKey: 'rotated' }),
     }
 
-    apiKeysService = { ensureDefaults: vi.fn().mockResolvedValue(undefined) }
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ApiKeyIssuanceService,
         { provide: getRepositoryToken(ApiKeyConsumer), useValue: repository },
         { provide: CREDENTIAL_ISSUER, useValue: credentialIssuer },
-        { provide: ApiKeysService, useValue: apiKeysService },
         {
           provide: ConfigService,
           useValue: {
@@ -152,12 +147,6 @@ describe('ApiKeyIssuanceService', () => {
 
       const call = credentialIssuer.issue.mock.calls[0][0]
       expect(call.aclGroups).toEqual(['cstar-guid'])
-    })
-
-    it('seeds limits from the tenant the same way a bound key does', async () => {
-      await issue()
-
-      expect(apiKeysService.ensureDefaults).toHaveBeenCalledWith('binding-uuid', 'tenant-uuid')
     })
 
     it('records the credential identifier when the issuer knows it', async () => {

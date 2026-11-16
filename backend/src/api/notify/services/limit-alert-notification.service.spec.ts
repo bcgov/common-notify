@@ -38,7 +38,6 @@ describe('LimitAlertNotificationService', () => {
     alertLogId: 'alert-log-day',
     tenantId: 'tenant-1',
     recipientEmail: 'operations@example.com',
-    apiKeyConsumerId: 'consumer-1',
     channelCode: 'EMAIL',
     periodTypeCode: 'DAY',
     alertLevel: 'WARN',
@@ -52,7 +51,6 @@ describe('LimitAlertNotificationService', () => {
     alertLogId: 'alert-log-year',
     tenantId: 'tenant-2',
     recipientEmail: 'tenant-ops@example.com',
-    apiKeyConsumerId: 'consumer-2',
     channelCode: 'SMS',
     periodTypeCode: 'YEAR',
     alertLevel: 'LIMIT_REACHED',
@@ -63,7 +61,7 @@ describe('LimitAlertNotificationService', () => {
   }
 
   const acceptedUsageInput: ProcessLimitAlertNotificationsInput = {
-    apiKeyConsumerId: 'consumer-1',
+    tenantId: 'tenant-1',
     usageResults: [
       {
         channelCode: 'EMAIL',
@@ -117,8 +115,8 @@ describe('LimitAlertNotificationService', () => {
   })
 
   it.each([
-    { apiKeyConsumerId: '', usageResults: acceptedUsageInput.usageResults },
-    { apiKeyConsumerId: 'consumer-1', usageResults: [] },
+    { tenantId: '', usageResults: acceptedUsageInput.usageResults },
+    { tenantId: 'tenant-1', usageResults: [] },
   ])('performs no work for empty input', async (input) => {
     await expect(service.processAcceptedUsage(input)).resolves.toBeUndefined()
 
@@ -225,7 +223,6 @@ describe('LimitAlertNotificationService', () => {
     const content = buildLimitAlertEmail(dayWarning)
 
     expect(JSON.stringify(content)).not.toContain('raw-api-key-secret')
-    expect(JSON.stringify(content)).not.toContain(dayWarning.apiKeyConsumerId)
   })
 
   it('enqueues with the established ingestion payload and job options', async () => {

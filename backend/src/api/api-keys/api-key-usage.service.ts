@@ -2,11 +2,10 @@ import { HttpException, HttpStatus, Injectable, Logger, NotFoundException } from
 import { InjectRepository } from '@nestjs/typeorm'
 import { In, Repository } from 'typeorm'
 import type { SelectQueryBuilder } from 'typeorm'
-import { ApiKeyConsumer } from './entities/api-key-consumer.entity'
-import { ApiKeyLimit } from './entities/api-key-limit.entity'
-import { ApiKeyLimitAlert } from './entities/api-key-limit-alert.entity'
-import { ApiKeyUsage } from './entities/api-key-usage.entity'
-import { lowestLimitsByChannel, lowestThresholdsByChannel } from './tenant-limits'
+import { TenantLimit } from './entities/tenant-limit.entity'
+import { TenantLimitAlert } from './entities/tenant-limit-alert.entity'
+import { TenantUsage } from './entities/tenant-usage.entity'
+import { DEFAULT_WARN_THRESHOLD_PERCENT } from './tenant-limit-defaults'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { TENANT_DISABLED } from '../admin/tenants/tenants.service'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
@@ -33,7 +32,6 @@ import {
 const FISCAL_YEAR_START_KEY = 'fiscal_year_start'
 const DEFAULT_FISCAL_MONTH = 4 // April
 const DEFAULT_FISCAL_DAY = 1
-const DEFAULT_WARN_THRESHOLD_PERCENT = 80
 
 /**
  * What the admin all-tenants usage table can be sorted and filtered on. Tenants are paged, so a
@@ -66,14 +64,12 @@ const TENANT_SORTS: Record<string, string> = {
      WHERE r.tenant_id = t.id AND d.channel IN (:...sortChannels)
        AND d.status = :sortFailedStatus AND d.created_at >= :sortFailedSince)`,
   usedToday: `(SELECT COALESCE(SUM(u.sent_count), 0)
-      FROM notify.api_key_usage u
-      JOIN notify.api_key_consumer c ON c.id = u.api_key_consumer_id
-     WHERE c.tenant_id = t.id AND u.channel_code IN (:...sortChannels)
+      FROM notify.tenant_usage u
+     WHERE u.tenant_id = t.id AND u.channel_code IN (:...sortChannels)
        AND u.period_type_code = :sortDay AND u.period_start >= date_trunc('day', now()))`,
   usedThisYear: `(SELECT COALESCE(SUM(u.sent_count), 0)
-      FROM notify.api_key_usage u
-      JOIN notify.api_key_consumer c ON c.id = u.api_key_consumer_id
-     WHERE c.tenant_id = t.id AND u.channel_code IN (:...sortChannels)
+      FROM notify.tenant_usage u
+     WHERE u.tenant_id = t.id AND u.channel_code IN (:...sortChannels)
        AND u.period_type_code = :sortYear AND u.period_start >= :sortFiscalYearStart)`,
 }
 
@@ -156,23 +152,20 @@ export interface RecordedUsageResult {
  * Reads notification limits and usage for a tenant and lets an operations admin
  * update the alert threshold.
  *
- * Limits apply to the tenant as a whole but are stored per (API key, channel), and a tenant may
- * have several keys bound. Per channel, usage is summed across the tenant's keys and measured
- * against the lowest limit and threshold configured on any of them (see tenant-limits.ts).
+ * Usage, limits and alert thresholds are all kept per (tenant, channel), so every send counts
+ * whether it was made with an API key or from the Notify UI.
  */
 @Injectable()
 export class ApiKeyUsageService {
   private readonly logger = new Logger(ApiKeyUsageService.name)
 
   constructor(
-    @InjectRepository(ApiKeyConsumer)
-    private readonly apiKeyConsumerRepository: Repository<ApiKeyConsumer>,
-    @InjectRepository(ApiKeyLimit)
-    private readonly apiKeyLimitRepository: Repository<ApiKeyLimit>,
-    @InjectRepository(ApiKeyLimitAlert)
-    private readonly apiKeyLimitAlertRepository: Repository<ApiKeyLimitAlert>,
-    @InjectRepository(ApiKeyUsage)
-    private readonly apiKeyUsageRepository: Repository<ApiKeyUsage>,
+    @InjectRepository(TenantLimit)
+    private readonly tenantLimitRepository: Repository<TenantLimit>,
+    @InjectRepository(TenantLimitAlert)
+    private readonly tenantLimitAlertRepository: Repository<TenantLimitAlert>,
+    @InjectRepository(TenantUsage)
+    private readonly tenantUsageRepository: Repository<TenantUsage>,
     @InjectRepository(NotifyConfiguration)
     private readonly configurationRepository: Repository<NotifyConfiguration>,
     @InjectRepository(Tenant)
@@ -184,23 +177,19 @@ export class ApiKeyUsageService {
    */
   async getTenantUsage(tenantId: string): Promise<TenantUsageResponseDto> {
     const fiscalYearStart = await this.getFiscalYearStart()
-    const consumerIds = await this.getConsumerIds(tenantId)
 
-    if (consumerIds.length === 0) {
-      return { tenantId, fiscalYearStart: fiscalYearStart.toISOString(), channels: [] }
-    }
+    const [limits, alerts] = await Promise.all([
+      this.tenantLimitRepository.find({ where: { tenantId } }),
+      this.tenantLimitAlertRepository.find({ where: { tenantId } }),
+    ])
 
-    const limits = await this.apiKeyLimitRepository.find({
-      where: { apiKeyConsumerId: In(consumerIds) },
-    })
-
-    // Aggregate current-window usage per (channel, period) across the tenant's keys.
-    const usageRows = await this.apiKeyUsageRepository
+    // Current-window usage per (channel, period).
+    const usageRows = await this.tenantUsageRepository
       .createQueryBuilder('u')
       .select('u.channel_code', 'channelCode')
       .addSelect('u.period_type_code', 'periodTypeCode')
       .addSelect('SUM(u.sent_count)', 'total')
-      .where('u.api_key_consumer_id IN (:...consumerIds)', { consumerIds })
+      .where('u.tenant_id = :tenantId', { tenantId })
       .andWhere(
         `(
           (u.period_type_code = :minute AND u.period_start >= date_trunc('minute', now())) OR
@@ -228,11 +217,13 @@ export class ApiKeyUsageService {
       usageByChannel.set(row.channelCode, entry)
     }
 
-    // Alert thresholds live in api_key_limit_alert, most-conservative (minimum) across keys.
-    const thresholdByChannel = await this.getThresholdsByChannel(consumerIds)
+    const thresholdByChannel = new Map(
+      alerts.map((alert) => [alert.channelCode, alert.warnThresholdPercent]),
+    )
 
-    const channels = Array.from(lowestLimitsByChannel(limits))
-      .map(([channel, limit]): ChannelUsageDto => {
+    const channels = limits
+      .map((limit): ChannelUsageDto => {
+        const channel = limit.channelCode
         const usage = usageByChannel.get(channel)
         return {
           channel,
@@ -251,29 +242,15 @@ export class ApiKeyUsageService {
   }
 
   /**
-   * Most-conservative (minimum) warning threshold per channel across the given API keys,
-   * read from api_key_limit_alert.
-   */
-  private async getThresholdsByChannel(consumerIds: string[]): Promise<Map<string, number>> {
-    const alerts = await this.apiKeyLimitAlertRepository.find({
-      where: { apiKeyConsumerId: In(consumerIds) },
-    })
-    return lowestThresholdsByChannel(alerts)
-  }
-
-  /**
    * Per-fiscal-year usage history for the tenant (retained YEAR buckets), newest first.
    */
   async getUsageHistory(tenantId: string): Promise<UsageHistoryEntryDto[]> {
-    const consumerIds = await this.getConsumerIds(tenantId)
-    if (consumerIds.length === 0) return []
-
-    const rows = await this.apiKeyUsageRepository
+    const rows = await this.tenantUsageRepository
       .createQueryBuilder('u')
       .select('u.channel_code', 'channelCode')
       .addSelect('u.period_start', 'periodStart')
       .addSelect('SUM(u.sent_count)', 'total')
-      .where('u.api_key_consumer_id IN (:...consumerIds)', { consumerIds })
+      .where('u.tenant_id = :tenantId', { tenantId })
       .andWhere('u.period_type_code = :year', { year: UsagePeriodType.YEAR })
       .groupBy('u.channel_code')
       .addGroupBy('u.period_start')
@@ -289,7 +266,7 @@ export class ApiKeyUsageService {
   }
 
   /**
-   * Update the warning threshold in every alert-config row a tenant has on the given channel.
+   * Update the tenant's warning threshold on the given channel.
    * Restricted to NOTIFY_OPERATIONS_ADMIN at the route level.
    */
   async updateThreshold(
@@ -298,13 +275,8 @@ export class ApiKeyUsageService {
     warnThresholdPercent: number,
     updatedBy?: string,
   ): Promise<TenantUsageResponseDto> {
-    const consumerIds = await this.getConsumerIds(tenantId)
-    if (consumerIds.length === 0) {
-      throw new NotFoundException('No API keys are bound to this tenant')
-    }
-
-    const result = await this.apiKeyLimitAlertRepository.update(
-      { apiKeyConsumerId: In(consumerIds), channelCode: channel },
+    const result = await this.tenantLimitAlertRepository.update(
+      { tenantId, channelCode: channel },
       { warnThresholdPercent, updatedBy, updatedAt: new Date() },
     )
 
@@ -321,9 +293,8 @@ export class ApiKeyUsageService {
   }
 
   /**
-   * Update a tenant's daily and annual limits for a channel (admin only). Applies the same
-   * values to every API key the tenant has on that channel. Returns the tenant's refreshed
-   * usage rows so the admin table can update in place.
+   * Update a tenant's daily and annual limits for a channel (admin only). Returns the tenant's
+   * refreshed usage rows so the admin table can update in place.
    */
   async updateTenantLimits(
     tenantId: string,
@@ -332,13 +303,8 @@ export class ApiKeyUsageService {
     annualLimit: number,
     updatedBy?: string,
   ): Promise<AdminTenantUsageRowDto[]> {
-    const consumerIds = await this.getConsumerIds(tenantId)
-    if (consumerIds.length === 0) {
-      throw new NotFoundException('No API keys are bound to this tenant')
-    }
-
-    const result = await this.apiKeyLimitRepository.update(
-      { apiKeyConsumerId: In(consumerIds), channelCode: channel },
+    const result = await this.tenantLimitRepository.update(
+      { tenantId, channelCode: channel },
       { dailyLimit, annualLimit, updatedBy, updatedAt: new Date() },
     )
 
@@ -360,9 +326,9 @@ export class ApiKeyUsageService {
 
   /**
    * Usage vs limits for every tenant, one row per (tenant, channel), for the NOTIFY_ADMIN
-   * all-tenants view. Lists every active tenant that came from CSTAR, whether or not it has an
-   * API key: CSTAR only returns tenants with Notify connected, so that is the set it syncs. A
-   * channel with no limit configured still gets a row, with zero usage and null limits.
+   * all-tenants view. Lists every active tenant that came from CSTAR: CSTAR only returns tenants
+   * with Notify connected, so that is the set it syncs. A channel with no limit configured still
+   * gets a row, with zero usage and null limits.
    */
   async getAllTenantsUsage(
     parsedQuery: ParsedListQuery,
@@ -396,8 +362,8 @@ export class ApiKeyUsageService {
 
   /**
    * How many tenants use Notify: connected, sending this fiscal year, and disabled.
-   * Sending is read from notification requests, not usage rows, because usage is only recorded
-   * for sends made with an API key and tenants also send from the UI.
+   * Sending is read from notification requests rather than usage rows, so a tenant whose every
+   * recipient was blocked still counts as having sent.
    */
   async getAdminUsageSummary(): Promise<AdminUsageSummaryDto> {
     const fiscalYearStart = await this.getFiscalYearStart()
@@ -474,7 +440,6 @@ export class ApiKeyUsageService {
 
   /**
    * Usage-vs-limits rows for each tenant on each of the given channels, in the order given.
-   * Values are aggregated across each tenant's API keys.
    */
   private async buildUsageRows(
     tenants: TenantRef[],
@@ -510,8 +475,7 @@ export class ApiKeyUsageService {
    * When each tenant last sent on each channel, how much it sent in the average's window, and
    * how many recipients failed recently. Failed means status `failed`: blocked (safelist) and
    * quarantined (malware) are outcomes of their own, not delivery failures.
-   * Read from the per-recipient records rather than usage rows, so sends made from the UI
-   * count as well as those made with an API key.
+   * Read from the per-recipient records, since usage rows hold counts but not outcomes or times.
    */
   private async sendHistoryByTenantChannel(
     tenantIds: string[],
@@ -560,47 +524,43 @@ export class ApiKeyUsageService {
     )
   }
 
-  /** Limits per (tenant, channel): the lowest configured across the tenant's keys. */
+  /** Limits and warning threshold per (tenant, channel). */
   private async limitsByTenantChannel(
     tenantIds: string[],
     channels: string[],
   ): Promise<Map<string, LimitRow>> {
-    const rows = await this.apiKeyLimitRepository
+    const rows = await this.tenantLimitRepository
       .createQueryBuilder('l')
-      .innerJoin(ApiKeyConsumer, 'c', 'c.id = l.api_key_consumer_id')
       .leftJoin(
-        ApiKeyLimitAlert,
+        TenantLimitAlert,
         'a',
-        'a.api_key_consumer_id = l.api_key_consumer_id AND a.channel_code = l.channel_code',
+        'a.tenant_id = l.tenant_id AND a.channel_code = l.channel_code',
       )
-      .select('c.tenant_id', 'tenantId')
+      .select('l.tenant_id', 'tenantId')
       .addSelect('l.channel_code', 'channelCode')
-      .addSelect('MIN(l.rate_limit_per_minute)', 'rateLimitPerMinute')
-      .addSelect('MIN(l.daily_limit)', 'dailyLimit')
-      .addSelect('MIN(l.annual_limit)', 'annualLimit')
-      .addSelect('MIN(a.warn_threshold_percent)', 'warnThresholdPercent')
-      .where('c.tenant_id IN (:...tenantIds)', { tenantIds })
+      .addSelect('l.rate_limit_per_minute', 'rateLimitPerMinute')
+      .addSelect('l.daily_limit', 'dailyLimit')
+      .addSelect('l.annual_limit', 'annualLimit')
+      .addSelect('a.warn_threshold_percent', 'warnThresholdPercent')
+      .where('l.tenant_id IN (:...tenantIds)', { tenantIds })
       .andWhere('l.channel_code IN (:...channels)', { channels })
-      .groupBy('c.tenant_id')
-      .addGroupBy('l.channel_code')
       .getRawMany<LimitRow>()
     return new Map(rows.map((row) => [`${row.tenantId}|${row.channelCode}`, row]))
   }
 
-  /** Current-window usage per (tenant, channel), summed across the tenant's keys. */
+  /** Current-window usage per (tenant, channel). */
   private async usageByTenantChannel(
     tenantIds: string[],
     channels: string[],
   ): Promise<Map<string, WindowUsage>> {
     const fiscalYearStart = await this.getFiscalYearStart()
-    const rows = await this.apiKeyUsageRepository
+    const rows = await this.tenantUsageRepository
       .createQueryBuilder('u')
-      .innerJoin(ApiKeyConsumer, 'c', 'c.id = u.api_key_consumer_id')
-      .select('c.tenant_id', 'tenantId')
+      .select('u.tenant_id', 'tenantId')
       .addSelect('u.channel_code', 'channelCode')
       .addSelect('u.period_type_code', 'periodTypeCode')
       .addSelect('SUM(u.sent_count)', 'total')
-      .where('c.tenant_id IN (:...tenantIds)', { tenantIds })
+      .where('u.tenant_id IN (:...tenantIds)', { tenantIds })
       .andWhere('u.channel_code IN (:...channels)', { channels })
       .andWhere(
         `(
@@ -615,7 +575,7 @@ export class ApiKeyUsageService {
           fiscalYearStart,
         },
       )
-      .groupBy('c.tenant_id')
+      .groupBy('u.tenant_id')
       .addGroupBy('u.channel_code')
       .addGroupBy('u.period_type_code')
       .getRawMany<{
@@ -637,132 +597,92 @@ export class ApiKeyUsageService {
   }
 
   /**
-   * Record `count` accepted notifications for an API key on a channel by incrementing the
-   * MINUTE, DAY and YEAR usage buckets in a single atomic upsert. Called on send acceptance.
+   * Record `count` accepted notifications for a tenant on a channel by incrementing the
+   * MINUTE, DAY and YEAR usage buckets in a single atomic upsert. Called on send acceptance by
+   * every send path, with an API key or from the Notify UI.
    *
    * Safe to call for any channel; a no-op when count <= 0. Bucket period starts:
    *   MINUTE -> date_trunc('minute', now())
    *   DAY    -> date_trunc('day', now())
    *   YEAR   -> the global fiscal-year start
    *
-   * Returns the tenant's post-increment totals for the DAY and YEAR buckets - summed across all
-   * of its API keys, because the limits these are alerted against are tenant-wide.
+   * Returns the tenant's post-increment totals for the DAY and YEAR buckets, including any
+   * concurrent sends that committed first.
    */
   async recordUsage(
-    apiKeyConsumerId: string,
+    tenantId: string,
     channel: string,
     count: number,
   ): Promise<RecordedUsageResult[]> {
-    if (!apiKeyConsumerId || !channel || count <= 0) return []
+    if (!tenantId || !channel || count <= 0) return []
 
     const fiscalYearStart = await this.getFiscalYearStart()
 
-    const rows = await this.apiKeyUsageRepository.query(
+    const rows = (await this.tenantUsageRepository.query(
       `
-      INSERT INTO notify.api_key_usage
-        (api_key_consumer_id, channel_code, period_type_code, period_start, sent_count, created_at, updated_at)
+      INSERT INTO notify.tenant_usage
+        (tenant_id, channel_code, period_type_code, period_start, sent_count, created_at, updated_at)
       VALUES
         ($1, $2, '${UsagePeriodType.MINUTE}', date_trunc('minute', now()), $3, now(), now()),
         ($1, $2, '${UsagePeriodType.DAY}',    date_trunc('day', now()),    $3, now(), now()),
         ($1, $2, '${UsagePeriodType.YEAR}',   $4,                          $3, now(), now())
-      ON CONFLICT (api_key_consumer_id, channel_code, period_type_code, period_start)
+      ON CONFLICT (tenant_id, channel_code, period_type_code, period_start)
       DO UPDATE SET
-        sent_count = notify.api_key_usage.sent_count + EXCLUDED.sent_count,
+        sent_count = notify.tenant_usage.sent_count + EXCLUDED.sent_count,
         updated_at = now()
       RETURNING period_type_code, period_start, sent_count
       `,
-      [apiKeyConsumerId, channel, count, fiscalYearStart],
-    )
+      [tenantId, channel, count, fiscalYearStart],
+    )) as Array<{
+      period_type_code: UsagePeriodType
+      period_start: Date | string
+      sent_count: string
+    }>
 
-    const buckets = (
-      rows as Array<{
-        period_type_code: UsagePeriodType
-        period_start: Date | string
-        sent_count: string
-      }>
-    )
+    return rows
       .filter(
-        (
-          row,
-        ): row is {
-          period_type_code: UsagePeriodType.DAY | UsagePeriodType.YEAR
-          period_start: Date | string
-          sent_count: string
-        } =>
+        (row) =>
           row.period_type_code === UsagePeriodType.DAY ||
           row.period_type_code === UsagePeriodType.YEAR,
       )
       .map((row) => ({
-        periodTypeCode: row.period_type_code,
+        periodTypeCode: row.period_type_code as RecordedUsageResult['periodTypeCode'],
         periodStart: new Date(row.period_start),
         sentCount: Number(row.sent_count),
       }))
-    if (buckets.length === 0) return []
-
-    // Read after the upsert commits, so the totals include this send and any concurrent ones.
-    const totals = (await this.apiKeyUsageRepository.query(
-      `
-      SELECT u.period_type_code, SUM(u.sent_count) AS sent_count
-      FROM notify.api_key_usage u
-      JOIN notify.api_key_consumer c ON c.id = u.api_key_consumer_id
-      WHERE c.tenant_id = (SELECT tenant_id FROM notify.api_key_consumer WHERE id = $1)
-        AND u.channel_code = $2
-        AND (
-          (u.period_type_code = '${UsagePeriodType.DAY}' AND u.period_start = $3) OR
-          (u.period_type_code = '${UsagePeriodType.YEAR}' AND u.period_start = $4)
-        )
-      GROUP BY u.period_type_code
-      `,
-      [
-        apiKeyConsumerId,
-        channel,
-        buckets.find((b) => b.periodTypeCode === UsagePeriodType.DAY)?.periodStart ?? null,
-        buckets.find((b) => b.periodTypeCode === UsagePeriodType.YEAR)?.periodStart ?? null,
-      ],
-    )) as Array<{ period_type_code: UsagePeriodType; sent_count: string }>
-
-    return buckets.map((bucket) => {
-      const total = totals.find((row) => row.period_type_code === bucket.periodTypeCode)
-      return total ? { ...bucket, sentCount: Number(total.sent_count) } : bucket
-    })
   }
 
   /**
-   * Enforce the tenant's daily and annual limits before accepting a send. Usage is summed across
-   * every API key bound to the sending key's tenant and checked against the lowest limit on any
-   * of them. Throws HTTP 429 if any channel in the request would exceed its limit
-   * (used + count > limit); the whole request is rejected. Per-minute rate limiting is handled
-   * at the gateway, not here.
+   * Enforce the tenant's daily and annual limits before accepting a send, from any send path.
+   * Throws HTTP 429 if any channel in the request would exceed its limit (used + count > limit);
+   * the whole request is rejected. Per-minute rate limiting is handled at the gateway, not here.
    *
-   * Fail-open when the key is not bound to a tenant or a channel has no configured limit row.
+   * Fail-open when a channel has no configured limit row.
    *
    * Note: this is a check-then-act against the counters, so under heavy concurrency a small
    * overshoot is possible. Acceptable for now; can be made atomic later if needed.
    */
   async assertWithinLimits(
-    apiKeyConsumerId: string,
+    tenantId: string,
     entries: Array<{ channel: string; count: number; countExplanation?: string }>,
   ): Promise<void> {
-    if (!apiKeyConsumerId) return
+    if (!tenantId) return
     const channels = entries.filter((e) => e.count > 0).map((e) => e.channel)
     if (channels.length === 0) return
 
-    const consumerIds = await this.getTenantConsumerIds(apiKeyConsumerId)
-    if (consumerIds.length === 0) return
-
-    const limits = await this.apiKeyLimitRepository.find({
-      where: { apiKeyConsumerId: In(consumerIds), channelCode: In(channels) },
+    const limits = await this.tenantLimitRepository.find({
+      where: { tenantId, channelCode: In(channels) },
     })
-    const limitByChannel = lowestLimitsByChannel(limits)
+    const limitByChannel = new Map(limits.map((limit) => [limit.channelCode, limit]))
 
     const fiscalYearStart = await this.getFiscalYearStart()
 
-    const usageRows = await this.apiKeyUsageRepository
+    const usageRows = await this.tenantUsageRepository
       .createQueryBuilder('u')
       .select('u.channel_code', 'channelCode')
       .addSelect('u.period_type_code', 'periodTypeCode')
       .addSelect('SUM(u.sent_count)', 'total')
-      .where('u.api_key_consumer_id IN (:...consumerIds)', { consumerIds })
+      .where('u.tenant_id = :tenantId', { tenantId })
       .andWhere('u.channel_code IN (:...channels)', { channels })
       .andWhere(
         `(
@@ -841,23 +761,6 @@ export class ApiKeyUsageService {
       },
       HttpStatus.TOO_MANY_REQUESTS,
     )
-  }
-
-  private async getConsumerIds(tenantId: string): Promise<string[]> {
-    const consumers = await this.apiKeyConsumerRepository.find({
-      where: { tenantId },
-      select: { id: true },
-    })
-    return consumers.map((consumer) => consumer.id)
-  }
-
-  /** Every API key bound to the same tenant as the given key, the key itself included. */
-  private async getTenantConsumerIds(apiKeyConsumerId: string): Promise<string[]> {
-    const consumer = await this.apiKeyConsumerRepository.findOne({
-      where: { id: apiKeyConsumerId },
-      select: { id: true, tenantId: true },
-    })
-    return consumer ? this.getConsumerIds(consumer.tenantId) : []
   }
 
   /**

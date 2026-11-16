@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { ApiKeyConsumer } from './entities/api-key-consumer.entity'
-import { ApiKeyLimit } from './entities/api-key-limit.entity'
-import { ApiKeyUsage } from './entities/api-key-usage.entity'
-import { ApiKeyLimitAlert } from './entities/api-key-limit-alert.entity'
-import { ApiKeyLimitAlertLog } from './entities/api-key-limit-alert-log.entity'
+import { TenantLimit } from './entities/tenant-limit.entity'
+import { TenantUsage } from './entities/tenant-usage.entity'
+import { TenantLimitAlert } from './entities/tenant-limit-alert.entity'
+import { TenantLimitAlertLog } from './entities/tenant-limit-alert-log.entity'
 import { TenantSettings } from '../tenant-settings/entities/tenant-settings.entity'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
@@ -24,10 +24,10 @@ import { CredentialIssuerModule } from '../../services/credential-issuer/credent
   imports: [
     TypeOrmModule.forFeature([
       ApiKeyConsumer,
-      ApiKeyLimit,
-      ApiKeyUsage,
-      ApiKeyLimitAlert,
-      ApiKeyLimitAlertLog,
+      TenantLimit,
+      TenantUsage,
+      TenantLimitAlert,
+      TenantLimitAlertLog,
       TenantSettings,
       Tenant,
       NotifyConfiguration,
