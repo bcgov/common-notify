@@ -55,6 +55,7 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
   const [rendered, setRendered] = useState<string>('')
   const [renderedHtml, setRenderedHtml] = useState<string | undefined>()
   const [loading, setLoading] = useState(false)
+  const [savingValues, setSavingValues] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loadingValues, setLoadingValues] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -77,8 +78,10 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
     setError(null)
     try {
       if (persist && templateId && canSave) {
+        setSavingValues(true)
         await saveTemplatePreviewData(templateId, vals)
         if (session.current !== currentSession) return
+        setSavingValues(false)
       }
       const result = await previewTemplateBody({
         body,
@@ -97,6 +100,7 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
     } finally {
       if (session.current === currentSession) {
         applying.current = false
+        setSavingValues(false)
         setLoading(false)
       }
     }
@@ -107,6 +111,7 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
     const currentSession = ++session.current
     applying.current = false
     setLoading(false)
+    setSavingValues(false)
     if (!isOpen) return
     setValues({})
     setActiveTab('raw')
@@ -179,16 +184,21 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
       title="Email Notification Preview"
       className="template-preview"
       notice={
-        loadError ? (
-          <div role="alert">
-            <p>{loadError}</p>
-            <Button type="button" variant="secondary" onPress={() => setLoadAttempt((n) => n + 1)}>
-              Retry loading values
-            </Button>
-          </div>
-        ) : loadingValues ? (
-          <p role="status">Loading preview values...</p>
-        ) : undefined
+        <>
+          {loadError && (
+            <div role="alert">
+              <p>{loadError}</p>
+              <Button
+                type="button"
+                variant="secondary"
+                onPress={() => setLoadAttempt((n) => n + 1)}
+              >
+                Retry loading values
+              </Button>
+            </div>
+          )}
+          {activeTab === 'raw' && error && <p role="alert">{error}</p>}
+        </>
       }
       variables={variables.map((variable) => ({
         name: variable.name,
@@ -198,7 +208,7 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
         errorMessage: 'This field is empty.',
       }))}
       variablesIntro="Enter values for all variables to view the rendered template."
-      isEditable={!loadingValues && !loadError}
+      isEditable={!loadingValues && !loading && !loadError}
       onVariableChange={(name, value) => handleValueChange(name)(value)}
       footer={
         <Button
@@ -239,6 +249,15 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
         </>
       }
       isLoading={loading && activeTab === 'rendered'}
+      statusMessage={
+        loadingValues
+          ? 'Loading preview values...'
+          : savingValues
+            ? 'Saving preview values...'
+            : loading
+              ? 'Rendering preview...'
+              : ''
+      }
       error={activeTab === 'rendered' ? error : null}
     />
   )

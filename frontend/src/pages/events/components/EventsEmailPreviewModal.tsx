@@ -55,6 +55,7 @@ const EventsEmailPreviewModal: FC<EventsEmailPreviewModalProps> = ({
   const [bodyHtml, setBodyHtml] = useState<string | undefined>()
   const [bodyText, setBodyText] = useState('')
   const [loading, setLoading] = useState(false)
+  const [savingValues, setSavingValues] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loadingValues, setLoadingValues] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -77,8 +78,10 @@ const EventsEmailPreviewModal: FC<EventsEmailPreviewModalProps> = ({
       setError(null)
       try {
         if (persist && canEdit) {
+          setSavingValues(true)
           await saveTemplatePreviewData(template.id, vals)
           if (session.current !== currentSession) return
+          setSavingValues(false)
         }
         const response = await previewTemplate(template.id, params)
         if (session.current !== currentSession) return
@@ -94,6 +97,7 @@ const EventsEmailPreviewModal: FC<EventsEmailPreviewModalProps> = ({
       } finally {
         if (session.current === currentSession) {
           applying.current = false
+          setSavingValues(false)
           setLoading(false)
         }
       }
@@ -106,6 +110,7 @@ const EventsEmailPreviewModal: FC<EventsEmailPreviewModalProps> = ({
     const currentSession = ++session.current
     applying.current = false
     setLoading(false)
+    setSavingValues(false)
     if (!isOpen) return
     setValues({})
     setSubject('')
@@ -156,7 +161,6 @@ const EventsEmailPreviewModal: FC<EventsEmailPreviewModalProps> = ({
               </Button>
             </div>
           )}
-          {loadingValues && <p role="status">Loading preview values...</p>}
           {isNoticeVisible && (
             <InlineAlert
               variant="info"
@@ -173,7 +177,7 @@ const EventsEmailPreviewModal: FC<EventsEmailPreviewModalProps> = ({
         type: variable.type,
       }))}
       variablesIntro="Provide values for all variables in your template."
-      isEditable={!loadingValues && !loadError}
+      isEditable={!loadingValues && !loading && !loadError}
       onVariableChange={(name, value) => setValues((prev) => ({ ...prev, [name]: value }))}
       variablesFooter={
         <Button
@@ -201,6 +205,15 @@ const EventsEmailPreviewModal: FC<EventsEmailPreviewModalProps> = ({
       bodyHtml={bodyHtml}
       bodyText={bodyText}
       isLoading={loading || loadingValues}
+      statusMessage={
+        loadingValues
+          ? 'Loading preview values...'
+          : savingValues
+            ? 'Saving preview values...'
+            : loading
+              ? 'Rendering preview...'
+              : ''
+      }
       error={error}
     />
   )
