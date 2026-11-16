@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs'
+import { readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common'
@@ -28,6 +28,17 @@ const base = {
   port: PORT,
   username: 'postgres',
   password: 'default',
+}
+
+/**
+ * The migration that creates these tables, found by name rather than version: a version can be
+ * renumbered to land after another branch's migration.
+ */
+function smsNumbersMigration(): string {
+  const dir = join(__dirname, '../../migrations/sql')
+  const [file] = readdirSync(dir).filter((name) => /^V\d+__sms_numbers\.sql$/.test(name))
+  if (!file) throw new Error(`No V*__sms_numbers.sql migration in ${dir}`)
+  return readFileSync(join(dir, file), 'utf8')
 }
 
 const PARKS = '7f1d5c9e-0000-4000-8000-0000000000a1'
@@ -68,9 +79,7 @@ describe('SMS numbers (database)', () => {
       CREATE TABLE notify.tenant (
         id UUID PRIMARY KEY, name VARCHAR(200) NOT NULL, is_deleted BOOLEAN NOT NULL DEFAULT FALSE
       );`)
-    await dataSource.query(
-      readFileSync(join(__dirname, '../../migrations/sql/V81__sms_numbers.sql'), 'utf8'),
-    )
+    await dataSource.query(smsNumbersMigration())
     await dataSource.query(
       `INSERT INTO notify.tenant (id, name) VALUES ($1, 'Parks'), ($2, 'Roads')`,
       [PARKS, ROADS],
