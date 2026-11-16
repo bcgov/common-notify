@@ -152,13 +152,17 @@ export class NotifyPreviewService {
     this.assertPreviewable(request, original)
 
     const names = CHANNELS.filter((name) => request[name])
-    const renders = await Promise.all(
-      names.map((name) => {
-        const channel = request[name]!
-        const params = { ...request.params, ...channel.params }
-        return this.renderContent(tenantId, name, channel.content!, params)
-      }),
-    )
+    const [renders, senderName] = await Promise.all([
+      Promise.all(
+        names.map((name) => {
+          const channel = request[name]!
+          const params = { ...request.params, ...channel.params }
+          return this.renderContent(tenantId, name, channel.content!, params)
+        }),
+      ),
+      // Only an SMS body starts with the tenant's name.
+      request.sms ? this.tenantSettingsService?.getSmsSenderName(tenantId) : undefined,
+    ])
 
     const result: NotifyPreviewResponse = {}
     for (const [i, name] of names.entries()) {
@@ -166,8 +170,7 @@ export class NotifyPreviewService {
       const rendered = renders[i]
 
       if (name === 'sms') {
-        const senderName = (await this.tenantSettingsService?.getSmsSenderName(tenantId)) ?? null
-        result.sms = this.smsPreview(request, rendered, senderName)
+        result.sms = this.smsPreview(request, rendered, senderName ?? null)
       } else {
         result[name] = {
           recipients: original[name]!.recipients,

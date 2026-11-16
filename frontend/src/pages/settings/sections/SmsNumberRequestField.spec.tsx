@@ -161,6 +161,30 @@ describe('SmsNumberRequestField', () => {
     expect(screen.queryByText(/This is a test environment/)).not.toBeInTheDocument()
   })
 
+  it('drops the test-environment note once the tenant has a number of its own', async () => {
+    vi.mocked(getMySmsNumberRequest).mockResolvedValue(
+      status(request({ statusCode: 'approved', phoneNumber: '+12364995305' }), {
+        senderNumber: '+12364995305',
+        testEnvironment: true,
+      }),
+    )
+    render(<SmsNumberRequestField canEdit smsEnabled />)
+
+    expect(await screen.findByText('Your SMS is sent from +12364995305.')).toBeInTheDocument()
+    expect(screen.queryByText(/This is a test environment/)).not.toBeInTheDocument()
+  })
+
+  it('keeps the note for an approval on the shared default number', async () => {
+    vi.mocked(getMySmsNumberRequest).mockResolvedValue(
+      status(request({ statusCode: 'approved', usesDefaultNumber: true }), {
+        testEnvironment: true,
+      }),
+    )
+    render(<SmsNumberRequestField canEdit smsEnabled />)
+
+    expect(await screen.findByText(/This is a test environment/)).toBeInTheDocument()
+  })
+
   it('shows no test-environment note in prod', async () => {
     vi.mocked(getMySmsNumberRequest).mockResolvedValue(status(null))
     render(<SmsNumberRequestField canEdit smsEnabled />)

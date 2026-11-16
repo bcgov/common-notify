@@ -310,7 +310,7 @@ const BulkNotifications: FC = () => {
           {channel === 'sms' && (
             <p className="bulk-notifications__hint">
               Use digits with optional spaces, hyphens, periods, or parentheses, for example{' '}
-              +1-778-123-1234. Canadian numbers may omit +1. Letters and extensions are not
+              +1-250-555-0100. Canadian numbers may omit +1. Letters and extensions are not
               supported.
             </p>
           )}

@@ -133,12 +133,15 @@ const SmsNumberRequestField: FC<SmsNumberRequestFieldProps> = ({ canEdit, smsEna
   }
 
   const loaded = !loading && !loadError
+  // The note is about the shared number, so not for a tenant approved onto a number of its own.
+  const hasOwnNumber = request?.statusCode === 'approved' && !request.usesDefaultNumber
+  const showTestNote = loaded && testEnvironment && smsEnabled && !hasOwnNumber
   const showActions = canEdit && loaded
 
   return (
     <div className="settings__field" aria-busy={loading}>
       <span className="settings__label">SMS number</span>
-      {loaded && testEnvironment && smsEnabled && (
+      {showTestNote && (
         <InlineAlert variant="info">
           <span className="description">
             This is a test environment. SMS is sent from {sharedNumber(senderNumber)} for testing,
