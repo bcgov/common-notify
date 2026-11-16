@@ -18,6 +18,8 @@ interface TemplatePreviewModalProps {
   subject?: string
   channelCode: NotificationChannel
   engineCode: TemplateEngine
+  draftValues?: Record<string, string>
+  onDraftValuesChange?: (values: Record<string, string>) => void
 }
 
 const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
@@ -27,8 +29,13 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
   subject,
   channelCode,
   engineCode,
+  draftValues,
+  onDraftValuesChange,
 }) => {
-  const variables = useMemo(() => detectVariables(body, engineCode), [body, engineCode])
+  const variables = useMemo(
+    () => detectVariables(`${subject ?? ''}\n${body}`, engineCode),
+    [subject, body, engineCode],
+  )
 
   const dispatch = useAppDispatch()
   const savedValues = useAppSelector((s) => s.templates.previewValues)
@@ -80,9 +87,10 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
     if (!isOpen) return
     const initial: Record<string, string> = {}
     variables.forEach((v) => {
-      initial[v.name] = savedValues[v.name] ?? (v.type === 'boolean' ? 'true' : '')
+      initial[v.name] = (draftValues ?? savedValues)[v.name] ?? (v.type === 'boolean' ? 'true' : '')
     })
     setValues(initial)
+    onDraftValuesChange?.(initial)
     setActiveTab('raw')
     setShowErrors(false)
     // Only render up front when every value is present; otherwise the Rendered tab
@@ -102,7 +110,11 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
 
   const handleValueChange = (name: string) => (value: string) => {
     setValues((prev) => ({ ...prev, [name]: value }))
-    dispatch(setPreviewValues({ [name]: value }))
+    if (onDraftValuesChange) {
+      onDraftValuesChange({ ...values, [name]: value })
+    } else {
+      dispatch(setPreviewValues({ [name]: value }))
+    }
   }
 
   let renderedOverride: ReactNode

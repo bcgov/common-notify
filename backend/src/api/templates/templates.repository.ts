@@ -219,6 +219,36 @@ export class TemplatesRepository {
     return this.templateRepository.save(newTemplate)
   }
 
+  async createWithInitialVersion(
+    data: Partial<Template>,
+    previewParams?: Record<string, string>,
+  ): Promise<Template> {
+    return this.templateRepository.manager.transaction(async (manager) => {
+      const template = await manager.save(Template, manager.create(Template, data))
+      await manager.save(TemplateVersion, {
+        templateId: template.id,
+        version: 1,
+        name: template.name,
+        description: template.description,
+        channelCode: template.channelCode,
+        subject: template.subject,
+        body: template.body,
+        engineCode: template.engineCode,
+        bodyType: template.bodyType,
+        createdBy: template.createdBy,
+      })
+      if (previewParams !== undefined) {
+        await manager.save(TemplatePreviewData, {
+          templateId: template.id,
+          params: previewParams,
+          createdBy: template.createdBy,
+          updatedBy: template.updatedBy,
+        })
+      }
+      return template
+    })
+  }
+
   /**
    * Update a template
    */

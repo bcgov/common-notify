@@ -217,6 +217,7 @@ export async function previewTemplateBody(
 }
 
 export interface CreateTemplateData {
+  previewParams?: Record<string, string>
   name: string
   channelCode: NotificationChannel
   engineCode: TemplateEngine

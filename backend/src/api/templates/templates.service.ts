@@ -156,34 +156,23 @@ export class TemplatesService {
     // SMS carries no formatting, so its body is stored and sent as plain text.
     const bodyType = this.defaultBodyType(engineCode, createDto.channelCode)
 
-    const template = await this.templatesRepository.create({
-      tenantId,
-      name: createDto.name,
-      description: createDto.description,
-      channelCode: createDto.channelCode,
-      subject: createDto.subject,
-      body: createDto.body,
-      engineCode,
-      bodyType,
-      version: 1,
-      active: true,
-      createdBy: userId,
-      updatedBy: userId,
-    })
-
-    // Create a version record
-    await this.templatesRepository.createVersion({
-      templateId: template.id,
-      version: 1,
-      name: template.name,
-      description: template.description,
-      channelCode: template.channelCode,
-      subject: template.subject,
-      body: template.body,
-      engineCode: template.engineCode,
-      bodyType: template.bodyType,
-      createdBy: userId,
-    })
+    const template = await this.templatesRepository.createWithInitialVersion(
+      {
+        tenantId,
+        name: createDto.name,
+        description: createDto.description,
+        channelCode: createDto.channelCode,
+        subject: createDto.subject,
+        body: createDto.body,
+        engineCode,
+        bodyType,
+        version: 1,
+        active: true,
+        createdBy: userId,
+        updatedBy: userId,
+      },
+      createDto.previewParams,
+    )
 
     return this.toResponseDto(template)
   }
