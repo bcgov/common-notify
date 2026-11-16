@@ -10,7 +10,7 @@ import { Repository } from 'typeorm'
 import { Tenant } from './entities/tenant.entity'
 import { TenantSendingHistory } from './entities/tenant-sending-history.entity'
 import { CreateTenantDto } from './schemas/create-tenant.dto'
-import { seedTenantLimitDefaults } from '../../api-keys/tenant-limit-defaults'
+import { seedTenantLimitDefaults } from '../../usage/tenant-limit-defaults'
 
 /**
  * TenantsService

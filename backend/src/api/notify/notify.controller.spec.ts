@@ -33,7 +33,7 @@ import { EMAIL_ADAPTER } from '../../adapters/tokens'
 import { RenderingModule } from '../../services/rendering/rendering.module'
 import { AttachmentProcessingService } from './services/attachment-processing.service'
 import { AttachmentValidationService } from './services/attachment-validation.service'
-import { ApiKeyUsageService } from '../api-keys/api-key-usage.service'
+import { TenantUsageService } from '../usage/tenant-usage.service'
 import { FeatureFlagService } from '../../api/feature-flag/feature-flag.service'
 import { TenantsService } from '../../api/admin/tenants/tenants.service'
 import { WebhookService } from '../../api/webhook/webhook.service'
@@ -134,7 +134,7 @@ const mockSafelistService = {
   appliesTo: (channel: string) => channel === 'EMAIL' || channel === 'SMS',
 }
 
-const mockApiKeyUsageService = {
+const mockTenantUsageService = {
   recordUsage: vi.fn().mockResolvedValue([]),
   assertWithinLimits: vi.fn().mockResolvedValue(undefined),
 }
@@ -176,8 +176,8 @@ describe('Notify Controllers', () => {
     )
     mockNotificationService.create.mockResolvedValue({ id: 'mock-notification-id' })
     mockNotificationService.update.mockResolvedValue(undefined)
-    mockApiKeyUsageService.recordUsage.mockResolvedValue([])
-    mockApiKeyUsageService.assertWithinLimits.mockResolvedValue(undefined)
+    mockTenantUsageService.recordUsage.mockResolvedValue([])
+    mockTenantUsageService.assertWithinLimits.mockResolvedValue(undefined)
     mockLimitAlertNotificationService.processAcceptedUsage.mockResolvedValue(undefined)
     mockSafelistService.isEnforced.mockResolvedValue(false)
     mockSafelistService.findBlocked.mockResolvedValue([])
@@ -215,8 +215,8 @@ describe('Notify Controllers', () => {
         { provide: TenantsService, useValue: mockTenantsService },
         { provide: WebhookService, useValue: mockWebhookService },
         {
-          provide: ApiKeyUsageService,
-          useValue: mockApiKeyUsageService,
+          provide: TenantUsageService,
+          useValue: mockTenantUsageService,
         },
         {
           provide: LimitAlertNotificationService,
@@ -289,7 +289,7 @@ describe('Notify Controllers', () => {
         .expect(202)
       expect(mockNotificationService.create).toHaveBeenCalledTimes(1)
       expect(mockIngestionQueue.add).toHaveBeenCalledTimes(1)
-      expect(mockApiKeyUsageService.recordUsage).toHaveBeenCalledTimes(1)
+      expect(mockTenantUsageService.recordUsage).toHaveBeenCalledTimes(1)
     })
 
     it('should be defined', () => {
@@ -418,7 +418,7 @@ describe('Notify Controllers', () => {
       }
 
       it('forwards exact standard-send usage results and the tenant ID', async () => {
-        mockApiKeyUsageService.recordUsage.mockResolvedValue([
+        mockTenantUsageService.recordUsage.mockResolvedValue([
           {
             periodTypeCode: UsagePeriodType.DAY,
             periodStart: dayPeriodStart,
@@ -457,7 +457,7 @@ describe('Notify Controllers', () => {
       })
 
       it('forwards exact email-merge usage results', async () => {
-        mockApiKeyUsageService.recordUsage.mockResolvedValue([
+        mockTenantUsageService.recordUsage.mockResolvedValue([
           {
             periodTypeCode: UsagePeriodType.DAY,
             periodStart: dayPeriodStart,
@@ -503,7 +503,7 @@ describe('Notify Controllers', () => {
           await request(app.getHttpServer()).post('/api/v1/notifysimple').send(smsBody).expect(202)
 
           // 2 recipients x 3 segments = 6 billable messages, enforced and recorded.
-          expect(mockApiKeyUsageService.assertWithinLimits).toHaveBeenCalledWith('test-tenant-id', [
+          expect(mockTenantUsageService.assertWithinLimits).toHaveBeenCalledWith('test-tenant-id', [
             { channel: NotificationChannel.EMAIL, count: 0 },
             {
               channel: NotificationChannel.SMS,
@@ -512,7 +512,7 @@ describe('Notify Controllers', () => {
               countExplanation: expect.stringContaining('2 recipient(s) x 3 segments'),
             },
           ])
-          expect(mockApiKeyUsageService.recordUsage).toHaveBeenCalledWith(
+          expect(mockTenantUsageService.recordUsage).toHaveBeenCalledWith(
             'test-tenant-id',
             NotificationChannel.SMS,
             6,
@@ -526,7 +526,7 @@ describe('Notify Controllers', () => {
 
           await request(app.getHttpServer()).post('/api/v1/notifysimple').send(smsBody).expect(202)
 
-          expect(mockApiKeyUsageService.recordUsage).toHaveBeenCalledWith(
+          expect(mockTenantUsageService.recordUsage).toHaveBeenCalledWith(
             'test-tenant-id',
             NotificationChannel.SMS,
             2,
@@ -544,7 +544,7 @@ describe('Notify Controllers', () => {
       })
 
       it('does not process alerts when recorded usage is empty', async () => {
-        mockApiKeyUsageService.recordUsage.mockResolvedValue([])
+        mockTenantUsageService.recordUsage.mockResolvedValue([])
 
         await request(app.getHttpServer())
           .post('/api/v1/notifysimple')
@@ -555,7 +555,7 @@ describe('Notify Controllers', () => {
       })
 
       it('counts usage and processes alerts against the tenant when there is no API key', async () => {
-        mockApiKeyUsageService.recordUsage.mockResolvedValue([
+        mockTenantUsageService.recordUsage.mockResolvedValue([
           { periodTypeCode: UsagePeriodType.DAY, periodStart: dayPeriodStart, sentCount: 7 },
         ])
 
@@ -564,11 +564,11 @@ describe('Notify Controllers', () => {
           .send(standardBody)
           .expect(202)
 
-        expect(mockApiKeyUsageService.assertWithinLimits).toHaveBeenCalledWith(
+        expect(mockTenantUsageService.assertWithinLimits).toHaveBeenCalledWith(
           'test-tenant-id',
           expect.any(Array),
         )
-        expect(mockApiKeyUsageService.recordUsage).toHaveBeenCalledWith(
+        expect(mockTenantUsageService.recordUsage).toHaveBeenCalledWith(
           'test-tenant-id',
           NotificationChannel.EMAIL,
           1,
@@ -579,7 +579,7 @@ describe('Notify Controllers', () => {
       })
 
       it('does not fail the original response when orchestration rejects', async () => {
-        mockApiKeyUsageService.recordUsage.mockResolvedValue([
+        mockTenantUsageService.recordUsage.mockResolvedValue([
           {
             periodTypeCode: UsagePeriodType.DAY,
             periodStart: dayPeriodStart,
@@ -599,7 +599,7 @@ describe('Notify Controllers', () => {
       })
 
       it('does not fail when the optional orchestration service is unavailable', async () => {
-        mockApiKeyUsageService.recordUsage.mockResolvedValue([
+        mockTenantUsageService.recordUsage.mockResolvedValue([
           {
             periodTypeCode: UsagePeriodType.DAY,
             periodStart: dayPeriodStart,
@@ -622,7 +622,7 @@ describe('Notify Controllers', () => {
       })
 
       it('processes a successful channel when another usage write fails', async () => {
-        mockApiKeyUsageService.recordUsage.mockImplementation((_tenantId, channel) => {
+        mockTenantUsageService.recordUsage.mockImplementation((_tenantId, channel) => {
           if (channel === NotificationChannel.EMAIL) {
             return Promise.reject(new Error('email usage write failed'))
           }
@@ -696,7 +696,7 @@ describe('Notify Controllers', () => {
 
       const expectNothingAccepted = () => {
         expect(mockNotificationService.create).not.toHaveBeenCalled()
-        expect(mockApiKeyUsageService.recordUsage).not.toHaveBeenCalled()
+        expect(mockTenantUsageService.recordUsage).not.toHaveBeenCalled()
         expect(mockIngestionQueue.add).not.toHaveBeenCalled()
       }
 
@@ -733,7 +733,7 @@ describe('Notify Controllers', () => {
           duplicate: true,
         })
         expect(mockAttachmentProcessingService.processAttachments).not.toHaveBeenCalled()
-        expect(mockApiKeyUsageService.assertWithinLimits).not.toHaveBeenCalled()
+        expect(mockTenantUsageService.assertWithinLimits).not.toHaveBeenCalled()
         expect(mockNotificationDedupService.claim).not.toHaveBeenCalled()
         expectNothingAccepted()
       })
@@ -752,7 +752,7 @@ describe('Notify Controllers', () => {
       })
 
       it('claims only after the limit check, so a rejected send holds no claim', async () => {
-        mockApiKeyUsageService.assertWithinLimits.mockRejectedValueOnce(
+        mockTenantUsageService.assertWithinLimits.mockRejectedValueOnce(
           new BadRequestException('over limit'),
         )
 
@@ -1194,7 +1194,7 @@ describe('Notify Controllers', () => {
             })
 
           expect(mockNotificationService.create).not.toHaveBeenCalled()
-          expect(mockApiKeyUsageService.recordUsage).not.toHaveBeenCalled()
+          expect(mockTenantUsageService.recordUsage).not.toHaveBeenCalled()
           expect(mockIngestionQueue.add).not.toHaveBeenCalled()
         })
 
@@ -1395,7 +1395,7 @@ describe('Notify Controllers', () => {
             .send(validSmsMerge)
             .expect(202)
 
-          expect(mockApiKeyUsageService.assertWithinLimits).toHaveBeenCalledWith('test-tenant-id', [
+          expect(mockTenantUsageService.assertWithinLimits).toHaveBeenCalledWith('test-tenant-id', [
             { channel: 'SMS', count: 8 },
           ])
         })
@@ -1780,7 +1780,7 @@ describe('Notify Controllers', () => {
 
       // The UI sends with a user's token, not an API key; the send is still the tenant's usage.
       it("checks and counts a UI bulk send against the tenant's limits", async () => {
-        mockApiKeyUsageService.recordUsage.mockResolvedValue([
+        mockTenantUsageService.recordUsage.mockResolvedValue([
           { periodTypeCode: UsagePeriodType.DAY, periodStart: new Date(), sentCount: 2 },
         ])
 
@@ -1789,10 +1789,10 @@ describe('Notify Controllers', () => {
           .send(validMergeBody)
           .expect(202)
 
-        expect(mockApiKeyUsageService.assertWithinLimits).toHaveBeenCalledWith('test-tenant-id', [
+        expect(mockTenantUsageService.assertWithinLimits).toHaveBeenCalledWith('test-tenant-id', [
           { channel: NotificationChannel.EMAIL, count: 2 },
         ])
-        expect(mockApiKeyUsageService.recordUsage).toHaveBeenCalledWith(
+        expect(mockTenantUsageService.recordUsage).toHaveBeenCalledWith(
           'test-tenant-id',
           NotificationChannel.EMAIL,
           2,
@@ -1820,7 +1820,7 @@ describe('Notify Controllers', () => {
           })
           .expect(202)
 
-        expect(mockApiKeyUsageService.recordUsage).toHaveBeenCalledWith(
+        expect(mockTenantUsageService.recordUsage).toHaveBeenCalledWith(
           'test-tenant-id',
           NotificationChannel.SMS,
           5,
@@ -1828,7 +1828,7 @@ describe('Notify Controllers', () => {
       })
 
       it('rejects a UI bulk send over the tenant limit with 429, queueing nothing', async () => {
-        mockApiKeyUsageService.assertWithinLimits.mockRejectedValueOnce(
+        mockTenantUsageService.assertWithinLimits.mockRejectedValueOnce(
           new HttpException('EMAIL daily notification limit reached', HttpStatus.TOO_MANY_REQUESTS),
         )
 
@@ -1837,7 +1837,7 @@ describe('Notify Controllers', () => {
           .send(validMergeBody)
           .expect(429)
 
-        expect(mockApiKeyUsageService.recordUsage).not.toHaveBeenCalled()
+        expect(mockTenantUsageService.recordUsage).not.toHaveBeenCalled()
         expect(mockIngestionQueue.add).not.toHaveBeenCalled()
       })
     })

@@ -156,8 +156,8 @@ export interface RecordedUsageResult {
  * whether it was made with an API key or from the Notify UI.
  */
 @Injectable()
-export class ApiKeyUsageService {
-  private readonly logger = new Logger(ApiKeyUsageService.name)
+export class TenantUsageService {
+  private readonly logger = new Logger(TenantUsageService.name)
 
   constructor(
     @InjectRepository(TenantLimit)

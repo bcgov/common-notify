@@ -2,7 +2,7 @@ import { Injectable, Logger, ForbiddenException, ConflictException } from '@nest
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { ApiKeyConsumer } from './entities/api-key-consumer.entity'
-import { seedTenantLimitDefaults } from './tenant-limit-defaults'
+import { seedTenantLimitDefaults } from '../usage/tenant-limit-defaults'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 
 @Injectable()

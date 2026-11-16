@@ -4,6 +4,7 @@ import { CodeTablesModule } from './code-tables/code-tables.module'
 import { TemplatesModule } from './templates/templates.module'
 import { AuthModule } from './auth/auth.module'
 import { ApiKeysModule } from './api-keys/api-keys.module'
+import { UsageModule } from './usage/usage.module'
 import { AttachmentModule } from './attachment/attachment.module'
 import { TenantSettingsModule } from './tenant-settings/tenant-settings.module'
 import { EventsModule } from './events/events.module'
@@ -31,6 +32,7 @@ import { EmailLogoModule } from './email-logo/email-logo.module'
     TemplatesModule,
     AuthModule,
     ApiKeysModule,
+    UsageModule,
     AttachmentModule,
     TenantSettingsModule,
     EventsModule,
@@ -43,6 +45,7 @@ import { EmailLogoModule } from './email-logo/email-logo.module'
     TemplatesModule,
     AuthModule,
     ApiKeysModule,
+    UsageModule,
     AttachmentModule,
     TenantSettingsModule,
     EventsModule,

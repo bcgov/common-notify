@@ -4,7 +4,7 @@ import {
   ClaimedLimitAlert,
   LimitAlertService,
   ProcessLimitAlertUsageInput,
-} from '../../api-keys/limit-alert.service'
+} from '../../usage/limit-alert.service'
 import { NotificationService } from '../../notification/notification.service'
 import { NotificationStatus } from '../../../enum/notification-status.enum'
 import { QueueName } from '../../../enum/queue-name.enum'

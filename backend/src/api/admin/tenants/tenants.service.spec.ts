@@ -5,9 +5,9 @@ import { vi } from 'vitest'
 import { TenantsService, sendingDisabledMessage } from './tenants.service'
 import { TenantSendingHistory } from './entities/tenant-sending-history.entity'
 import { Tenant } from './entities/tenant.entity'
-import { seedTenantLimitDefaults } from '../../api-keys/tenant-limit-defaults'
+import { seedTenantLimitDefaults } from '../../usage/tenant-limit-defaults'
 
-vi.mock('../../api-keys/tenant-limit-defaults', () => ({ seedTenantLimitDefaults: vi.fn() }))
+vi.mock('../../usage/tenant-limit-defaults', () => ({ seedTenantLimitDefaults: vi.fn() }))
 
 describe('TenantsService', () => {
   let service: TenantsService

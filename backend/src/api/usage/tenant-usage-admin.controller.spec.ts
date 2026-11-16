@@ -3,8 +3,8 @@ import { ValidationPipe, VersioningType } from '@nestjs/common'
 import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { ApiKeyUsageAdminController } from './api-key-usage-admin.controller'
-import { ApiKeyUsageService } from './api-key-usage.service'
+import { TenantUsageAdminController } from './tenant-usage-admin.controller'
+import { TenantUsageService } from './tenant-usage.service'
 import { NotifyAdminGuard } from '../../common/guards/notify-admin.guard'
 import { TenantsService } from '../admin/tenants/tenants.service'
 
@@ -12,7 +12,7 @@ import { TenantsService } from '../admin/tenants/tenants.service'
  * Driven over HTTP, through the global ValidationPipe as app.ts installs it, because the query
  * string is what is under test and the DTO's transforms only run inside that pipe.
  */
-describe('ApiKeyUsageAdminController GET /frontend/admin/api-key-usage', () => {
+describe('TenantUsageAdminController GET /frontend/admin/api-key-usage', () => {
   let app: INestApplication
   let getAllTenantsUsage: ReturnType<typeof vi.fn>
   let getAdminUsageSummary: ReturnType<typeof vi.fn>
@@ -30,10 +30,10 @@ describe('ApiKeyUsageAdminController GET /frontend/admin/api-key-usage', () => {
       .mockResolvedValue({ tenants: 42, sentThisFiscalYear: 30, disabled: 0 })
 
     const module = await Test.createTestingModule({
-      controllers: [ApiKeyUsageAdminController],
+      controllers: [TenantUsageAdminController],
       providers: [
         {
-          provide: ApiKeyUsageService,
+          provide: TenantUsageService,
           useValue: { getAllTenantsUsage, getAdminUsageSummary, listNotifyTenants },
         },
         { provide: TenantsService, useValue: { setSending } },

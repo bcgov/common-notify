@@ -3,9 +3,9 @@ import { vi, afterAll } from 'vitest'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { ApiKeyConsumer } from './entities/api-key-consumer.entity'
 import { ApiKeysService } from './api-keys.service'
-import { seedTenantLimitDefaults } from './tenant-limit-defaults'
+import { seedTenantLimitDefaults } from '../usage/tenant-limit-defaults'
 
-vi.mock('./tenant-limit-defaults', () => ({ seedTenantLimitDefaults: vi.fn() }))
+vi.mock('../usage/tenant-limit-defaults', () => ({ seedTenantLimitDefaults: vi.fn() }))
 
 describe('ApiKeysService.autoBindApiKeyForLoadTest', () => {
   const loadtestTenant = { id: 'loadtest-tenant-id', slug: 'loadtest-tenant' }

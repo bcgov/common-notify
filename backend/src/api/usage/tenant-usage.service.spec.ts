@@ -8,14 +8,14 @@ import { TenantLimitAlert } from './entities/tenant-limit-alert.entity'
 import { TenantUsage } from './entities/tenant-usage.entity'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import {
-  ApiKeyUsageService,
+  TenantUsageService,
   averageMonthlySends,
   averageWindow,
   channelsInScope,
-} from './api-key-usage.service'
+} from './tenant-usage.service'
 import type { ListQueryFilter, ParsedListQuery } from '../../common/query/list-query.types'
 
-describe('ApiKeyUsageService.recordUsage', () => {
+describe('TenantUsageService.recordUsage', () => {
   const tenantUsageRepository = {
     query: vi.fn(),
   }
@@ -23,7 +23,7 @@ describe('ApiKeyUsageService.recordUsage', () => {
     findOne: vi.fn(),
   }
 
-  const service = new ApiKeyUsageService(
+  const service = new TenantUsageService(
     {} as Repository<TenantLimit>,
     {} as Repository<TenantLimitAlert>,
     tenantUsageRepository as unknown as Repository<TenantUsage>,
@@ -86,7 +86,7 @@ describe('ApiKeyUsageService.recordUsage', () => {
   })
 })
 
-describe('ApiKeyUsageService.assertWithinLimits', () => {
+describe('TenantUsageService.assertWithinLimits', () => {
   const tenantLimitRepository = { find: vi.fn() }
   const configurationRepository = { findOne: vi.fn() }
   const usageQueryBuilder = {
@@ -102,7 +102,7 @@ describe('ApiKeyUsageService.assertWithinLimits', () => {
     createQueryBuilder: vi.fn(() => usageQueryBuilder),
   }
 
-  const service = new ApiKeyUsageService(
+  const service = new TenantUsageService(
     tenantLimitRepository as unknown as Repository<TenantLimit>,
     {} as Repository<TenantLimitAlert>,
     tenantUsageRepository as unknown as Repository<TenantUsage>,
@@ -196,7 +196,7 @@ describe('ApiKeyUsageService.assertWithinLimits', () => {
   })
 })
 
-describe('ApiKeyUsageService.getAllTenantsUsage', () => {
+describe('TenantUsageService.getAllTenantsUsage', () => {
   const active = {
     status: 'active',
     disabledReason: null,
@@ -247,7 +247,7 @@ describe('ApiKeyUsageService.getAllTenantsUsage', () => {
       createQueryBuilder: vi.fn().mockReturnValue(tenantQb.qb),
       query: vi.fn().mockResolvedValue(history),
     }
-    const service = new ApiKeyUsageService(
+    const service = new TenantUsageService(
       {
         createQueryBuilder: vi.fn().mockReturnValue(limitQb.qb),
       } as unknown as Repository<TenantLimit>,
@@ -428,14 +428,14 @@ describe('ApiKeyUsageService.getAllTenantsUsage', () => {
   })
 })
 
-describe('ApiKeyUsageService.updateTenantLimits', () => {
+describe('TenantUsageService.updateTenantLimits', () => {
   it("returns the edited channel's row under the tenant's name", async () => {
     const limitRepository = {
       update: vi.fn().mockResolvedValue({ affected: 1 }),
       createQueryBuilder: vi.fn(() => rawQb([])),
     }
     const rawQb = (rows: unknown[]) => fakeQueryBuilder({ rawMany: rows }).qb
-    const service = new ApiKeyUsageService(
+    const service = new TenantUsageService(
       limitRepository as unknown as Repository<TenantLimit>,
       {} as Repository<TenantLimitAlert>,
       { createQueryBuilder: () => rawQb([]) } as unknown as Repository<TenantUsage>,
@@ -456,12 +456,12 @@ describe('ApiKeyUsageService.updateTenantLimits', () => {
   })
 })
 
-describe('ApiKeyUsageService.getAdminUsageSummary', () => {
+describe('TenantUsageService.getAdminUsageSummary', () => {
   it('counts Notify tenants, those sending this fiscal year and those disabled', async () => {
     const { qb, where, parameters } = fakeQueryBuilder({
       rawOne: { tenants: '42', sentThisFiscalYear: '30', disabled: '2' },
     })
-    const service = new ApiKeyUsageService(
+    const service = new TenantUsageService(
       {} as Repository<TenantLimit>,
       {} as Repository<TenantLimitAlert>,
       {} as Repository<TenantUsage>,
@@ -481,12 +481,12 @@ describe('ApiKeyUsageService.getAdminUsageSummary', () => {
   })
 })
 
-describe('ApiKeyUsageService.listNotifyTenants', () => {
+describe('TenantUsageService.listNotifyTenants', () => {
   it('lists the CSTAR tenants the usage table shows, by name, as id and name only', async () => {
     const { qb, where, calls } = fakeQueryBuilder({
       many: [{ id: 't-1', name: 'Parks', status: 'active' }],
     })
-    const service = new ApiKeyUsageService(
+    const service = new TenantUsageService(
       {} as Repository<TenantLimit>,
       {} as Repository<TenantLimitAlert>,
       {} as Repository<TenantUsage>,

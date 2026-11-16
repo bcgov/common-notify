@@ -12,7 +12,7 @@ import { QueueName } from '../../../enum/queue-name.enum'
 import { NotificationChannel } from '../../../enum/notification-channel.enum'
 import { NotificationService } from '../../notification/notification.service'
 import { NotificationRequestDetailService } from '../../notification/notification-request-detail.service'
-import { ApiKeyUsageService, RecordedUsageResult } from '../../api-keys/api-key-usage.service'
+import { TenantUsageService, RecordedUsageResult } from '../../usage/tenant-usage.service'
 import { SafelistService } from '../../safelist/safelist.service'
 import type { SafelistCandidate } from '../../safelist/safelist.service'
 import { EventNotificationResolver } from '../../events/event-notification.resolver'
@@ -89,7 +89,7 @@ export class NotifySubmissionService {
     private readonly attachmentValidationService: AttachmentValidationService,
     private readonly attachmentProcessingService: AttachmentProcessingService,
     private readonly notificationRequestDetailService: NotificationRequestDetailService,
-    private readonly apiKeyUsageService: ApiKeyUsageService,
+    private readonly tenantUsageService: TenantUsageService,
     private readonly safelistService: SafelistService,
     private readonly smsSegmentService: SmsSegmentService,
     private readonly notificationDedupService: NotificationDedupService,
@@ -297,7 +297,7 @@ export class NotifySubmissionService {
    * request must fail. Applies to every send, with an API key or from the Notify UI.
    */
   async enforceLimits(tenantId: string, entries: UsageEntry[]): Promise<void> {
-    await this.apiKeyUsageService.assertWithinLimits(tenantId, entries)
+    await this.tenantUsageService.assertWithinLimits(tenantId, entries)
   }
 
   /**
@@ -314,7 +314,7 @@ export class NotifySubmissionService {
         .filter(({ count }) => count > 0)
         .map(async ({ channel, count }): Promise<AcceptedUsageResult[]> => {
           try {
-            const usageRows = await this.apiKeyUsageService.recordUsage(tenantId, channel, count)
+            const usageRows = await this.tenantUsageService.recordUsage(tenantId, channel, count)
             return usageRows.map(({ periodTypeCode, periodStart, sentCount }) => ({
               channelCode: channel,
               periodTypeCode,

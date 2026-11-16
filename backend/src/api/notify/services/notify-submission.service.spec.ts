@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { NotifySubmissionService } from './notify-submission.service'
 import { NotificationService } from '../../notification/notification.service'
 import { NotificationRequestDetailService } from '../../notification/notification-request-detail.service'
-import { ApiKeyUsageService } from '../../api-keys/api-key-usage.service'
+import { TenantUsageService } from '../../usage/tenant-usage.service'
 import { SafelistService } from '../../safelist/safelist.service'
 import { EventNotificationResolver } from '../../events/event-notification.resolver'
 import { AttachmentValidationService } from './attachment-validation.service'
@@ -62,7 +62,7 @@ describe('NotifySubmissionService', () => {
             update: vi.fn(),
           },
         },
-        { provide: ApiKeyUsageService, useValue: usage },
+        { provide: TenantUsageService, useValue: usage },
         { provide: SafelistService, useValue: { findBlocked: vi.fn().mockResolvedValue([]) } },
         { provide: NotificationDedupService, useValue: { enabled: false } },
         { provide: LimitAlertNotificationService, useValue: limitAlerts },

@@ -12,7 +12,7 @@ import { AttachmentValidationService } from '../notify/services/attachment-valid
 import { AttachmentProcessingService } from '../notify/services/attachment-processing.service'
 import { SafelistService } from '../safelist/safelist.service'
 import { GcNotifyBulkValidationService } from './gc-notify-bulk-validation.service'
-import { ApiKeyUsageService } from '../api-keys/api-key-usage.service'
+import { TenantUsageService } from '../usage/tenant-usage.service'
 import { SmsSegmentService } from '../notify/services/sms-segment.service'
 import { NotificationDedupService } from '../notify/services/notification-dedup.service'
 import { NotifySubmissionService } from '../notify/services/notify-submission.service'
@@ -49,7 +49,7 @@ describe('GcNotifyInternalExecutionService', () => {
   let mockAttachmentProcessingService: { processAttachments: ReturnType<typeof vi.fn> }
   let mockSafelistService: { findBlocked: ReturnType<typeof vi.fn> }
   const mockBulkValidationService = { validateRows: vi.fn() }
-  const mockApiKeyUsageService = { assertWithinLimits: vi.fn(), recordUsage: vi.fn() }
+  const mockTenantUsageService = { assertWithinLimits: vi.fn(), recordUsage: vi.fn() }
   const mockSmsSegmentService = { countSegments: vi.fn() }
   let mockTenantSettingsService: { resolveSenderAddress: ReturnType<typeof vi.fn> }
   // Disabled unless a test opts in, so the rest of the suite runs the undeduplicated path.
@@ -122,7 +122,7 @@ describe('GcNotifyInternalExecutionService', () => {
         },
         { provide: SafelistService, useValue: mockSafelistService },
         { provide: GcNotifyBulkValidationService, useValue: mockBulkValidationService },
-        { provide: ApiKeyUsageService, useValue: mockApiKeyUsageService },
+        { provide: TenantUsageService, useValue: mockTenantUsageService },
         { provide: SmsSegmentService, useValue: mockSmsSegmentService },
         { provide: TenantSettingsService, useValue: mockTenantSettingsService },
         { provide: getRepositoryToken(NotifyConfiguration), useValue: mockConfigurationRepository },

@@ -10,7 +10,7 @@ import { Roles } from '../../common/decorators/roles.decorator'
 import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import type { Tenant } from '../admin/tenants/entities/tenant.entity'
-import { ApiKeyUsageService } from './api-key-usage.service'
+import { TenantUsageService } from './tenant-usage.service'
 import { UpdateThresholdDto } from './schemas/update-threshold.dto'
 import { TenantUsageResponseDto, UsageHistoryEntryDto } from './schemas/tenant-usage-response.dto'
 
@@ -32,8 +32,8 @@ import { TenantUsageResponseDto, UsageHistoryEntryDto } from './schemas/tenant-u
 @Controller('frontend/api-key-usage')
 @UseGuards(NotifyFrontendRoleGuard)
 @ApiBearerAuth()
-export class ApiKeyUsageFrontendController {
-  constructor(private readonly apiKeyUsageService: ApiKeyUsageService) {}
+export class TenantUsageFrontendController {
+  constructor(private readonly tenantUsageService: TenantUsageService) {}
 
   @Version('1')
   @Get()
@@ -46,7 +46,7 @@ export class ApiKeyUsageFrontendController {
   @ApiOkResponse({ type: TenantUsageResponseDto })
   getUsage(@Req() req: Request): Promise<TenantUsageResponseDto> {
     const tenant = (req as any).tenant as Tenant
-    return this.apiKeyUsageService.getTenantUsage(tenant.id)
+    return this.tenantUsageService.getTenantUsage(tenant.id)
   }
 
   @Version('1')
@@ -60,7 +60,7 @@ export class ApiKeyUsageFrontendController {
   @ApiOkResponse({ type: [UsageHistoryEntryDto] })
   getHistory(@Req() req: Request): Promise<UsageHistoryEntryDto[]> {
     const tenant = (req as any).tenant as Tenant
-    return this.apiKeyUsageService.getUsageHistory(tenant.id)
+    return this.tenantUsageService.getUsageHistory(tenant.id)
   }
 
   @Version('1')
@@ -76,7 +76,7 @@ export class ApiKeyUsageFrontendController {
   ): Promise<TenantUsageResponseDto> {
     const tenant = (req as any).tenant as Tenant
     const userGuid = (req as any).userGuid as string | undefined
-    return this.apiKeyUsageService.updateThreshold(
+    return this.tenantUsageService.updateThreshold(
       tenant.id,
       dto.channel,
       dto.warnThresholdPercent,

@@ -3,7 +3,7 @@ import { vi } from 'vitest'
 import { UsagePeriodType } from '../../../enum/usage-period-type.enum'
 import { NotificationStatus } from '../../../enum/notification-status.enum'
 import { QueueName } from '../../../enum/queue-name.enum'
-import { ClaimedLimitAlert, LimitAlertService } from '../../api-keys/limit-alert.service'
+import { ClaimedLimitAlert, LimitAlertService } from '../../usage/limit-alert.service'
 import { NotificationService } from '../../notification/notification.service'
 import { TenantsService } from '../../admin/tenants/tenants.service'
 import {
@@ -321,7 +321,7 @@ describe('LimitAlertNotificationService', () => {
 
     await service.processAcceptedUsage(acceptedUsageInput)
 
-    expect(Object.keys(service)).not.toContain('apiKeyUsageService')
+    expect(Object.keys(service)).not.toContain('tenantUsageService')
     expect(Object.keys(service)).not.toContain('queueMap')
   })
 })

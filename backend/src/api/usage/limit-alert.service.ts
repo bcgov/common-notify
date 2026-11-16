@@ -10,7 +10,7 @@ import {
   LimitAlertLevel,
   LimitAlertPeriod,
 } from './entities/tenant-limit-alert-log.entity'
-import { RecordedUsageResult } from './api-key-usage.service'
+import { RecordedUsageResult } from './tenant-usage.service'
 import { evaluateLimitAlerts } from './limit-alert.evaluator'
 import type { LimitAlertToFire } from './limit-alert.evaluator'
 
