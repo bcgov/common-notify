@@ -372,7 +372,11 @@ export class TemplatesFrontendController {
   @Version('1')
   @Post(':templateId/preview')
   @HttpCode(200)
-  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
   async previewTemplate(
     @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,

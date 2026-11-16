@@ -13,6 +13,7 @@ import {
 } from '@/api/templates.api'
 import { useAppSelector } from '@/redux/hooks'
 import { detectVariables } from '@/utils/templateVariables'
+import { initializePreviewValues, previewRenderParams } from '@/utils/templatePreviewValues'
 import '@/scss/components/templates.scss'
 
 interface TemplatePreviewModalProps {
@@ -70,13 +71,7 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
     if (applying.current) return
     applying.current = true
     const currentSession = session.current
-    const params: Record<string, string> = {}
-    variables.forEach((v) => {
-      const raw = vals[v.name] ?? ''
-      // For a boolean toggle, "false" must render as falsy so the else/inverted
-      // branch shows; an empty string is falsy in Handlebars and Mustache.
-      params[v.name] = v.type === 'boolean' && raw !== 'true' ? '' : raw
-    })
+    const params = previewRenderParams(variables, vals)
 
     setLoading(true)
     setError(null)
@@ -129,16 +124,7 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
           ? (await getTemplatePreviewData(templateId)).params
           : (draftValues ?? {})
         if (session.current !== currentSession) return
-        const initial = Object.fromEntries(
-          variables.map((v) => [
-            v.name,
-            Object.prototype.hasOwnProperty.call(saved, v.name)
-              ? saved[v.name]
-              : v.type === 'boolean'
-                ? 'true'
-                : '',
-          ]),
-        )
+        const initial = initializePreviewValues(variables, saved)
         setValues(initial)
         onDraftValuesChange?.(initial)
         const missing = variables.some(
