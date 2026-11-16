@@ -232,8 +232,25 @@ export class ListSmsNumberRequestsQueryDto {
   status?: SmsNumberRequestStatus
 }
 
-/** The tenant's latest request, wrapped so "none yet" is an explicit null rather than no body. */
+/**
+ * The tenant's latest request, wrapped so "none yet" is an explicit null rather than no body, and
+ * what the tenant sends from meanwhile.
+ */
 export class TenantSmsNumberRequestResponseDto {
   @ApiProperty({ type: SmsNumberRequestDto, nullable: true })
   request: SmsNumberRequestDto | null
+
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    description:
+      "The number the tenant's SMS goes out from now: its own, else the active provider's default",
+  })
+  senderNumber: string | null
+
+  @ApiProperty({
+    description:
+      'Dev, test or a PR environment, where every tenant normally sends from the shared default number',
+  })
+  testEnvironment: boolean
 }

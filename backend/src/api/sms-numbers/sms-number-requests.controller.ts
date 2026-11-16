@@ -24,6 +24,7 @@ import { JwtUserExtractor } from '../../common/utils/jwt-user-extractor'
 import { CstarRole } from '../../enum/cstar-role.enum'
 import type { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { SmsNumberRequestsService } from './sms-number-requests.service'
+import { SmsNumbersService } from './sms-numbers.service'
 import { SmsNumberRequestDto, TenantSmsNumberRequestResponseDto } from './schemas/sms-number.dto'
 
 type TenantRequest = Request & { tenant: Tenant }
@@ -44,7 +45,10 @@ const actorOf = (req: Request) => ({
 @UseGuards(NotifyFrontendRoleGuard)
 @ApiBearerAuth()
 export class SmsNumberRequestsController {
-  constructor(private readonly requestsService: SmsNumberRequestsService) {}
+  constructor(
+    private readonly requestsService: SmsNumberRequestsService,
+    private readonly smsNumbersService: SmsNumbersService,
+  ) {}
 
   @Version('1')
   @Get()
@@ -53,10 +57,21 @@ export class SmsNumberRequestsController {
     CstarRole.NOTIFY_TEMPLATE_EDITOR,
     CstarRole.NOTIFY_OPERATIONS_ADMIN,
   )
-  @ApiOperation({ summary: "The tenant's most recent SMS number request" })
+  @ApiOperation({
+    summary: "The tenant's most recent SMS number request, and the number it sends from now",
+  })
   @ApiOkResponse({ type: TenantSmsNumberRequestResponseDto })
   async getLatest(@Req() req: TenantRequest): Promise<TenantSmsNumberRequestResponseDto> {
-    return { request: await this.requestsService.findLatestForTenant(req.tenant.id) }
+    const [request, senderNumber] = await Promise.all([
+      this.requestsService.findLatestForTenant(req.tenant.id),
+      this.smsNumbersService.resolveSenderNumber(req.tenant.id),
+    ])
+    // The same rule that lets an admin approve onto the default number: every environment but prod.
+    return {
+      request,
+      senderNumber,
+      testEnvironment: this.smsNumbersService.defaultNumberAssignable(),
+    }
   }
 
   @Version('1')

@@ -18,6 +18,7 @@ import type { TemplatesService } from '../../api/templates/templates.service'
 import type { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
 import type { StructuredLoggerService } from '../../common/logger'
 import type { SmsNumbersService } from '../../api/sms-numbers/sms-numbers.service'
+import type { TenantSettingsService } from '../../api/tenant-settings/tenant-settings.service'
 
 describe('SmsDeliveryWorker', () => {
   let mockNotificationService: any
@@ -40,6 +41,7 @@ describe('SmsDeliveryWorker', () => {
     concurrency?: number
     structuredLogger?: StructuredLoggerService
     smsNumbersService?: SmsNumbersService
+    tenantSettingsService?: TenantSettingsService
   }) {
     const mergeBatches = new MergeBatchRunner(
       deps.notificationService,
@@ -64,6 +66,7 @@ describe('SmsDeliveryWorker', () => {
       ),
       deps.structuredLogger,
       deps.smsNumbersService,
+      deps.tenantSettingsService,
     )
     processHandler = (job) => worker.process(job)
     failedCallback = (job, err) => worker.onFailed(job, err)
@@ -1167,8 +1170,9 @@ describe('SmsDeliveryWorker', () => {
   })
 
   describe('sending number', () => {
-    const init = (fromNumber: string | null) => {
+    const init = (fromNumber: string | null, senderName: string | null = null) => {
       const smsNumbersService = { getFromNumber: vi.fn().mockResolvedValue(fromNumber) }
+      const tenantSettingsService = { getSmsSenderName: vi.fn().mockResolvedValue(senderName) }
       mockInlineRenderingService.renderSms = vi.fn().mockResolvedValue({ body: 'Hi A' })
       mockSmsAdapter.send = vi.fn().mockResolvedValue({ messageId: 'SM1' })
       initialize({
@@ -1179,8 +1183,9 @@ describe('SmsDeliveryWorker', () => {
         smsAdapter: mockSmsAdapter,
         requestDetailService: mockRequestDetailService,
         smsNumbersService: smsNumbersService as unknown as SmsNumbersService,
+        tenantSettingsService: tenantSettingsService as unknown as TenantSettingsService,
       })
-      return smsNumbersService
+      return Object.assign(smsNumbersService, tenantSettingsService)
     }
 
     it("sends from the tenant's number for the provider the transport sends through", async () => {
@@ -1204,6 +1209,40 @@ describe('SmsDeliveryWorker', () => {
         expect(options).toMatchObject({ from: '+15814360804' })
       }
       expect(smsNumbersService.getFromNumber).toHaveBeenCalledTimes(1)
+    })
+
+    it('starts a plain send with the tenant name when the tenant includes it', async () => {
+      const services = init(null, 'Parks Booking')
+
+      await processHandler(plainJob())
+
+      expect(services.getSmsSenderName).toHaveBeenCalledWith('tenant-123')
+      expect(mockSmsAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.objectContaining({ body: 'Parks Booking: Test SMS' }),
+        }),
+      )
+    })
+
+    it('starts every merge recipient with the tenant name, looked up once per batch', async () => {
+      const services = init(null, 'Parks Booking')
+
+      await processHandler(mergeJob())
+
+      for (const [options] of vi.mocked(mockSmsAdapter.send).mock.calls) {
+        expect(options).toMatchObject({ content: { body: 'Parks Booking: Hi A' } })
+      }
+      expect(services.getSmsSenderName).toHaveBeenCalledTimes(1)
+    })
+
+    it('sends the body unchanged when the tenant leaves its name out', async () => {
+      init(null, null)
+
+      await processHandler(plainJob())
+
+      expect(mockSmsAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({ content: expect.objectContaining({ body: 'Test SMS' }) }),
+      )
     })
 
     it('leaves the transport its default number when the tenant has none for this provider', async () => {

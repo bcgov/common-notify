@@ -141,7 +141,7 @@ const SmsSettings: FC = () => {
         </p>
       </div>
 
-      <SmsNumberRequestField canEdit={canEdit} />
+      <SmsNumberRequestField canEdit={canEdit} smsEnabled={smsNotificationsEnabled} />
 
       {internationalSmsAvailable && (
         <div className="settings__field">

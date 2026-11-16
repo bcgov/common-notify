@@ -29,6 +29,7 @@ import { AttachmentProcessingService } from './services/attachment-processing.se
 import { AttachmentResolverService } from './services/attachment-resolver.service'
 import { LimitAlertNotificationService } from './services/limit-alert-notification.service'
 import { SmsSegmentService } from './services/sms-segment.service'
+import { TenantSettingsModule } from '../tenant-settings/tenant-settings.module'
 import { NotificationDedupService } from './services/notification-dedup.service'
 import { NotifySubmissionService } from './services/notify-submission.service'
 import { PhoneNumberService } from './services/phone-number.service'
@@ -48,6 +49,7 @@ import { EventsModule } from '../events/events.module'
     ApiKeysModule,
     AttachmentModule,
     SafelistModule,
+    TenantSettingsModule,
     forwardRef(() => TemplatesModule),
     forwardRef(() => QueueModule),
     forwardRef(() => EventsModule),

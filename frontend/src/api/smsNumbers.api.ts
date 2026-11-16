@@ -235,13 +235,19 @@ export async function rejectSmsNumberRequest(
 
 // --- Tenant ------------------------------------------------------------------------------------
 
-/** The selected tenant's latest request, or null if it has never asked for a number. */
-export async function getMySmsNumberRequest(): Promise<SmsNumberRequest | null> {
+/** Where the selected tenant's SMS number stands. */
+export interface MySmsNumberStatus {
+  /** Its latest request, or null if it has never asked for a number. */
+  request: SmsNumberRequest | null
+  /** The number its SMS goes out from now: its own, else the shared default. */
+  senderNumber: string | null
+  /** Dev, test or a PR environment, where tenants normally share the default number. */
+  testEnvironment: boolean
+}
+
+export async function getMySmsNumberRequest(): Promise<MySmsNumberStatus> {
   try {
-    const { request } = await get<{ request: SmsNumberRequest | null }>(
-      generateApiParameters(REQUESTS_URL),
-    )
-    return request
+    return await get<MySmsNumberStatus>(generateApiParameters(REQUESTS_URL))
   } catch (error) {
     throw toReadableError(error, 'SMS number request')
   }
