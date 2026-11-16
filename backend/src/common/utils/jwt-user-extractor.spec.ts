@@ -374,6 +374,33 @@ describe('JwtUserExtractor', () => {
       ).toBeNull()
     })
   })
+
+  describe('extractFullName', () => {
+    const reqWith = (headers: Record<string, string>) => ({ headers }) as unknown as Request
+    const withClaims = (claims: Record<string, unknown>) =>
+      reqWith({ authorization: `Bearer ${createJwt(claims)}` })
+
+    it.each([
+      [
+        { given_name: 'Barrett', family_name: 'Falk', display_name: 'Falk, Barrett CITZ:EX' },
+        'Barrett Falk',
+      ],
+      [{ given_name: 'Barrett', display_name: 'Falk, Barrett CITZ:EX' }, 'Barrett'],
+      [{ family_name: 'Falk' }, 'Falk'],
+      [{ display_name: 'Falk, Barrett CITZ:EX' }, 'Falk, Barrett CITZ:EX'],
+      [{ preferred_username: 'guid@azureidir' }, null],
+    ])('reads %o as %s', (claims, expected) => {
+      expect(JwtUserExtractor.extractFullName(withClaims(claims))).toBe(expected)
+    })
+
+    it('returns null without a usable bearer token', () => {
+      expect(JwtUserExtractor.extractFullName(undefined)).toBeNull()
+      expect(JwtUserExtractor.extractFullName(reqWith({}))).toBeNull()
+      expect(
+        JwtUserExtractor.extractFullName(reqWith({ authorization: 'Bearer not-a-jwt' })),
+      ).toBeNull()
+    })
+  })
 })
 
 /**

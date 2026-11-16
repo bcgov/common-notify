@@ -33,6 +33,57 @@
   gap: 0.25rem;
 }
 
+// Grows with the version it shows, up to 800px or the screen, whichever is shorter (the DS margin
+// is on both sides of the modal). Past that the modal scrolls as a whole rather than the preview
+// box inside it, with the title bar pinned so the close button stays in reach.
+.bcds-react-aria-Modal:has(.previous-template-version) {
+  width: 1120px;
+  max-width: calc(100vw - 2 * var(--layout-margin-large));
+  max-height: min(800px, calc(100vh - 2 * var(--layout-margin-large)));
+  overflow-y: auto;
+
+  .bcds-react-aria-AlertDialog--Header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--surface-color-forms-default);
+  }
+
+  .bcds-react-aria-AlertDialog--children {
+    border-bottom: 0;
+  }
+}
+
+// A sentence rather than a field, so it is not held to the form's narrow column: at that width it
+// wraps onto a second line.
+.page--narrow > .previous-template-version__updated {
+  max-width: none;
+}
+
+.previous-template-version__name {
+  margin: 0 0 var(--layout-padding-small);
+  font: var(--typography-bold-large-body);
+  color: var(--typography-color-primary);
+}
+
+.previous-template-version__edited {
+  margin: 0 0 var(--layout-padding-xsmall);
+  font: var(--typography-regular-small-body);
+  color: var(--typography-color-primary);
+}
+
+.previous-template-version__sms-estimate {
+  margin: var(--layout-padding-xsmall) 0 0;
+  font: var(--typography-regular-small-body);
+  color: var(--typography-color-primary);
+}
+
+.previous-template-version__loading {
+  display: flex;
+  justify-content: center;
+  padding: var(--layout-padding-large);
+}
+
 .template-form__section--title {
   width: 100%;
   max-width: 418px;
