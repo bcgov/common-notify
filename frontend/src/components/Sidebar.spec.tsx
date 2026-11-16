@@ -244,6 +244,7 @@ describe('Sidebar', () => {
       ])
       expect(linksIn('Manage')).toEqual([
         ['Tenants', '/admin/tenants'],
+        ['SMS Numbers', '/admin/sms-numbers'],
         ['Feature Flags', '/admin/feature-flags'],
       ])
       expect(screen.queryByRole('list', { name: 'Report' })).not.toBeInTheDocument()

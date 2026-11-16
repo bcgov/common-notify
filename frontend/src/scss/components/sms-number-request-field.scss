@@ -1,0 +1,17 @@
+@import '../variables';
+
+.sms-number-request {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: $spacing-xs;
+}
+
+.sms-number-request__text {
+  margin: 0;
+  color: $text-secondary;
+}
+
+.sms-number-request__actions {
+  margin-top: $spacing-sm;
+}

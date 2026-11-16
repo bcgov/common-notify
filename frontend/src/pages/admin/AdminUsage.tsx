@@ -26,6 +26,7 @@ import EditModal from '@/components/EditModal'
 import NumberInputField from '@/components/NumberInputField'
 import { showSuccessToast, showErrorToast } from '@/redux/utils/toastUtils'
 import TenantSendingCell from './TenantSendingCell'
+import TenantSmsCell from './TenantSmsCell'
 import TenantSendingDialog from './TenantSendingDialog'
 import {
   adoptionSummaryText,
@@ -212,6 +213,11 @@ const AdminUsage: FC = () => {
         { label: 'Disabled', value: 'disabled' },
       ],
       render: (_, tenant) => <TenantSendingCell {...tenant} />,
+    },
+    {
+      key: 'smsFromNumber',
+      label: 'SMS',
+      render: (_, tenant) => <TenantSmsCell {...tenant} />,
     },
     {
       key: 'channels',

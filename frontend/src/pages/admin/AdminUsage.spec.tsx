@@ -43,6 +43,8 @@ const row = {
   disabledReason: null,
   disabledAt: null,
   disabledBy: null,
+  smsEnabled: true,
+  smsFromNumber: null,
   channel: 'SMS',
   dailyLimit: 100,
   annualLimit: 1000,
@@ -132,6 +134,7 @@ describe('AdminUsage', () => {
     expect(cells).toEqual([
       'Test Tenant',
       'Enabled',
+      'EnabledDefault number',
       'SMS',
       'SMS: Never',
       'SMS: —No full month of sending yet',
@@ -149,12 +152,32 @@ describe('AdminUsage', () => {
     setup({ adminRows: [{ ...row, channel: 'EMAIL', usedToday: 7 }, row], adminCount: 1 })
     expect(screen.getAllByRole('row', { name: /Test Tenant/ })).toHaveLength(1)
     const tenantRow = screen.getByRole('row', { name: /Test Tenant/ })
-    const daily = within(tenantRow).getAllByRole('cell')[6]
+    const daily = within(tenantRow).getAllByRole('cell')[7]
     expect(
       within(daily)
         .getAllByRole('listitem')
         .map((item) => item.textContent),
     ).toEqual(['Email: 7 / 100 (7%)', 'SMS: 20 / 100 (20%)'])
+  })
+  it('shows whether each tenant may send SMS and the number it sends from', () => {
+    setup({
+      adminRows: [
+        row,
+        {
+          ...row,
+          tenantId: 'other',
+          tenantName: 'Other Tenant',
+          smsEnabled: false,
+          smsFromNumber: '+15814360804',
+        },
+      ],
+      adminCount: 2,
+    })
+    const smsCell = (tenant: RegExp) =>
+      within(screen.getByRole('row', { name: tenant })).getAllByRole('cell')[2].textContent
+    expect(screen.getByRole('columnheader', { name: /SMS/ })).toBeInTheDocument()
+    expect(smsCell(/Test Tenant/)).toBe('EnabledDefault number')
+    expect(smsCell(/Other Tenant/)).toBe('Disabled+15814360804')
   })
   it('shows when each channel last sent and its monthly average', () => {
     setup({ adminRows: [row], adminCount: 1 })

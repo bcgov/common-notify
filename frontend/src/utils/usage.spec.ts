@@ -18,6 +18,8 @@ describe('groupUsageByTenant', () => {
       disabledReason: tenantId === 'b' ? 'Unpaid' : null,
       disabledAt: null,
       disabledBy: null,
+      smsEnabled: tenantId === 'a',
+      smsFromNumber: tenantId === 'a' ? '+15814360804' : null,
     }) as AdminTenantUsageRow
 
   it('makes one entry per tenant, in order, holding its channel rows', () => {
@@ -29,6 +31,7 @@ describe('groupUsageByTenant', () => {
       ['a', ['EMAIL', 'SMS']],
       ['b', ['EMAIL']],
     ])
+    expect(tenants[0]).toMatchObject({ smsEnabled: true, smsFromNumber: '+15814360804' })
     expect(tenants[1]).toMatchObject({ sendingEnabled: false, disabledReason: 'Unpaid' })
   })
 

@@ -268,13 +268,15 @@ describe('ApiKeyUsageService.getAllTenantsUsage', () => {
         recent_failed: '4',
       },
     ],
+    sms = [{ tenant_id: 't-1', sms_enabled: true, sms_from_number: '+15814360804' }],
   } = {}) {
     const tenantQb = fakeQueryBuilder({ manyAndCount: [tenants, total] })
     const limitQb = fakeQueryBuilder({ rawMany: limits })
     const usageQb = fakeQueryBuilder({ rawMany: usage })
     const tenantRepository = {
       createQueryBuilder: vi.fn().mockReturnValue(tenantQb.qb),
-      query: vi.fn().mockResolvedValue(history),
+      // Two raw queries: the SMS settings one reads feature_flag, the send history one does not.
+      query: vi.fn((sql: string) => Promise.resolve(sql.includes('feature_flag') ? sms : history)),
     }
     const service = new ApiKeyUsageService(
       {} as Repository<ApiKeyConsumer>,
@@ -316,6 +318,27 @@ describe('ApiKeyUsageService.getAllTenantsUsage', () => {
     ])
   })
 
+  it('shows whether each tenant may send SMS and the number it sends from, on every channel row', async () => {
+    const { service, tenantRepository } = setup()
+
+    const { data } = await service.getAllTenantsUsage(parsed())
+
+    expect(
+      data.map((row) => [row.tenantName, row.channel, row.smsEnabled, row.smsFromNumber]),
+    ).toEqual([
+      ['Parks', 'EMAIL', true, '+15814360804'],
+      ['Parks', 'SMS', true, '+15814360804'],
+      // No row back for a tenant: SMS off, on the default number.
+      ['Roads', 'EMAIL', false, null],
+      ['Roads', 'SMS', false, null],
+    ])
+    expect(tenantRepository.query).toHaveBeenCalledWith(expect.stringContaining('feature_flag'), [
+      ['t-1', 't-2'],
+      'sms_notifications',
+      'aws',
+    ])
+  })
+
   it('shows zero usage and no limits on a channel the tenant has no limit for', async () => {
     const { service } = setup()
 
@@ -329,6 +352,8 @@ describe('ApiKeyUsageService.getAllTenantsUsage', () => {
       disabledReason: 'Unpaid invoice',
       disabledAt: '2026-11-01T16:00:00.000Z',
       disabledBy: 'Pat Admin',
+      smsEnabled: false,
+      smsFromNumber: null,
       rateLimitPerMinute: null,
       dailyLimit: null,
       annualLimit: null,

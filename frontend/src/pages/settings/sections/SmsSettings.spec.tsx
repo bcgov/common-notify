@@ -28,6 +28,9 @@ vi.mock('@/redux/thunks/apiKeyUsage.thunks', () => ({
   fetchApiKeyUsage: vi.fn(() => ({ type: 'apiKeyUsage/fetch' })),
 }))
 
+// Has its own spec; stubbed so these tests make no request-status call.
+vi.mock('./SmsNumberRequestField', () => ({ default: () => null }))
+
 vi.mock('@/redux/utils/toastUtils', () => ({
   showErrorToast: vi.fn(),
   showSuccessToast: vi.fn(),

@@ -1,0 +1,29 @@
+@import '../variables';
+
+.admin-sms-numbers__stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: $spacing-xs;
+}
+
+.admin-sms-numbers__number {
+  white-space: nowrap;
+}
+
+.admin-sms-numbers__detail {
+  color: $text-secondary;
+  font-size: $font-size-sm;
+}
+
+.admin-sms-numbers__tenants {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.admin-sms-numbers__default {
+  color: $text-secondary;
+  font-size: $font-size-sm;
+  font-weight: 600;
+}

@@ -86,6 +86,7 @@ const adminItems = {
       label: 'Manage',
       links: [
         { label: 'Tenants', to: '/admin/tenants' },
+        { label: 'SMS Numbers', to: '/admin/sms-numbers' },
         { label: 'Feature Flags', to: '/admin/feature-flags' },
       ],
     },

@@ -1057,6 +1057,45 @@ routes:
     request_buffering: true
     response_buffering: true
 
+  # /api/v1/frontend/sms-number-requests (frontend variant)
+  # A tenant's own SMS number request: GET the latest, POST to request one, and
+  # POST /{id}/withdraw. Kong prefix-matches, so this covers the withdraw path too.
+  - name: ${ROUTE_PREFIX}sms-number-requests-frontend
+    tags: [${CONFIG_TAG}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/sms-number-requests
+    methods:
+      - GET
+      - POST
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/admin/sms-numbers (admin variant - SMS number inventory)
+  # Admin-only (NOTIFY_ADMIN SSO role), not tenant-scoped. Kong prefix-matches, so this
+  # also covers /codes, /{id}, /tenants/{tenantId}[/{numberId}] and /requests[/{id}/...].
+  - name: ${ROUTE_PREFIX}admin-sms-numbers-frontend
+    tags: [${CONFIG_TAG}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/admin/sms-numbers
+    methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
   # /api/v1/frontend/admin/api-key-usage (admin variant - all tenants' usage)
   # Admin-only (NOTIFY_ADMIN SSO role), not tenant-scoped. Same jwt-keycloak plugin
   # as the other frontend admin routes. Kong prefix-matches, so this also covers
@@ -1964,6 +2003,20 @@ plugins:
     tags: [${CONFIG_TAG}]
     enabled: true
     route: ${ROUTE_PREFIX}admin-notifications-frontend
+    config: *jwtConfig
+
+  # SMS Number Requests Frontend - Frontend Token
+  - name: jwt-keycloak
+    tags: [${CONFIG_TAG}]
+    enabled: true
+    route: ${ROUTE_PREFIX}sms-number-requests-frontend
+    config: *jwtConfig
+
+  # Admin SMS Numbers Frontend - Frontend Admin Token
+  - name: jwt-keycloak
+    tags: [${CONFIG_TAG}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-sms-numbers-frontend
     config: *jwtConfig
 
   # Admin API Key Usage Frontend - Frontend Admin Token

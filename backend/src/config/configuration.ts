@@ -179,6 +179,13 @@ export default function configuration() {
     // Hard-gated to non-test/prod namespaces: all environments run NODE_ENV=production,
     // so the namespace (…-dev / …-test / …-prod) is the reliable discriminator. Even if
     // LOADTEST_AUTOBIND_ENABLED were somehow set in test/prod, this stays false there.
+    smsNumbers: {
+      // Dev, test and PR environments all send from DEFAULT_SMS_FROM_NUMBER, so approving a
+      // tenant's number request there can assign it. Gated on the namespace like loadtest below:
+      // NODE_ENV is 'production' everywhere.
+      defaultNumberAssignable: !(process.env.NAMESPACE || '').includes('-prod'),
+    },
+
     loadtest: {
       autobindEnabled:
         process.env.LOADTEST_AUTOBIND_ENABLED === 'true' &&

@@ -1,4 +1,12 @@
-import { HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import {
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { In, Repository } from 'typeorm'
 import type { SelectQueryBuilder } from 'typeorm'
@@ -13,6 +21,9 @@ import { NotifyConfiguration } from '../notification/entities/configuration.enti
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { NotificationStatus } from '../../enum/notification-status.enum'
+import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
+import { SMS_ADAPTER } from '../../adapters'
+import type { ISmsTransport } from '../../adapters'
 import { andWhereContains, applyListQueryFilters } from '../../common/query/typeorm-list-query.util'
 import type {
   ListQueryFilter,
@@ -177,6 +188,7 @@ export class ApiKeyUsageService {
     private readonly configurationRepository: Repository<NotifyConfiguration>,
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
+    @Optional() @Inject(SMS_ADAPTER) private readonly smsAdapter?: ISmsTransport,
   ) {}
 
   /**
@@ -483,10 +495,11 @@ export class ApiKeyUsageService {
     if (tenants.length === 0) return []
     const tenantIds = tenants.map((tenant) => tenant.id)
     const window = averageWindow(new Date())
-    const [limitsByKey, usageByKey, historyByKey] = await Promise.all([
+    const [limitsByKey, usageByKey, historyByKey, smsByTenant] = await Promise.all([
       this.limitsByTenantChannel(tenantIds, channels),
       this.usageByTenantChannel(tenantIds, channels),
       this.sendHistoryByTenantChannel(tenantIds, channels, window),
+      this.smsSettingsByTenant(tenantIds),
     ])
 
     return tenants.flatMap((tenant) =>
@@ -495,6 +508,8 @@ export class ApiKeyUsageService {
         const history = historyByKey.get(key)
         return {
           ...toUsageRow(tenant, channel, limitsByKey.get(key), usageByKey.get(key)),
+          smsEnabled: smsByTenant.get(tenant.id)?.enabled ?? false,
+          smsFromNumber: smsByTenant.get(tenant.id)?.fromNumber ?? null,
           lastSentAt: history ? history.lastSentAt.toISOString() : null,
           averageMonthlySends: history
             ? averageMonthlySends(history.windowCount, history.firstSentAt, window)
@@ -503,6 +518,39 @@ export class ApiKeyUsageService {
           failedLast30Days: history?.recentFailed ?? 0,
         }
       }),
+    )
+  }
+
+  /**
+   * Whether each tenant may send SMS, and the number it sends from through the active provider.
+   * Enabled is the sms_notifications flag, which is what the send endpoints check: the tenant's
+   * override, else the global flag.
+   */
+  private async smsSettingsByTenant(
+    tenantIds: string[],
+  ): Promise<Map<string, { enabled: boolean; fromNumber: string | null }>> {
+    const rows: Array<{ tenant_id: string; sms_enabled: boolean; sms_from_number: string | null }> =
+      await this.tenantRepository.query(
+        `SELECT t.id AS tenant_id,
+                COALESCE(
+                  (SELECT ff.enabled FROM notify.feature_flag ff
+                    WHERE ff.code = $2 AND ff.tenant_id = t.id LIMIT 1),
+                  (SELECT ff.enabled FROM notify.feature_flag ff
+                    WHERE ff.code = $2 AND ff.tenant_id IS NULL LIMIT 1),
+                  FALSE
+                ) AS sms_enabled,
+                n.phone_number AS sms_from_number
+           FROM notify.tenant t
+           LEFT JOIN notify.tenant_sms_number a ON a.tenant_id = t.id AND a.provider_code = $3
+           LEFT JOIN notify.sms_number n ON n.id = a.sms_number_id AND NOT n.is_deleted
+          WHERE t.id = ANY($1)`,
+        [tenantIds, FeatureFlagCode.SMS_NOTIFICATIONS, this.smsAdapter?.name ?? 'aws'],
+      )
+    return new Map(
+      rows.map((row) => [
+        row.tenant_id,
+        { enabled: row.sms_enabled === true, fromNumber: row.sms_from_number?.trim() || null },
+      ]),
     )
   }
 
@@ -898,7 +946,12 @@ function toUsageRow(
   usage: WindowUsage | undefined,
 ): Omit<
   AdminTenantUsageRowDto,
-  'lastSentAt' | 'averageMonthlySends' | 'recipientsLast30Days' | 'failedLast30Days'
+  | 'lastSentAt'
+  | 'averageMonthlySends'
+  | 'recipientsLast30Days'
+  | 'failedLast30Days'
+  | 'smsEnabled'
+  | 'smsFromNumber'
 > {
   return {
     tenantId: tenant.id,
