@@ -35,6 +35,10 @@ import { EventRecipientKindCode } from './api/events/entities/event-recipient-ki
 import { ProvisionedPhoneNumber } from './api/events/entities/provisioned-phone-number.entity'
 import { EmailLogo } from './api/tenant-settings/entities/email-logo.entity'
 import { RecipientSafelist } from './api/safelist/entities/recipient-safelist.entity'
+import { SmsNumber } from './api/sms-numbers/entities/sms-number.entity'
+import { TenantSmsNumber } from './api/sms-numbers/entities/tenant-sms-number.entity'
+import { SmsNumberRequest } from './api/sms-numbers/entities/sms-number-request.entity'
+import { SmsNumberRequestHistory } from './api/sms-numbers/entities/sms-number-request-history.entity'
 
 const dbHost = process.env.POSTGRES_HOST || 'localhost'
 const dbUser = process.env.POSTGRES_USER || 'postgres'
@@ -89,6 +93,10 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         ProvisionedPhoneNumber,
         EmailLogo,
         RecipientSafelist,
+        SmsNumber,
+        TenantSmsNumber,
+        SmsNumberRequest,
+        SmsNumberRequestHistory,
       ],
       synchronize: false, // Use Flyway for migrations
       logging: process.env.NODE_ENV !== 'production' ? ['query', 'error'] : ['error'],
