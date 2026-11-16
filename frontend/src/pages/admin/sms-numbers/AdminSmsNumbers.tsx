@@ -3,6 +3,7 @@ import type { FC } from 'react'
 import { Button } from '@bcgov/design-system-react-components'
 import PageHeading from '@/components/PageHeading'
 import TabBar from '@/components/TabBar'
+import NoDataCard from '@/components/NoDataCard'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
 import RowActionsMenu from '@/components/RowActionsMenu'
@@ -186,6 +187,60 @@ const AdminSmsNumbers: FC = () => {
   // The inventory is small and the dialogs need all of it, so it is paged here, not by the API.
   const numbersOnPage = numbers.slice((numbersPage - 1) * numbersLimit, numbersPage * numbersLimit)
 
+  /** The Numbers tab: a card until there is a number, then the defaults and the table. */
+  function renderNumbersTab() {
+    if (!loading && !error && numbers.length === 0) {
+      return (
+        <NoDataCard
+          title="No SMS numbers yet."
+          message="Add the numbers Notify sends SMS from, then assign them to tenants or make one a provider's default."
+          actionLabel="Add number"
+          onAction={() => setDialog({ kind: 'add' })}
+          isActionDisabled={!codes}
+        />
+      )
+    }
+    return (
+      <>
+        {codes && (
+          <SmsDefaultNumbersSummary
+            codes={codes}
+            numbers={numbers}
+            onChange={(providerCode) => setDialog({ kind: 'chooseDefault', providerCode })}
+          />
+        )}
+        <div className="page__toolbar">
+          <Button
+            variant="primary"
+            size="small"
+            isDisabled={!codes}
+            onPress={() => setDialog({ kind: 'add' })}
+          >
+            Add number
+          </Button>
+        </div>
+        <DataTable
+          columns={numberColumns}
+          data={numbersOnPage}
+          keyExtractor={(number) => number.id}
+          multiline
+          isLoading={loading}
+          emptyMessage="No SMS numbers yet."
+          currentPage={numbersPage}
+          pageSize={numbersLimit}
+          totalCount={numbers.length}
+          onPageChange={setNumbersPage}
+          onPageSizeChange={(size) => {
+            setNumbersLimit(size)
+            setNumbersPage(1)
+          }}
+          pageSizeOptions={NUMBERS_PAGE_SIZES}
+          label="SMS numbers"
+        />
+      </>
+    )
+  }
+
   return (
     <div className="page">
       <PageHeading title="SMS Numbers" />
@@ -200,43 +255,7 @@ const AdminSmsNumbers: FC = () => {
           onAction={(kind, request) => setDialog({ kind, request })}
         />
       ) : (
-        <>
-          {codes && (
-            <SmsDefaultNumbersSummary
-              codes={codes}
-              numbers={numbers}
-              onChange={(providerCode) => setDialog({ kind: 'chooseDefault', providerCode })}
-            />
-          )}
-          <div className="page__toolbar">
-            <Button
-              variant="primary"
-              size="small"
-              isDisabled={!codes}
-              onPress={() => setDialog({ kind: 'add' })}
-            >
-              Add number
-            </Button>
-          </div>
-          <DataTable
-            columns={numberColumns}
-            data={numbersOnPage}
-            keyExtractor={(number) => number.id}
-            multiline
-            isLoading={loading}
-            emptyMessage="No SMS numbers yet."
-            currentPage={numbersPage}
-            pageSize={numbersLimit}
-            totalCount={numbers.length}
-            onPageChange={setNumbersPage}
-            onPageSizeChange={(size) => {
-              setNumbersLimit(size)
-              setNumbersPage(1)
-            }}
-            pageSizeOptions={NUMBERS_PAGE_SIZES}
-            label="SMS numbers"
-          />
-        </>
+        renderNumbersTab()
       )}
 
       {dialog && (

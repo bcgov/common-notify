@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FC } from 'react'
 import DataTable from '@/components/DataTable/DataTable'
+import NoDataCard from '@/components/NoDataCard'
 import type { TableColumn } from '@/components/DataTable/DataTable'
 import RowActionsMenu from '@/components/RowActionsMenu'
 import type { RowActionGroup } from '@/components/RowActionsMenu'
@@ -181,6 +182,29 @@ const SmsNumberRequestsTable: FC<SmsNumberRequestsTableProps> = ({
       },
     },
   ]
+
+  // Nothing to show in the usual view (pending, or every status, with no search): a card, as on
+  // the other list pages. A search or another filter keeps the table, with its own empty state.
+  const pendingOnly = statusFilter.length === 1 && statusFilter[0] === 'pending'
+  const usualView = !search && (pendingOnly || statusFilter.length === 0)
+  if (!loading && !error && count === 0 && usualView) {
+    return pendingOnly ? (
+      <NoDataCard
+        title="No pending requests."
+        message="New SMS number requests from tenants appear here for review. Requests already decided are kept under their other statuses."
+        actionLabel="Show all requests"
+        onAction={() => {
+          setStatusFilter([])
+          setPage(1)
+        }}
+      />
+    ) : (
+      <NoDataCard
+        title="No SMS number requests yet."
+        message="Tenants request an SMS number from their SMS settings. Their requests will appear here for review."
+      />
+    )
+  }
 
   return (
     <>

@@ -500,17 +500,42 @@ describe('AdminSmsNumbers', () => {
     await waitFor(() => expect(clearDefaultSmsNumber).toHaveBeenCalledWith('num-aws'))
   })
 
-  it('shows the empty state, offering to clear the pending filter or a search', async () => {
-    setup({ numbers: [], requests: [] })
+  it('shows the no-data card when nothing is pending, offering all requests', async () => {
+    setup({ requests: [] })
 
-    // Pending is a filter, so an empty first page offers to clear it and see the rest.
-    expect(await screen.findAllByText('No data match the filters applied.')).not.toHaveLength(0)
-    await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
+    expect(await screen.findByText('No pending requests.')).toBeInTheDocument()
+    // The card replaces the search and table, as on the other list pages.
+    expect(screen.queryByRole('table', { name: 'SMS number requests' })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Show all requests' }))
     await waitFor(() => expect(lastRequestsQuery()).toMatchObject({ filter: undefined }))
-    expect(await screen.findAllByText('No tenant has requested an SMS number.')).not.toHaveLength(0)
+    expect(await screen.findByText('No SMS number requests yet.')).toBeInTheDocument()
+  })
 
+  it("keeps the table's own empty state for a search with no matches", async () => {
+    setup()
+    await screen.findByRole('table', { name: 'SMS number requests' })
+    vi.mocked(getSmsNumberRequests).mockResolvedValue(pageOf([]))
+
+    await userEvent.type(
+      screen.getByRole('combobox', { name: 'Search requests by tenant' }),
+      'nobody{Enter}',
+    )
+
+    expect(
+      await screen.findAllByText('No results found. Try a different search.'),
+    ).not.toHaveLength(0)
+    expect(screen.getByRole('button', { name: 'Clear search' })).toBeInTheDocument()
+  })
+
+  it('shows the no-data card on the Numbers tab, with a way to add the first', async () => {
+    setup({ numbers: [] })
     await openNumbersTab()
-    expect(screen.getAllByText('No SMS numbers yet.')).not.toHaveLength(0)
+
+    expect(await screen.findByText('No SMS numbers yet.')).toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: 'SMS numbers' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Add number' }))
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
   })
 
   it('shows a failed load as an alert', async () => {
