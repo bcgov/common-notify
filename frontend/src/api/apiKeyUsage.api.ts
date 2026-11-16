@@ -1,6 +1,7 @@
-import type { AxiosError } from 'axios'
-import { getApiErrorMessage } from '@/utils/apiErrorMessage'
-import { get, patch, generateApiParameters, STATUS_CODES } from '@/common/api'
+import { toReadableError } from '@/utils/apiErrorMessage'
+import { get, patch, generateApiParameters } from '@/common/api'
+import type { PaginatedResponse } from '@/interfaces/PaginatedNotificationResponse'
+import { toListQueryString } from './listQuery'
 
 /**
  * API Key Usage / Limits API
@@ -45,21 +46,42 @@ export interface AdminTenantUsageRow {
   tenantId: string
   tenantName: string
   channel: string
-  rateLimitPerMinute: number
-  dailyLimit: number
-  annualLimit: number
-  warnThresholdPercent: number
+  /** The limit fields are null when the tenant has no limit on this channel, e.g. no API key. */
+  rateLimitPerMinute: number | null
+  dailyLimit: number | null
+  annualLimit: number | null
+  warnThresholdPercent: number | null
   usedThisMinute: number
   usedToday: number
   usedThisYear: number
+  /** False when an admin has disabled sending for the tenant; the disabled* fields say why. */
+  sendingEnabled: boolean
+  disabledReason: string | null
+  disabledAt: string | null
+  disabledBy: string | null
+  /** ISO time of the tenant's last send on this channel, from any source; null if never. */
+  lastSentAt: string | null
+  /** Recipients per month over the last 12 full months; null with no full month yet. */
+  averageMonthlySends: number | null
+  /** Recipients sent to on this channel in the last 30 days, and how many of them failed. */
+  recipientsLast30Days: number
+  failedLast30Days: number
 }
 
-export interface PaginatedAdminUsageResponse {
-  data: AdminTenantUsageRow[]
-  count: number
-  page: number
-  limit: number
-  totalPages: number
+export type PaginatedAdminUsageResponse = PaginatedResponse<AdminTenantUsageRow>
+
+/** How many tenants use Notify, across every tenant whatever the table's search or filters. */
+export interface AdminUsageSummary {
+  tenants: number
+  sentThisFiscalYear: number
+  /** Tenants an admin has disabled from sending. */
+  disabled: number
+}
+
+/** A tenant the admin usage table can list. */
+export interface AdminTenantOption {
+  id: string
+  name: string
 }
 
 export interface UpdateTenantLimitsRequest {
@@ -110,7 +132,8 @@ export async function updateApiKeyThreshold(
 
 /**
  * Get a paginated page of usage vs limits across tenants (one row per tenant × channel),
- * optionally filtered by tenant name and `field:in:values` filters. Pagination is by tenant.
+ * optionally filtered by tenant name and `field:in:values` filters, and sorted by a usage total
+ * (`usedToday`, or `-usedToday` for descending). Pagination is by tenant.
  * Requires NOTIFY_ADMIN. Backed by /api/v1/frontend/admin/api-key-usage.
  */
 export async function getAllTenantsUsage(
@@ -118,17 +141,51 @@ export async function getAllTenantsUsage(
   limit: number = 15,
   search?: string,
   filter?: string[],
+  sort?: string,
 ): Promise<PaginatedAdminUsageResponse> {
   try {
-    const qs = new URLSearchParams()
-    qs.set('page', String(page))
-    qs.set('limit', String(limit))
-    if (search) qs.set('search', search)
-    filter?.forEach((f) => qs.append('filter', f))
-    const params = generateApiParameters(`/api/v1/frontend/admin/api-key-usage?${qs.toString()}`)
+    const qs = toListQueryString({ page, limit, search, sort, filter })
+    const params = generateApiParameters(`/api/v1/frontend/admin/api-key-usage?${qs}`)
     return await get<PaginatedAdminUsageResponse>(params)
   } catch (error) {
     throw toReadableError(error, 'tenant usage')
+  }
+}
+
+/** Enable or disable sending for a tenant. A reason is required to disable. Requires NOTIFY_ADMIN. */
+export async function setTenantSending(
+  tenantId: string,
+  enabled: boolean,
+  reason?: string,
+): Promise<{ sendingEnabled: boolean }> {
+  try {
+    const params = generateApiParameters(
+      `/api/v1/frontend/admin/api-key-usage/tenants/${encodeURIComponent(tenantId)}/sending`,
+      enabled ? { enabled } : { enabled, reason },
+    )
+    return await patch<{ sendingEnabled: boolean }>(params)
+  } catch (error) {
+    throw toReadableError(error, 'tenant sending')
+  }
+}
+
+/** How many tenants use Notify. Requires NOTIFY_ADMIN. */
+export async function getAdminUsageSummary(): Promise<AdminUsageSummary> {
+  try {
+    const params = generateApiParameters('/api/v1/frontend/admin/api-key-usage/summary')
+    return await get<AdminUsageSummary>(params)
+  } catch (error) {
+    throw toReadableError(error, 'tenant summary')
+  }
+}
+
+/** Every tenant the admin usage table can list, by name: the options for its search. */
+export async function getAdminUsageTenants(): Promise<AdminTenantOption[]> {
+  try {
+    const params = generateApiParameters('/api/v1/frontend/admin/api-key-usage/tenants')
+    return await get<AdminTenantOption[]>(params)
+  } catch (error) {
+    throw toReadableError(error, 'tenants')
   }
 }
 
@@ -145,17 +202,4 @@ export async function updateTenantLimits(
   } catch (error) {
     throw toReadableError(error, 'tenant limits')
   }
-}
-
-function toReadableError(error: unknown, resource: string): Error {
-  const axiosError = error as AxiosError
-
-  if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
-    return new Error(`You are not authorized to view ${resource}`)
-  }
-  if (axiosError.response?.status === STATUS_CODES.Forbidden) {
-    return new Error(`You do not have permission to modify the ${resource}`)
-  }
-
-  return new Error(`Failed to load ${resource}: ${getApiErrorMessage(error)}`)
 }

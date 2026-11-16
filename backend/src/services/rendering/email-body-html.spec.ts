@@ -26,6 +26,16 @@ describe('toEmailHtml', () => {
     expect(toEmailHtml('<script>alert(1)</script>', undefined)).not.toContain('<script>')
   })
 
+  it('renders a single newline as a line break', () => {
+    expect(toEmailHtml('**Ref:** 123\n**Status:** Approved', 'markdown')).toContain(
+      '<strong>Ref:</strong> 123<br>\n<strong>Status:</strong> Approved',
+    )
+  })
+
+  it('still starts a new paragraph at a blank line', () => {
+    expect(toEmailHtml('One\n\nTwo', 'markdown')).toBe('<p>One</p>\n<p>Two</p>\n')
+  })
+
   it('does not treat a bare # without a space as a heading', () => {
     expect(toEmailHtml('#Hello', 'markdown')).toContain('#Hello')
     expect(toEmailHtml('#Hello', 'markdown')).not.toContain('<h1>')

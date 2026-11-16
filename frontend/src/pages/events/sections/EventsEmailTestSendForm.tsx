@@ -21,7 +21,12 @@ import type { AddRecipients, Recipient } from '../utils/testSend'
 import { sendEventTestEmail } from '@/api/events.api'
 import type { EventEmailSettings } from '@/api/events.api'
 import { useCsvUpload } from '@/hooks/useCsvUpload'
-import { buildSampleCsv, csvFilenameFor, downloadCsv } from '@/utils/bulkNotificationsCsv'
+import {
+  buildSampleCsv,
+  csvFilenameFor,
+  downloadCsv,
+  hasBlockingIssue,
+} from '@/utils/bulkNotificationsCsv'
 import { useAppSelector } from '@/redux/hooks'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 
@@ -74,7 +79,7 @@ const EventsEmailTestSendForm: FC<EventsEmailTestSendFormProps> = ({ eventId, em
   const rowIssues = csv.rowIssues.filter((issue) => issue.row <= MAX_TEST_RECIPIENTS + 1)
 
   const isCsvReady =
-    isManyRecipients && parsed !== null && csv.fileIssue === null && rowIssues.length === 0
+    isManyRecipients && parsed !== null && csv.fileIssue === null && !hasBlockingIssue(rowIssues)
   const csvRowCount = parsed?.rows.length ?? 0
   // The rows a CSV send addresses, once they are ready to be sent and reviewed.
   const readyRows = isCsvReady ? parsed : null
@@ -113,7 +118,7 @@ const EventsEmailTestSendForm: FC<EventsEmailTestSendFormProps> = ({ eventId, em
 
   const isMissingRecipients = recipient === 'other' && !addRecipients
   const isCsvInvalid =
-    isManyRecipients && (!csv.file || csv.fileIssue !== null || rowIssues.length > 0)
+    isManyRecipients && (!csv.file || csv.fileIssue !== null || hasBlockingIssue(rowIssues))
 
   const recipientError = submitAttempted && !recipient ? 'Select a recipient.' : undefined
   const addRecipientsError =

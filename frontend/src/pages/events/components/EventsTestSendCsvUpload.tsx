@@ -59,7 +59,7 @@ const EventsTestSendCsvUpload: FC<EventsTestSendCsvUploadProps> = ({
 
     <CsvIssuesTable issues={rowIssues} />
 
-    {isCsvReady && (
+    {isCsvReady && rowIssues.length === 0 && (
       <InlineAlert
         variant="success"
         title="All required data passed validation."

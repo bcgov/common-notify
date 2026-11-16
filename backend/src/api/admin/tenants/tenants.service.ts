@@ -1,7 +1,14 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common'
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Tenant } from './entities/tenant.entity'
+import { TenantSendingHistory } from './entities/tenant-sending-history.entity'
 import { CreateTenantDto } from './schemas/create-tenant.dto'
 
 /**
@@ -10,6 +17,21 @@ import { CreateTenantDto } from './schemas/create-tenant.dto'
  * Handles tenant database operations.
  * Manages multi-tenant data where all data is scoped under a tenant.
  */
+export const TENANT_ACTIVE = 'active'
+export const TENANT_DISABLED = 'disabled'
+
+/** Who is changing a tenant, from their JWT. */
+export interface TenantActor {
+  id: string
+  name: string | null
+}
+
+/** What a rejected send says. The reason is the admin's, so tenant users know why. */
+export function sendingDisabledMessage(reason: string | null): string {
+  const base = 'Sending is disabled for this tenant by the Notify team'
+  return reason ? `${base}: ${reason}` : `${base}.`
+}
+
 @Injectable()
 export class TenantsService {
   private readonly logger = new Logger(TenantsService.name)
@@ -178,16 +200,12 @@ export class TenantsService {
       const existing = await this.findByExternalId(externalId)
 
       if (existing) {
-        // Update existing tenant with latest data from CSTAR
-        const updated = Object.assign(existing, {
-          name,
-          slug: slug || existing.slug,
-          status: status || existing.status,
-          updatedAt: new Date(),
-        })
-        const savedTenant = await this.tenantRepository.save(updated)
+        // Only the fields CSTAR owns. Saving the whole entity would also write back the status it
+        // was loaded with, undoing an admin's disable made in the meantime.
+        const changes = { name, slug: slug || existing.slug, updatedAt: new Date() }
+        await this.tenantRepository.update(existing.id, changes)
         this.logger.debug(`Updated tenant from CSTAR: ${name} (externalId: ${externalId})`)
-        return savedTenant
+        return Object.assign(existing, changes)
       }
 
       // Create new tenant if it doesn't exist
@@ -222,5 +240,90 @@ export class TenantsService {
       this.logger.error(`Error upserting tenant from CSTAR: ${error}`)
       throw error
     }
+  }
+
+  /**
+   * Rejects a send from a tenant an admin has disabled. Read from the database on every send,
+   * so a disable takes effect on every pod at once.
+   */
+  async assertCanSend(tenantId: string): Promise<void> {
+    const tenant = await this.tenantRepository
+      .createQueryBuilder('t')
+      .select(['t.id', 't.status', 't.disabledReason'])
+      .where('t.id = :tenantId', { tenantId })
+      .getOne()
+    if (tenant?.status === TENANT_DISABLED) {
+      throw new ForbiddenException(sendingDisabledMessage(tenant.disabledReason))
+    }
+  }
+
+  /** Whether an admin has disabled sending for the tenant. */
+  async isSendingDisabled(tenantId: string): Promise<boolean> {
+    const tenant = await this.tenantRepository
+      .createQueryBuilder('t')
+      .select(['t.id', 't.status'])
+      .where('t.id = :tenantId', { tenantId })
+      .getOne()
+    return tenant?.status === TENANT_DISABLED
+  }
+
+  /**
+   * Enable or disable sending for a tenant, recording the change in tenant_sending_history in
+   * the same transaction. Setting the state it already has changes and records nothing.
+   *
+   * @param reason Required when disabling; ignored when enabling
+   * @returns Whether the tenant can now send
+   */
+  async setSending(
+    tenantId: string,
+    enabled: boolean,
+    reason: string | undefined,
+    actor: TenantActor,
+  ): Promise<boolean> {
+    const trimmed = reason?.trim() || null
+    if (!enabled && !trimmed) {
+      throw new BadRequestException('A reason is required to disable sending')
+    }
+
+    return await this.tenantRepository.manager.transaction(async (manager) => {
+      // Row lock, so two admins changing the same tenant at once record one change, not two.
+      // Eager relations off: FOR UPDATE can't lock the outer join they add.
+      const tenant = await manager.findOne(Tenant, {
+        where: { id: tenantId },
+        lock: { mode: 'pessimistic_write' },
+        loadEagerRelations: false,
+      })
+      if (!tenant) {
+        throw new NotFoundException('Tenant not found')
+      }
+      if ((tenant.status !== TENANT_DISABLED) === enabled) {
+        return enabled
+      }
+
+      // status is read-only on the entity (it is written through the status-code relation), so
+      // the update is SQL.
+      await manager.query(
+        `UPDATE notify.tenant
+            SET status = $2, disabled_reason = $3, disabled_by = $4, disabled_by_name = $5,
+                disabled_at = $6, updated_by = $7
+          WHERE id = $1`,
+        enabled
+          ? [tenantId, TENANT_ACTIVE, null, null, null, null, actor.id]
+          : [tenantId, TENANT_DISABLED, trimmed, actor.id, actor.name, new Date(), actor.id],
+      )
+      await manager.save(
+        manager.create(TenantSendingHistory, {
+          tenantId,
+          enabled,
+          reason: enabled ? null : trimmed,
+          createdBy: actor.id,
+          createdByName: actor.name,
+        }),
+      )
+      this.logger.log(
+        `Sending ${enabled ? 'enabled' : 'disabled'} for tenant ${tenantId} by ${actor.id}`,
+      )
+      return enabled
+    })
   }
 }

@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { NotifySubmissionService } from './notify-submission.service'
@@ -11,6 +12,7 @@ import { AttachmentProcessingService } from './attachment-processing.service'
 import { LimitAlertNotificationService } from './limit-alert-notification.service'
 import { SmsSegmentService } from './sms-segment.service'
 import { NotificationDedupService } from './notification-dedup.service'
+import { TenantsService } from '../../admin/tenants/tenants.service'
 import { QueueName } from '../../../enum/queue-name.enum'
 import { NotificationChannel } from '../../../enum/notification-channel.enum'
 import { UsagePeriodType } from '../../../enum/usage-period-type.enum'
@@ -28,6 +30,8 @@ describe('NotifySubmissionService', () => {
       content: { templateId: 'tpl-1' },
     },
   } as unknown as NotifySimpleRequest
+
+  const tenants = { assertCanSend: vi.fn().mockResolvedValue(undefined) }
 
   beforeEach(async () => {
     limitAlerts.processAcceptedUsage.mockReset()
@@ -68,6 +72,7 @@ describe('NotifySubmissionService', () => {
         { provide: AttachmentProcessingService, useValue: {} },
         { provide: SmsSegmentService, useValue: {} },
         { provide: EventNotificationResolver, useValue: {} },
+        { provide: TenantsService, useValue: tenants },
       ],
     }).compile()
 
@@ -89,6 +94,16 @@ describe('NotifySubmissionService', () => {
       apiKeyConsumerId: 'consumer-1',
       usageResults: [expect.objectContaining({ channelCode: NotificationChannel.EMAIL })],
     })
+  })
+
+  it('rejects a send from a tenant an admin has disabled, before queueing anything', async () => {
+    tenants.assertCanSend.mockRejectedValueOnce(
+      new ForbiddenException('Sending is disabled for this tenant by the Notify team: Billing'),
+    )
+
+    await expect(merge('consumer-1')).rejects.toBeInstanceOf(ForbiddenException)
+    expect(tenants.assertCanSend).toHaveBeenCalledWith('tenant-1')
+    expect(limitAlerts.processAcceptedUsage).not.toHaveBeenCalled()
   })
 
   it('sends no alert when the request has no API key to attribute usage to', async () => {

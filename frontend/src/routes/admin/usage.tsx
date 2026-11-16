@@ -1,10 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router'
-import AdminUsage from '@/pages/admin/AdminUsage'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
+/** The page moved to Manage Tenants; old links and bookmarks go there. */
 export const Route = createFileRoute('/admin/usage')({
-  component: AdminUsagePage,
+  beforeLoad: () => {
+    throw redirect({ to: '/admin/tenants', replace: true })
+  },
 })
-
-function AdminUsagePage() {
-  return <AdminUsage />
-}

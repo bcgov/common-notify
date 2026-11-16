@@ -7,6 +7,7 @@ import type {
   PaginatedNotificationDetailResponse,
 } from '@/interfaces/PaginatedNotificationResponse'
 import UserService from '@/service/user-service'
+import { toListQueryString } from './listQuery'
 //
 export interface ListNotificationsOptions {
   page?: number
@@ -27,13 +28,8 @@ export const notificationApi = {
    */
   async listNotifications(options: ListNotificationsOptions = {}) {
     try {
-      const qs = new URLSearchParams()
-      if (options.page) qs.set('page', String(options.page))
-      if (options.limit) qs.set('limit', String(options.limit))
-      if (options.sort) qs.set('sort', options.sort)
-      if (options.filter && options.filter.length > 0)
-        options.filter.forEach((f) => qs.append('filter', f))
-      const params = generateApiParameters(`/api/v1/frontend/notification_request?${qs.toString()}`)
+      const qs = toListQueryString(options)
+      const params = generateApiParameters(`/api/v1/frontend/notification_request?${qs}`)
       return await get<PaginatedNotificationResponse>(params)
     } catch (error) {
       const axiosError = error as AxiosError
@@ -76,15 +72,8 @@ export const notificationApi = {
     options: ListRequestDetailsOptions = {},
   ): Promise<PaginatedNotificationDetailResponse> {
     try {
-      const qs = new URLSearchParams()
-      if (options.page) qs.set('page', String(options.page))
-      if (options.limit) qs.set('limit', String(options.limit))
-      if (options.search) qs.set('search', options.search)
-      if (options.sort) qs.set('sort', options.sort)
-      if (options.filter && options.filter.length > 0)
-        options.filter.forEach((f) => qs.append('filter', f))
       const params = generateApiParameters(
-        `/api/v1/frontend/notification_request/request_details/${notificationRequestId}?${qs.toString()}`,
+        `/api/v1/frontend/notification_request/request_details/${notificationRequestId}?${toListQueryString(options)}`,
       )
       return await get<PaginatedNotificationDetailResponse>(params)
     } catch (error) {

@@ -30,6 +30,7 @@ import { extractRequestRoute } from '../../../common/utils/extract-request-route
 import { describeError } from '../../../common/utils/describe-error'
 import { mergeRequestChannel } from '../../../queue/merge-batch-builder'
 import { INGESTION_JOB_OPTIONS } from '../../../queue/job-options'
+import { TenantsService } from '../../admin/tenants/tenants.service'
 
 interface AcceptedUsageResult extends RecordedUsageResult {
   channelCode: string
@@ -95,6 +96,7 @@ export class NotifySubmissionService {
     private readonly smsSegmentService: SmsSegmentService,
     private readonly notificationDedupService: NotificationDedupService,
     private readonly eventNotificationResolver: EventNotificationResolver,
+    private readonly tenantsService: TenantsService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Queue,
     @Optional() private readonly limitAlertNotificationService?: LimitAlertNotificationService,
   ) {}
@@ -152,6 +154,7 @@ export class NotifySubmissionService {
    */
   async acceptMerge(submission: MergeSubmission): Promise<NotificationAcceptanceResponse> {
     const { tenantId, dto, channel, apiKeyConsumerId, requestRoute, eventId } = submission
+    await this.tenantsService.assertCanSend(tenantId)
     const isSms = channel === NotificationChannel.SMS
     const channelPayload = (isSms ? dto.sms : dto.email)!
     const channelName = isSms ? 'sms' : 'email'
@@ -419,6 +422,7 @@ export class NotifySubmissionService {
     skipDedup: boolean,
   ): Promise<NotificationAcceptanceResponse> {
     const { tenantId, apiKeyConsumerId } = caller
+    await this.tenantsService.assertCanSend(tenantId)
     const channels: string[] = []
     if (payload.email) channels.push('email')
     if (payload.sms) channels.push('sms')

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { toFilterParams } from './listFilters'
+import { toFilterParams, toSortParam } from './listFilters'
 
 describe('toFilterParams', () => {
   it('writes each filtered column as field:in:values', () => {
@@ -16,5 +16,14 @@ describe('toFilterParams', () => {
   it('is undefined when nothing is filtered', () => {
     expect(toFilterParams({})).toBeUndefined()
     expect(toFilterParams({ channel: [] })).toBeUndefined()
+  })
+})
+
+describe('toSortParam', () => {
+  it('prefixes a descending sort, and sends nothing without a field and direction', () => {
+    expect(toSortParam('usedToday', 'desc')).toBe('-usedToday')
+    expect(toSortParam('usedToday', 'asc')).toBe('usedToday')
+    expect(toSortParam(null, 'desc')).toBeUndefined()
+    expect(toSortParam('usedToday', null)).toBeUndefined()
   })
 })

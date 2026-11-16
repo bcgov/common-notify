@@ -301,7 +301,7 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
                     </div>
                   )}
                   {subject && (
-                    <div className="notification-preview__envelope-row">
+                    <div className="notification-preview__envelope-row notification-preview__envelope-row--subject">
                       <dt>Subject line:</dt>
                       <dd>{subject}</dd>
                     </div>

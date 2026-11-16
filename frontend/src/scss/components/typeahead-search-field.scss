@@ -1,0 +1,106 @@
+@import '../variables';
+
+// Drawn with the design system's tokens to match its TextField, which can't host a ComboBox.
+.typeahead-search-field {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.typeahead-search-field__control {
+  display: flex;
+  align-items: center;
+  gap: var(--layout-margin-small);
+  box-sizing: border-box;
+  height: var(--layout-margin-xxlarge);
+  padding: var(--layout-padding-small) 12px;
+  background: var(--surface-color-forms-default);
+  border: var(--layout-border-width-small) solid var(--surface-color-border-default);
+  border-radius: var(--layout-border-radius-medium);
+  color: var(--typography-color-primary);
+
+  &:hover {
+    border-color: var(--surface-color-border-dark);
+  }
+
+  &:has(.typeahead-search-field__input[data-focused]) {
+    border-color: var(--surface-color-border-active);
+  }
+
+  &:has(.typeahead-search-field__input[data-focus-visible]) {
+    outline: solid var(--layout-border-width-medium) var(--surface-color-border-active);
+    outline-offset: var(--layout-margin-hair);
+  }
+}
+
+.typeahead-search-field__input {
+  flex-grow: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: var(--typography-regular-body);
+  color: var(--typography-color-primary);
+
+  &::placeholder {
+    color: var(--typography-color-placeholder);
+  }
+
+  &[data-focused] {
+    outline: none;
+  }
+}
+
+.typeahead-search-field__clear {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 2px;
+  border: none;
+  border-radius: var(--layout-border-radius-small);
+  background: transparent;
+  color: var(--typography-color-secondary);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--typography-color-primary);
+    background: var(--surface-color-secondary-hover);
+  }
+
+  &:focus-visible {
+    outline: solid var(--layout-border-width-medium) var(--surface-color-border-active);
+    outline-offset: 1px;
+  }
+}
+
+.typeahead-search-field__popover {
+  min-width: var(--trigger-width);
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--surface-color-forms-default);
+  border: var(--layout-border-width-small) solid var(--surface-color-border-default);
+  border-radius: var(--layout-border-radius-medium);
+  box-shadow: var(--surface-shadow-medium);
+}
+
+.typeahead-search-field__list {
+  padding: var(--layout-padding-xsmall) 0;
+  outline: none;
+}
+
+.typeahead-search-field__option {
+  padding: var(--layout-padding-small) 12px;
+  font: var(--typography-regular-body);
+  color: var(--typography-color-primary);
+  cursor: pointer;
+  outline: none;
+
+  &[data-focused],
+  &[data-hovered] {
+    background: var(--surface-color-secondary-hover);
+  }
+
+  &[data-focus-visible] {
+    outline: solid var(--layout-border-width-medium) var(--surface-color-border-active);
+    outline-offset: calc(-1 * var(--layout-border-width-medium));
+  }
+}

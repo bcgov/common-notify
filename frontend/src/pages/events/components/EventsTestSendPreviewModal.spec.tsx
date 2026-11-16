@@ -16,7 +16,7 @@ vi.mock('@/api/templates.api', async () => {
 })
 
 // The header looks its logo up in the store; here it only needs to show it was placed.
-vi.mock('./EventsEmailHeader', () => ({
+vi.mock('@/components/EmailHeader', () => ({
   default: () => <div>Email header</div>,
 }))
 
@@ -162,15 +162,20 @@ describe('EventsTestSendPreviewModal', () => {
   })
 
   describe('editing values', () => {
-    it('has nothing to apply until a value is changed', async () => {
-      renderModal({ values: { firstName: 'Molly' } })
+    it('can apply the values it opened with, without a change', async () => {
+      const onApply = vi.fn()
+      renderModal({ values: { firstName: 'Molly' }, onApply })
 
       await screen.findByText('Permit for Molly')
-      expect(applyButton()).toBeDisabled()
-
-      await userEvent.type(firstNameField(), '!')
-
       expect(applyButton()).toBeEnabled()
+
+      await userEvent.click(applyButton())
+
+      await waitFor(() =>
+        expect(onApply).toHaveBeenCalledWith(
+          expect.objectContaining({ params: { firstName: 'Molly', isUrgent: 'true' } }),
+        ),
+      )
     })
 
     it('re-renders the preview once typing stops', async () => {
@@ -185,6 +190,18 @@ describe('EventsTestSendPreviewModal', () => {
         firstName: 'Ann',
         isUrgent: 'true',
       })
+    })
+
+    it('re-renders when a value is changed back to what it opened with', async () => {
+      renderModal({ values: { firstName: 'Molly' } })
+      await screen.findByText('Permit for Molly')
+
+      await userEvent.type(firstNameField(), '!')
+      await screen.findByText('Permit for Molly!', {}, { timeout: 2000 })
+
+      await userEvent.type(firstNameField(), '{Backspace}')
+
+      expect(await screen.findByText('Permit for Molly', {}, { timeout: 2000 })).toBeInTheDocument()
     })
 
     it('sends a condition switched off as empty', async () => {
@@ -282,15 +299,60 @@ describe('EventsTestSendPreviewModal', () => {
     expect(await screen.findByText('Failed to render preview')).toBeInTheDocument()
   })
 
-  it('lets the note about where values come from be dismissed', async () => {
-    renderModal()
-    const notice =
-      'Notification values are generated from your API payload and notification event settings.'
+  const valuesNotice =
+    'Notification values are generated from your API payload and notification event settings.'
 
-    expect(screen.getByText(notice)).toBeInTheDocument()
+  it('lets the note about where values come from be dismissed', async () => {
+    renderModal({ values: { firstName: 'Molly' } })
+
+    expect(screen.getByText(valuesNotice)).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'Close this alert' }))
 
-    expect(screen.queryByText(notice)).not.toBeInTheDocument()
+    expect(screen.queryByText(valuesNotice)).not.toBeInTheDocument()
+  })
+
+  describe('empty fields', () => {
+    it('flags them and warns as soon as the preview opens, and still renders it', async () => {
+      renderModal()
+
+      expect(await screen.findByText('This field is empty.')).toBeInTheDocument()
+      expect(screen.getByText('Some fields are empty.')).toBeInTheDocument()
+      expect(screen.queryByText(valuesNotice)).not.toBeInTheDocument()
+      await waitFor(() =>
+        expect(previewTemplateMock).toHaveBeenCalledWith('template-1', {
+          firstName: '',
+          isUrgent: 'true',
+        }),
+      )
+    })
+
+    it('never flags a condition', async () => {
+      renderModal({ values: { firstName: 'Molly', isUrgent: 'false' } })
+
+      await screen.findByText('Permit for Molly')
+      expect(screen.queryByText('This field is empty.')).not.toBeInTheDocument()
+      expect(screen.getByText(valuesNotice)).toBeInTheDocument()
+    })
+
+    it('clears the flag and warning once the field is filled in', async () => {
+      renderModal()
+      await screen.findByText('Some fields are empty.')
+
+      await userEvent.type(firstNameField(), 'Molly')
+
+      expect(screen.queryByText('This field is empty.')).not.toBeInTheDocument()
+      expect(screen.queryByText('Some fields are empty.')).not.toBeInTheDocument()
+      expect(screen.getByText(valuesNotice)).toBeInTheDocument()
+    })
+
+    it('still warns about an emptied field after the note about values was dismissed', async () => {
+      renderModal({ values: { firstName: 'Molly' } })
+      await userEvent.click(screen.getByRole('button', { name: 'Close this alert' }))
+
+      await userEvent.clear(firstNameField())
+
+      expect(screen.getByText('Some fields are empty.')).toBeInTheDocument()
+    })
   })
 })
