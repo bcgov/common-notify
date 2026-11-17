@@ -46,6 +46,12 @@ describe('TenantsService', () => {
     manager: {} as unknown,
   }
 
+  // New tenants are saved through a transaction; its save delegates to the repository mock so
+  // tests can stub and assert one save.
+  const txManager = {
+    save: (_entity: unknown, value: Tenant) => mockRepository.save(value),
+  }
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -59,6 +65,9 @@ describe('TenantsService', () => {
 
     service = module.get<TenantsService>(TenantsService)
     vi.clearAllMocks()
+    mockRepository.manager = {
+      transaction: (work: (m: typeof txManager) => unknown) => work(txManager),
+    }
   })
 
   describe('create', () => {
@@ -86,7 +95,22 @@ describe('TenantsService', () => {
         }),
       )
       expect(mockRepository.save).toHaveBeenCalled()
-      expect(seedTenantLimitDefaults).toHaveBeenCalledWith(mockRepository.manager, mockTenant.id)
+      expect(seedTenantLimitDefaults).toHaveBeenCalledWith(txManager, mockTenant.id)
+    })
+
+    it('fails the create when the default limits cannot be seeded', async () => {
+      mockRepository.findOne.mockResolvedValue(null)
+      mockRepository.create.mockReturnValue(mockTenant)
+      mockRepository.save.mockResolvedValue(mockTenant)
+      vi.mocked(seedTenantLimitDefaults).mockRejectedValueOnce(new Error('insert failed'))
+
+      await expect(
+        service.create({
+          name: 'test-tenant',
+          externalId: 'ext-123',
+          createdBy: 'user@example.com',
+        }),
+      ).rejects.toThrow('insert failed')
     })
 
     it('should auto-generate slug from name if not provided', async () => {
@@ -429,7 +453,7 @@ describe('TenantsService', () => {
 
       await service.upsertFromCstar({ id: 'ext-123', name: 'test-tenant' })
 
-      expect(seedTenantLimitDefaults).toHaveBeenCalledWith(mockRepository.manager, mockTenant.id)
+      expect(seedTenantLimitDefaults).toHaveBeenCalledWith(txManager, mockTenant.id)
     })
 
     it("updates only CSTAR's fields on sync, so it can't undo a disable", async () => {

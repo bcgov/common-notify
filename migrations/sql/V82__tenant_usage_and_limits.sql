@@ -172,7 +172,8 @@ GROUP BY
   c.tenant_id,
   l.channel_code;
 
--- Then the V40 defaults for every tenant that had no API key.
+-- Then the V40 defaults for every tenant that had no API key. Soft-deleted tenants are included:
+-- CSTAR sync still finds them by external id, and nothing reseeds an existing tenant.
 INSERT INTO
   notify.tenant_limit (tenant_id, channel_code, rate_limit_per_minute, daily_limit, annual_limit, created_by, updated_by)
 SELECT
@@ -190,8 +191,6 @@ FROM
       ('EMAIL', 1000, 100000, 20000000),
       ('SMS', 1000, 10000, 100000)
   ) AS d (channel_code, rate_limit_per_minute, daily_limit, annual_limit)
-WHERE
-  t.is_deleted = FALSE
 ON CONFLICT (tenant_id, channel_code) DO NOTHING;
 
 -- Alert config: enabled if any of the tenant's keys had alerts enabled, at the lowest threshold
@@ -227,8 +226,6 @@ FROM
       ('EMAIL'),
       ('SMS')
   ) AS d (channel_code)
-WHERE
-  t.is_deleted = FALSE
 ON CONFLICT (tenant_id, channel_code) DO NOTHING;
 
 -- Alert log: carried over so an alert already sent for the current day or year does not fire again.
