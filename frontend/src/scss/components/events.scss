@@ -54,6 +54,7 @@
   > .events__additional-recipients,
   > fieldset:has(> .events__cstar-groups),
   > .events__template-preview,
+  > .email-template-preview,
   > .events__header-preview {
     max-width: 500px;
   }
@@ -199,50 +200,11 @@
   gap: var(--layout-padding-xsmall);
 }
 
-.events__template-preview-label {
-  font: var(--typography-regular-small-body);
-  font-weight: 700;
-  color: var(--typography-color-primary);
-}
-
-.events__template-preview-box {
-  padding: var(--layout-padding-small) 12px;
-  background: var(--surface-color-forms-default, #fff);
-  border: var(--layout-border-width-small) solid var(--surface-color-border-default);
-  border-radius: var(--layout-border-radius-medium);
-}
-
-.events__template-preview-subject {
-  margin: 0 0 8px;
-  font: var(--typography-regular-body);
-  color: var(--typography-color-primary);
-}
-
-.events__template-preview-body-label {
-  margin: 0;
-  font: var(--typography-regular-body);
-  color: var(--typography-color-primary);
-}
-
 .events__template-preview-content {
   margin: 0;
   font: var(--typography-regular-body);
   color: var(--typography-color-primary);
   white-space: pre-wrap;
-}
-
-// Matches the greyed-out look of the DS form controls when the channel is inactive.
-.events__template-preview--disabled {
-  .events__template-preview-label,
-  .events__template-preview-subject,
-  .events__template-preview-body-label,
-  .events__template-preview-content {
-    color: var(--typography-color-disabled, #9f9d9c);
-  }
-
-  .events__template-preview-box {
-    background: var(--surface-color-forms-disabled);
-  }
 }
 
 // Grows the read-only preview TextArea to fit its content instead of scrolling,
