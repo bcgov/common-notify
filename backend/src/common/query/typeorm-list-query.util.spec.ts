@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { SelectQueryBuilder } from 'typeorm'
 import {
+  andWhereContains,
+  andWhereJsonbHasAny,
   applyListQueryFilters,
   applyParsedListQueryToQueryBuilder,
 } from './typeorm-list-query.util'
+import { fakeQueryBuilder } from './test-utils/fake-query-builder'
 import type { ParsedListQuery, QueryableFieldsConfig } from './list-query.types'
 
 const queryConfig: QueryableFieldsConfig = {
@@ -139,5 +143,43 @@ describe('applyListQueryFilters', () => {
     expect(qb.skip).not.toHaveBeenCalled()
     expect(qb.take).not.toHaveBeenCalled()
     expect(result).toBe(qb)
+  })
+})
+
+const builder = () => {
+  const fake = fakeQueryBuilder()
+  return { ...fake, qb: fake.qb as unknown as SelectQueryBuilder<object> }
+}
+
+describe('andWhereContains', () => {
+  it('matches the trimmed term anywhere, case-insensitively, with LIKE wildcards escaped', () => {
+    const { qb, where } = builder()
+    andWhereContains(qb, 't.name', '  50%_off\\ ')
+
+    expect(where).toEqual([
+      [String.raw`t.name ILIKE :search ESCAPE '\'`, { search: String.raw`%50\%\_off\\%` }],
+    ])
+  })
+
+  it('adds nothing for a blank term', () => {
+    const { qb, where } = builder()
+    andWhereContains(qb, 't.name', '   ')
+    andWhereContains(qb, 't.name', undefined)
+    expect(where).toEqual([])
+  })
+})
+
+describe('andWhereJsonbHasAny', () => {
+  it('matches rows whose array holds any of the values, and adds nothing for none', () => {
+    const { qb, where } = builder()
+    andWhereJsonbHasAny(qb, 'n.channel_codes', [], 'channels')
+    andWhereJsonbHasAny(qb, 'n.channel_codes', ['EMAIL', 'SMS'], 'channels')
+
+    expect(where).toEqual([
+      [
+        'jsonb_exists_any(n.channel_codes, ARRAY[:...channels]::text[])',
+        { channels: ['EMAIL', 'SMS'] },
+      ],
+    ])
   })
 })

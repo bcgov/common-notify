@@ -38,7 +38,7 @@ const TenantSelectionModal: FC = () => {
     [tenants],
   )
 
-  // Don't show modal for NOTIFY_ADMIN users without tenants - they go directly to feature flags
+  // NOTIFY_ADMIN users without tenants don't need one: they use the admin section (useTenantlessAdmin)
   const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
   if (tenants.length === 0 && isAdmin) {
     return null

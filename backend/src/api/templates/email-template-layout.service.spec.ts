@@ -29,7 +29,7 @@ describe('EmailTemplateLayoutService', () => {
   }
   const logoImg =
     '<img src="https://gateway.example.test/logos/logo-id/image?format=email" alt="Agriculture" ' +
-    'height="110" style="height:110px;width:auto;border:0;display:block;">'
+    'height="85" style="height:85px;width:auto;border:0;display:block;">'
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -190,8 +190,8 @@ describe('EmailTemplateLayoutService', () => {
       // Left unconstrained, a logo arrives at whatever size it was uploaded at. The preview caps
       // its height, so the email has to as well - as an attribute and a style, since mail
       // clients disagree about which they honour.
-      expect(result.body).toContain('height="110"')
-      expect(result.body).toContain('height:110px;width:auto;')
+      expect(result.body).toContain('height="85"')
+      expect(result.body).toContain('height:85px;width:auto;')
       // The preview's title is not bold, and the rule between the halves is 16px out either side.
       expect(result.body).not.toContain('font-weight:bold')
       expect(result.body).toContain('padding-right:16px')

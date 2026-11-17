@@ -134,6 +134,30 @@ describe('apiKeyUsage API', () => {
       ['filter', 'channel:in:EMAIL|SMS'],
       ['filter', 'status:in:x'],
     ])
+    await api.getAllTenantsUsage(1, 15, undefined, undefined, '-usedToday')
+    expect(lastQuery()).toEqual([
+      ['page', '1'],
+      ['limit', '15'],
+      ['sort', '-usedToday'],
+    ])
+  })
+  it('getAdminUsageSummary reads the summary endpoint and translates failures', async () => {
+    await expect(api.getAdminUsageSummary()).resolves.toEqual({ ok: true })
+    expect(vi.mocked(get).mock.lastCall![0]).toMatchObject({
+      url: '/api/v1/frontend/admin/api-key-usage/summary',
+    })
+    vi.mocked(get).mockRejectedValue({ response: { status: 500, data: { message: 'down' } } })
+    await expect(api.getAdminUsageSummary()).rejects.toThrow('Failed to load tenant summary: down')
+  })
+  it('setTenantSending sends the reason only when disabling', async () => {
+    await api.setTenantSending('tenant 1', false, 'Unpaid invoice')
+    expect(vi.mocked(patch).mock.lastCall![0]).toMatchObject({
+      url: '/api/v1/frontend/admin/api-key-usage/tenants/tenant%201/sending',
+      params: { enabled: false, reason: 'Unpaid invoice' },
+    })
+    await api.setTenantSending('tenant-1', true, 'ignored')
+    expect(vi.mocked(patch).mock.lastCall![0]).toMatchObject({ params: { enabled: true } })
+    expect(vi.mocked(patch).mock.lastCall![0]).not.toHaveProperty('params.reason')
   })
   it("surfaces the server's message for any other failure", async () => {
     vi.mocked(get).mockRejectedValue(

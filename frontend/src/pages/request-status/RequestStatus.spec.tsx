@@ -10,13 +10,25 @@ import reducer, {
 import { showErrorToast } from '@/redux/utils/toastUtils'
 import RequestStatus from './RequestStatus'
 
-const mocks = vi.hoisted(() => ({ state: {} as Record<string, unknown>, dispatch: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  state: {} as Record<string, unknown>,
+  dispatch: vi.fn(),
+  canDashboard: true,
+}))
 vi.mock('@/redux/hooks', () => ({
   useAppSelector: (select: (state: unknown) => unknown) => select(mocks.state),
   useAppDispatch: () => mocks.dispatch,
 }))
+vi.mock('@/hooks/useDashboardAccess', () => ({
+  useDashboardAccess: () => ({ isResolved: true, canAccess: mocks.canDashboard }),
+}))
 vi.mock('@/components/PageHeading', () => ({
-  default: ({ title }: { title: string }) => <h1>{title}</h1>,
+  default: ({ title, breadcrumbs = [] }: { title: string; breadcrumbs?: { label: string }[] }) => (
+    <>
+      <nav aria-label="Breadcrumb">{breadcrumbs.map((crumb) => crumb.label).join(' / ')}</nav>
+      <h1>{title}</h1>
+    </>
+  ),
 }))
 vi.mock('@/redux/utils/toastUtils', () => ({ showErrorToast: vi.fn() }))
 
@@ -25,7 +37,23 @@ function setup(overrides = {}) {
   return render(<RequestStatus notificationRequestId="request-1" />)
 }
 describe('RequestStatus', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.canDashboard = true
+  })
+  it('links back to the Dashboard when the tenant can open it', () => {
+    setup()
+    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent(
+      'Home / Dashboard / Request Status',
+    )
+  })
+  it('omits the Dashboard crumb when the dashboard is not available', () => {
+    mocks.canDashboard = false
+    setup()
+    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent(
+      'Home / Request Status',
+    )
+  })
   it('shows an empty delivery table', () => {
     setup()
     expect(screen.getAllByText('No delivery records found')[0]).toBeInTheDocument()

@@ -9,6 +9,7 @@ import TenantError from './TenantError'
 import TenantSelectionModal from './TenantSelectionModal'
 import TenantSwitcher from './TenantSwitcher'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
+import { useTenantlessAdmin } from '@/hooks/useTenantlessAdmin'
 import UserService from '@/service/user-service'
 import { SsoRole } from '@/enum/sso-role.enum'
 import Sidebar from './Sidebar'
@@ -21,6 +22,7 @@ const Layout: FC<Props> = ({ children }) => {
   const dispatch = useAppDispatch()
   const location = useLocation()
   const navigate = useNavigate()
+  const tenantlessAdmin = useTenantlessAdmin()
 
   const tenants = useAppSelector((state) => state.cstar.tenants)
   const tenantError = useAppSelector((state) => state.cstar.error)
@@ -120,8 +122,9 @@ const Layout: FC<Props> = ({ children }) => {
   }
 
   // Only block on CSTAR error if we don't have a selected tenant
-  // Once tenant is selected in Redux, we don't need CSTAR anymore
-  if (tenantError && !selectedTenant) {
+  // Once tenant is selected in Redux, we don't need CSTAR anymore. An admin with no tenant
+  // doesn't need one: the admin section is cross-tenant.
+  if (tenantError && !selectedTenant && !tenantlessAdmin) {
     return <TenantError error={tenantError} onRetry={() => dispatch(fetchCstarTenants())} />
   }
 

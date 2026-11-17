@@ -3,7 +3,7 @@ import { Separator } from '@bcgov/design-system-react-components'
 import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer'
 import GroupIcon from '@mui/icons-material/Group'
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
-import { NotificationChannel } from '@/enum/notification-channel.enum'
+import { formatChannel } from '@/utils/channels'
 import '@/scss/components/request-status.scss'
 import type { NotificationStatusCode } from '@/interfaces/NotificationRequest'
 import { StatusBadge } from '@/components/StatusBadge'
@@ -15,15 +15,7 @@ interface RequestStatusSummaryProps {
   overallStatus: NotificationStatusCode | null
 }
 
-const formatChannels = (channels: string[]): string =>
-  channels
-    .map((channel) => {
-      const match = Object.values(NotificationChannel).find(
-        (value) => value.toLowerCase() === channel.toLowerCase(),
-      )
-      return match ?? channel
-    })
-    .join(', ')
+const formatChannels = (channels: string[]): string => channels.map(formatChannel).join(', ')
 
 const formatSentDate = (date: Date): string =>
   date.toLocaleString('en-US', {

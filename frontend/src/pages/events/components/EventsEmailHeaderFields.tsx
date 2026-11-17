@@ -2,6 +2,7 @@ import type { FC } from 'react'
 import { Radio, RadioGroup, Select, TextField } from '@bcgov/design-system-react-components'
 import { HEADER_CUSTOM_ID, HEADER_TENANT_DEFAULT_ID } from '../hooks/useEmailHeader'
 import type { EmailHeader } from '../hooks/useEmailHeader'
+import '@/scss/components/email-header.scss'
 
 type EventsEmailHeaderFieldsProps = {
   header: EmailHeader
@@ -62,17 +63,17 @@ const EventsEmailHeaderFields: FC<EventsEmailHeaderFieldsProps> = ({
     {(header.previewLogo || header.previewTitle) && (
       <div className="events__header-preview">
         <span className="events__field-label">Header Preview</span>
-        <div className="events__header-preview-row">
+        <div className="email-header">
           {header.previewLogo && (
             <img
               alt=""
-              className="events__header-preview-logo"
+              className="email-header__logo"
               loading="lazy"
               src={header.previewLogo.imageUrl}
             />
           )}
           {header.previewTitle && (
-            <span className="events__header-preview-title">{header.previewTitle}</span>
+            <span className="email-header__title">{header.previewTitle}</span>
           )}
         </div>
       </div>

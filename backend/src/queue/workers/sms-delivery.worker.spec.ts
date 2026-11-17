@@ -1067,6 +1067,28 @@ describe('SmsDeliveryWorker', () => {
       mockInlineRenderingService.renderSms = vi.fn().mockResolvedValue({ body: 'Hi A' })
     })
 
+    it('allows blank values when rendering a merge row from a stored template', async () => {
+      mockTemplatesRepository.findById = vi
+        .fn()
+        .mockResolvedValue({ id: 'template-sms-uuid', channelCode: 'SMS' })
+      mockTemplatesService.renderTemplateContent = vi.fn().mockResolvedValue({ body: 'Hi ' })
+      mockSmsAdapter.send = vi.fn().mockResolvedValue({ messageId: 'SM1' })
+      await init()
+
+      const job = mergeJob()
+      ;(job.data.mailMergeData as { content: object }).content = {
+        templateId: 'template-sms-uuid',
+      }
+      await processHandler(job)
+
+      expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'template-sms-uuid' }),
+        expect.anything(),
+        undefined,
+        { allowEmptyValues: true },
+      )
+    })
+
     it('pauses a merge batch on an outage, leaving unsent recipients owed rather than failed', async () => {
       mockSmsAdapter.send = vi
         .fn()

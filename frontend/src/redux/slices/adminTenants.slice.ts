@@ -1,6 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit'
 import type { PayloadAction } from '@reduxjs/toolkit'
-import { fetchAllNotifyTenants } from '../thunks/adminTenants.thunks'
+import { fetchAllNotifyTenants, fetchNotifyTenantOptions } from '../thunks/adminTenants.thunks'
 
 interface AdminTenantsState {
   items: Array<{
@@ -9,12 +9,18 @@ interface AdminTenantsState {
   }>
   isLoading: boolean
   error: string | null
+  /** Tenants with Notify connected, for the admin tenant searches; see fetchNotifyTenantOptions. */
+  notifyOptions: Array<{ id: string; name: string }>
+  /** Set once requested, so each screen that needs the options doesn't fetch them again. */
+  notifyOptionsRequested: boolean
 }
 
 const initialState: AdminTenantsState = {
   items: [],
   isLoading: false,
   error: null,
+  notifyOptions: [],
+  notifyOptionsRequested: false,
 }
 
 export const adminTenantsSlice = createSlice({
@@ -49,6 +55,17 @@ export const adminTenantsSlice = createSlice({
           state.error = null
         },
       )
+      .addCase(fetchNotifyTenantOptions.pending, (state) => {
+        state.notifyOptionsRequested = true
+      })
+      .addCase(fetchNotifyTenantOptions.fulfilled, (state, action) => {
+        state.notifyOptions = action.payload
+      })
+      // A failure leaves the options empty: the search still works on typed text. Cleared so the
+      // next screen to mount tries again.
+      .addCase(fetchNotifyTenantOptions.rejected, (state) => {
+        state.notifyOptionsRequested = false
+      })
       .addCase(fetchAllNotifyTenants.rejected, (state, action) => {
         state.isLoading = false
         state.error = action.payload ?? 'Error'

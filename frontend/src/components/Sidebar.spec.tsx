@@ -14,7 +14,14 @@ import Sidebar from './Sidebar'
 const location = vi.hoisted(() => ({ pathname: '/' }))
 
 vi.mock('@tanstack/react-router', () => ({
-  Link: ({ children, to, className, activeProps: _activeProps, ...rest }: any) => (
+  Link: ({
+    children,
+    to,
+    className,
+    activeProps: _activeProps,
+    activeOptions: _activeOptions,
+    ...rest
+  }: any) => (
     <a href={to} className={className} {...rest}>
       {children}
     </a>
@@ -66,7 +73,7 @@ function makeStore(
         current: cstarRoles.length > 0 ? ({ cstarRoles } as any) : null,
         isLoading: false,
         rolesLoading: false,
-        rolesTenantId: null,
+        rolesTenantId: 'tenant-1',
         error: null,
         rolesError: null,
       },
@@ -106,10 +113,16 @@ describe('Sidebar', () => {
   })
 
   it('renders primary nav items when user has CSTAR roles', () => {
-    renderSidebar(null, ['NOTIFY_VIEWER'])
+    renderSidebar(null, ['NOTIFY_VIEWER'], { dashboard: true })
 
     expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /templates/i })).toBeInTheDocument()
+  })
+
+  it('hides Dashboard when the dashboard feature flag is disabled', () => {
+    renderSidebar(null, ['NOTIFY_VIEWER'], { dashboard: false })
+
+    expect(screen.queryByRole('link', { name: /dashboard/i })).not.toBeInTheDocument()
   })
 
   it('hides Events when the events feature flag is disabled', () => {
@@ -188,7 +201,7 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: /feature flags/i })).toBeInTheDocument()
   })
 
-  it('shows the Monitoring link to NOTIFY_ADMIN users', async () => {
+  it('shows the System link to NOTIFY_ADMIN users', async () => {
     const user = userEvent.setup()
     const UserService = (await import('@/service/user-service')).default
     vi.mocked(UserService.hasRole).mockReturnValue(true)
@@ -196,25 +209,25 @@ describe('Sidebar', () => {
     renderSidebar()
     await user.click(screen.getByRole('button', { name: /admin/i }))
 
-    expect(screen.getByRole('link', { name: 'Monitoring' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'System' })).toHaveAttribute(
       'href',
       '/admin/monitoring',
     )
   })
 
-  it('does not show the Monitoring link without the NOTIFY_ADMIN role', async () => {
+  it('does not show the System link without the NOTIFY_ADMIN role', async () => {
     const UserService = (await import('@/service/user-service')).default
     vi.mocked(UserService.hasRole).mockReturnValue(false)
 
     renderSidebar()
 
-    expect(screen.queryByRole('link', { name: 'Monitoring' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'System' })).not.toBeInTheDocument()
   })
 
   describe('admin menu', () => {
     beforeEach(() => vi.mocked(UserService.hasRole).mockReturnValue(true))
 
-    it('groups the admin pages under Monitor, Report and Manage', async () => {
+    it('groups the admin pages under Monitor and Manage', async () => {
       const user = userEvent.setup()
       renderSidebar()
       await user.click(screen.getByRole('button', { name: 'Admin' }))
@@ -224,9 +237,16 @@ describe('Sidebar', () => {
           .getAllByRole('link')
           .map((link) => [link.textContent, link.getAttribute('href')])
 
-      expect(linksIn('Monitor')).toEqual([['Monitoring', '/admin/monitoring']])
-      expect(linksIn('Report')).toEqual([['Usage & Limits', '/admin/usage']])
-      expect(linksIn('Manage')).toEqual([['Feature Flags', '/admin/feature-flags']])
+      expect(linksIn('Monitor')).toEqual([
+        ['Overview', '/admin'],
+        ['System', '/admin/monitoring'],
+        ['Notifications', '/admin/notifications'],
+      ])
+      expect(linksIn('Manage')).toEqual([
+        ['Tenants', '/admin/tenants'],
+        ['Feature Flags', '/admin/feature-flags'],
+      ])
+      expect(screen.queryByRole('list', { name: 'Report' })).not.toBeInTheDocument()
     })
 
     it('starts closed away from the admin pages, and reports its state', async () => {
@@ -243,21 +263,21 @@ describe('Sidebar', () => {
       const menuId = toggle.getAttribute('aria-controls')
       expect(menuId).toBeTruthy()
       expect(document.getElementById(menuId!)).toContainElement(
-        screen.getByRole('link', { name: 'Monitoring' }),
+        screen.getByRole('link', { name: 'System' }),
       )
     })
 
-    it.each(['/admin', '/admin/usage'])('opens on its own on %s', (pathname) => {
+    it.each(['/admin', '/admin/tenants'])('opens on its own on %s', (pathname) => {
       location.pathname = pathname
       renderSidebar()
 
       expect(screen.getByRole('button', { name: 'Admin' })).toHaveAttribute('aria-expanded', 'true')
-      expect(screen.getByRole('link', { name: 'Usage & Limits' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Tenants' })).toBeInTheDocument()
     })
 
     it('stays closed on an admin page once the user closes it', async () => {
       const user = userEvent.setup()
-      location.pathname = '/admin/usage'
+      location.pathname = '/admin/tenants'
       renderSidebar()
 
       await user.click(screen.getByRole('button', { name: 'Admin' }))
@@ -266,7 +286,7 @@ describe('Sidebar', () => {
         'aria-expanded',
         'false',
       )
-      expect(screen.queryByRole('link', { name: 'Usage & Limits' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'Tenants' })).not.toBeInTheDocument()
     })
 
     it('does not open for a page that only starts with the word admin', () => {

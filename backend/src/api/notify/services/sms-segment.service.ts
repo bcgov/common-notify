@@ -101,7 +101,11 @@ export class SmsSegmentService {
       const renderTemplate = applyGcNotifyMergeRendering(template, content)
       return guarded(
         async (params) =>
-          (await this.templatesService.renderTemplateContent(renderTemplate, params)).body,
+          (
+            await this.templatesService.renderTemplateContent(renderTemplate, params, undefined, {
+              allowEmptyValues: true,
+            })
+          ).body,
       )
     }
 
