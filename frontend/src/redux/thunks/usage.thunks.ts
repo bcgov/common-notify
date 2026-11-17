@@ -1,11 +1,11 @@
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import {
-  getApiKeyUsage,
-  getApiKeyUsageHistory,
+  getTenantUsage,
+  getTenantUsageHistory,
   getAllTenantsUsage,
   updateApiKeyThreshold,
   updateTenantLimits as updateTenantLimitsApi,
-} from '@/api/apiKeyUsage.api'
+} from '@/api/usage.api'
 import type {
   TenantUsageResponse,
   UsageHistoryEntry,
@@ -13,35 +13,35 @@ import type {
   PaginatedAdminUsageResponse,
   UpdateTenantLimitsRequest,
   AdminTenantUsageRow,
-} from '@/api/apiKeyUsage.api'
+} from '@/api/usage.api'
 import type { RootState } from '../store'
 import { toFilterParams, toSortParam } from '../utils/listFilters'
 
 const emptyUsage: TenantUsageResponse = { tenantId: '', fiscalYearStart: '', channels: [] }
 
-export const fetchApiKeyUsage = createAsyncThunk<
+export const fetchTenantUsage = createAsyncThunk<
   TenantUsageResponse,
   void,
   { state: RootState; rejectValue: string }
->('apiKeyUsage/fetch', async (_, { getState, rejectWithValue }) => {
+>('usage/fetch', async (_, { getState, rejectWithValue }) => {
   try {
     const tenantId = getState().tenant.selectedTenant?.id
     if (!tenantId) return emptyUsage
-    return await getApiKeyUsage()
+    return await getTenantUsage()
   } catch (error) {
     return rejectWithValue(error instanceof Error ? error.message : 'Failed to load usage')
   }
 })
 
-export const fetchApiKeyUsageHistory = createAsyncThunk<
+export const fetchTenantUsageHistory = createAsyncThunk<
   UsageHistoryEntry[],
   void,
   { state: RootState; rejectValue: string }
->('apiKeyUsage/fetchHistory', async (_, { getState, rejectWithValue }) => {
+>('usage/fetchHistory', async (_, { getState, rejectWithValue }) => {
   try {
     const tenantId = getState().tenant.selectedTenant?.id
     if (!tenantId) return []
-    return await getApiKeyUsageHistory()
+    return await getTenantUsageHistory()
   } catch (error) {
     return rejectWithValue(error instanceof Error ? error.message : 'Failed to load usage history')
   }
@@ -51,10 +51,10 @@ export const fetchAllTenantsUsage = createAsyncThunk<
   PaginatedAdminUsageResponse,
   void,
   { state: RootState; rejectValue: string }
->('apiKeyUsage/fetchAllTenants', async (_, { getState, rejectWithValue }) => {
+>('usage/fetchAllTenants', async (_, { getState, rejectWithValue }) => {
   try {
     const { adminPage, adminLimit, adminSearch, adminFilters, adminSortBy, adminSortOrder } =
-      getState().apiKeyUsage
+      getState().usage
     return await getAllTenantsUsage(
       adminPage,
       adminLimit,
@@ -71,7 +71,7 @@ export const updateTenantLimits = createAsyncThunk<
   AdminTenantUsageRow[],
   UpdateTenantLimitsRequest,
   { rejectValue: string }
->('apiKeyUsage/updateTenantLimits', async (payload, { rejectWithValue }) => {
+>('usage/updateTenantLimits', async (payload, { rejectWithValue }) => {
   try {
     return await updateTenantLimitsApi(payload)
   } catch (error) {
@@ -83,7 +83,7 @@ export const updateThreshold = createAsyncThunk<
   TenantUsageResponse,
   UpdateThresholdRequest,
   { rejectValue: string }
->('apiKeyUsage/updateThreshold', async (payload, { rejectWithValue }) => {
+>('usage/updateThreshold', async (payload, { rejectWithValue }) => {
   try {
     return await updateApiKeyThreshold(payload)
   } catch (error) {

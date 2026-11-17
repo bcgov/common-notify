@@ -22,10 +22,13 @@ interface RowActionsMenuProps {
 
 /** A table row's actions behind one ⋮ button, so each row has a single control. */
 const RowActionsMenu: FC<RowActionsMenuProps> = ({ label, groups, onAction }) => {
+  // Section and item ids share one key space in the menu's collection, so a group named like one
+  // of its actions ('sending' holding the 'sending' action) collides. In development under
+  // StrictMode that makes the menu render itself without end and hang the browser on open.
   const sections = groups
     .filter((group) => group.actions.length > 0)
     .map((group) => ({
-      id: group.id,
+      id: `group:${group.id}`,
       items: group.actions.map((action) => ({ id: action.id, label: action.label })),
     }))
 

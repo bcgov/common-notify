@@ -22,7 +22,7 @@ import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
 import { CstarRole } from '@/enum/cstar-role.enum'
 
-// Not set appears if a tenant hasn't been bound to the api key
+// Not set appears if the tenant has no email limit configured
 const formatLimit = (limit: number | undefined, unit: 'day' | 'year'): string =>
   limit === undefined ? 'Not set' : `${limit.toLocaleString()} emails/${unit}`
 
@@ -40,7 +40,7 @@ interface EmailSwitches {
 
 const EmailSettings: FC = () => {
   const dispatch = useAppDispatch()
-  const { usage, isLoading } = useAppSelector((state) => state.apiKeyUsage)
+  const { usage, isLoading } = useAppSelector((state) => state.usage)
   const {
     emailLogoId,
     useCustomEmailHeader = false,

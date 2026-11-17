@@ -1,29 +1,23 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
-import { In } from 'typeorm'
 import { vi } from 'vitest'
 import { UsagePeriodType } from '../../enum/usage-period-type.enum'
 import { TenantSettings } from '../tenant-settings/entities/tenant-settings.entity'
-import { ApiKeyConsumer } from './entities/api-key-consumer.entity'
-import { ApiKeyLimit } from './entities/api-key-limit.entity'
-import { ApiKeyLimitAlert } from './entities/api-key-limit-alert.entity'
-import { ApiKeyLimitAlertLog } from './entities/api-key-limit-alert-log.entity'
+import { TenantLimit } from './entities/tenant-limit.entity'
+import { TenantLimitAlert } from './entities/tenant-limit-alert.entity'
+import { TenantLimitAlertLog } from './entities/tenant-limit-alert-log.entity'
 import { LimitAlertService, ProcessLimitAlertUsageInput } from './limit-alert.service'
 
 describe('LimitAlertService', () => {
   let service: LimitAlertService
 
-  const apiKeyConsumerRepository = {
+  const tenantLimitRepository = {
     findOne: vi.fn(),
-    find: vi.fn(),
   }
-  const apiKeyLimitRepository = {
-    find: vi.fn(),
+  const tenantLimitAlertRepository = {
+    findOne: vi.fn(),
   }
-  const apiKeyLimitAlertRepository = {
-    find: vi.fn(),
-  }
-  const apiKeyLimitAlertLogRepository = {
+  const tenantLimitAlertLogRepository = {
     query: vi.fn(),
     update: vi.fn(),
   }
@@ -36,7 +30,7 @@ describe('LimitAlertService', () => {
   const input = (
     usageResults: ProcessLimitAlertUsageInput['usageResults'],
   ): ProcessLimitAlertUsageInput => ({
-    apiKeyConsumerId: 'consumer-1',
+    tenantId: 'tenant-1',
     usageResults,
   })
 
@@ -45,20 +39,16 @@ describe('LimitAlertService', () => {
       providers: [
         LimitAlertService,
         {
-          provide: getRepositoryToken(ApiKeyConsumer),
-          useValue: apiKeyConsumerRepository,
+          provide: getRepositoryToken(TenantLimit),
+          useValue: tenantLimitRepository,
         },
         {
-          provide: getRepositoryToken(ApiKeyLimit),
-          useValue: apiKeyLimitRepository,
+          provide: getRepositoryToken(TenantLimitAlert),
+          useValue: tenantLimitAlertRepository,
         },
         {
-          provide: getRepositoryToken(ApiKeyLimitAlert),
-          useValue: apiKeyLimitAlertRepository,
-        },
-        {
-          provide: getRepositoryToken(ApiKeyLimitAlertLog),
-          useValue: apiKeyLimitAlertLogRepository,
+          provide: getRepositoryToken(TenantLimitAlertLog),
+          useValue: tenantLimitAlertLogRepository,
         },
         {
           provide: getRepositoryToken(TenantSettings),
@@ -70,54 +60,43 @@ describe('LimitAlertService', () => {
     service = module.get<LimitAlertService>(LimitAlertService)
     vi.clearAllMocks()
 
-    apiKeyConsumerRepository.findOne.mockResolvedValue({
-      id: 'consumer-1',
-      tenantId: 'tenant-1',
-    })
-    apiKeyConsumerRepository.find.mockResolvedValue([{ id: 'consumer-1', tenantId: 'tenant-1' }])
     tenantSettingsRepository.findOne.mockResolvedValue({
       tenantId: 'tenant-1',
       alertEmail: 'alerts@example.com',
       isDeleted: false,
     })
-    apiKeyLimitRepository.find.mockResolvedValue([
-      {
-        apiKeyConsumerId: 'consumer-1',
-        channelCode: 'EMAIL',
-        dailyLimit: 100,
-        annualLimit: 1_000,
-      },
-    ])
-    apiKeyLimitAlertRepository.find.mockResolvedValue([
-      {
-        apiKeyConsumerId: 'consumer-1',
-        channelCode: 'EMAIL',
-        alertsEnabled: true,
-        warnThresholdPercent: 80,
-      },
-    ])
-    apiKeyLimitAlertLogRepository.query.mockImplementation(
+    tenantLimitRepository.findOne.mockResolvedValue({
+      tenantId: 'tenant-1',
+      channelCode: 'EMAIL',
+      dailyLimit: 100,
+      annualLimit: 1_000,
+    })
+    tenantLimitAlertRepository.findOne.mockResolvedValue({
+      tenantId: 'tenant-1',
+      channelCode: 'EMAIL',
+      alertsEnabled: true,
+      warnThresholdPercent: 80,
+    })
+    tenantLimitAlertLogRepository.query.mockImplementation(
       (_sql: string, parameters: unknown[]) => {
         const periodTypeCode = parameters[2]
         return Promise.resolve([{ id: `log-${periodTypeCode}` }])
       },
     )
-    apiKeyLimitAlertLogRepository.update.mockResolvedValue({ affected: 1 })
+    tenantLimitAlertLogRepository.update.mockResolvedValue({ affected: 1 })
   })
 
   it('returns no alerts for empty usage input', async () => {
     await expect(service.evaluateAndClaim(input([]))).resolves.toEqual([])
-    expect(apiKeyConsumerRepository.findOne).not.toHaveBeenCalled()
+    expect(tenantSettingsRepository.findOne).not.toHaveBeenCalled()
   })
 
-  it('returns no alerts when the API key consumer ID is missing', async () => {
-    await expect(
-      service.evaluateAndClaim({ apiKeyConsumerId: '', usageResults: [] }),
-    ).resolves.toEqual([])
+  it('returns no alerts when the tenant ID is missing', async () => {
+    await expect(service.evaluateAndClaim({ tenantId: '', usageResults: [] })).resolves.toEqual([])
   })
 
   it('treats a missing alert-config row as alerts disabled', async () => {
-    apiKeyLimitAlertRepository.find.mockResolvedValue([])
+    tenantLimitAlertRepository.findOne.mockResolvedValue(null)
 
     await expect(
       service.evaluateAndClaim(
@@ -131,13 +110,15 @@ describe('LimitAlertService', () => {
         ]),
       ),
     ).resolves.toEqual([])
-    expect(apiKeyLimitAlertLogRepository.query).not.toHaveBeenCalled()
+    expect(tenantLimitAlertLogRepository.query).not.toHaveBeenCalled()
   })
 
   it('returns no alerts when alerts are explicitly disabled', async () => {
-    apiKeyLimitAlertRepository.find.mockResolvedValue([
-      { channelCode: 'EMAIL', alertsEnabled: false, warnThresholdPercent: 80 },
-    ])
+    tenantLimitAlertRepository.findOne.mockResolvedValue({
+      channelCode: 'EMAIL',
+      alertsEnabled: false,
+      warnThresholdPercent: 80,
+    })
 
     await expect(
       service.evaluateAndClaim(
@@ -151,7 +132,7 @@ describe('LimitAlertService', () => {
         ]),
       ),
     ).resolves.toEqual([])
-    expect(apiKeyLimitAlertLogRepository.query).not.toHaveBeenCalled()
+    expect(tenantLimitAlertLogRepository.query).not.toHaveBeenCalled()
   })
 
   it.each([
@@ -176,7 +157,7 @@ describe('LimitAlertService', () => {
     expect(tenantSettingsRepository.findOne).toHaveBeenCalledWith({
       where: { tenantId: 'tenant-1', isDeleted: false },
     })
-    expect(apiKeyLimitRepository.find).not.toHaveBeenCalled()
+    expect(tenantLimitRepository.findOne).not.toHaveBeenCalled()
   })
 
   it('claims and returns a DAY warning using the supplied post-increment count', async () => {
@@ -196,7 +177,6 @@ describe('LimitAlertService', () => {
         alertLogId: 'log-DAY',
         tenantId: 'tenant-1',
         recipientEmail: 'alerts@example.com',
-        apiKeyConsumerId: 'consumer-1',
         channelCode: 'EMAIL',
         periodTypeCode: 'DAY',
         alertLevel: 'WARN',
@@ -206,11 +186,11 @@ describe('LimitAlertService', () => {
         percent: 85,
       },
     ])
-    expect(apiKeyLimitAlertLogRepository.query).toHaveBeenCalledWith(
+    expect(tenantLimitAlertLogRepository.query).toHaveBeenCalledWith(
       expect.stringContaining('ON CONFLICT'),
-      ['consumer-1', 'EMAIL', 'DAY', dayPeriodStart, 'WARN'],
+      ['tenant-1', 'EMAIL', 'DAY', dayPeriodStart, 'WARN'],
     )
-    expect(apiKeyLimitAlertLogRepository.query.mock.calls[0][0]).not.toContain(
+    expect(tenantLimitAlertLogRepository.query.mock.calls[0][0]).not.toContain(
       "date_trunc('day', now())",
     )
   })
@@ -266,19 +246,19 @@ describe('LimitAlertService', () => {
   })
 
   it('evaluates two channels independently', async () => {
-    apiKeyLimitRepository.find.mockImplementation(({ where }) =>
-      Promise.resolve([
-        {
-          channelCode: where.channelCode,
-          dailyLimit: where.channelCode === 'EMAIL' ? 100 : 50,
-          annualLimit: 1_000,
-        },
-      ]),
+    tenantLimitRepository.findOne.mockImplementation(({ where }) =>
+      Promise.resolve({
+        channelCode: where.channelCode,
+        dailyLimit: where.channelCode === 'EMAIL' ? 100 : 50,
+        annualLimit: 1_000,
+      }),
     )
-    apiKeyLimitAlertRepository.find.mockImplementation(({ where }) =>
-      Promise.resolve([
-        { channelCode: where.channelCode, alertsEnabled: true, warnThresholdPercent: 80 },
-      ]),
+    tenantLimitAlertRepository.findOne.mockImplementation(({ where }) =>
+      Promise.resolve({
+        channelCode: where.channelCode,
+        alertsEnabled: true,
+        warnThresholdPercent: 80,
+      }),
     )
 
     const result = await service.evaluateAndClaim(
@@ -308,19 +288,19 @@ describe('LimitAlertService', () => {
   it('uses each supplied period start unchanged when claims span a DAY boundary', async () => {
     const beforeBoundaryBucket = new Date('2026-07-29T00:00:00.000Z')
     const afterBoundaryBucket = new Date('2026-07-30T00:00:00.000Z')
-    apiKeyLimitRepository.find.mockImplementation(({ where }) =>
-      Promise.resolve([
-        {
-          channelCode: where.channelCode,
-          dailyLimit: where.channelCode === 'EMAIL' ? 100 : 50,
-          annualLimit: 1_000,
-        },
-      ]),
+    tenantLimitRepository.findOne.mockImplementation(({ where }) =>
+      Promise.resolve({
+        channelCode: where.channelCode,
+        dailyLimit: where.channelCode === 'EMAIL' ? 100 : 50,
+        annualLimit: 1_000,
+      }),
     )
-    apiKeyLimitAlertRepository.find.mockImplementation(({ where }) =>
-      Promise.resolve([
-        { channelCode: where.channelCode, alertsEnabled: true, warnThresholdPercent: 80 },
-      ]),
+    tenantLimitAlertRepository.findOne.mockImplementation(({ where }) =>
+      Promise.resolve({
+        channelCode: where.channelCode,
+        alertsEnabled: true,
+        warnThresholdPercent: 80,
+      }),
     )
 
     await service.evaluateAndClaim(
@@ -340,8 +320,8 @@ describe('LimitAlertService', () => {
       ]),
     )
 
-    expect(apiKeyLimitAlertLogRepository.query.mock.calls[0][1][3]).toBe(beforeBoundaryBucket)
-    expect(apiKeyLimitAlertLogRepository.query.mock.calls[1][1][3]).toBe(afterBoundaryBucket)
+    expect(tenantLimitAlertLogRepository.query.mock.calls[0][1][3]).toBe(beforeBoundaryBucket)
+    expect(tenantLimitAlertLogRepository.query.mock.calls[1][1][3]).toBe(afterBoundaryBucket)
   })
 
   it('skips a missing DAY or YEAR usage result', async () => {
@@ -358,59 +338,31 @@ describe('LimitAlertService', () => {
 
     expect(result).toHaveLength(1)
     expect(result[0].periodTypeCode).toBe('DAY')
-    expect(apiKeyLimitAlertLogRepository.query).toHaveBeenCalledTimes(1)
+    expect(tenantLimitAlertLogRepository.query).toHaveBeenCalledTimes(1)
   })
 
-  it('measures a multi-key tenant against its lowest limit and claims under its earliest key', async () => {
-    apiKeyConsumerRepository.findOne.mockResolvedValue({ id: 'consumer-2', tenantId: 'tenant-1' })
-    apiKeyConsumerRepository.find.mockResolvedValue([
-      { id: 'consumer-1', tenantId: 'tenant-1' },
-      { id: 'consumer-2', tenantId: 'tenant-1' },
-    ])
-    apiKeyLimitRepository.find.mockResolvedValue([
-      { channelCode: 'EMAIL', dailyLimit: 100, annualLimit: 1_000 },
-      { channelCode: 'EMAIL', dailyLimit: 500, annualLimit: 5_000 },
-    ])
-    apiKeyLimitAlertRepository.find.mockResolvedValue([
-      { channelCode: 'EMAIL', alertsEnabled: true, warnThresholdPercent: 90 },
-      { channelCode: 'EMAIL', alertsEnabled: true, warnThresholdPercent: 80 },
-    ])
-
-    const result = await service.evaluateAndClaim({
-      apiKeyConsumerId: 'consumer-2',
-      usageResults: [
+  it("reads the tenant's own limit and claims under the tenant", async () => {
+    await service.evaluateAndClaim(
+      input([
         {
           channelCode: 'EMAIL',
           periodTypeCode: UsagePeriodType.DAY,
           periodStart: dayPeriodStart,
           sentCount: 85,
         },
-      ],
-    })
+      ]),
+    )
 
-    expect(apiKeyLimitRepository.find).toHaveBeenCalledWith({
-      where: { apiKeyConsumerId: In(['consumer-1', 'consumer-2']), channelCode: 'EMAIL' },
+    expect(tenantLimitRepository.findOne).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant-1', channelCode: 'EMAIL' },
     })
-    expect(result).toEqual([
-      expect.objectContaining({
-        apiKeyConsumerId: 'consumer-2',
-        alertLevel: 'WARN',
-        sentCount: 85,
-        limit: 100,
-        percent: 85,
-      }),
-    ])
-    expect(apiKeyLimitAlertLogRepository.query).toHaveBeenCalledWith(expect.any(String), [
-      'consumer-1',
-      'EMAIL',
-      'DAY',
-      dayPeriodStart,
-      'WARN',
-    ])
+    expect(tenantLimitAlertLogRepository.query.mock.calls[0][0]).toContain(
+      'INSERT INTO notify.tenant_limit_alert_log',
+    )
   })
 
   it('returns no claimed alert when the atomic insert loses a dedup conflict', async () => {
-    apiKeyLimitAlertLogRepository.query.mockResolvedValue([])
+    tenantLimitAlertLogRepository.query.mockResolvedValue([])
 
     await expect(
       service.evaluateAndClaim(
@@ -427,7 +379,7 @@ describe('LimitAlertService', () => {
   })
 
   it('returns output only for successful INSERT RETURNING claims', async () => {
-    apiKeyLimitAlertLogRepository.query
+    tenantLimitAlertLogRepository.query
       .mockResolvedValueOnce([{ id: 'log-DAY' }])
       .mockResolvedValueOnce([])
 
@@ -455,7 +407,7 @@ describe('LimitAlertService', () => {
   it('sets notification_request_id without setting enqueued_at', async () => {
     await service.markNotificationCreated('log-1', 'request-1')
 
-    expect(apiKeyLimitAlertLogRepository.update).toHaveBeenCalledWith(
+    expect(tenantLimitAlertLogRepository.update).toHaveBeenCalledWith(
       { id: 'log-1' },
       { notificationRequestId: 'request-1' },
     )
@@ -463,13 +415,13 @@ describe('LimitAlertService', () => {
 
   it('sets enqueued_at only through the enqueue-success method', async () => {
     await service.markNotificationCreated('log-1', 'request-1')
-    expect(apiKeyLimitAlertLogRepository.update).not.toHaveBeenCalledWith(
+    expect(tenantLimitAlertLogRepository.update).not.toHaveBeenCalledWith(
       { id: 'log-1' },
       expect.objectContaining({ enqueuedAt: expect.any(Date) }),
     )
 
     await service.markEnqueued('log-1')
-    expect(apiKeyLimitAlertLogRepository.update).toHaveBeenLastCalledWith(
+    expect(tenantLimitAlertLogRepository.update).toHaveBeenLastCalledWith(
       { id: 'log-1' },
       { enqueuedAt: expect.any(Date) },
     )

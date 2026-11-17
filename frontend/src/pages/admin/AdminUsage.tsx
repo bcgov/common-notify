@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FC } from 'react'
-import { getAdminUsageSummary } from '@/api/apiKeyUsage.api'
+import { getAdminUsageSummary } from '@/api/usage.api'
 import { useNotifyTenantNames } from '@/hooks/useNotifyTenantNames'
-import type { AdminTenantUsageRow, AdminUsageSummary } from '@/api/apiKeyUsage.api'
+import type { AdminTenantUsageRow, AdminUsageSummary } from '@/api/usage.api'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
-import { fetchAllTenantsUsage, updateTenantLimits } from '@/redux/thunks/apiKeyUsage.thunks'
+import { fetchAllTenantsUsage, updateTenantLimits } from '@/redux/thunks/usage.thunks'
 import {
   setAdminPage,
   setAdminLimit,
   setAdminSearch,
   setAdminFilter,
   setAdminSort,
-} from '@/redux/slices/apiKeyUsage.slice'
+} from '@/redux/slices/usage.slice'
 import UserService from '@/service/user-service'
 import PageHeading from '@/components/PageHeading'
 import { channelFilterOptions, formatChannel } from '@/utils/channels'
@@ -45,7 +45,7 @@ function tenantActionGroups(tenant: AdminTenantUsage) {
   return [
     {
       id: 'limits',
-      // Limits are created when an API key is bound, so a channel without them has nothing to edit.
+      // Limits are created with the tenant, so a channel without them has nothing to edit.
       actions: tenant.channels
         .filter((row) => row.dailyLimit !== null && row.annualLimit !== null)
         .map((row) => ({
@@ -79,7 +79,7 @@ const AdminUsage: FC = () => {
     adminSortOrder,
     adminUpdatingKey,
     adminError,
-  } = useAppSelector((state) => state.apiKeyUsage)
+  } = useAppSelector((state) => state.usage)
   const isAdmin = UserService.hasRole('NOTIFY_ADMIN')
   const [searchInput, setSearchInput] = useState(adminSearch)
   const [editingRow, setEditingRow] = useState<AdminTenantUsageRow | null>(null)

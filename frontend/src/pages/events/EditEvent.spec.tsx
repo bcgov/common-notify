@@ -7,8 +7,8 @@ import { configureStore } from '@reduxjs/toolkit'
 import EditEvent from './EditEvent'
 import tenantReducer, { selectTenant } from '@/redux/slices/tenant.slice'
 import tenantSettingsReducer from '@/redux/slices/tenantSettings.slice'
-import apiKeyUsageReducer from '@/redux/slices/apiKeyUsage.slice'
-import { getApiKeyUsage } from '@/api/apiKeyUsage.api'
+import usageReducer from '@/redux/slices/usage.slice'
+import { getTenantUsage } from '@/api/usage.api'
 import emailSettingsReducer from '@/redux/slices/emailSettings.slice'
 import userReducer from '@/redux/slices/user.slice'
 import {
@@ -31,7 +31,7 @@ import type { Tenant } from '@/interfaces/CstarTenant'
 const navigateMock = vi.fn()
 
 vi.mock('@/config/featureFlags/useFeatureFlag', () => ({ useFeatureFlag: () => true }))
-vi.mock('@/api/apiKeyUsage.api', () => ({ getApiKeyUsage: vi.fn() }))
+vi.mock('@/api/usage.api', () => ({ getTenantUsage: vi.fn() }))
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
@@ -118,7 +118,7 @@ function makeStore(
     reducer: {
       tenant: tenantReducer,
       tenantSettings: tenantSettingsReducer,
-      apiKeyUsage: apiKeyUsageReducer,
+      usage: usageReducer,
       emailSettings: emailSettingsReducer,
       user: userReducer,
     },
@@ -168,7 +168,7 @@ describe('EditEvent', () => {
       event({ emailSettings: { ...configuredEmail, active: false } }),
     )
     vi.mocked(getSettings).mockResolvedValue(null)
-    vi.mocked(getApiKeyUsage).mockResolvedValue({
+    vi.mocked(getTenantUsage).mockResolvedValue({
       tenantId: 'tenant-1',
       fiscalYearStart: '2026-04-01',
       channels: [],

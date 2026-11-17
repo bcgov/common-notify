@@ -12,7 +12,6 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { ApiKeyConsumer, ApiKeyIssuedVia } from './entities/api-key-consumer.entity'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
-import { ApiKeysService } from './api-keys.service'
 import { ApiKeySummaryDto, IssuedApiKeyDto } from './schemas/api-key-response.dto'
 import {
   CREDENTIAL_ISSUER,
@@ -59,7 +58,6 @@ export class ApiKeyIssuanceService {
     private readonly apiKeyConsumerRepository: Repository<ApiKeyConsumer>,
     @Inject(CREDENTIAL_ISSUER)
     private readonly credentialIssuer: CredentialIssuer,
-    private readonly apiKeysService: ApiKeysService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -182,10 +180,6 @@ export class ApiKeyIssuanceService {
       }
       throw error
     }
-
-    // Copies the limits and thresholds of any key the tenant already has, so cutting over
-    // from a legacy bound key keeps whatever an admin set.
-    await this.apiKeysService.ensureDefaults(binding.id, tenant.id)
 
     this.logger.log(
       `Issued API key ${credential.clientId} for tenant "${tenant.name}" (${tenant.id}) ` +

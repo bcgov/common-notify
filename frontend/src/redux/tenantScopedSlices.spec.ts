@@ -16,7 +16,7 @@ const TENANT_SCOPED = [
   'events',
   'safelist',
   'apiKeys',
-  'apiKeyUsage',
+  'usage',
   'tenantSettings',
   'emailSettings',
   'smsSettings',

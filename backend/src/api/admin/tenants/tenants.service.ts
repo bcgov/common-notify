@@ -10,6 +10,7 @@ import { Repository } from 'typeorm'
 import { Tenant } from './entities/tenant.entity'
 import { TenantSendingHistory } from './entities/tenant-sending-history.entity'
 import { CreateTenantDto } from './schemas/create-tenant.dto'
+import { seedTenantLimitDefaults } from '../../usage/tenant-limit-defaults'
 
 /**
  * TenantsService
@@ -56,6 +57,18 @@ export class TenantsService {
   }
 
   /**
+   * Saves a new tenant and its default limits together. A tenant with no limit rows is never
+   * limited, and no later path reseeds an existing tenant, so the two must commit as one.
+   */
+  private saveNewTenant(tenant: Tenant): Promise<Tenant> {
+    return this.tenantRepository.manager.transaction(async (manager) => {
+      const savedTenant = await manager.save(Tenant, tenant)
+      await seedTenantLimitDefaults(manager, savedTenant.id)
+      return savedTenant
+    })
+  }
+
+  /**
    * Create a new tenant record
    * @param createTenantDto Tenant creation data
    * @returns Created tenant
@@ -88,7 +101,7 @@ export class TenantsService {
         createdBy,
       })
 
-      const savedTenant = await this.tenantRepository.save(tenant)
+      const savedTenant = await this.saveNewTenant(tenant)
       this.logger.debug(`Created tenant: ${name} (id: ${savedTenant.id})`)
 
       return {
@@ -233,7 +246,7 @@ export class TenantsService {
         createdBy: 'CSTAR_SYNC',
       })
 
-      const savedTenant = await this.tenantRepository.save(tenant)
+      const savedTenant = await this.saveNewTenant(tenant)
       this.logger.debug(`Created tenant from CSTAR: ${name} (externalId: ${externalId})`)
       return savedTenant
     } catch (error) {
