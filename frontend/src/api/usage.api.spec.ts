@@ -167,4 +167,18 @@ describe('usage API', () => {
     )
     await expect(api.getTenantUsage()).rejects.toThrow('Failed to load usage: database is down')
   })
+  it('setTenantSending translates failures', async () => {
+    vi.mocked(patch).mockRejectedValue({ response: { status: 500, data: { message: 'down' } } })
+    await expect(api.setTenantSending('tenant-1', true)).rejects.toThrow(
+      'Failed to load tenant sending: down',
+    )
+  })
+  it('getAdminUsageTenants reads the tenants endpoint and translates failures', async () => {
+    await expect(api.getAdminUsageTenants()).resolves.toEqual({ ok: true })
+    expect(vi.mocked(get).mock.lastCall![0]).toMatchObject({
+      url: '/api/v1/frontend/admin/usage/tenants',
+    })
+    vi.mocked(get).mockRejectedValue({ response: { status: 500, data: { message: 'down' } } })
+    await expect(api.getAdminUsageTenants()).rejects.toThrow('Failed to load tenants: down')
+  })
 })

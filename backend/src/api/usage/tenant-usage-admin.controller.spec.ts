@@ -18,8 +18,10 @@ describe('TenantUsageAdminController GET /frontend/admin/usage', () => {
   let getAdminUsageSummary: ReturnType<typeof vi.fn>
   let listNotifyTenants: ReturnType<typeof vi.fn>
   let setSending: ReturnType<typeof vi.fn>
+  let updateTenantLimits: ReturnType<typeof vi.fn>
 
   beforeEach(async () => {
+    updateTenantLimits = vi.fn().mockResolvedValue([{ tenantId: 't-1', channel: 'SMS' }])
     getAllTenantsUsage = vi
       .fn()
       .mockResolvedValue({ data: [], count: 0, page: 1, limit: 15, totalPages: 0 })
@@ -34,7 +36,12 @@ describe('TenantUsageAdminController GET /frontend/admin/usage', () => {
       providers: [
         {
           provide: TenantUsageService,
-          useValue: { getAllTenantsUsage, getAdminUsageSummary, listNotifyTenants },
+          useValue: {
+            getAllTenantsUsage,
+            getAdminUsageSummary,
+            listNotifyTenants,
+            updateTenantLimits,
+          },
         },
         { provide: TenantsService, useValue: { setSending } },
       ],
@@ -127,6 +134,29 @@ describe('TenantUsageAdminController GET /frontend/admin/usage', () => {
     await request(app.getHttpServer()).get(`${url}?page=two`).expect(400)
 
     expect(getAllTenantsUsage).not.toHaveBeenCalled()
+  })
+
+  describe('PATCH limits', () => {
+    const tenantId = '0b9f6d0c-1d7e-4c55-9d2a-5f3f4a1b2c3d'
+
+    it("updates the tenant's limits and returns its refreshed rows", async () => {
+      const response = await request(app.getHttpServer())
+        .patch(`${url}/limits`)
+        .send({ tenantId, channel: 'SMS', dailyLimit: 10, annualLimit: 100 })
+        .expect(200)
+
+      expect(response.body).toEqual([{ tenantId: 't-1', channel: 'SMS' }])
+      expect(updateTenantLimits).toHaveBeenCalledWith(tenantId, 'SMS', 10, 100, undefined)
+    })
+
+    it('rejects a limit below 1', async () => {
+      await request(app.getHttpServer())
+        .patch(`${url}/limits`)
+        .send({ tenantId, channel: 'SMS', dailyLimit: 0, annualLimit: 100 })
+        .expect(400)
+
+      expect(updateTenantLimits).not.toHaveBeenCalled()
+    })
   })
 
   describe('PATCH tenants/:tenantId/sending', () => {

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import reducer, { setAdminPage, setAdminLimit, setAdminSearch, setAdminFilter } from './usage.slice'
+import reducer, {
+  setAdminPage,
+  setAdminLimit,
+  setAdminSearch,
+  setAdminFilter,
+  setAdminSort,
+} from './usage.slice'
 import {
   fetchTenantUsage,
   fetchTenantUsageHistory,
@@ -123,6 +129,15 @@ describe('usage results', () => {
     expect(reducer(state, setAdminSearch('Health'))).toMatchObject({
       adminPage: 1,
       adminSearch: 'Health',
+    })
+  })
+  it('sets and clears the sort, returning to the first page', () => {
+    const state = reducer(undefined, setAdminPage(4))
+    const sorted = reducer(state, setAdminSort({ sortBy: 'usedToday', sortOrder: 'desc' }))
+    expect(sorted).toMatchObject({ adminPage: 1, adminSortBy: 'usedToday', adminSortOrder: 'desc' })
+    expect(reducer(sorted, setAdminSort({ sortBy: null, sortOrder: null }))).toMatchObject({
+      adminSortBy: null,
+      adminSortOrder: null,
     })
   })
   it('sets and clears column filters, returning to the first page', () => {
