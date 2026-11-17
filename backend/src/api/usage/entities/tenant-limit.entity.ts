@@ -1,28 +1,27 @@
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm'
-import { ApiKeyConsumer } from './api-key-consumer.entity'
+import { Tenant } from '../../admin/tenants/entities/tenant.entity'
 import { numericTransformer } from '../../../common/transformers/numeric.transformer'
 
 /**
- * ApiKeyLimit Entity
+ * TenantLimit Entity
  *
- * Configured notification limits per (API key, channel). One row per
- * (api_key_consumer, channel_code). Populated once when an API key is linked to a
- * tenant during onboarding (see migration V40).
+ * Configured notification limits per (tenant, channel). One row per (tenant, channel_code),
+ * seeded when the tenant is created (see migration V81).
  *
  * The annual window boundary is global (notify.configuration key 'fiscal_year_start'),
  * not stored here.
  */
-@Entity('api_key_limit')
-export class ApiKeyLimit {
+@Entity('tenant_limit')
+export class TenantLimit {
   @PrimaryGeneratedColumn('uuid')
   id: string
 
-  @Column({ name: 'api_key_consumer_id' })
-  apiKeyConsumerId: string
+  @Column({ name: 'tenant_id' })
+  tenantId: string
 
-  @ManyToOne(() => ApiKeyConsumer, { eager: false })
-  @JoinColumn({ name: 'api_key_consumer_id' })
-  apiKeyConsumer: ApiKeyConsumer
+  @ManyToOne(() => Tenant, { eager: false })
+  @JoinColumn({ name: 'tenant_id' })
+  tenant: Tenant
 
   @Column({ name: 'channel_code' })
   channelCode: string

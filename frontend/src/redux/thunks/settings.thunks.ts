@@ -1,5 +1,5 @@
 import { createAsyncThunk } from '@reduxjs/toolkit'
-import { fetchApiKeyUsage } from './apiKeyUsage.thunks'
+import { fetchTenantUsage } from './usage.thunks'
 import {
   getApprovedEmailLogos,
   getSettings,
@@ -31,12 +31,12 @@ export const fetchSettings = createAsyncThunk<
     const tenantId = getState().tenant.selectedTenant?.id
     if (!tenantId) return null
 
-    const cachedUsage = getState().apiKeyUsage.usage
+    const cachedUsage = getState().usage.usage
     const [settings, usage] = await Promise.all([
       getSettings(),
       cachedUsage?.tenantId === tenantId
         ? Promise.resolve(cachedUsage)
-        : dispatch(fetchApiKeyUsage()).unwrap(),
+        : dispatch(fetchTenantUsage()).unwrap(),
     ])
 
     // Each channel has its own limit. Missing channels are unconfigured; preserve zero.

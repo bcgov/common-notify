@@ -6,7 +6,7 @@ import {
   groupUsageByTenant,
   percentOf,
 } from './usage'
-import type { AdminTenantUsageRow } from '@/api/apiKeyUsage.api'
+import type { AdminTenantUsageRow } from '@/api/usage.api'
 
 describe('groupUsageByTenant', () => {
   const row = (tenantId: string, channel: string) =>

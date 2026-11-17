@@ -1,28 +1,28 @@
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm'
-import { ApiKeyConsumer } from './api-key-consumer.entity'
+import { Tenant } from '../../admin/tenants/entities/tenant.entity'
 import { numericTransformer } from '../../../common/transformers/numeric.transformer'
 
 /**
- * ApiKeyUsage Entity
+ * TenantUsage Entity
  *
- * Rolling notification counters per (API key, channel, period). One row per
- * (api_key_consumer, channel_code, period_type_code, period_start), incremented on
- * each accepted send (see migration V40).
+ * Rolling notification counters per (tenant, channel, period). One row per
+ * (tenant, channel_code, period_type_code, period_start), incremented on each accepted send,
+ * whether made with an API key or from the Notify UI (see migration V81).
  *
  * MINUTE/DAY buckets drive rate and daily checks; YEAR buckets drive the annual
  * check and are retained as per-fiscal-year history.
  */
-@Entity('api_key_usage')
-export class ApiKeyUsage {
+@Entity('tenant_usage')
+export class TenantUsage {
   @PrimaryGeneratedColumn('uuid')
   id: string
 
-  @Column({ name: 'api_key_consumer_id' })
-  apiKeyConsumerId: string
+  @Column({ name: 'tenant_id' })
+  tenantId: string
 
-  @ManyToOne(() => ApiKeyConsumer, { eager: false })
-  @JoinColumn({ name: 'api_key_consumer_id' })
-  apiKeyConsumer: ApiKeyConsumer
+  @ManyToOne(() => Tenant, { eager: false })
+  @JoinColumn({ name: 'tenant_id' })
+  tenant: Tenant
 
   @Column({ name: 'channel_code' })
   channelCode: string

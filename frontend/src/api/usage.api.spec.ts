@@ -1,5 +1,5 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest'
-import * as api from './apiKeyUsage.api'
+import * as api from './usage.api'
 import { get, patch, post } from '@/common/api'
 vi.mock('@/common/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>()
@@ -9,9 +9,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   for (const method of [get, patch, post]) vi.mocked(method).mockResolvedValue({ ok: true })
 })
-describe('apiKeyUsage API', () => {
-  it('getApiKeyUsage returns results and translates failures', async () => {
-    const invoke = () => api.getApiKeyUsage()
+describe('usage API', () => {
+  it('getTenantUsage returns results and translates failures', async () => {
+    const invoke = () => api.getTenantUsage()
     await expect(invoke()).resolves.toEqual({ ok: true })
     for (const status of [401, 403, 409, 503, 500]) {
       for (const method of [get, patch, post])
@@ -29,8 +29,8 @@ describe('apiKeyUsage API', () => {
       )
     }
   })
-  it('getApiKeyUsageHistory returns results and translates failures', async () => {
-    const invoke = () => api.getApiKeyUsageHistory()
+  it('getTenantUsageHistory returns results and translates failures', async () => {
+    const invoke = () => api.getTenantUsageHistory()
     await expect(invoke()).resolves.toEqual({ ok: true })
     for (const status of [401, 403, 409, 503, 500]) {
       for (const method of [get, patch, post])
@@ -144,7 +144,7 @@ describe('apiKeyUsage API', () => {
   it('getAdminUsageSummary reads the summary endpoint and translates failures', async () => {
     await expect(api.getAdminUsageSummary()).resolves.toEqual({ ok: true })
     expect(vi.mocked(get).mock.lastCall![0]).toMatchObject({
-      url: '/api/v1/frontend/admin/api-key-usage/summary',
+      url: '/api/v1/frontend/admin/usage/summary',
     })
     vi.mocked(get).mockRejectedValue({ response: { status: 500, data: { message: 'down' } } })
     await expect(api.getAdminUsageSummary()).rejects.toThrow('Failed to load tenant summary: down')
@@ -152,7 +152,7 @@ describe('apiKeyUsage API', () => {
   it('setTenantSending sends the reason only when disabling', async () => {
     await api.setTenantSending('tenant 1', false, 'Unpaid invoice')
     expect(vi.mocked(patch).mock.lastCall![0]).toMatchObject({
-      url: '/api/v1/frontend/admin/api-key-usage/tenants/tenant%201/sending',
+      url: '/api/v1/frontend/admin/usage/tenants/tenant%201/sending',
       params: { enabled: false, reason: 'Unpaid invoice' },
     })
     await api.setTenantSending('tenant-1', true, 'ignored')
@@ -165,6 +165,20 @@ describe('apiKeyUsage API', () => {
         response: { status: 500, data: { message: 'database is down' } },
       }),
     )
-    await expect(api.getApiKeyUsage()).rejects.toThrow('Failed to load usage: database is down')
+    await expect(api.getTenantUsage()).rejects.toThrow('Failed to load usage: database is down')
+  })
+  it('setTenantSending translates failures', async () => {
+    vi.mocked(patch).mockRejectedValue({ response: { status: 500, data: { message: 'down' } } })
+    await expect(api.setTenantSending('tenant-1', true)).rejects.toThrow(
+      'Failed to load tenant sending: down',
+    )
+  })
+  it('getAdminUsageTenants reads the tenants endpoint and translates failures', async () => {
+    await expect(api.getAdminUsageTenants()).resolves.toEqual({ ok: true })
+    expect(vi.mocked(get).mock.lastCall![0]).toMatchObject({
+      url: '/api/v1/frontend/admin/usage/tenants',
+    })
+    vi.mocked(get).mockRejectedValue({ response: { status: 500, data: { message: 'down' } } })
+    await expect(api.getAdminUsageTenants()).rejects.toThrow('Failed to load tenants: down')
   })
 })

@@ -174,7 +174,7 @@ describe('EmailHeader', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  // Only the logos are checked: fetchSettings also reads API key usage, which this store leaves out.
+  // Only the logos are checked: fetchSettings also reads tenant usage, which this store leaves out.
   it("loads the tenant's logos once a tenant is selected", async () => {
     renderHeader({}, { selectedTenant: { id: 'tenant-1', name: 'Forests' } as Tenant })
 

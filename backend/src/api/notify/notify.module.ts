@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { TenantsModule } from '../admin/tenants/tenants.module'
 import { ApiKeysModule } from '../api-keys/api-keys.module'
+import { UsageModule } from '../usage/usage.module'
 import { TemplatesModule } from '../templates/templates.module'
 import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
 import { CstarModule } from '../../services/cstar/cstar.module'
@@ -47,6 +48,7 @@ import { EventsModule } from '../events/events.module'
     CstarModule,
     WebhookModule,
     ApiKeysModule,
+    UsageModule,
     AttachmentModule,
     SafelistModule,
     TenantSettingsModule,

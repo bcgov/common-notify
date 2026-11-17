@@ -1,6 +1,6 @@
 import type { FC } from 'react'
 import { StatusBadge } from '@/components/StatusBadge'
-import type { AdminTenantUsageRow } from '@/api/apiKeyUsage.api'
+import type { AdminTenantUsageRow } from '@/api/usage.api'
 import { formatDate } from '@/utils/dates'
 import '@/scss/components/tenant-sending-cell.scss'
 

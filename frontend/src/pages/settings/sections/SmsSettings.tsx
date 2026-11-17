@@ -19,7 +19,7 @@ const formatLimit = (limit: number | undefined, unit: 'day' | 'year'): string =>
 const SmsSettings: FC = () => {
   const dispatch = useAppDispatch()
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
-  const { usage, isLoading } = useAppSelector((state) => state.apiKeyUsage)
+  const { usage, isLoading } = useAppSelector((state) => state.usage)
   const {
     smsNotificationsEnabled,
     includeTenantNameInSms,

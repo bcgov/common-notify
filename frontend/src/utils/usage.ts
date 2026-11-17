@@ -1,4 +1,4 @@
-import type { AdminTenantUsageRow, AdminUsageSummary } from '@/api/apiKeyUsage.api'
+import type { AdminTenantUsageRow, AdminUsageSummary } from '@/api/usage.api'
 import { formatDate } from './dates'
 
 /** Shared helpers for the notification usage & limits screens. */
