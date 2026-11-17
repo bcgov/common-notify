@@ -38,6 +38,7 @@ function renderLayout({
   rolesTenantId = TENANT.id as string | null,
   tenants = [TENANT],
   globalLoading = false,
+  tenantError = null as string | null,
 } = {}) {
   const store = configureStore({
     reducer: {
@@ -56,7 +57,7 @@ function renderLayout({
         rolesError: null,
       },
       tenant: { selectedTenant: selectedTenant as never, showTenantModal: false },
-      cstar: { tenants: tenants as never, isLoading: false, hasLoaded: true, error: null },
+      cstar: { tenants: tenants as never, isLoading: false, hasLoaded: true, error: tenantError },
       loading: { isLoading: globalLoading, requestCount: globalLoading ? 1 : 0 },
     },
   })
@@ -121,5 +122,21 @@ describe('Layout tenant switching', () => {
 
     expect(screen.queryByText('Page content')).not.toBeInTheDocument()
     expect(queryLoading()).toBeInTheDocument()
+  })
+})
+
+describe('Layout without a tenant', () => {
+  it('blocks a non-admin on a CSTAR error', () => {
+    renderLayout({ selectedTenant: null, tenants: [], tenantError: 'User not found in CSTAR' })
+    expect(screen.getByText('Tenant error')).toBeInTheDocument()
+  })
+
+  it('lets an admin through a CSTAR error: the admin section needs no tenant', async () => {
+    const UserService = (await import('@/service/user-service')).default
+    vi.mocked(UserService.hasRole).mockReturnValue(true)
+    renderLayout({ selectedTenant: null, tenants: [], tenantError: 'User not found in CSTAR' })
+    expect(screen.queryByText('Tenant error')).not.toBeInTheDocument()
+    expect(screen.getByText('Page content')).toBeInTheDocument()
+    vi.mocked(UserService.hasRole).mockReturnValue(false)
   })
 })

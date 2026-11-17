@@ -14,7 +14,7 @@ import UsageCell from '@/components/UsageCell'
 import EditModal from '@/components/EditModal'
 import NumberInputField from '@/components/NumberInputField'
 import { showSuccessToast, showErrorToast } from '@/redux/utils/toastUtils'
-import { formatChannel } from '@/utils/usage'
+import { formatChannel } from '@/utils/channels'
 
 const OPERATIONS_ADMIN_ROLE = 'NOTIFY_OPERATIONS_ADMIN'
 

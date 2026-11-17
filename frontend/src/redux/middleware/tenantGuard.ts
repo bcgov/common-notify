@@ -18,6 +18,7 @@ export const TENANT_AGNOSTIC_THUNKS: readonly string[] = [
   'cstar/fetchTenants',
   'codeTables/*',
   'adminTenants/*',
+  'adminNotifications/*',
   'apiKeyUsage/fetchAllTenants',
   'apiKeyUsage/updateTenantLimits',
   'featureFlags/fetchAll',

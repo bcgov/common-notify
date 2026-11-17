@@ -146,10 +146,11 @@ metrics:
     runAsNonRoot: false
   image:
     registry: artifacts.developer.gov.bc.ca/docker-remote
+  #-- the exporter is idle between scrapes but spikes during them; 200m throttled it
   resources:
     requests:
       cpu: 50m
       memory: 64Mi
     limits:
-      cpu: 200m
+      cpu: 500m
       memory: 256Mi

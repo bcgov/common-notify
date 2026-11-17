@@ -12,6 +12,7 @@ import { QueueName } from '../../enum/queue-name.enum'
 import { PhoneNumberService } from '../../api/notify/services/phone-number.service'
 import type { ConfigService } from '@nestjs/config'
 import type { ClamavService } from '../../services/clamav.service'
+import type { TenantsService } from '../../api/admin/tenants/tenants.service'
 import type { NotificationService } from '../../api/notification/notification.service'
 import type { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 
@@ -37,6 +38,7 @@ describe('IngestionWorker', () => {
     concurrency?: number
     attachmentService?: AttachmentService
     phoneNumberService?: PhoneNumberService
+    tenantsService?: Pick<TenantsService, 'isSendingDisabled'>
   }) {
     const worker = new IngestionWorker(
       deps.emailQueue,
@@ -45,6 +47,9 @@ describe('IngestionWorker', () => {
       deps.requestDetailService,
       deps.configService,
       deps.phoneNumberService ?? new PhoneNumberService(),
+      (deps.tenantsService ?? {
+        isSendingDisabled: vi.fn().mockResolvedValue(false),
+      }) as TenantsService,
       deps.clamavService,
       deps.attachmentService,
     )
@@ -306,6 +311,74 @@ describe('IngestionWorker', () => {
       const callArgs = (mockEmailQueue.add as any).mock.calls[0][2]
       expect(callArgs.delay).toBeGreaterThan(50000)
       expect(callArgs.delay).toBeLessThanOrEqual(60000)
+    })
+
+    describe('when an admin has disabled sending for the tenant', () => {
+      const job = (scheduledFor?: string) =>
+        ({
+          data: {
+            notifyId: 'notify-1',
+            tenantId: 'tenant-1',
+            request: {
+              email: {
+                recipients: { to: ['test@example.com'] },
+                content: { subject: 'Test', body: 'Test body' },
+              },
+            },
+            requestedAt: new Date().toISOString(),
+            ...(scheduledFor && { scheduledFor }),
+          },
+        }) as Job<IngestionJobPayload>
+      const disabled = { isSendingDisabled: vi.fn().mockResolvedValue(true) }
+      const setUp = () =>
+        initialize({
+          emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+          smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
+          notificationService: mockNotificationService,
+          requestDetailService: mockRequestDetailService,
+          configService: mockConfigService,
+          tenantsService: disabled,
+        })
+
+      beforeEach(() => {
+        mockNotificationService.cancelOrRescheduleNotification = vi.fn().mockResolvedValue({})
+      })
+
+      it('cancels a scheduled send that comes due, the same as a cancel through the API', async () => {
+        setUp()
+
+        const result = await processHandler(job(new Date().toISOString()))
+
+        expect(result).toEqual({ success: false, reason: 'Sending is disabled for this tenant' })
+        expect(mockNotificationService.cancelOrRescheduleNotification).toHaveBeenCalledWith(
+          'notify-1',
+          'tenant-1',
+          'tenant-disabled',
+          'cancel',
+        )
+        expect(mockEmailQueue.add).not.toHaveBeenCalled()
+        expect(mockRequestDetailService.createPending).not.toHaveBeenCalled()
+      })
+
+      it('still does not send when the request could not be marked cancelled', async () => {
+        setUp()
+        mockNotificationService.cancelOrRescheduleNotification.mockRejectedValue(
+          new Error("Cannot modify notification with status 'cancelled'"),
+        )
+
+        await processHandler(job(new Date().toISOString()))
+
+        expect(mockEmailQueue.add).not.toHaveBeenCalled()
+      })
+
+      it('lets a send accepted for now go out: it was accepted while the tenant could send', async () => {
+        setUp()
+
+        await processHandler(job())
+
+        expect(disabled.isSendingDisabled).not.toHaveBeenCalled()
+        expect(mockEmailQueue.add).toHaveBeenCalled()
+      })
     })
 
     it('should update status to processing for scheduled notifications', async () => {

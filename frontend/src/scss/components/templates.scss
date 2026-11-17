@@ -24,13 +24,64 @@
   align-items: flex-start;
   gap: 24px;
   width: 100%;
-  padding-bottom: 24px;
+  padding-bottom: 40px;
 }
 
 .template-form__section {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+}
+
+// Grows with the version it shows, up to 800px or the screen, whichever is shorter (the DS margin
+// is on both sides of the modal). Past that the modal scrolls as a whole rather than the preview
+// box inside it, with the title bar pinned so the close button stays in reach.
+.bcds-react-aria-Modal:has(.previous-template-version) {
+  width: 1120px;
+  max-width: calc(100vw - 2 * var(--layout-margin-large));
+  max-height: min(800px, calc(100vh - 2 * var(--layout-margin-large)));
+  overflow-y: auto;
+
+  .bcds-react-aria-AlertDialog--Header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--surface-color-forms-default);
+  }
+
+  .bcds-react-aria-AlertDialog--children {
+    border-bottom: 0;
+  }
+}
+
+// A sentence rather than a field, so it is not held to the form's narrow column: at that width it
+// wraps onto a second line.
+.page--narrow > .previous-template-version__updated {
+  max-width: none;
+}
+
+.previous-template-version__name {
+  margin: 0 0 var(--layout-padding-small);
+  font: var(--typography-bold-large-body);
+  color: var(--typography-color-primary);
+}
+
+.previous-template-version__edited {
+  margin: 0 0 var(--layout-padding-xsmall);
+  font: var(--typography-regular-small-body);
+  color: var(--typography-color-primary);
+}
+
+.previous-template-version__sms-estimate {
+  margin: var(--layout-padding-xsmall) 0 0;
+  font: var(--typography-regular-small-body);
+  color: var(--typography-color-primary);
+}
+
+.previous-template-version__loading {
+  display: flex;
+  justify-content: center;
+  padding: var(--layout-padding-large);
 }
 
 .template-form__section--title {
@@ -207,6 +258,34 @@
 .templates__action-cell .bcds-react-aria-Button.small {
   padding-left: 0;
   padding-right: 0;
+}
+
+// The preview tabs sit directly on the output they switch, so the pane's gap is dropped here
+// and only the intro keeps space below it.
+.template-preview .notification-preview__output-pane {
+  gap: 0;
+}
+
+.template-preview__output-intro {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  margin-bottom: $spacing-sm;
+}
+
+// The rendered email, boxed to match the raw template beside it.
+.template-preview__rendered {
+  padding: $spacing-md;
+  border: 1px solid $border-default;
+  border-radius: 4px;
+  background: $white;
+}
+
+// The raw template, in the same type as the rendered email so the tabs read alike. Bootstrap's
+// reboot otherwise shrinks a <pre> to 0.875em.
+.template-preview .notification-preview__text {
+  font: var(--typography-regular-body);
+  color: var(--typography-color-primary);
 }
 
 // Events that still use a template, listed when it cannot be deleted.

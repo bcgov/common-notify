@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { FC } from 'react'
-import { Button, ToggleButton, ToggleButtonGroup } from '@bcgov/design-system-react-components'
+import type { FC, ReactNode } from 'react'
+import { Button } from '@bcgov/design-system-react-components'
+import EmailBodyFrame from '@/components/EmailBodyFrame'
 import NotificationPreviewModal from '@/components/NotificationPreviewModal'
+import TabBar from '@/components/TabBar'
 import type { TemplateEngine } from '@/api/templates.api'
 import { previewTemplateBody, NotificationChannel } from '@/api/templates.api'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
@@ -37,19 +39,13 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
   const [renderedHtml, setRenderedHtml] = useState<string | undefined>()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Whether a valid render has been generated; when false the Rendered tab
-  // shows a "Preview unavailable" placeholder instead of stale/empty output.
+  // Whether a render has been generated; when false the Rendered tab shows a
+  // placeholder instead of stale/empty output.
   const [hasApplied, setHasApplied] = useState(false)
-  // Whether to surface per-field errors on empty required inputs.
+  // Whether to surface per-field errors on empty inputs, once a preview has been applied.
   const [showErrors, setShowErrors] = useState(false)
 
-  // Booleans always carry a value; text variables must be filled in.
-  const requiredVariables = variables.filter((v) => v.type !== 'boolean')
   const isMissing = (name: string) => !(values[name] ?? '').trim()
-  const missingCount = requiredVariables.filter((v) => isMissing(v.name)).length
-  const hasMissing = missingCount > 0
-  // Enable Apply once the user has entered a value (or nothing is required).
-  const canApply = requiredVariables.length === 0 || missingCount < requiredVariables.length
 
   const runPreview = async (vals: Record<string, string>) => {
     const params: Record<string, string> = {}
@@ -89,8 +85,8 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
     setValues(initial)
     setActiveTab('raw')
     setShowErrors(false)
-    // Only render a preview when every required value is present; otherwise the
-    // Rendered tab shows the "Preview unavailable" placeholder until applied.
+    // Only render up front when every value is present; otherwise the Rendered tab
+    // shows its placeholder until the user applies what they have.
     const missing = variables.some((v) => v.type !== 'boolean' && !(initial[v.name] ?? '').trim())
     if (missing) {
       setHasApplied(false)
@@ -109,73 +105,76 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
     dispatch(setPreviewValues({ [name]: value }))
   }
 
+  let renderedOverride: ReactNode
+  if (activeTab === 'rendered' && !hasApplied && !loading) {
+    renderedOverride = (
+      <p className="notification-preview__placeholder">
+        Select Apply to template to view the rendered template.
+      </p>
+    )
+  } else if (activeTab === 'rendered' && !loading && !error && renderedHtml !== undefined) {
+    // Sized to its content and in the app font, like the events preview. Only once a render has
+    // succeeded, so the modal's own loading and error states still show.
+    renderedOverride = (
+      <div className="template-preview__rendered">
+        <EmailBodyFrame html={renderedHtml} />
+      </div>
+    )
+  }
+
   return (
     <NotificationPreviewModal
       isOpen={isOpen}
       onClose={onClose}
       title="Email Notification Preview"
+      className="template-preview"
       variables={variables.map((variable) => ({
         name: variable.name,
         value: values[variable.name] ?? '',
         type: variable.type,
         isInvalid: showErrors && variable.type !== 'boolean' && isMissing(variable.name),
-        errorMessage: 'Enter a value to generate the preview',
+        errorMessage: 'This field is empty.',
       }))}
-      variablesIntro="Enter values for all variables in your template."
+      variablesIntro="Enter values for all variables to view the rendered template."
       isEditable
       onVariableChange={(name, value) => handleValueChange(name)(value)}
-      variablesFooter={
+      footer={
         <Button
           type="button"
-          variant="secondary"
+          variant="primary"
           onPress={() => {
             setActiveTab('rendered')
-            if (hasMissing) {
-              // Surface field errors and keep the preview unavailable.
-              setShowErrors(true)
-              setHasApplied(false)
-            } else {
-              setShowErrors(false)
-              setHasApplied(true)
-              void runPreview(values)
-            }
+            // Empty fields are flagged but still render, printing nothing.
+            setShowErrors(true)
+            setHasApplied(true)
+            void runPreview(values)
           }}
-          isDisabled={loading || !canApply}
+          isDisabled={loading}
         >
-          {loading ? 'Applying...' : 'Apply to Preview'}
+          {loading ? 'Applying...' : 'Apply to template'}
         </Button>
       }
-      subject={channelCode === NotificationChannel.EMAIL ? subject : undefined}
       bodyHtml={activeTab === 'rendered' && hasApplied ? renderedHtml : undefined}
       bodyText={activeTab === 'rendered' ? rendered : body}
-      bodyOverride={
-        activeTab === 'rendered' && !hasApplied && !loading ? (
-          <p className="notification-preview__placeholder">
-            Preview unavailable. Provide values for all variables to view the rendered template.
-          </p>
-        ) : undefined
-      }
+      bodyOverride={renderedOverride}
       outputHeader={
-        <ToggleButtonGroup
-          aria-label="Preview mode"
-          selectionMode="single"
-          disallowEmptySelection
-          selectedKeys={[activeTab]}
-          size="small"
-          onSelectionChange={(keys) => {
-            const [selected] = keys
-            if (selected != null) {
-              setActiveTab(selected as 'rendered' | 'raw')
-            }
-          }}
-        >
-          <ToggleButton id="rendered" size="small">
-            Rendered Preview
-          </ToggleButton>
-          <ToggleButton id="raw" size="small">
-            Raw Template
-          </ToggleButton>
-        </ToggleButtonGroup>
+        <>
+          <div className="template-preview__output-intro">
+            <h6 className="notification-preview__heading">Show preview</h6>
+            <p className="notification-preview__intro">
+              Preview how your template will appear using the provided values.
+            </p>
+          </div>
+          <TabBar
+            label="Preview mode"
+            items={[
+              { id: 'rendered', label: 'Rendered Preview' },
+              { id: 'raw', label: 'Raw Template' },
+            ]}
+            selected={activeTab}
+            onSelect={setActiveTab}
+          />
+        </>
       }
       isLoading={loading && activeTab === 'rendered'}
       error={activeTab === 'rendered' ? error : null}

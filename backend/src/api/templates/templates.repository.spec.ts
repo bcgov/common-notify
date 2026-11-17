@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
+import { LessThan } from 'typeorm'
 import { vi } from 'vitest'
 import { TemplatesRepository } from './templates.repository'
 import { Template } from './entities/template.entity'
@@ -460,10 +461,23 @@ describe('TemplatesRepository', () => {
           engineCode: TemplateEngine.MUSTACHE,
           bodyType: updatedTemplate.bodyType,
           updatedBy: updatedTemplate.updatedBy,
+          updatedByName: updatedTemplate.updatedByName,
         },
       )
       expect(result.engineCode).toBe(TemplateEngine.MUSTACHE)
       expect(result.engine.engineCode).toBe(TemplateEngine.MUSTACHE)
+    })
+
+    it('should write a null updatedByName rather than skip the column', async () => {
+      mockTemplateRepository.update.mockResolvedValue({ affected: 1 })
+      mockTemplateRepository.findOne.mockResolvedValue(mockTemplate)
+
+      await repository.update({ ...mockTemplate, updatedByName: null } as Template)
+
+      expect(mockTemplateRepository.update).toHaveBeenCalledWith(
+        { id: 'template-123', tenantId: 'tenant-123', active: true },
+        expect.objectContaining({ updatedByName: null }),
+      )
     })
 
     it('should fail when the tenant-owned active template was not updated', async () => {
@@ -631,6 +645,20 @@ describe('TemplatesRepository', () => {
       expect(result).toEqual(mockTemplateVersion)
       expect(mockVersionRepository.create).toHaveBeenCalledWith(versionData)
       expect(mockVersionRepository.save).toHaveBeenCalledWith(mockTemplateVersion)
+    })
+  })
+
+  describe('findPreviousVersion', () => {
+    it('should find the newest version older than the given one', async () => {
+      mockVersionRepository.findOne.mockResolvedValue(mockTemplateVersion)
+
+      const result = await repository.findPreviousVersion('template-123', 4)
+
+      expect(result).toEqual(mockTemplateVersion)
+      expect(mockVersionRepository.findOne).toHaveBeenCalledWith({
+        where: { templateId: 'template-123', version: LessThan(4) },
+        order: { version: 'DESC' },
+      })
     })
   })
 

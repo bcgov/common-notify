@@ -259,7 +259,7 @@ groups:
               editorMode: code
               expr: |
                 sum(count_over_time({namespace=~"f6bc3f-(test|prod)", app="backend"}
-                  | json | context="HTTP" | duration > 3000
+                  | json | context="HTTP" | duration > 5000 | statusCode < 400
                 [10m])) by (namespace)
               queryType: instant
               refId: A

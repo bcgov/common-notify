@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
-import EventsEmailHeader from './EventsEmailHeader'
+import EmailHeader from './EmailHeader'
 import emailSettingsReducer from '@/redux/slices/emailSettings.slice'
 import tenantReducer from '@/redux/slices/tenant.slice'
 import type { EventEmailSettings } from '@/api/events.api'
@@ -80,7 +80,7 @@ function renderHeader(
 
   return render(
     <Provider store={store}>
-      <EventsEmailHeader emailSettings={{ ...emailSettings, ...overrides }} />
+      <EmailHeader emailSettings={{ ...emailSettings, ...overrides }} />
     </Provider>,
   )
 }
@@ -89,7 +89,7 @@ function renderHeader(
 // takes it out of the accessibility tree.
 const logo = () => document.querySelector('img')
 
-describe('EventsEmailHeader', () => {
+describe('EmailHeader', () => {
   describe('the tenant default header', () => {
     it("shows the tenant's logo", () => {
       renderHeader({}, { emailLogoId: 'logo-tenant' })

@@ -52,6 +52,8 @@ describe('SmsSegmentService.countSegmentsPerRecipient', () => {
     expect(templatesService.renderTemplateContent).toHaveBeenCalledWith(
       { id: 'tpl-1', channelCode: 'SMS' },
       { a: 1, b: 2 }, // channel params merged over request params, as the delivery worker does
+      undefined,
+      { allowEmptyValues: true },
     )
   })
 
@@ -138,6 +140,8 @@ describe('SmsSegmentService.countMergeSegments', () => {
     expect(templatesService.renderTemplateContent).toHaveBeenCalledWith(
       { id: 'tpl-1', channelCode: 'SMS' },
       { office: 'Surrey', code: 'X' },
+      undefined,
+      { allowEmptyValues: true },
     )
   })
 
