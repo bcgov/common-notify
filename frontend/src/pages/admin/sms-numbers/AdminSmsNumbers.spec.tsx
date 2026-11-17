@@ -175,12 +175,11 @@ describe('AdminSmsNumbers', () => {
     const numbers = screen.getByRole('table', { name: 'SMS numbers' })
     expect(screen.queryByRole('table', { name: 'SMS number requests' })).not.toBeInTheDocument()
     const awsRow = within(numbers).getByRole('row', { name: /\+15814360804/ })
-    expect(within(awsRow).getByText('Sending now')).toBeInTheDocument()
+    expect(within(awsRow).getByRole('cell', { name: 'Long code' })).toBeInTheDocument()
     expect(within(awsRow).getByText('Default')).toBeInTheDocument()
     expect(within(awsRow).getByText('Parks')).toBeInTheDocument()
     const twilioRow = within(numbers).getByRole('row', { name: /\+15551230000/ })
     expect(within(twilioRow).getByText('Not assigned')).toBeInTheDocument()
-    expect(within(twilioRow).queryByText('Sending now')).not.toBeInTheDocument()
     expect(within(twilioRow).queryByText('Default')).not.toBeInTheDocument()
   })
 
@@ -459,9 +458,8 @@ describe('AdminSmsNumbers', () => {
     await openNumbersTab()
 
     const summary = await screen.findByRole('region', { name: 'Default numbers' })
-    // AWS is sending now and has a default; Twilio has numbers but no default.
+    // AWS has a default; Twilio has numbers but no default.
     expect(within(summary).getByText('AWS End User Messaging')).toBeInTheDocument()
-    expect(within(summary).getByText('Sending now')).toBeInTheDocument()
     expect(within(summary).getByText('+15814360804')).toBeInTheDocument()
     expect(within(summary).getByText('Not set')).toBeInTheDocument()
   })

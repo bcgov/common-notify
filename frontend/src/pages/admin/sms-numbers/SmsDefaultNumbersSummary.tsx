@@ -46,10 +46,7 @@ const SmsDefaultNumbersSummary: FC<SmsDefaultNumbersSummaryProps> = ({
           const hasNumbers = numbers.some((number) => number.providerCode === provider.code)
           return (
             <div key={provider.code} className="sms-defaults__row">
-              <dt className="sms-defaults__provider">
-                {provider.description}
-                {isActive && <span className="sms-defaults__active">Sending now</span>}
-              </dt>
+              <dt className="sms-defaults__provider">{provider.description}</dt>
               <dd className="sms-defaults__value">
                 {current ? (
                   <span className="fw-semibold">{current.phoneNumber}</span>

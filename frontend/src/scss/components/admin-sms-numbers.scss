@@ -7,6 +7,14 @@
   gap: $spacing-xs;
 }
 
+// The number with its Default tag beside it.
+.admin-sms-numbers__number-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
 .admin-sms-numbers__number {
   white-space: nowrap;
 }
@@ -47,12 +55,6 @@
   flex-direction: column;
   min-width: 14rem;
   font-weight: 600;
-}
-
-.sms-defaults__active {
-  color: $text-secondary;
-  font-size: $font-size-sm;
-  font-weight: normal;
 }
 
 .sms-defaults__value {

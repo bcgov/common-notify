@@ -131,26 +131,21 @@ const AdminSmsNumbers: FC = () => {
       key: 'phoneNumber',
       label: 'Number',
       render: (_, number) => (
-        <div className="admin-sms-numbers__stack">
+        <div className="admin-sms-numbers__number-cell">
           <span className="fw-semibold admin-sms-numbers__number">{number.phoneNumber}</span>
           {number.isDefault && <SmsDefaultTag />}
-          <span className="admin-sms-numbers__detail">
-            {codeLabel(codes?.numberTypes ?? [], number.numberTypeCode)}
-          </span>
         </div>
       ),
     },
     {
+      key: 'numberTypeCode',
+      label: 'Type',
+      render: (_, number) => codeLabel(codes?.numberTypes ?? [], number.numberTypeCode),
+    },
+    {
       key: 'providerCode',
       label: 'Provider',
-      render: (_, number) => (
-        <div className="admin-sms-numbers__stack">
-          <span>{codeLabel(providers, number.providerCode)}</span>
-          {number.providerCode === codes?.activeProvider && (
-            <span className="admin-sms-numbers__detail">Sending now</span>
-          )}
-        </div>
-      ),
+      render: (_, number) => codeLabel(providers, number.providerCode),
     },
     {
       key: 'tenants',

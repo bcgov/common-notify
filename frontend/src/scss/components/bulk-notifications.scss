@@ -92,30 +92,6 @@
   gap: $spacing-md;
 }
 
-.bulk-notifications__result {
-  padding: $spacing-md;
-  border: 1px solid $border-default;
-  border-left: 4px solid $success-color;
-  border-radius: 4px;
-  background: $light-bg;
-}
-
-// Nothing was sent, so not the success green.
-.bulk-notifications__result--duplicate {
-  border-left-color: $primary-color;
-}
-
-.bulk-notifications__result-title {
-  margin: 0 0 $spacing-sm;
-  font-size: $font-size-lg;
-  font-weight: 700;
-}
-
-.bulk-notifications__result-blocked {
-  margin: 0 0 $spacing-sm;
-  color: $text-secondary;
-}
-
 // Preview modal
 .bulk-notifications-preview {
   display: flex;
