@@ -92,8 +92,8 @@ export class SmsNumberRequestsService {
     const page = query.page ?? 1
     const limit = query.limit ?? 10
     const search = query.search?.trim()
-    const where = `WHERE (cardinality($1::text[]) = 0 OR r.status_code = ANY($1))
-                     AND ($2::text IS NULL OR t.name ILIKE $2 ESCAPE '\\')`
+    const where = String.raw`WHERE (cardinality($1::text[]) = 0 OR r.status_code = ANY($1))
+                     AND ($2::text IS NULL OR t.name ILIKE $2 ESCAPE '\')`
     const params = [query.statuses ?? [], search ? `%${escapeLikePattern(search)}%` : null]
 
     const [rows, [{ total }]]: [RequestRow[], Array<{ total: string }>] = await Promise.all([
