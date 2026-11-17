@@ -36,6 +36,12 @@ vi.mock('./TemplatePreviewModal', () => ({
   default: () => null,
 }))
 
+vi.mock('./PreviousTemplateVersion', () => ({
+  default: ({ template }: { template: { id: string } }) => (
+    <span>Previous version of {template.id}</span>
+  ),
+}))
+
 vi.mock('@/hooks/useCstarRoles', () => ({
   useCstarRoles: () => useCstarRolesMock(),
 }))
@@ -323,6 +329,12 @@ describe('TemplateEdit', () => {
     expect(screen.getByRole('button', { name: 'About Mustache syntax' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'About GC Notify legacy syntax' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'About MJML syntax' })).toBeTruthy()
+  })
+
+  it('shows the last updated line for the loaded template', async () => {
+    render(<TemplateEdit templateId="template-123" />)
+
+    expect(await screen.findByText('Previous version of template-123')).toBeTruthy()
   })
 
   it('shows the inline template ID row and copies it to the clipboard', async () => {
