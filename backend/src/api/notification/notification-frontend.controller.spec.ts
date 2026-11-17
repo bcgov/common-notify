@@ -29,9 +29,11 @@ const mockAuthGuard: CanActivate = {
 
 const mockNotificationService = {
   findAll: vi.fn(),
+  findOneFrontend: vi.fn(),
 }
 
 const mockNotificationRequestDetailService = {
+  findByRequestIdFrontend: vi.fn(),
   findAllByTenantId: vi.fn(),
   findByRequestId: vi.fn(),
 }
@@ -83,6 +85,51 @@ describe('NotificationFrontendController', () => {
   it('should be defined', () => {
     const controller = app.get(NotificationFrontendController)
     expect(controller).toBeDefined()
+  })
+
+  it('summarizes request errors without modifying the stored service result', async () => {
+    const raw = { id: 'req-1', errorReason: '{"status":503,"message":"internal details"}' }
+    mockNotificationService.findAll.mockResolvedValue({ data: [raw], count: 1 })
+    mockNotificationService.findOneFrontend.mockResolvedValue(raw)
+
+    const list = await request(app.getHttpServer())
+      .get('/api/v1/frontend/notification_request')
+      .expect(200)
+    const detail = await request(app.getHttpServer())
+      .get('/api/v1/frontend/notification_request/req-1')
+      .expect(200)
+
+    const summary = 'A service we depend on was unavailable at this time.'
+    expect(list.body.data[0].errorReason).toBe(summary)
+    expect(detail.body.errorReason).toBe(summary)
+    expect(raw.errorReason).toBe('{"status":503,"message":"internal details"}')
+  })
+
+  it('summarizes delivery errors while preserving pagination and other delivery fields', async () => {
+    const raw = { id: 'delivery-1', status: 'failed', errorMessage: '{"private":"details"}' }
+    mockNotificationRequestDetailService.findByRequestIdFrontend.mockResolvedValue({
+      data: [raw],
+      count: 1,
+      page: 1,
+      limit: 15,
+      totalPages: 1,
+    })
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/frontend/notification_request/request_details/req-1')
+      .expect(200)
+    expect(response.body).toEqual({
+      data: [
+        {
+          ...raw,
+          errorMessage: 'The notification could not be sent because an unexpected error occurred.',
+        },
+      ],
+      count: 1,
+      page: 1,
+      limit: 15,
+      totalPages: 1,
+    })
+    expect(raw.errorMessage).toBe('{"private":"details"}')
   })
 
   describe('GET /api/v1/frontend/notification_request', () => {
