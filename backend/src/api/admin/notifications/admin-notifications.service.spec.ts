@@ -119,6 +119,23 @@ describe('AdminNotificationsService', () => {
   })
 
   describe('findOne', () => {
+    it('preserves technical JSON diagnostics while redacting recipient information', async () => {
+      const errorReason = JSON.stringify({
+        status: 503,
+        message: 'Provider unavailable for jane@gov.bc.ca',
+        requestId: 'upstream-request-123',
+      })
+      build({ one: { ...request, errorReason, recipients: { email: ['jane@gov.bc.ca'] } } })
+
+      const detail = await service.findOne('req-1')
+
+      expect(JSON.parse(detail.errorReason!)).toEqual({
+        status: 503,
+        message: 'Provider unavailable for [recipient]',
+        requestId: 'upstream-request-123',
+      })
+    })
+
     it('returns the redacted error, history without repeats, delivery counts and log link', async () => {
       vi.stubEnv('NAMESPACE', 'f6bc3f-test')
       build(
