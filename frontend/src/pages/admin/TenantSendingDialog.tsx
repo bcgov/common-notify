@@ -2,8 +2,8 @@ import { useState } from 'react'
 import type { FC } from 'react'
 import { TextArea } from '@bcgov/design-system-react-components'
 import ConfirmDialog from '@/components/ConfirmDialog'
-import { setTenantSending } from '@/api/apiKeyUsage.api'
-import type { AdminTenantUsageRow } from '@/api/apiKeyUsage.api'
+import { setTenantSending } from '@/api/usage.api'
+import type { AdminTenantUsageRow } from '@/api/usage.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 
 const REASON_MAX_LENGTH = 500

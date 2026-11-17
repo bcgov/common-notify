@@ -40,7 +40,6 @@ import { extractRequestRoute } from '../../common/utils/extract-request-route'
 interface GcNotifyRequest extends express.Request {
   tenantId: string
   tenantExternalId: string
-  apiKeyConsumerId?: string
 }
 
 @ApiTags('GC Notify')
@@ -129,7 +128,6 @@ export class GcNotifyController {
     return this.gcNotifyInternalExecutionService.sendEmail(
       body,
       req.tenantId,
-      req.apiKeyConsumerId,
       extractRequestRoute(req),
     )
   }
@@ -154,7 +152,6 @@ export class GcNotifyController {
     return this.gcNotifyInternalExecutionService.sendSms(
       body,
       req.tenantId,
-      req.apiKeyConsumerId,
       extractRequestRoute(req),
     )
   }
@@ -180,7 +177,6 @@ export class GcNotifyController {
     return this.gcNotifyInternalExecutionService.sendBulk(
       body,
       req.tenantId,
-      req.apiKeyConsumerId,
       extractRequestRoute(req),
     )
   }

@@ -1,21 +1,17 @@
 import { createSlice } from '@reduxjs/toolkit'
 import type { PayloadAction } from '@reduxjs/toolkit'
-import type {
-  TenantUsageResponse,
-  UsageHistoryEntry,
-  AdminTenantUsageRow,
-} from '@/api/apiKeyUsage.api'
+import type { TenantUsageResponse, UsageHistoryEntry, AdminTenantUsageRow } from '@/api/usage.api'
 import {
-  fetchApiKeyUsage,
-  fetchApiKeyUsageHistory,
+  fetchTenantUsage,
+  fetchTenantUsageHistory,
   fetchAllTenantsUsage,
   updateTenantLimits,
   updateThreshold,
-} from '../thunks/apiKeyUsage.thunks'
+} from '../thunks/usage.thunks'
 import { selectTenant } from './tenant.slice'
 import { isStaleResponse } from '../utils/latestRequest'
 
-interface ApiKeyUsageState {
+interface UsageState {
   usage: TenantUsageResponse | null
   history: UsageHistoryEntry[]
   isLoading: boolean
@@ -48,7 +44,7 @@ interface ApiKeyUsageState {
   adminRequestId: string | null
 }
 
-const initialState: ApiKeyUsageState = {
+const initialState: UsageState = {
   usage: null,
   history: [],
   isLoading: false,
@@ -76,8 +72,8 @@ const initialState: ApiKeyUsageState = {
   adminRequestId: null,
 }
 
-export const apiKeyUsageSlice = createSlice({
-  name: 'apiKeyUsage',
+export const usageSlice = createSlice({
+  name: 'usage',
   initialState,
   reducers: {
     setAdminPage(state, action: PayloadAction<number>) {
@@ -129,37 +125,37 @@ export const apiKeyUsageSlice = createSlice({
         state.historyRequestId = null
       })
       // Fetch usage
-      .addCase(fetchApiKeyUsage.pending, (state, action) => {
+      .addCase(fetchTenantUsage.pending, (state, action) => {
         state.isLoading = true
         state.error = null
         state.usageRequestId = action.meta.requestId
       })
-      .addCase(fetchApiKeyUsage.fulfilled, (state, action) => {
+      .addCase(fetchTenantUsage.fulfilled, (state, action) => {
         if (isStaleResponse(state.usageRequestId, action)) return
         state.usage = action.payload
         state.isLoading = false
         state.hasLoaded = true
         state.usageRequestId = null
       })
-      .addCase(fetchApiKeyUsage.rejected, (state, action) => {
+      .addCase(fetchTenantUsage.rejected, (state, action) => {
         if (isStaleResponse(state.usageRequestId, action)) return
         state.isLoading = false
         state.error = action.payload ?? 'Failed to load usage'
         state.usageRequestId = null
       })
       // Fetch history
-      .addCase(fetchApiKeyUsageHistory.pending, (state, action) => {
+      .addCase(fetchTenantUsageHistory.pending, (state, action) => {
         state.historyLoading = true
         state.historyError = null
         state.historyRequestId = action.meta.requestId
       })
-      .addCase(fetchApiKeyUsageHistory.fulfilled, (state, action) => {
+      .addCase(fetchTenantUsageHistory.fulfilled, (state, action) => {
         if (isStaleResponse(state.historyRequestId, action)) return
         state.history = action.payload
         state.historyLoading = false
         state.historyRequestId = null
       })
-      .addCase(fetchApiKeyUsageHistory.rejected, (state, action) => {
+      .addCase(fetchTenantUsageHistory.rejected, (state, action) => {
         if (isStaleResponse(state.historyRequestId, action)) return
         state.historyLoading = false
         state.historyError = action.payload ?? 'Failed to load usage history'
@@ -222,6 +218,6 @@ export const apiKeyUsageSlice = createSlice({
 })
 
 export const { setAdminPage, setAdminLimit, setAdminSearch, setAdminFilter, setAdminSort } =
-  apiKeyUsageSlice.actions
+  usageSlice.actions
 
-export default apiKeyUsageSlice.reducer
+export default usageSlice.reducer

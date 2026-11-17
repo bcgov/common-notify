@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, userEvent, waitFor, fireEvent } from '@/test-utils'
-import reducer from '@/redux/slices/apiKeyUsage.slice'
+import reducer from '@/redux/slices/usage.slice'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import Usage from './Usage'
-import { updateThreshold } from '@/redux/thunks/apiKeyUsage.thunks'
-import type * as UsageThunks from '@/redux/thunks/apiKeyUsage.thunks'
+import { updateThreshold } from '@/redux/thunks/usage.thunks'
+import type * as UsageThunks from '@/redux/thunks/usage.thunks'
 
-vi.mock('@/redux/thunks/apiKeyUsage.thunks', async (importOriginal) => {
+vi.mock('@/redux/thunks/usage.thunks', async (importOriginal) => {
   const actual = await importOriginal<typeof UsageThunks>()
   return { ...actual, updateThreshold: vi.fn(actual.updateThreshold) }
 })
@@ -42,7 +42,7 @@ let usageState: ReturnType<typeof reducer>
 function setup(overrides = {}, roles = ['NOTIFY_OPERATIONS_ADMIN']) {
   usageState = { ...reducer(undefined, { type: 'init' }), ...overrides }
   mocks.state = {
-    apiKeyUsage: usageState,
+    usage: usageState,
     tenant: { selectedTenant: { id: 'tenant' } },
     user: { current: { cstarRoles: roles } },
   }

@@ -3,8 +3,8 @@ import { ValidationPipe, VersioningType } from '@nestjs/common'
 import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { ApiKeyUsageAdminController } from './api-key-usage-admin.controller'
-import { ApiKeyUsageService } from './api-key-usage.service'
+import { TenantUsageAdminController } from './tenant-usage-admin.controller'
+import { TenantUsageService } from './tenant-usage.service'
 import { NotifyAdminGuard } from '../../common/guards/notify-admin.guard'
 import { TenantsService } from '../admin/tenants/tenants.service'
 
@@ -12,14 +12,16 @@ import { TenantsService } from '../admin/tenants/tenants.service'
  * Driven over HTTP, through the global ValidationPipe as app.ts installs it, because the query
  * string is what is under test and the DTO's transforms only run inside that pipe.
  */
-describe('ApiKeyUsageAdminController GET /frontend/admin/api-key-usage', () => {
+describe('TenantUsageAdminController GET /frontend/admin/usage', () => {
   let app: INestApplication
   let getAllTenantsUsage: ReturnType<typeof vi.fn>
   let getAdminUsageSummary: ReturnType<typeof vi.fn>
   let listNotifyTenants: ReturnType<typeof vi.fn>
   let setSending: ReturnType<typeof vi.fn>
+  let updateTenantLimits: ReturnType<typeof vi.fn>
 
   beforeEach(async () => {
+    updateTenantLimits = vi.fn().mockResolvedValue([{ tenantId: 't-1', channel: 'SMS' }])
     getAllTenantsUsage = vi
       .fn()
       .mockResolvedValue({ data: [], count: 0, page: 1, limit: 15, totalPages: 0 })
@@ -30,11 +32,16 @@ describe('ApiKeyUsageAdminController GET /frontend/admin/api-key-usage', () => {
       .mockResolvedValue({ tenants: 42, sentThisFiscalYear: 30, disabled: 0 })
 
     const module = await Test.createTestingModule({
-      controllers: [ApiKeyUsageAdminController],
+      controllers: [TenantUsageAdminController],
       providers: [
         {
-          provide: ApiKeyUsageService,
-          useValue: { getAllTenantsUsage, getAdminUsageSummary, listNotifyTenants },
+          provide: TenantUsageService,
+          useValue: {
+            getAllTenantsUsage,
+            getAdminUsageSummary,
+            listNotifyTenants,
+            updateTenantLimits,
+          },
         },
         { provide: TenantsService, useValue: { setSending } },
       ],
@@ -55,7 +62,7 @@ describe('ApiKeyUsageAdminController GET /frontend/admin/api-key-usage', () => {
     await app.close()
   })
 
-  const url = '/v1/frontend/admin/api-key-usage'
+  const url = '/v1/frontend/admin/usage'
 
   it('passes the page, search and no filters when none are given', async () => {
     await request(app.getHttpServer())
@@ -127,6 +134,29 @@ describe('ApiKeyUsageAdminController GET /frontend/admin/api-key-usage', () => {
     await request(app.getHttpServer()).get(`${url}?page=two`).expect(400)
 
     expect(getAllTenantsUsage).not.toHaveBeenCalled()
+  })
+
+  describe('PATCH limits', () => {
+    const tenantId = '0b9f6d0c-1d7e-4c55-9d2a-5f3f4a1b2c3d'
+
+    it("updates the tenant's limits and returns its refreshed rows", async () => {
+      const response = await request(app.getHttpServer())
+        .patch(`${url}/limits`)
+        .send({ tenantId, channel: 'SMS', dailyLimit: 10, annualLimit: 100 })
+        .expect(200)
+
+      expect(response.body).toEqual([{ tenantId: 't-1', channel: 'SMS' }])
+      expect(updateTenantLimits).toHaveBeenCalledWith(tenantId, 'SMS', 10, 100, undefined)
+    })
+
+    it('rejects a limit below 1', async () => {
+      await request(app.getHttpServer())
+        .patch(`${url}/limits`)
+        .send({ tenantId, channel: 'SMS', dailyLimit: 0, annualLimit: 100 })
+        .expect(400)
+
+      expect(updateTenantLimits).not.toHaveBeenCalled()
+    })
   })
 
   describe('PATCH tenants/:tenantId/sending', () => {

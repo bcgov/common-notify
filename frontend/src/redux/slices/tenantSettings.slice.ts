@@ -1,4 +1,4 @@
-import { fetchApiKeyUsage } from '../thunks/apiKeyUsage.thunks'
+import { fetchTenantUsage } from '../thunks/usage.thunks'
 import { createSlice } from '@reduxjs/toolkit'
 import { fetchSettings, updateTenantSettings } from '../thunks/settings.thunks'
 import type { TenantSettingsValues } from '@/interfaces/tenant-settings.interface'
@@ -46,7 +46,7 @@ export const tenantSettingsSlice = createSlice({
         state.defaultSenderEmail =
           action.payload?.defaultSenderEmail ?? defaultTenantSettings.defaultSenderEmail
       })
-      .addCase(fetchApiKeyUsage.fulfilled, (state, action) => {
+      .addCase(fetchTenantUsage.fulfilled, (state, action) => {
         state.rateLimitPerMinute = {
           EMAIL:
             action.payload.channels.find((channel) => channel.channel === 'EMAIL')

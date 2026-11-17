@@ -107,9 +107,6 @@ export abstract class ApiKeyTenantGuard implements CanActivate {
     request.tenant = tenant
     request.tenantId = tenant.id
     request.tenantExternalId = tenant.externalId
-    // The bound API key (api_key_consumer) that authenticated this request.
-    // Used downstream to attribute notification usage against the key's limits.
-    request.apiKeyConsumerId = mapping.id
 
     this.logger.debug(
       `✓ ${this.routeDescription} authorized. Tenant: "${tenant.name}" (${tenant.id})`,
