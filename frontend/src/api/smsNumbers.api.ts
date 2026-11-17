@@ -1,19 +1,15 @@
 import { get, post, put, patch, deleteMethod, generateApiParameters } from '@/common/api'
 import { getApiErrorMessage, toReadableError } from '@/utils/apiErrorMessage'
-import type { PaginatedResponse } from '@/interfaces/PaginatedNotificationResponse'
-import { toListQueryString } from './listQuery'
-import type { ListQuery } from './listQuery'
+import type { TenantRequest } from './tenantRequests.api'
 
 /**
  * SMS numbers: the admin inventory and assignments (/api/v1/frontend/admin/sms-numbers,
  * NOTIFY_ADMIN), and a tenant's own request for a number (/api/v1/frontend/sms-number-requests,
- * tenant-scoped by the X-Tenant-ID header).
+ * tenant-scoped by the X-Tenant-ID header). Admins decide requests through tenantRequests.api.
  */
 
 const ADMIN_URL = '/api/v1/frontend/admin/sms-numbers'
 const REQUESTS_URL = '/api/v1/frontend/sms-number-requests'
-
-export type SmsNumberRequestStatus = 'pending' | 'approved' | 'rejected' | 'released' | 'cancelled'
 
 export interface SmsNumberTenant {
   tenantId: string
@@ -41,27 +37,12 @@ export interface SmsNumberInput {
 
 export type SmsNumberUpdate = Partial<Pick<SmsNumberInput, 'numberTypeCode' | 'description'>>
 
-export interface SmsNumberRequest {
-  id: string
-  tenantId: string
-  tenantName: string
-  statusCode: SmsNumberRequestStatus
-  requestedBy: string | null
-  requestedAt: string
-  decidedBy: string | null
-  decidedAt: string | null
-  /** Why it was rejected. */
-  decisionReason: string | null
+/** A tenant's request for an SMS number, as its SMS settings show it. */
+export interface SmsNumberRequest extends TenantRequest {
   /** The number assigned on approval. */
   phoneNumber: string | null
   /** Approved on the service-wide default number rather than one of its own (non-prod only). */
   usesDefaultNumber: boolean
-  /** Who released the number, and when: an admin, the tenant, or an admin reassigning it. */
-  releasedBy: string | null
-  releasedAt: string | null
-  /** Who cancelled the request while it was pending, and when. */
-  cancelledBy: string | null
-  cancelledAt: string | null
 }
 
 export interface SmsCode {
@@ -72,7 +53,6 @@ export interface SmsCode {
 export interface SmsNumberCodes {
   providers: SmsCode[]
   numberTypes: SmsCode[]
-  requestStatuses: SmsCode[]
   /** The provider SMS is sending through now. */
   activeProvider: string
   /** What a tenant without a number of its own sends from now: the active provider's default. */
@@ -173,66 +153,6 @@ export async function unassignSmsNumber(tenantId: string, smsNumberId: string): 
     )
   } catch (error) {
     throw failed('unassign the number', error)
-  }
-}
-
-/**
- * A page of requests, newest first. Filter on status with `statusCode:in:pending|approved`;
- * `search` matches tenant names.
- */
-export async function getSmsNumberRequests(
-  query: ListQuery = {},
-): Promise<PaginatedResponse<SmsNumberRequest>> {
-  try {
-    return await get<PaginatedResponse<SmsNumberRequest>>(
-      generateApiParameters(`${ADMIN_URL}/requests?${toListQueryString(query)}`),
-    )
-  } catch (error) {
-    throw toReadableError(error, 'SMS number requests')
-  }
-}
-
-/**
- * Approves a request by assigning the tenant the number, or with null, on the default number
- * (non-prod only).
- */
-export async function approveSmsNumberRequest(
-  requestId: string,
-  smsNumberId: string | null,
-): Promise<SmsNumberRequest> {
-  try {
-    return await post<SmsNumberRequest>({
-      ...generateApiParameters(`${ADMIN_URL}/requests/${encodeURIComponent(requestId)}/approve`),
-      data: smsNumberId === null ? { useDefaultNumber: true } : { smsNumberId },
-    })
-  } catch (error) {
-    throw failed('approve the request', error)
-  }
-}
-
-/** Releases the number an approved request assigned its tenant. */
-export async function releaseSmsNumberRequest(requestId: string): Promise<SmsNumberRequest> {
-  try {
-    return await post<SmsNumberRequest>({
-      ...generateApiParameters(`${ADMIN_URL}/requests/${encodeURIComponent(requestId)}/release`),
-      data: {},
-    })
-  } catch (error) {
-    throw failed('release the number', error)
-  }
-}
-
-export async function rejectSmsNumberRequest(
-  requestId: string,
-  reason: string,
-): Promise<SmsNumberRequest> {
-  try {
-    return await post<SmsNumberRequest>({
-      ...generateApiParameters(`${ADMIN_URL}/requests/${encodeURIComponent(requestId)}/reject`),
-      data: { reason },
-    })
-  } catch (error) {
-    throw failed('reject the request', error)
   }
 }
 

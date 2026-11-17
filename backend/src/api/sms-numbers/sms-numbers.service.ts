@@ -4,7 +4,8 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { EntityManager, Repository } from 'typeorm'
 import { SMS_ADAPTER } from '../../adapters'
 import type { ISmsTransport } from '../../adapters'
-import { SmsNumberRequestStatus } from './sms-number-codes'
+import { TenantRequestsService } from '../tenant-requests/tenant-requests.service'
+import type { RequestActor } from '../tenant-requests/tenant-request-codes'
 import { SmsNumber } from './entities/sms-number.entity'
 import { TenantSmsNumber } from './entities/tenant-sms-number.entity'
 import {
@@ -14,12 +15,6 @@ import {
   SmsNumberDto,
   UpdateSmsNumberDto,
 } from './schemas/sms-number.dto'
-
-/** Who made a change: the stable id stored for audit, and a display name if the token had one. */
-export interface SmsNumberActor {
-  id: string
-  name: string | null
-}
 
 /** The provider used when none is configured; matches the SMS_ADAPTER fallback. */
 const DEFAULT_PROVIDER = 'aws'
@@ -37,6 +32,7 @@ export class SmsNumbersService {
     @InjectRepository(SmsNumber) private readonly numberRepository: Repository<SmsNumber>,
     @InjectRepository(TenantSmsNumber)
     private readonly assignmentRepository: Repository<TenantSmsNumber>,
+    private readonly tenantRequests: TenantRequestsService,
     @Optional() @Inject(SMS_ADAPTER) private readonly smsAdapter?: ISmsTransport,
     @Optional() private readonly configService?: ConfigService,
   ) {}
@@ -101,7 +97,7 @@ export class SmsNumbersService {
    * Makes this the number a tenant without one of its own sends from through its provider,
    * replacing that provider's previous default.
    */
-  async setDefault(id: string, actor: SmsNumberActor): Promise<SmsNumberDto> {
+  async setDefault(id: string, actor: RequestActor): Promise<SmsNumberDto> {
     await this.numberRepository.manager.transaction(async (manager) => {
       const number = await manager.findOne(SmsNumber, { where: { id, isDeleted: false } })
       if (!number) throw new NotFoundException(`SMS number ${id} not found`)
@@ -117,7 +113,7 @@ export class SmsNumbersService {
   }
 
   /** Stops using this number as its provider's default: DEFAULT_SMS_FROM_NUMBER applies again. */
-  async clearDefault(id: string, actor: SmsNumberActor): Promise<SmsNumberDto> {
+  async clearDefault(id: string, actor: RequestActor): Promise<SmsNumberDto> {
     const number = await this.findNumber(id)
     number.isDefault = false
     number.updatedBy = actor.id
@@ -162,22 +158,20 @@ export class SmsNumbersService {
   async getCodes(): Promise<SmsNumberCodesDto> {
     const read = (table: string): Promise<SmsCodeDto[]> =>
       this.numberRepository.query(`SELECT code, description FROM notify.${table} ORDER BY code`)
-    const [providers, numberTypes, requestStatuses] = await Promise.all([
+    const [providers, numberTypes] = await Promise.all([
       read('sms_provider_code'),
       read('sms_number_type_code'),
-      read('sms_number_request_status_code'),
     ])
     return {
       providers,
       numberTypes,
-      requestStatuses,
       activeProvider: this.activeProvider(),
       defaultNumber: await this.defaultNumber(),
       defaultNumberAssignable: this.defaultNumberAssignable(),
     }
   }
 
-  async createNumber(dto: CreateSmsNumberDto, actor: SmsNumberActor): Promise<SmsNumberDto> {
+  async createNumber(dto: CreateSmsNumberDto, actor: RequestActor): Promise<SmsNumberDto> {
     const existing = await this.numberRepository.findOne({
       where: { providerCode: dto.providerCode, phoneNumber: dto.phoneNumber, isDeleted: false },
     })
@@ -201,7 +195,7 @@ export class SmsNumbersService {
   async updateNumber(
     id: string,
     dto: UpdateSmsNumberDto,
-    actor: SmsNumberActor,
+    actor: RequestActor,
   ): Promise<SmsNumberDto> {
     const number = await this.findNumber(id)
     if (dto.numberTypeCode !== undefined) number.numberTypeCode = dto.numberTypeCode
@@ -215,7 +209,7 @@ export class SmsNumbersService {
    * Removes a number from the inventory. One still assigned to a tenant must be unassigned first,
    * and the default must stop being the default.
    */
-  async deleteNumber(id: string, actor: SmsNumberActor): Promise<void> {
+  async deleteNumber(id: string, actor: RequestActor): Promise<void> {
     const number = await this.findNumber(id)
     if (number.isDefault) {
       throw new ConflictException(
@@ -241,7 +235,7 @@ export class SmsNumbersService {
   async assign(
     tenantId: string,
     smsNumberId: string,
-    actor: SmsNumberActor,
+    actor: RequestActor,
     manager?: EntityManager,
   ): Promise<SmsNumber> {
     if (manager) return this.assignWithin(manager, tenantId, smsNumberId, actor)
@@ -254,7 +248,7 @@ export class SmsNumbersService {
     manager: EntityManager,
     tenantId: string,
     smsNumberId: string,
-    actor: SmsNumberActor,
+    actor: RequestActor,
   ): Promise<SmsNumber> {
     const number = await manager.findOne(SmsNumber, {
       where: { id: smsNumberId, isDeleted: false },
@@ -285,7 +279,7 @@ export class SmsNumbersService {
   }
 
   /** Takes a number off a tenant; an approved request for it is marked released. */
-  async unassign(tenantId: string, smsNumberId: string, actor: SmsNumberActor): Promise<void> {
+  async unassign(tenantId: string, smsNumberId: string, actor: RequestActor): Promise<void> {
     await this.assignmentRepository.manager.transaction(async (manager) => {
       const released = await this.release(manager, tenantId, smsNumberId, actor)
       if (!released) throw new NotFoundException('That number is not assigned to this tenant')
@@ -300,7 +294,7 @@ export class SmsNumbersService {
     manager: EntityManager,
     tenantId: string,
     smsNumberId: string,
-    actor: SmsNumberActor,
+    actor: RequestActor,
   ): Promise<boolean> {
     const result = await manager.delete(TenantSmsNumber, { tenantId, smsNumberId })
     await this.markReleased(manager, tenantId, smsNumberId, actor)
@@ -315,28 +309,19 @@ export class SmsNumbersService {
     manager: EntityManager,
     tenantId: string,
     smsNumberId: string,
-    actor: SmsNumberActor,
+    actor: RequestActor,
   ): Promise<void> {
-    // The request and its history row in one statement, so neither is written without the other.
-    await manager.query(
-      `WITH released AS (
-         UPDATE notify.sms_number_request
-            SET status_code = $3, released_by = $4, released_by_name = $5, released_at = NOW(),
-                updated_at = NOW(), updated_by = $4
-          WHERE tenant_id = $1 AND sms_number_id = $2 AND status_code = $6
-          RETURNING id
-       )
-       INSERT INTO notify.sms_number_request_history
-              (sms_number_request_id, status_code, sms_number_id, created_by, created_by_name)
-       SELECT id, $3, $2, $4, $5 FROM released`,
-      [
-        tenantId,
-        smsNumberId,
-        SmsNumberRequestStatus.RELEASED,
-        actor.id,
-        actor.name,
-        SmsNumberRequestStatus.APPROVED,
-      ],
+    const rows: Array<{ id: string }> = await manager.query(
+      `SELECT r.id
+         FROM notify.tenant_request r
+         JOIN notify.tenant_request_sms_number d ON d.tenant_request_id = r.id
+        WHERE r.tenant_id = $1 AND d.sms_number_id = $2`,
+      [tenantId, smsNumberId],
+    )
+    await this.tenantRequests.markReleased(
+      manager,
+      rows.map((row) => row.id),
+      actor,
     )
   }
 

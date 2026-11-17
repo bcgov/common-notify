@@ -11,13 +11,13 @@ const BADGES: Record<string, { status: string; label: string }> = {
 }
 
 /** How a request status reads, e.g. "Pending"; a status added later reads as its code. */
-export const smsRequestStatusLabel = (status: string): string => BADGES[status]?.label ?? status
+export const tenantRequestStatusLabel = (status: string): string => BADGES[status]?.label ?? status
 
 /** The statuses this badge knows, in workflow order, for when the code table is not loaded. */
-export const SMS_REQUEST_STATUSES = Object.keys(BADGES)
+export const TENANT_REQUEST_STATUSES = Object.keys(BADGES)
 
-/** The status of an SMS number request. A status added later shows with a neutral colour. */
-const SmsRequestStatusBadge: FC<{ status: string }> = ({ status }) => {
+/** The status of a tenant request. A status added later shows with a neutral colour. */
+const TenantRequestStatusBadge: FC<{ status: string }> = ({ status }) => {
   const badge = BADGES[status]
   return badge ? (
     <StatusBadge status={badge.status} statusLabel={badge.label} />
@@ -26,4 +26,4 @@ const SmsRequestStatusBadge: FC<{ status: string }> = ({ status }) => {
   )
 }
 
-export default SmsRequestStatusBadge
+export default TenantRequestStatusBadge

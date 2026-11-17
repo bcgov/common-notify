@@ -1,4 +1,4 @@
-import type { SmsNumber, SmsNumberRequest, SmsNumberTenant } from '@/api/smsNumbers.api'
+import type { SmsNumber, SmsNumberTenant } from '@/api/smsNumbers.api'
 
 /** What can be done with a number from its row's menu, each opening a dialog. */
 export type SmsNumberAction = 'edit' | 'assign' | 'makeDefault' | 'clearDefault' | 'remove'
@@ -8,5 +8,4 @@ export type SmsNumberDialog =
   | { kind: 'add' }
   | { kind: SmsNumberAction; number: SmsNumber }
   | { kind: 'unassign'; number: SmsNumber; tenant: SmsNumberTenant }
-  | { kind: 'approve' | 'reject' | 'release'; request: SmsNumberRequest }
   | { kind: 'chooseDefault'; providerCode: string }

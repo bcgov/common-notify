@@ -3,7 +3,6 @@ import { Transform } from 'class-transformer'
 import {
   IsBoolean,
   IsIn,
-  IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
@@ -12,8 +11,7 @@ import {
   ValidateIf,
 } from 'class-validator'
 import { SMS_NUMBER_PATTERN, SMS_NUMBER_TYPE_CODES, SMS_PROVIDER_CODES } from '../sms-number-codes'
-import { PaginatedResponse } from '../../../common/schemas/paginated-response'
-import type { QueryableFieldsConfig } from '../../../common/query/list-query.types'
+import { TenantRequestDto } from '../../tenant-requests/schemas/tenant-request.dto'
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value)
 /** An optional text field: blank is stored as null. */
@@ -62,8 +60,8 @@ export class AssignSmsNumberDto {
 }
 
 /**
- * Approves a request by assigning the tenant a number from the inventory, or, outside prod, by
- * leaving it on the default number. Exactly one of the two.
+ * The options an admin approves an SMS number request with: a number from the inventory to assign,
+ * or, outside prod, the default number. Exactly one of the two.
  */
 export class ApproveSmsNumberRequestDto {
   @ApiPropertyOptional({ format: 'uuid', description: 'The inventory number to assign' })
@@ -77,16 +75,6 @@ export class ApproveSmsNumberRequestDto {
   @IsOptional()
   @IsBoolean()
   useDefaultNumber?: boolean
-}
-
-/** Rejects a request. The reason is shown to the tenant. */
-export class RejectSmsNumberRequestDto {
-  @ApiProperty({ maxLength: 500 })
-  @Transform(trim)
-  @IsString()
-  @IsNotEmpty({ message: 'A reason is required to reject a request' })
-  @MaxLength(500)
-  reason: string
 }
 
 export class SmsNumberTenantDto {
@@ -123,34 +111,8 @@ export class SmsNumberDto {
   tenants: SmsNumberTenantDto[]
 }
 
-export class SmsNumberRequestDto {
-  @ApiProperty({ format: 'uuid' })
-  id: string
-
-  @ApiProperty({ format: 'uuid' })
-  tenantId: string
-
-  @ApiProperty()
-  tenantName: string
-
-  @ApiProperty({ example: 'pending' })
-  statusCode: string
-
-  @ApiProperty({ nullable: true, type: String })
-  requestedBy: string | null
-
-  @ApiProperty({ type: String, format: 'date-time' })
-  requestedAt: string
-
-  @ApiProperty({ nullable: true, type: String })
-  decidedBy: string | null
-
-  @ApiProperty({ nullable: true, type: String, format: 'date-time' })
-  decidedAt: string | null
-
-  @ApiProperty({ nullable: true, type: String })
-  decisionReason: string | null
-
+/** A tenant's SMS number request as its SMS settings show it: with the number approval gave it. */
+export class SmsNumberRequestDto extends TenantRequestDto {
   @ApiProperty({ nullable: true, type: String, description: 'The number assigned on approval' })
   phoneNumber: string | null
 
@@ -158,18 +120,6 @@ export class SmsNumberRequestDto {
     description: 'Approved on the service-wide default number rather than one of its own',
   })
   usesDefaultNumber: boolean
-
-  @ApiProperty({ nullable: true, type: String, description: 'Who released the number' })
-  releasedBy: string | null
-
-  @ApiProperty({ nullable: true, type: String, format: 'date-time' })
-  releasedAt: string | null
-
-  @ApiProperty({ nullable: true, type: String, description: 'Who cancelled the request' })
-  cancelledBy: string | null
-
-  @ApiProperty({ nullable: true, type: String, format: 'date-time' })
-  cancelledAt: string | null
 }
 
 export class SmsCodeDto {
@@ -187,9 +137,6 @@ export class SmsNumberCodesDto {
   @ApiProperty({ type: [SmsCodeDto] })
   numberTypes: SmsCodeDto[]
 
-  @ApiProperty({ type: [SmsCodeDto] })
-  requestStatuses: SmsCodeDto[]
-
   @ApiProperty({ description: 'The provider SMS is sending through now', example: 'aws' })
   activeProvider: string
 
@@ -205,17 +152,6 @@ export class SmsNumberCodesDto {
     description: 'Whether a request can be approved on the default number (not prod)',
   })
   defaultNumberAssignable: boolean
-}
-
-/** One page of requests for the admin table. */
-export class PaginatedSmsNumberRequestsDto extends PaginatedResponse(SmsNumberRequestDto) {}
-
-/** The requests table filters on status (`statusCode:in:pending|approved`); search is tenant name. */
-export const smsNumberRequestListQueryConfig: QueryableFieldsConfig = {
-  sortableFields: {},
-  filterableFields: {
-    statusCode: { column: 'r.status_code', operators: ['eq', 'in'] },
-  },
 }
 
 /**

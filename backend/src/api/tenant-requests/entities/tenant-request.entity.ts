@@ -1,13 +1,17 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm'
 
-/** A tenant's request for an SMS number, and the admin's decision on it. */
-@Entity('sms_number_request', { schema: 'notify' })
-export class SmsNumberRequest {
+/** A tenant's request for something a Notify admin must approve, and the admin's decision. */
+@Entity('tenant_request', { schema: 'notify' })
+export class TenantRequest {
   @PrimaryGeneratedColumn('uuid')
   id: string
 
   @Column({ type: 'uuid', name: 'tenant_id' })
   tenantId: string
+
+  /** What is being asked for; the type's own table holds its details. */
+  @Column({ type: 'varchar', length: 30, name: 'request_type_code' })
+  requestTypeCode: string
 
   @Column({ type: 'varchar', length: 20, name: 'status_code', default: 'pending' })
   statusCode: string
@@ -24,10 +28,6 @@ export class SmsNumberRequest {
   /** Why it was rejected. Shown to the tenant. */
   @Column({ type: 'varchar', length: 500, nullable: true, name: 'decision_reason' })
   decisionReason: string | null
-
-  /** The number assigned on approval. */
-  @Column({ type: 'uuid', nullable: true, name: 'sms_number_id' })
-  smsNumberId: string | null
 
   @Column({ type: 'varchar', length: 200, nullable: true, name: 'released_by' })
   releasedBy: string | null

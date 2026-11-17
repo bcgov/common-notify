@@ -244,6 +244,7 @@ describe('Sidebar', () => {
       ])
       expect(linksIn('Manage')).toEqual([
         ['Tenants', '/admin/tenants'],
+        ['Tenant Requests', '/admin/tenant-requests'],
         ['SMS Numbers', '/admin/sms-numbers'],
         ['Feature Flags', '/admin/feature-flags'],
       ])

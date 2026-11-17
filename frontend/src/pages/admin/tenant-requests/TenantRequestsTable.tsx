@@ -6,12 +6,12 @@ import type { TableColumn } from '@/components/DataTable/DataTable'
 import RowActionsMenu from '@/components/RowActionsMenu'
 import type { RowActionGroup } from '@/components/RowActionsMenu'
 import TypeaheadSearchField from '@/components/TypeaheadSearchField'
-import SmsRequestStatusBadge, {
-  SMS_REQUEST_STATUSES,
-  smsRequestStatusLabel,
-} from '@/components/SmsRequestStatusBadge'
-import { getSmsNumberRequests } from '@/api/smsNumbers.api'
-import type { SmsCode, SmsNumberRequest } from '@/api/smsNumbers.api'
+import TenantRequestStatusBadge, {
+  TENANT_REQUEST_STATUSES,
+  tenantRequestStatusLabel,
+} from '@/components/TenantRequestStatusBadge'
+import { getTenantRequests } from '@/api/tenantRequests.api'
+import type { TenantRequest, TenantRequestCode } from '@/api/tenantRequests.api'
 import { useNotifyTenantNames } from '@/hooks/useNotifyTenantNames'
 import { toFilterParams } from '@/redux/utils/listFilters'
 import { formatDate } from '@/utils/dates'
@@ -19,13 +19,13 @@ import { formatDate } from '@/utils/dates'
 /** What can be done with a request in each status. A decided one is a record only. */
 const REQUEST_ACTIONS: Partial<Record<string, RowActionGroup['actions']>> = {
   pending: [
-    { id: 'approve', label: 'Approve and assign a number' },
+    { id: 'approve', label: 'Approve' },
     { id: 'reject', label: 'Reject' },
   ],
-  approved: [{ id: 'release', label: 'Release number' }],
+  approved: [{ id: 'release', label: 'Release' }],
 }
 
-export type SmsNumberRequestAction = 'approve' | 'reject' | 'release'
+export type TenantRequestAction = 'approve' | 'reject' | 'release'
 
 /** The admin's queue: new requests, until they choose to see the rest. */
 const DEFAULT_STATUSES = ['pending']
@@ -33,26 +33,25 @@ const PAGE_SIZES = [15, 30]
 
 /** "Approved by Pat Admin Nov 17, 2026": who did something and when. */
 const ByWhen: FC<{ verb: string; by: string | null; at: string }> = ({ verb, by, at }) => (
-  <span className="admin-sms-numbers__detail">
+  <span className="tenant-requests__detail">
     {verb}
     {by ? ` by ${by}` : ''} <time dateTime={at}>{formatDate(at)}</time>
   </span>
 )
 
 /**
- * Who decided a request and when, what came of it, and who released the number if anyone has. A
- * cancelled request was never decided, so shows who cancelled it.
+ * Who decided a request and when, what it granted, and who released it if anyone has. A cancelled
+ * request was never decided, so shows who cancelled it.
  */
-const RequestDecision: FC<{ request: SmsNumberRequest }> = ({ request }) => {
+const RequestDecision: FC<{ request: TenantRequest }> = ({ request }) => {
   if (request.cancelledAt) {
     return <ByWhen verb="Cancelled" by={request.cancelledBy} at={request.cancelledAt} />
   }
-  if (!request.decidedAt) return <span className="admin-sms-numbers__detail">Not yet decided</span>
+  if (!request.decidedAt) return <span className="tenant-requests__detail">Not yet decided</span>
   const verb = request.statusCode === 'rejected' ? 'Rejected' : 'Approved'
   return (
-    <div className="admin-sms-numbers__stack">
-      {request.phoneNumber && <span>{request.phoneNumber}</span>}
-      {request.usesDefaultNumber && <span>Default number</span>}
+    <div className="tenant-requests__stack">
+      {request.outcome && <span>{request.outcome}</span>}
       {request.decisionReason && <span>{request.decisionReason}</span>}
       <ByWhen verb={verb} by={request.decidedBy} at={request.decidedAt} />
       {request.releasedAt && (
@@ -62,45 +61,54 @@ const RequestDecision: FC<{ request: SmsNumberRequest }> = ({ request }) => {
   )
 }
 
-interface SmsNumberRequestsTableProps {
+/** A filter for each column with something selected: an empty filter is no filter. */
+function activeFiltersOf(filters: Record<string, string[]>): Record<string, string[]> {
+  return Object.fromEntries(Object.entries(filters).filter(([, values]) => values.length > 0))
+}
+
+interface TenantRequestsTableProps {
+  /** The request types, for the Type column and its filter. */
+  types: readonly TenantRequestCode[]
   /** The status code table, for the Status filter. Falls back to the statuses the badge knows. */
-  statuses?: readonly SmsCode[]
+  statuses?: readonly TenantRequestCode[]
   /** Changed by the page after it saves something, to load the current page again. */
   reloadKey: number
-  onAction: (action: SmsNumberRequestAction, request: SmsNumberRequest) => void
+  onAction: (action: TenantRequestAction, request: TenantRequest) => void
 }
 
 /**
- * Tenants' SMS number requests, a page at a time, newest first. Shows pending requests until the
- * admin filters on other statuses from the Status column; searches by tenant name.
+ * Every tenant's requests, a page at a time, newest first. Shows pending requests of every type
+ * until the admin filters from the Type or Status column; searches by tenant name.
  */
-const SmsNumberRequestsTable: FC<SmsNumberRequestsTableProps> = ({
+const TenantRequestsTable: FC<TenantRequestsTableProps> = ({
+  types,
   statuses,
   reloadKey,
   onAction,
 }) => {
   const tenantNames = useNotifyTenantNames()
-  const [requests, setRequests] = useState<SmsNumberRequest[]>([])
+  const [requests, setRequests] = useState<TenantRequest[]>([])
   const [count, setCount] = useState(0)
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(PAGE_SIZES[0])
   const [statusFilter, setStatusFilter] = useState<string[]>(DEFAULT_STATUSES)
+  const [typeFilter, setTypeFilter] = useState<string[]>([])
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [error, setError] = useState<string | null>(null)
   // Loading until the query on screen is the one last answered.
-  const query = JSON.stringify([page, limit, search, statusFilter, reloadKey])
+  const query = JSON.stringify([page, limit, search, statusFilter, typeFilter, reloadKey])
   const [answered, setAnswered] = useState<string | null>(null)
   const loading = answered !== query
 
   useEffect(() => {
     // A newer query replaces a slower older one, rather than the other way round.
     let current = true
-    getSmsNumberRequests({
+    getTenantRequests({
       page,
       limit,
       search: search || undefined,
-      filter: toFilterParams({ statusCode: statusFilter }),
+      filter: toFilterParams({ statusCode: statusFilter, requestTypeCode: typeFilter }),
     })
       .then((result) => {
         if (!current) return
@@ -118,7 +126,7 @@ const SmsNumberRequestsTable: FC<SmsNumberRequestsTableProps> = ({
     return () => {
       current = false
     }
-  }, [page, limit, search, statusFilter, query])
+  }, [page, limit, search, statusFilter, typeFilter, query])
 
   function applySearch(term: string) {
     setSearch(term.trim())
@@ -132,32 +140,40 @@ const SmsNumberRequestsTable: FC<SmsNumberRequestsTableProps> = ({
 
   const statusCodes = statuses?.length
     ? statuses.map((status) => status.code)
-    : SMS_REQUEST_STATUSES
+    : TENANT_REQUEST_STATUSES
   const statusOptions = statusCodes.map((code) => ({
-    label: smsRequestStatusLabel(code),
+    label: tenantRequestStatusLabel(code),
     value: code,
   }))
+  const typeOptions = types.map((type) => ({ label: type.description, value: type.code }))
+  const typeLabel = (code: string) => types.find((type) => type.code === code)?.description ?? code
 
-  const columns: TableColumn<SmsNumberRequest>[] = [
+  const columns: TableColumn<TenantRequest>[] = [
     {
       key: 'tenantName',
       label: 'Tenant',
       render: (_, request) => <span className="fw-semibold">{request.tenantName}</span>,
     },
     {
+      key: 'requestTypeCode',
+      label: 'Type',
+      filterOptions: typeOptions,
+      render: (_, request) => typeLabel(request.requestTypeCode),
+    },
+    {
       key: 'statusCode',
       label: 'Status',
       filterOptions: statusOptions,
-      render: (_, request) => <SmsRequestStatusBadge status={request.statusCode} />,
+      render: (_, request) => <TenantRequestStatusBadge status={request.statusCode} />,
     },
     {
       key: 'requestedAt',
       label: 'Requested',
       render: (_, request) => (
-        <div className="admin-sms-numbers__stack">
+        <div className="tenant-requests__stack">
           <time dateTime={request.requestedAt}>{formatDate(request.requestedAt)}</time>
           {request.requestedBy && (
-            <span className="admin-sms-numbers__detail">By {request.requestedBy}</span>
+            <span className="tenant-requests__detail">By {request.requestedBy}</span>
           )}
         </div>
       ),
@@ -176,22 +192,22 @@ const SmsNumberRequestsTable: FC<SmsNumberRequestsTableProps> = ({
           <RowActionsMenu
             label={`Actions for ${request.tenantName}'s request`}
             groups={[{ id: 'request', actions }]}
-            onAction={(actionId) => onAction(actionId as SmsNumberRequestAction, request)}
+            onAction={(actionId) => onAction(actionId as TenantRequestAction, request)}
           />
         ) : null
       },
     },
   ]
 
-  // Nothing to show in the usual view (pending, or every status, with no search): a card, as on
-  // the other list pages. A search or another filter keeps the table, with its own empty state.
+  // Nothing to show in the usual view (every type, pending or every status, no search): a card, as
+  // on the other list pages. A search or another filter keeps the table, with its own empty state.
   const pendingOnly = statusFilter.length === 1 && statusFilter[0] === 'pending'
-  const usualView = !search && (pendingOnly || statusFilter.length === 0)
+  const usualView = !search && typeFilter.length === 0 && (pendingOnly || statusFilter.length === 0)
   if (!loading && !error && count === 0 && usualView) {
     return pendingOnly ? (
       <NoDataCard
         title="No pending requests."
-        message="New SMS number requests from tenants appear here for review. Requests already decided are kept under their other statuses."
+        message="New requests from tenants appear here for review. Requests already decided are kept under their other statuses."
         actionLabel="Show all requests"
         onAction={() => {
           setStatusFilter([])
@@ -200,8 +216,8 @@ const SmsNumberRequestsTable: FC<SmsNumberRequestsTableProps> = ({
       />
     ) : (
       <NoDataCard
-        title="No SMS number requests yet."
-        message="Tenants request an SMS number from their SMS settings. Their requests will appear here for review."
+        title="No tenant requests yet."
+        message="Tenants ask for things like an SMS number from their settings. Their requests will appear here for review."
       />
     )
   }
@@ -225,13 +241,13 @@ const SmsNumberRequestsTable: FC<SmsNumberRequestsTableProps> = ({
         keyExtractor={(request) => request.id}
         multiline
         isLoading={loading}
-        emptyMessage="No tenant has requested an SMS number."
+        emptyMessage="No tenant has made a request."
         search={search}
         onClearSearch={clearSearch}
-        // Only while something is selected: an empty filter is no filter, for the empty state too.
-        activeFilters={statusFilter.length > 0 ? { statusCode: statusFilter } : {}}
-        onFilter={(_, values) => {
-          setStatusFilter(values)
+        activeFilters={activeFiltersOf({ statusCode: statusFilter, requestTypeCode: typeFilter })}
+        onFilter={(key, values) => {
+          if (key === 'requestTypeCode') setTypeFilter(values)
+          else setStatusFilter(values)
           setPage(1)
         }}
         currentPage={page}
@@ -243,10 +259,10 @@ const SmsNumberRequestsTable: FC<SmsNumberRequestsTableProps> = ({
           setPage(1)
         }}
         pageSizeOptions={PAGE_SIZES}
-        label="SMS number requests"
+        label="Tenant requests"
       />
     </>
   )
 }
 
-export default SmsNumberRequestsTable
+export default TenantRequestsTable

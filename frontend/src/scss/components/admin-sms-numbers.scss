@@ -1,12 +1,5 @@
 @import '../variables';
 
-.admin-sms-numbers__stack {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: $spacing-xs;
-}
-
 // The number with its Default tag beside it.
 .admin-sms-numbers__number-cell {
   display: flex;

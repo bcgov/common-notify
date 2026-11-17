@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import type { FC } from 'react'
 import { Button } from '@bcgov/design-system-react-components'
 import PageHeading from '@/components/PageHeading'
-import TabBar from '@/components/TabBar'
 import NoDataCard from '@/components/NoDataCard'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
@@ -14,32 +13,23 @@ import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchNotifyTenantOptions } from '@/redux/thunks/adminTenants.thunks'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import SmsNumberDialogs from './SmsNumberDialogs'
-import SmsNumberRequestsTable from './SmsNumberRequestsTable'
 import SmsDefaultNumbersSummary from './SmsDefaultNumbersSummary'
 import SmsDefaultTag from './SmsDefaultTag'
 import type { SmsNumberAction, SmsNumberDialog } from './smsNumberDialog'
 import { codeLabel } from './smsNumberLabels'
 import '@/scss/components/admin-sms-numbers.scss'
 
-type SmsNumbersTab = 'requests' | 'numbers'
-
 const NUMBERS_PAGE_SIZES = [15, 30]
 
-const TABS: { id: SmsNumbersTab; label: string }[] = [
-  { id: 'requests', label: 'Requests' },
-  { id: 'numbers', label: 'Numbers' },
-]
-
 /**
- * SMS numbers: tenants' requests for one, and the inventory of numbers with the tenants assigned
- * each. NOTIFY_ADMIN only, through routes/admin/route.tsx.
+ * The inventory of SMS numbers, each provider's default, and the tenants assigned each number.
+ * Tenants' requests for a number are decided on the Tenant Requests page. NOTIFY_ADMIN only,
+ * through routes/admin/route.tsx.
  */
 const AdminSmsNumbers: FC = () => {
   const dispatch = useAppDispatch()
   const tenants = useAppSelector((state) => state.adminTenants.notifyOptions)
   const [numbers, setNumbers] = useState<SmsNumber[]>([])
-  // Bumped after a save, so the requests table loads its current page again.
-  const [requestsReloadKey, setRequestsReloadKey] = useState(0)
   const [numbersPage, setNumbersPage] = useState(1)
   const [numbersLimit, setNumbersLimit] = useState(NUMBERS_PAGE_SIZES[0])
   const [codes, setCodes] = useState<SmsNumberCodes | null>(null)
@@ -47,7 +37,6 @@ const AdminSmsNumbers: FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [dialog, setDialog] = useState<SmsNumberDialog | null>(null)
   const [busy, setBusy] = useState(false)
-  const [tab, setTab] = useState<SmsNumbersTab>('requests')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -63,12 +52,6 @@ const AdminSmsNumbers: FC = () => {
     }
   }, [])
 
-  /** After a save: the numbers and codes, and the requests table's current page. */
-  const reload = useCallback(async () => {
-    setRequestsReloadKey((key) => key + 1)
-    await load()
-  }, [load])
-
   useEffect(() => {
     load()
     dispatch(fetchNotifyTenantOptions())
@@ -83,7 +66,7 @@ const AdminSmsNumbers: FC = () => {
       await action()
       showSuccessToast(success)
       close()
-      await reload()
+      await load()
     } catch (actionError) {
       showErrorToast(actionError instanceof Error ? actionError.message : 'Something went wrong')
     } finally {
@@ -182,8 +165,8 @@ const AdminSmsNumbers: FC = () => {
   // The inventory is small and the dialogs need all of it, so it is paged here, not by the API.
   const numbersOnPage = numbers.slice((numbersPage - 1) * numbersLimit, numbersPage * numbersLimit)
 
-  /** The Numbers tab: a card until there is a number, then the defaults and the table. */
-  function renderNumbersTab() {
+  /** A card until there is a number, then the defaults and the table. */
+  function renderNumbers() {
     if (!loading && !error && numbers.length === 0) {
       return (
         <NoDataCard
@@ -241,17 +224,7 @@ const AdminSmsNumbers: FC = () => {
       <PageHeading title="SMS Numbers" />
       {error && <div role="alert">{error}</div>}
 
-      <TabBar label="SMS number views" items={TABS} selected={tab} onSelect={setTab} />
-
-      {tab === 'requests' ? (
-        <SmsNumberRequestsTable
-          statuses={codes?.requestStatuses}
-          reloadKey={requestsReloadKey}
-          onAction={(kind, request) => setDialog({ kind, request })}
-        />
-      ) : (
-        renderNumbersTab()
-      )}
+      {renderNumbers()}
 
       {dialog && (
         <SmsNumberDialogs
@@ -261,7 +234,7 @@ const AdminSmsNumbers: FC = () => {
           tenants={tenants}
           busy={busy}
           onClose={close}
-          onSaved={reload}
+          onSaved={load}
           onConfirm={runConfirmed}
         />
       )}

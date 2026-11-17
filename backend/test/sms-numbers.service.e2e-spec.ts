@@ -5,17 +5,19 @@ import { BadRequestException, ConflictException, NotFoundException } from '@nest
 import type { ConfigService } from '@nestjs/config'
 import { DataSource } from 'typeorm'
 import { SmsNumbersService } from '../src/api/sms-numbers/sms-numbers.service'
-import { SmsNumberRequestsService } from '../src/api/sms-numbers/sms-number-requests.service'
+import { SmsNumberRequestHandler } from '../src/api/sms-numbers/sms-number-request.handler'
 import { SmsNumber } from '../src/api/sms-numbers/entities/sms-number.entity'
 import { TenantSmsNumber } from '../src/api/sms-numbers/entities/tenant-sms-number.entity'
-import { SmsNumberRequest } from '../src/api/sms-numbers/entities/sms-number-request.entity'
-import { SmsNumberRequestHistory } from '../src/api/sms-numbers/entities/sms-number-request-history.entity'
+import { TenantRequestsService } from '../src/api/tenant-requests/tenant-requests.service'
+import { TenantRequestHandlerRegistry } from '../src/api/tenant-requests/tenant-request-handler.registry'
+import { TenantRequest } from '../src/api/tenant-requests/entities/tenant-request.entity'
+import { TenantRequestHistory } from '../src/api/tenant-requests/entities/tenant-request-history.entity'
 import type { ISmsTransport } from '../src/adapters'
 
 /**
- * SMS numbers, assignments and requests against a real Postgres, on the schema V81 creates: the
- * per-provider assignment rule and the one-pending-request rule are constraints, so only the
- * database can show they hold.
+ * SMS numbers, assignments and requests against a real Postgres, on the schema the tenant requests
+ * and SMS numbers migrations create: the per-provider assignment rule and the one-pending-request
+ * rule are constraints, so only the database can show they hold.
  *
  * Needs Postgres (localhost:5432, user postgres, password default; override POSTGRES_PORT).
  * Builds its own database so a developer's migrated dev schema is never touched.
@@ -31,13 +33,15 @@ const base = {
 }
 
 /**
- * The migration that creates these tables, found by name rather than version: a version can be
- * renumbered to land after another branch's migration.
+ * A migration, found by name rather than version: a version can be renumbered to land after
+ * another branch's migration.
  */
-function smsNumbersMigration(): string {
+function migration(name: string): string {
   const dir = join(__dirname, '../../migrations/sql')
-  const [file] = readdirSync(dir).filter((name) => /^V\d+__sms_numbers\.sql$/.test(name))
-  if (!file) throw new Error(`No V*__sms_numbers.sql migration in ${dir}`)
+  const [file] = readdirSync(dir).filter((entry) =>
+    new RegExp(`^V\\d+__${name}\\.sql$`).test(entry),
+  )
+  if (!file) throw new Error(`No V*__${name}.sql migration in ${dir}`)
   return readFileSync(join(dir, file), 'utf8')
 }
 
@@ -55,7 +59,8 @@ const config: Record<string, unknown> = {
 describe('SMS numbers (database)', () => {
   let dataSource: DataSource
   let numbers: SmsNumbersService
-  let requests: SmsNumberRequestsService
+  let requests: TenantRequestsService
+  let handler: SmsNumberRequestHandler
 
   const addNumber = (phoneNumber: string, providerCode = 'aws') =>
     numbers.createNumber({ phoneNumber, providerCode, numberTypeCode: 'long_code' }, admin)
@@ -70,29 +75,34 @@ describe('SMS numbers (database)', () => {
     dataSource = new DataSource({
       ...base,
       database: TEST_DB,
-      entities: [SmsNumber, TenantSmsNumber, SmsNumberRequest, SmsNumberRequestHistory],
+      entities: [SmsNumber, TenantSmsNumber, TenantRequest, TenantRequestHistory],
       synchronize: false,
     })
     await dataSource.initialize()
-    // Only the tenant columns V81 and these services touch.
+    // Only the tenant columns the migrations and these services touch.
     await dataSource.query(`
       CREATE SCHEMA notify;
       CREATE TABLE notify.tenant (
         id UUID PRIMARY KEY, name VARCHAR(200) NOT NULL, is_deleted BOOLEAN NOT NULL DEFAULT FALSE
       );`)
-    await dataSource.query(smsNumbersMigration())
+    await dataSource.query(migration('tenant_requests'))
+    await dataSource.query(migration('sms_numbers'))
     await dataSource.query(
       `INSERT INTO notify.tenant (id, name) VALUES ($1, 'Parks'), ($2, 'Roads'), ($3, '100% Parks')`,
       [PARKS, ROADS, LANDS],
     )
 
+    const registry = new TenantRequestHandlerRegistry()
+    requests = new TenantRequestsService(dataSource.getRepository(TenantRequest), registry)
     numbers = new SmsNumbersService(
       dataSource.getRepository(SmsNumber),
       dataSource.getRepository(TenantSmsNumber),
+      requests,
       { name: 'aws' } as ISmsTransport,
       { get: (key: string) => config[key] } as unknown as ConfigService,
     )
-    requests = new SmsNumberRequestsService(dataSource.getRepository(SmsNumberRequest), numbers)
+    handler = new SmsNumberRequestHandler(registry, numbers)
+    handler.onModuleInit()
   })
 
   afterAll(async () => {
@@ -102,8 +112,8 @@ describe('SMS numbers (database)', () => {
   beforeEach(async () => {
     config['smsNumbers.defaultNumberAssignable'] = true
     await dataSource.query(
-      `TRUNCATE notify.sms_number_request_history, notify.sms_number_request,
-                notify.tenant_sms_number, notify.sms_number`,
+      `TRUNCATE notify.tenant_request_history, notify.tenant_request_sms_number,
+                notify.tenant_request, notify.tenant_sms_number, notify.sms_number`,
     )
   })
 
@@ -247,81 +257,114 @@ describe('SMS numbers (database)', () => {
       const codes = await numbers.getCodes()
 
       expect(codes.providers.map((p) => p.code)).toEqual(['acs', 'aws', 'swift', 'twilio'])
-      expect(codes.requestStatuses.map((s) => s.code)).toEqual([
-        'approved',
-        'cancelled',
-        'pending',
-        'rejected',
-        'released',
-      ])
+      await expect(requests.getCodes()).resolves.toEqual({
+        types: [{ code: 'sms_number', description: 'SMS number' }],
+        statuses: expect.arrayContaining([expect.objectContaining({ code: 'released' })]),
+      })
       expect(codes.numberTypes.map((t) => t.code)).toContain('rcs')
       expect(codes.activeProvider).toBe('aws')
     })
   })
 
   describe('requests', () => {
+    const ask = (tenantId: string) => requests.create(tenantId, 'sms_number', tenantUser)
+    /** Approves on a number from the inventory, or with null, on the default number. */
+    const approve = (requestId: string, smsNumberId: string | null) =>
+      requests.approve(
+        requestId,
+        smsNumberId === null ? { useDefaultNumber: true } : { smsNumberId },
+        admin,
+      )
+    const historyOf = (requestId: string) =>
+      dataSource
+        .getRepository(TenantRequestHistory)
+        .find({ where: { tenantRequestId: requestId }, order: { createdAt: 'ASC' } })
+
     it('allows one pending request per tenant', async () => {
-      const request = await requests.create(PARKS, tenantUser)
+      const request = await ask(PARKS)
 
       expect(request).toMatchObject({
         tenantName: 'Parks',
+        requestTypeCode: 'sms_number',
         statusCode: 'pending',
         requestedBy: 'Terry User',
         decidedAt: null,
+        outcome: null,
       })
-      await expect(requests.create(PARKS, tenantUser)).rejects.toBeInstanceOf(ConflictException)
-      await expect(requests.create(ROADS, tenantUser)).resolves.toBeDefined()
+      await expect(ask(PARKS)).rejects.toBeInstanceOf(ConflictException)
+      await expect(ask(ROADS)).resolves.toBeDefined()
     })
 
-    it('approves by assigning the number, recording who decided', async () => {
-      const number = await addNumber('+15814360804')
-      const request = await requests.create(PARKS, tenantUser)
+    it('refuses a request type nothing handles', async () => {
+      await expect(requests.create(PARKS, 'priority_lane', tenantUser)).rejects.toBeInstanceOf(
+        BadRequestException,
+      )
+    })
 
-      const approved = await requests.approve(request.id, number.id, admin)
+    it('approves by assigning the number, recording who decided and what was granted', async () => {
+      const number = await addNumber('+15814360804')
+      const request = await ask(PARKS)
+
+      const approved = await approve(request.id, number.id)
 
       expect(approved).toMatchObject({
         statusCode: 'approved',
-        phoneNumber: '+15814360804',
+        outcome: '+15814360804',
         decidedBy: 'Pat Admin',
       })
       expect(approved.decidedAt).not.toBeNull()
       await expect(numbers.getFromNumber(PARKS, 'aws')).resolves.toBe('+15814360804')
+      await expect(handler.toSmsDto(dataSource.manager, approved)).resolves.toMatchObject({
+        phoneNumber: '+15814360804',
+        usesDefaultNumber: false,
+      })
     })
 
-    it('leaves the request pending if the number cannot be assigned', async () => {
-      const request = await requests.create(PARKS, tenantUser)
+    it('leaves the request pending if the number cannot be assigned or is not chosen', async () => {
+      const request = await ask(PARKS)
 
       await expect(
-        requests.approve(request.id, '7f1d5c9e-0000-4000-8000-0000000000ff', admin),
+        approve(request.id, '7f1d5c9e-0000-4000-8000-0000000000ff'),
       ).rejects.toBeInstanceOf(NotFoundException)
+      await expect(requests.approve(request.id, {}, admin)).rejects.toBeInstanceOf(
+        BadRequestException,
+      )
+      await expect(
+        requests.approve(request.id, { smsNumberId: 'not-a-uuid' }, admin),
+      ).rejects.toBeInstanceOf(BadRequestException)
 
-      await expect(requests.findLatestForTenant(PARKS)).resolves.toMatchObject({
+      await expect(requests.findLatestForTenant(PARKS, 'sms_number')).resolves.toMatchObject({
         statusCode: 'pending',
       })
+      await expect(
+        dataSource.query('SELECT 1 FROM notify.tenant_request_sms_number'),
+      ).resolves.toHaveLength(0)
     })
 
     it('rejects with a reason, and decides a request only once', async () => {
       const number = await addNumber('+15814360804')
-      const request = await requests.create(PARKS, tenantUser)
+      const request = await ask(PARKS)
 
       await expect(requests.reject(request.id, 'No use case given', admin)).resolves.toMatchObject({
         statusCode: 'rejected',
         decisionReason: 'No use case given',
         decidedBy: 'Pat Admin',
       })
-      await expect(requests.approve(request.id, number.id, admin)).rejects.toBeInstanceOf(
-        ConflictException,
-      )
+      await expect(approve(request.id, number.id)).rejects.toBeInstanceOf(ConflictException)
       await expect(requests.release(request.id, admin)).rejects.toBeInstanceOf(ConflictException)
     })
 
     it('lets a tenant cancel its own pending request, recording who and when', async () => {
-      const request = await requests.create(PARKS, tenantUser)
+      const request = await ask(PARKS)
 
       await expect(requests.cancel(ROADS, request.id, tenantUser)).rejects.toBeInstanceOf(
         NotFoundException,
       )
-      const cancelled = await requests.cancel(PARKS, request.id, tenantUser)
+      // Another type's endpoint cannot reach it either.
+      await expect(
+        requests.cancel(PARKS, request.id, tenantUser, 'priority_lane'),
+      ).rejects.toBeInstanceOf(NotFoundException)
+      const cancelled = await requests.cancel(PARKS, request.id, tenantUser, 'sms_number')
 
       expect(cancelled).toMatchObject({
         statusCode: 'cancelled',
@@ -333,13 +376,10 @@ describe('SMS numbers (database)', () => {
       await expect(requests.reject(request.id, 'Late', admin)).rejects.toBeInstanceOf(
         ConflictException,
       )
-      await expect(requests.create(PARKS, tenantUser)).resolves.toMatchObject({
-        statusCode: 'pending',
-      })
-      const history = await dataSource
-        .getRepository(SmsNumberRequestHistory)
-        .find({ where: { smsNumberRequestId: request.id }, order: { createdAt: 'ASC' } })
-      expect(history.map((row) => [row.statusCode, row.createdByName])).toEqual([
+      await expect(ask(PARKS)).resolves.toMatchObject({ statusCode: 'pending' })
+      expect(
+        (await historyOf(request.id)).map((row) => [row.statusCode, row.createdByName]),
+      ).toEqual([
         ['pending', 'Terry User'],
         ['cancelled', 'Terry User'],
       ])
@@ -347,8 +387,8 @@ describe('SMS numbers (database)', () => {
 
     it('cancels only a pending request', async () => {
       const number = await addNumber('+15814360804')
-      const request = await requests.create(PARKS, tenantUser)
-      await requests.approve(request.id, number.id, admin)
+      const request = await ask(PARKS)
+      await approve(request.id, number.id)
 
       await expect(requests.cancel(PARKS, request.id, tenantUser)).rejects.toBeInstanceOf(
         ConflictException,
@@ -357,34 +397,42 @@ describe('SMS numbers (database)', () => {
 
     it('releases an approved number, by an admin or the tenant itself', async () => {
       const number = await addNumber('+15814360804')
-      const request = await requests.create(PARKS, tenantUser)
-      await requests.approve(request.id, number.id, admin)
+      const request = await ask(PARKS)
+      await approve(request.id, number.id)
 
       // Another tenant cannot see it, let alone release it.
-      await expect(requests.release(request.id, tenantUser, ROADS)).rejects.toBeInstanceOf(
-        NotFoundException,
-      )
-      const released = await requests.release(request.id, tenantUser, PARKS)
+      await expect(
+        requests.release(request.id, tenantUser, { tenantId: ROADS, type: 'sms_number' }),
+      ).rejects.toBeInstanceOf(NotFoundException)
+      const released = await requests.release(request.id, tenantUser, {
+        tenantId: PARKS,
+        type: 'sms_number',
+      })
 
       expect(released).toMatchObject({
         statusCode: 'released',
         releasedBy: 'Terry User',
-        // The approval is still on record.
+        // The approval, and the number it gave, are still on record.
         decidedBy: 'Pat Admin',
-        phoneNumber: '+15814360804',
+        outcome: '+15814360804',
       })
       expect(released.releasedAt).not.toBeNull()
       await expect(numbers.getFromNumber(PARKS, 'aws')).resolves.toBeNull()
       await expect(requests.release(request.id, admin)).rejects.toBeInstanceOf(ConflictException)
+      expect((await historyOf(request.id)).map((row) => row.statusCode)).toEqual([
+        'pending',
+        'approved',
+        'released',
+      ])
     })
 
     it('releases the request when an admin unassigns or replaces its number directly', async () => {
       const first = await addNumber('+15814360804')
       const second = await addNumber('+15814360805')
-      const replaced = await requests.create(PARKS, tenantUser)
-      await requests.approve(replaced.id, first.id, admin)
-      const unassigned = await requests.create(ROADS, tenantUser)
-      await requests.approve(unassigned.id, first.id, admin)
+      const replaced = await ask(PARKS)
+      await approve(replaced.id, first.id)
+      const unassigned = await ask(ROADS)
+      await approve(unassigned.id, first.id)
 
       await numbers.assign(PARKS, second.id, admin)
       await numbers.unassign(ROADS, first.id, admin)
@@ -399,16 +447,16 @@ describe('SMS numbers (database)', () => {
 
     it('keeps who created the request, and who last changed it', async () => {
       const number = await addNumber('+15814360804')
-      const request = await requests.create(PARKS, tenantUser)
+      const request = await ask(PARKS)
       const auditOf = async () =>
-        dataSource.getRepository(SmsNumberRequest).findOneByOrFail({ id: request.id })
+        dataSource.getRepository(TenantRequest).findOneByOrFail({ id: request.id })
 
       await expect(auditOf()).resolves.toMatchObject({
         createdBy: 'tuser',
         createdByName: 'Terry User',
         updatedBy: 'tuser',
       })
-      await requests.approve(request.id, number.id, admin)
+      await approve(request.id, number.id)
       await expect(auditOf()).resolves.toMatchObject({ createdBy: 'tuser', updatedBy: 'padmin' })
       // Released by an admin unassigning the number, through the bulk update.
       await numbers.unassign(PARKS, number.id, { id: 'other-admin', name: null })
@@ -421,64 +469,59 @@ describe('SMS numbers (database)', () => {
 
     it('records who moved a request into each status, and when, with the reason', async () => {
       const number = await addNumber('+15814360804')
-      const approved = await requests.create(PARKS, tenantUser)
-      await requests.approve(approved.id, number.id, admin)
+      const approved = await ask(PARKS)
+      await approve(approved.id, number.id)
       await numbers.unassign(PARKS, number.id, admin)
-      const rejected = await requests.create(ROADS, tenantUser)
+      const rejected = await ask(ROADS)
       await requests.reject(rejected.id, 'No opt-out steps', admin)
 
-      const history = await dataSource.getRepository(SmsNumberRequestHistory).find({
-        order: { createdAt: 'ASC' },
-      })
-      const rows = (requestId: string) =>
-        history
-          .filter((row) => row.smsNumberRequestId === requestId)
-          .map((row) => [row.statusCode, row.createdByName, row.reason, row.smsNumberId])
+      const rows = async (requestId: string) =>
+        (await historyOf(requestId)).map((row) => [row.statusCode, row.createdByName, row.reason])
 
-      expect(rows(approved.id)).toEqual([
-        ['pending', 'Terry User', null, null],
-        ['approved', 'Pat Admin', null, number.id],
-        ['released', 'Pat Admin', null, number.id],
+      await expect(rows(approved.id)).resolves.toEqual([
+        ['pending', 'Terry User', null],
+        ['approved', 'Pat Admin', null],
+        ['released', 'Pat Admin', null],
       ])
-      expect(rows(rejected.id)).toEqual([
-        ['pending', 'Terry User', null, null],
-        ['rejected', 'Pat Admin', 'No opt-out steps', null],
+      await expect(rows(rejected.id)).resolves.toEqual([
+        ['pending', 'Terry User', null],
+        ['rejected', 'Pat Admin', 'No opt-out steps'],
       ])
-      expect(history.every((row) => row.createdAt instanceof Date)).toBe(true)
     })
 
     it('approves on the default number outside prod, assigning nothing', async () => {
-      const request = await requests.create(PARKS, tenantUser)
+      const request = await ask(PARKS)
 
-      const approved = await requests.approve(request.id, null, admin)
+      const approved = await approve(request.id, null)
 
       expect(approved).toMatchObject({
         statusCode: 'approved',
-        usesDefaultNumber: true,
-        phoneNumber: null,
+        outcome: 'Default number',
         decidedBy: 'Pat Admin',
       })
-      await expect(dataSource.getRepository(TenantSmsNumber).count()).resolves.toBe(0)
-      await expect(requests.release(request.id, tenantUser, PARKS)).resolves.toMatchObject({
-        statusCode: 'released',
+      await expect(handler.toSmsDto(dataSource.manager, approved)).resolves.toMatchObject({
         usesDefaultNumber: true,
-        releasedBy: 'Terry User',
+        phoneNumber: null,
       })
-      const history = await dataSource
-        .getRepository(SmsNumberRequestHistory)
-        .find({ where: { smsNumberRequestId: request.id }, order: { createdAt: 'ASC' } })
-      expect(history.map((row) => row.statusCode)).toEqual(['pending', 'approved', 'released'])
+      await expect(dataSource.getRepository(TenantSmsNumber).count()).resolves.toBe(0)
+      await expect(
+        requests.release(request.id, tenantUser, { tenantId: PARKS, type: 'sms_number' }),
+      ).resolves.toMatchObject({ statusCode: 'released', releasedBy: 'Terry User' })
+      expect((await historyOf(request.id)).map((row) => row.statusCode)).toEqual([
+        'pending',
+        'approved',
+        'released',
+      ])
     })
 
     it('refuses the default number in prod, leaving the request pending', async () => {
       config['smsNumbers.defaultNumberAssignable'] = false
-      const request = await requests.create(PARKS, tenantUser)
+      const request = await ask(PARKS)
 
-      await expect(requests.approve(request.id, null, admin)).rejects.toBeInstanceOf(
-        BadRequestException,
-      )
-      await expect(requests.findLatestForTenant(PARKS)).resolves.toMatchObject({
-        statusCode: 'pending',
+      await expect(approve(request.id, null)).rejects.toBeInstanceOf(BadRequestException)
+      const latest = await requests.findLatestForTenant(PARKS, 'sms_number')
+      expect(latest).toMatchObject({ statusCode: 'pending', outcome: null })
+      await expect(handler.toSmsDto(dataSource.manager, latest)).resolves.toMatchObject({
         usesDefaultNumber: false,
       })
       await expect(numbers.getCodes()).resolves.toMatchObject({
@@ -487,12 +530,12 @@ describe('SMS numbers (database)', () => {
       })
     })
 
-    it('pages, filters by status and searches tenant names for the admin table', async () => {
-      const parks = await requests.create(PARKS, tenantUser)
+    it('pages, filters by status and type, and searches tenant names for the admin table', async () => {
+      const parks = await ask(PARKS)
       await requests.reject(parks.id, 'No', admin)
-      await requests.create(PARKS, tenantUser)
-      await requests.create(ROADS, tenantUser)
-      await requests.create(LANDS, tenantUser)
+      await ask(PARKS)
+      await ask(ROADS)
+      await ask(LANDS)
 
       // Newest first, two to a page.
       const first = await requests.list({ page: 1, limit: 2 })
@@ -506,6 +549,11 @@ describe('SMS numbers (database)', () => {
         count: 4,
       })
       await expect(requests.list({ statuses: [] })).resolves.toMatchObject({ count: 4 })
+      // By type, the same way.
+      await expect(requests.list({ types: ['sms_number'] })).resolves.toMatchObject({ count: 4 })
+      await expect(requests.list({ types: ['priority_lane'] })).resolves.toMatchObject({
+        count: 0,
+      })
 
       // Case-insensitive, and a % in the search is a literal, not a wildcard.
       const parksOnly = await requests.list({ search: 'parks', statuses: ['pending'] })
@@ -519,13 +567,15 @@ describe('SMS numbers (database)', () => {
     })
 
     it('shows a tenant its latest request, and admins every request by status', async () => {
-      await expect(requests.findLatestForTenant(PARKS)).resolves.toBeNull()
-      const first = await requests.create(PARKS, tenantUser)
+      await expect(requests.findLatestForTenant(PARKS, 'sms_number')).resolves.toBeNull()
+      const first = await ask(PARKS)
       await requests.reject(first.id, 'Not yet', admin)
-      const second = await requests.create(PARKS, tenantUser)
-      await requests.create(ROADS, tenantUser)
+      const second = await ask(PARKS)
+      await ask(ROADS)
 
-      await expect(requests.findLatestForTenant(PARKS)).resolves.toMatchObject({ id: second.id })
+      await expect(requests.findLatestForTenant(PARKS, 'sms_number')).resolves.toMatchObject({
+        id: second.id,
+      })
       const pending = await requests.list({ statuses: ['pending'] })
       expect(pending.data.map((r) => r.tenantName).sort()).toEqual(['Parks', 'Roads'])
       await expect(requests.list()).resolves.toMatchObject({ count: 3 })

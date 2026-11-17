@@ -3,14 +3,12 @@ import ConfirmDialog from '@/components/ConfirmDialog'
 import {
   clearDefaultSmsNumber,
   deleteSmsNumber,
-  releaseSmsNumberRequest,
   setDefaultSmsNumber,
   unassignSmsNumber,
 } from '@/api/smsNumbers.api'
 import type { SmsNumber, SmsNumberCodes } from '@/api/smsNumbers.api'
 import AssignSmsNumberDialog from './AssignSmsNumberDialog'
 import ChooseDefaultNumberDialog from './ChooseDefaultNumberDialog'
-import RejectSmsNumberRequestDialog from './RejectSmsNumberRequestDialog'
 import SmsNumberFormDialog from './SmsNumberFormDialog'
 import type { SmsNumberDialog } from './smsNumberDialog'
 import { codeLabel } from './smsNumberLabels'
@@ -74,51 +72,6 @@ const SmsNumberDialogs: FC<SmsNumberDialogsProps> = ({
           onClose={onClose}
           onSaved={onSaved}
         />
-      )
-    case 'approve':
-      return (
-        <AssignSmsNumberDialog
-          key={dialog.request.id}
-          providers={providers}
-          request={dialog.request}
-          numbers={numbers}
-          defaultNumber={
-            codes?.defaultNumberAssignable ? (codes.defaultNumber ?? undefined) : undefined
-          }
-          onClose={onClose}
-          onSaved={onSaved}
-        />
-      )
-    case 'reject':
-      return (
-        <RejectSmsNumberRequestDialog
-          key={dialog.request.id}
-          request={dialog.request}
-          onClose={onClose}
-          onSaved={onSaved}
-        />
-      )
-    case 'release':
-      return (
-        <ConfirmDialog
-          isOpen
-          title={`Release ${dialog.request.phoneNumber ?? 'the number'}`}
-          confirmLabel="Release number"
-          danger
-          isBusy={busy}
-          onCancel={onClose}
-          onConfirm={() =>
-            onConfirm(
-              () => releaseSmsNumberRequest(dialog.request.id).then(() => undefined),
-              `${dialog.request.tenantName}'s number released`,
-            )
-          }
-        >
-          <p className="mb-0">
-            {dialog.request.tenantName} will send from the shared default number. The number stays
-            in the inventory, free to assign again.
-          </p>
-        </ConfirmDialog>
       )
     case 'unassign':
       return (

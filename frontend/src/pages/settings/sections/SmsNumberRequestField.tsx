@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { FC } from 'react'
 import { Button, InlineAlert } from '@bcgov/design-system-react-components'
 import ConfirmDialog from '@/components/ConfirmDialog'
-import SmsRequestStatusBadge from '@/components/SmsRequestStatusBadge'
+import TenantRequestStatusBadge from '@/components/TenantRequestStatusBadge'
 import {
   cancelMySmsNumberRequest,
   getMySmsNumberRequest,
@@ -160,7 +160,7 @@ const SmsNumberRequestField: FC<SmsNumberRequestFieldProps> = ({ canEdit, smsEna
         )}
         {!loading && !loadError && request && (
           <>
-            <SmsRequestStatusBadge status={request.statusCode} />
+            <TenantRequestStatusBadge status={request.statusCode} />
             <p className="sms-number-request__text">{describe(request, senderNumber)}</p>
           </>
         )}

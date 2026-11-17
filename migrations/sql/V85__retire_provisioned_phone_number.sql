@@ -2,7 +2,7 @@
 -- Retire provisioned_phone_number (V60)
 --
 -- The Events page's own pool of tenant SMS numbers. It was never populated, and
--- V82's sms_number / tenant_sms_number now say which number a tenant sends from.
+-- V84's sms_number / tenant_sms_number now say which number a tenant sends from.
 -- Events show the sender a send actually uses: the tenant's number for the
 -- active provider, else that provider's default. With a sender always
 -- resolvable, activating an event's SMS channel no longer depends on one being

@@ -2,20 +2,20 @@ import { useState } from 'react'
 import type { FC } from 'react'
 import { TextArea } from '@bcgov/design-system-react-components'
 import ConfirmDialog from '@/components/ConfirmDialog'
-import { rejectSmsNumberRequest } from '@/api/smsNumbers.api'
-import type { SmsNumberRequest } from '@/api/smsNumbers.api'
+import { rejectTenantRequest } from '@/api/tenantRequests.api'
+import type { TenantRequest } from '@/api/tenantRequests.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 
 const REASON_MAX_LENGTH = 500
 
-interface RejectSmsNumberRequestDialogProps {
-  request: SmsNumberRequest
+interface RejectTenantRequestDialogProps {
+  request: TenantRequest
   onClose: () => void
   onSaved: () => void
 }
 
-/** Rejects a request. The reason is required, and shown to the tenant in its SMS settings. */
-const RejectSmsNumberRequestDialog: FC<RejectSmsNumberRequestDialogProps> = ({
+/** Rejects a request. The reason is required, and shown to the tenant with the request. */
+const RejectTenantRequestDialog: FC<RejectTenantRequestDialogProps> = ({
   request,
   onClose,
   onSaved,
@@ -31,7 +31,7 @@ const RejectSmsNumberRequestDialog: FC<RejectSmsNumberRequestDialogProps> = ({
     }
     setSaving(true)
     try {
-      await rejectSmsNumberRequest(request.id, reason.trim())
+      await rejectTenantRequest(request.id, reason.trim())
       showSuccessToast(`${request.tenantName}'s request rejected`)
       onSaved()
       onClose()
@@ -54,7 +54,7 @@ const RejectSmsNumberRequestDialog: FC<RejectSmsNumberRequestDialogProps> = ({
     >
       <TextArea
         label="Reason"
-        description={`Shown to ${request.tenantName} in its SMS settings.`}
+        description={`Shown to ${request.tenantName} with its request.`}
         value={reason}
         onChange={(value) => {
           setReason(value)
@@ -70,4 +70,4 @@ const RejectSmsNumberRequestDialog: FC<RejectSmsNumberRequestDialogProps> = ({
   )
 }
 
-export default RejectSmsNumberRequestDialog
+export default RejectTenantRequestDialog

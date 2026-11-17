@@ -22,6 +22,7 @@ import { Route as AdminFeatureFlagsRouteImport } from './routes/admin/feature-fl
 import { Route as AdminHealthRouteImport } from './routes/admin/health'
 import { Route as AdminMonitoringRouteImport } from './routes/admin/monitoring'
 import { Route as AdminSmsNumbersRouteImport } from './routes/admin/sms-numbers'
+import { Route as AdminTenantRequestsRouteImport } from './routes/admin/tenant-requests'
 import { Route as AdminTenantsRouteImport } from './routes/admin/tenants'
 import { Route as AdminUsageRouteImport } from './routes/admin/usage'
 import { Route as BulkNotificationsIndexRouteImport } from './routes/bulk-notifications/index'
@@ -98,6 +99,11 @@ const AdminMonitoringRoute = AdminMonitoringRouteImport.update({
 const AdminSmsNumbersRoute = AdminSmsNumbersRouteImport.update({
   id: '/sms-numbers',
   path: '/sms-numbers',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminTenantRequestsRoute = AdminTenantRequestsRouteImport.update({
+  id: '/tenant-requests',
+  path: '/tenant-requests',
   getParentRoute: () => AdminRouteRoute,
 } as any)
 const AdminTenantsRoute = AdminTenantsRouteImport.update({
@@ -177,6 +183,7 @@ export interface FileRoutesByFullPath {
   '/admin/health': typeof AdminHealthRoute
   '/admin/monitoring': typeof AdminMonitoringRoute
   '/admin/sms-numbers': typeof AdminSmsNumbersRoute
+  '/admin/tenant-requests': typeof AdminTenantRequestsRoute
   '/admin/tenants': typeof AdminTenantsRoute
   '/admin/usage': typeof AdminUsageRoute
   '/events/create': typeof EventsCreateRoute
@@ -203,6 +210,7 @@ export interface FileRoutesByTo {
   '/admin/health': typeof AdminHealthRoute
   '/admin/monitoring': typeof AdminMonitoringRoute
   '/admin/sms-numbers': typeof AdminSmsNumbersRoute
+  '/admin/tenant-requests': typeof AdminTenantRequestsRoute
   '/admin/tenants': typeof AdminTenantsRoute
   '/admin/usage': typeof AdminUsageRoute
   '/events/create': typeof EventsCreateRoute
@@ -231,6 +239,7 @@ export interface FileRoutesById {
   '/admin/health': typeof AdminHealthRoute
   '/admin/monitoring': typeof AdminMonitoringRoute
   '/admin/sms-numbers': typeof AdminSmsNumbersRoute
+  '/admin/tenant-requests': typeof AdminTenantRequestsRoute
   '/admin/tenants': typeof AdminTenantsRoute
   '/admin/usage': typeof AdminUsageRoute
   '/events/create': typeof EventsCreateRoute
@@ -260,6 +269,7 @@ export interface FileRouteTypes {
     | '/admin/health'
     | '/admin/monitoring'
     | '/admin/sms-numbers'
+    | '/admin/tenant-requests'
     | '/admin/tenants'
     | '/admin/usage'
     | '/events/create'
@@ -286,6 +296,7 @@ export interface FileRouteTypes {
     | '/admin/health'
     | '/admin/monitoring'
     | '/admin/sms-numbers'
+    | '/admin/tenant-requests'
     | '/admin/tenants'
     | '/admin/usage'
     | '/events/create'
@@ -313,6 +324,7 @@ export interface FileRouteTypes {
     | '/admin/health'
     | '/admin/monitoring'
     | '/admin/sms-numbers'
+    | '/admin/tenant-requests'
     | '/admin/tenants'
     | '/admin/usage'
     | '/events/create'
@@ -440,6 +452,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSmsNumbersRouteImport
       parentRoute: typeof AdminRouteRoute
     }
+    '/admin/tenant-requests': {
+      id: '/admin/tenant-requests'
+      path: '/tenant-requests'
+      fullPath: '/admin/tenant-requests'
+      preLoaderRoute: typeof AdminTenantRequestsRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/admin/tenants': {
       id: '/admin/tenants'
       path: '/tenants'
@@ -532,6 +551,7 @@ interface AdminRouteRouteChildren {
   AdminHealthRoute: typeof AdminHealthRoute
   AdminMonitoringRoute: typeof AdminMonitoringRoute
   AdminSmsNumbersRoute: typeof AdminSmsNumbersRoute
+  AdminTenantRequestsRoute: typeof AdminTenantRequestsRoute
   AdminTenantsRoute: typeof AdminTenantsRoute
   AdminUsageRoute: typeof AdminUsageRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -544,6 +564,7 @@ const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminHealthRoute: AdminHealthRoute,
   AdminMonitoringRoute: AdminMonitoringRoute,
   AdminSmsNumbersRoute: AdminSmsNumbersRoute,
+  AdminTenantRequestsRoute: AdminTenantRequestsRoute,
   AdminTenantsRoute: AdminTenantsRoute,
   AdminUsageRoute: AdminUsageRoute,
   AdminIndexRoute: AdminIndexRoute,

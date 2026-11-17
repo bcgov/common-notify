@@ -1,6 +1,6 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm'
 
-/** A number Notify owns, hosted by one provider. See V81. */
+/** A number Notify owns, hosted by one provider. See V84. */
 @Entity('sms_number', { schema: 'notify' })
 export class SmsNumber {
   @PrimaryGeneratedColumn('uuid')
