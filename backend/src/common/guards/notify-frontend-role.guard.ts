@@ -10,6 +10,7 @@ import { Reflector } from '@nestjs/core'
 import { ConfigService } from '@nestjs/config'
 import { AuthGuard } from '@nestjs/passport'
 import { TenantsService } from '../../api/admin/tenants/tenants.service'
+import { Tenant } from '../../api/admin/tenants/entities/tenant.entity'
 import { CstarApiClient } from '../../services/cstar/cstar-api.client'
 import { ROLES_KEY } from '../decorators/roles.decorator'
 import { SsoRole } from '../../enum/sso-role.enum'
@@ -64,7 +65,40 @@ export class NotifyFrontendRoleGuard extends AuthGuard('jwt') {
     const azp = payload.azp as string
     const iss = payload.iss as string
     const idirUserGuid = payload.idir_user_guid as string
+    const authHeader = request.headers.authorization as string
 
+    this.validateTokenSource(azp, iss)
+
+    // SSO roles from Keycloak token
+    const jwtRoles = (payload.client_roles as string[]) || []
+
+    // Required roles declared on endpoint/class. Can include SSO and CSTAR roles.
+    const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ])
+
+    const xTenantId = request.headers['x-tenant-id'] as string
+    const tenant = await this.resolveTenant(xTenantId)
+    await this.validateTenantMembership(xTenantId, idirUserGuid, authHeader)
+    await this.validateRequiredRoles(
+      requiredRoles ?? [],
+      jwtRoles,
+      xTenantId,
+      idirUserGuid,
+      authHeader,
+    )
+
+    // Attach context to request
+    request.tenant = tenant
+    request.userGuid = idirUserGuid
+    request.clientId = azp
+
+    return true
+  }
+
+  /** The token must have been issued by the expected Keycloak realm for the Notify client. */
+  private validateTokenSource(azp: string, iss: string): void {
     // Validate client ID (azp claim must match KEYCLOAK_CLIENT_ID)
     if (azp !== this.keycloakClientId) {
       this.logger.warn(
@@ -80,42 +114,34 @@ export class NotifyFrontendRoleGuard extends AuthGuard('jwt') {
       )
       throw new ForbiddenException('Invalid token issuer')
     }
+  }
 
-    // SSO roles from Keycloak token
-    const jwtRoles = (payload.client_roles as string[]) || []
-
-    // Required roles declared on endpoint/class. Can include SSO and CSTAR roles.
-    const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ])
-
+  /** Requires the x-tenant-id header and returns the tenant it names. */
+  private async resolveTenant(xTenantId: string): Promise<Tenant> {
     // Validate x-tenant-id header is present (required for tenant-scoped operations)
-    const xTenantId = request.headers['x-tenant-id'] as string
     if (!xTenantId) {
       this.logger.warn(`[NotifyFrontendRoleGuard] x-tenant-id header is missing`)
       throw new BadRequestException('x-tenant-id header is required for frontend requests')
     }
 
-    // Look up tenant by external ID (required for all frontend routes using this guard)
-    let tenant
-    try {
-      tenant = await this.tenantsService.findByExternalId(xTenantId)
-    } catch {
-      throw new BadRequestException(
-        `Tenant with ID "${xTenantId}" does not exist. Please verify the tenant ID and try again.`,
-      )
-    }
+    // Look up tenant by external ID. A failed lookup is reported the same as a missing tenant.
+    const tenant = await this.tenantsService.findByExternalId(xTenantId).catch(() => null)
 
     if (!tenant) {
       throw new BadRequestException(
         `Tenant with ID "${xTenantId}" does not exist. Please verify the tenant ID and try again.`,
       )
     }
+    return tenant
+  }
 
-    // Validate tenant membership via CSTAR for all users.
+  /** Validate tenant membership via CSTAR for all users. */
+  private async validateTenantMembership(
+    xTenantId: string,
+    idirUserGuid: string,
+    authHeader: string,
+  ): Promise<void> {
     try {
-      const authHeader = request.headers.authorization as string
       const userTenants = await this.cstarApiClient.getUserTenants(idirUserGuid, authHeader)
 
       // userTenants can be either an array of strings (tenant IDs) or objects with id property
@@ -140,57 +166,51 @@ export class NotifyFrontendRoleGuard extends AuthGuard('jwt') {
       )
       throw new UnauthorizedException('Failed to verify tenant access')
     }
+  }
 
-    if (requiredRoles && requiredRoles.length > 0) {
-      const ssoRoles = requiredRoles.filter((role) =>
-        Object.values(SsoRole).includes(role as SsoRole),
+  /**
+   * Validates required roles from @Roles(): SSO roles against the JWT client_roles, CSTAR roles
+   * against CSTAR for the selected tenant. When both kinds are listed, the user needs one of each.
+   */
+  private async validateRequiredRoles(
+    requiredRoles: string[],
+    jwtRoles: string[],
+    xTenantId: string,
+    idirUserGuid: string,
+    authHeader: string,
+  ): Promise<void> {
+    const isSsoRole = (role: string) => Object.values(SsoRole).includes(role as SsoRole)
+    const ssoRoles = requiredRoles.filter(isSsoRole)
+    const cstarRoles = requiredRoles.filter((role) => !isSsoRole(role))
+
+    if (ssoRoles.length > 0 && !ssoRoles.some((role) => jwtRoles.includes(role))) {
+      this.logger.warn(
+        `[NotifyFrontendRoleGuard] User ${idirUserGuid} missing required SSO role(s). Required: [${ssoRoles.join(', ')}], User has: [${jwtRoles.join(', ')}]`,
       )
-      const cstarRoles = requiredRoles.filter(
-        (role) => !Object.values(SsoRole).includes(role as SsoRole),
-      )
-
-      if (ssoRoles.length > 0) {
-        const hasSsoRole = ssoRoles.some((role) => jwtRoles.includes(role))
-        if (!hasSsoRole) {
-          this.logger.warn(
-            `[NotifyFrontendRoleGuard] User ${idirUserGuid} missing required SSO role(s). Required: [${ssoRoles.join(', ')}], User has: [${jwtRoles.join(', ')}]`,
-          )
-          throw new ForbiddenException('User does not have required SSO role')
-        }
-      }
-
-      if (cstarRoles.length > 0) {
-        // Validate CSTAR role (fetch fresh roles from CSTAR)
-        // Frontend routes commonly use CSTAR roles for tenant-scoped authorization.
-        try {
-          const authHeader = request.headers.authorization as string
-          const userRoles = await this.cstarApiClient.getUserRoles(
-            xTenantId,
-            idirUserGuid,
-            authHeader,
-          )
-          const hasCstarRole = cstarRoles.some((role) => userRoles.includes(role))
-
-          if (!hasCstarRole) {
-            this.logger.warn(
-              `[NotifyFrontendRoleGuard] User ${idirUserGuid} does not have required CSTAR role(s). Required: [${cstarRoles.join(', ')}], User has: [${userRoles.join(', ')}]`,
-            )
-            throw new ForbiddenException('User does not have required CSTAR role')
-          }
-        } catch (error) {
-          if (error instanceof ForbiddenException) {
-            throw error
-          }
-          throw new UnauthorizedException('Failed to verify user CSTAR role')
-        }
-      }
+      throw new ForbiddenException('User does not have required SSO role')
     }
 
-    // Attach context to request
-    request.tenant = tenant
-    request.userGuid = idirUserGuid
-    request.clientId = azp
+    if (cstarRoles.length === 0) {
+      return
+    }
 
-    return true
+    // Validate CSTAR role (fetch fresh roles from CSTAR)
+    // Frontend routes commonly use CSTAR roles for tenant-scoped authorization.
+    try {
+      const userRoles = await this.cstarApiClient.getUserRoles(xTenantId, idirUserGuid, authHeader)
+      const hasCstarRole = cstarRoles.some((role) => userRoles.includes(role))
+
+      if (!hasCstarRole) {
+        this.logger.warn(
+          `[NotifyFrontendRoleGuard] User ${idirUserGuid} does not have required CSTAR role(s). Required: [${cstarRoles.join(', ')}], User has: [${userRoles.join(', ')}]`,
+        )
+        throw new ForbiddenException('User does not have required CSTAR role')
+      }
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        throw error
+      }
+      throw new UnauthorizedException('Failed to verify user CSTAR role')
+    }
   }
 }
