@@ -5,7 +5,7 @@ import EmailSettings from './EmailSettings'
 import EmailLogoMenu from '@/components/EmailLogoMenu'
 import { showSuccessToast } from '@/redux/utils/toastUtils'
 import { fetchApprovedEmailLogos, updateEmailSettings } from '@/redux/thunks/settings.thunks'
-import { fetchApiKeyUsage } from '@/redux/thunks/apiKeyUsage.thunks'
+import { fetchTenantUsage } from '@/redux/thunks/usage.thunks'
 import { CstarRole } from '@/enum/cstar-role.enum'
 
 const dispatchMock = vi.fn()
@@ -22,8 +22,8 @@ vi.mock('@/redux/thunks/settings.thunks', () => ({
   updateEmailSettings: vi.fn((payload) => ({ type: 'emailSettings/update', payload })),
 }))
 
-vi.mock('@/redux/thunks/apiKeyUsage.thunks', () => ({
-  fetchApiKeyUsage: vi.fn(() => ({ type: 'apiKeyUsage/fetch' })),
+vi.mock('@/redux/thunks/usage.thunks', () => ({
+  fetchTenantUsage: vi.fn(() => ({ type: 'usage/fetch' })),
 }))
 
 vi.mock('@/redux/utils/toastUtils', () => ({
@@ -112,7 +112,7 @@ const APPROVED_LOGOS = [
 
 function renderWithRoles(roles: CstarRole[] = [CstarRole.NOTIFY_OPERATIONS_ADMIN]) {
   state = {
-    apiKeyUsage: {
+    usage: {
       isLoading: false,
       usage: { channels: [{ channel: 'EMAIL', dailyLimit: 500, annualLimit: 1000500 }] },
     },
@@ -154,7 +154,7 @@ describe('EmailSettings section', () => {
   it('renders the usage limits from the store without re-fetching them', () => {
     renderWithRoles()
 
-    expect(fetchApiKeyUsage).not.toHaveBeenCalled()
+    expect(fetchTenantUsage).not.toHaveBeenCalled()
     expect(fetchApprovedEmailLogos).toHaveBeenCalledTimes(1)
     expect(screen.getByText('500 emails/day')).toBeInTheDocument()
     expect(screen.getByText('1,000,500 emails/year')).toBeInTheDocument()
@@ -379,7 +379,7 @@ describe('EmailSettings section', () => {
 
   it('reports Not set when a limit is missing', () => {
     renderWithRoles()
-    state = { ...state, apiKeyUsage: { isLoading: false, usage: { channels: [] } } }
+    state = { ...state, usage: { isLoading: false, usage: { channels: [] } } }
     render(<EmailSettings />)
 
     expect(screen.getAllByText('Not set').length).toBeGreaterThan(0)

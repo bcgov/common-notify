@@ -2,10 +2,10 @@ import { configureStore } from '@reduxjs/toolkit'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   getAllTenantsUsage,
-  getApiKeyUsage,
+  getTenantUsage,
   type PaginatedAdminUsageResponse,
   type TenantUsageResponse,
-} from '@/api/apiKeyUsage.api'
+} from '@/api/usage.api'
 import { issueApiKey as issueApiKeyApi } from '@/api/apiKeys.api'
 import { updateTenantSettings as updateTenantSettingsApi } from '@/api/settings.api'
 import cstarApi from '@/api/cstar.api'
@@ -14,16 +14,16 @@ import tenant, { selectTenant } from '../slices/tenant.slice'
 import cstar from '../slices/cstar.slice'
 import user from '../slices/user.slice'
 import apiKeys from '../slices/apiKeys.slice'
-import apiKeyUsage from '../slices/apiKeyUsage.slice'
+import usageReducer from '../slices/usage.slice'
 import tenantSettings from '../slices/tenantSettings.slice'
-import { fetchAllTenantsUsage, fetchApiKeyUsage } from '../thunks/apiKeyUsage.thunks'
+import { fetchAllTenantsUsage, fetchTenantUsage } from '../thunks/usage.thunks'
 import { issueApiKey } from '../thunks/apiKeys.thunks'
 import { updateTenantSettings } from '../thunks/settings.thunks'
 import { fetchCstarRoles, fetchCstarTenants } from '../thunks/cstar.thunks'
 import type { AppDispatch } from '../store'
 import { tenantGuardMiddleware } from './tenantGuard'
 
-vi.mock('@/api/apiKeyUsage.api', () => ({ getApiKeyUsage: vi.fn(), getAllTenantsUsage: vi.fn() }))
+vi.mock('@/api/usage.api', () => ({ getTenantUsage: vi.fn(), getAllTenantsUsage: vi.fn() }))
 vi.mock('@/api/apiKeys.api', () => ({ issueApiKey: vi.fn() }))
 vi.mock('@/api/settings.api', () => ({ updateTenantSettings: vi.fn() }))
 vi.mock('@/api/cstar.api', () => ({
@@ -78,7 +78,7 @@ function deferred<T>() {
 
 function setupStore() {
   const store = configureStore({
-    reducer: { tenant, cstar, user, apiKeys, apiKeyUsage, tenantSettings },
+    reducer: { tenant, cstar, user, apiKeys, usage: usageReducer, tenantSettings },
     middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(tenantGuardMiddleware),
   })
   store.dispatch(selectTenant(tenantA))
@@ -94,15 +94,15 @@ describe('tenantGuardMiddleware', () => {
   it('drops a result that resolves after switching tenant', async () => {
     const store = setupStore()
     const response = deferred<TenantUsageResponse>()
-    vi.mocked(getApiKeyUsage).mockReturnValue(response.promise)
+    vi.mocked(getTenantUsage).mockReturnValue(response.promise)
 
-    const request = store.dispatch(fetchApiKeyUsage())
+    const request = store.dispatch(fetchTenantUsage())
     store.dispatch(selectTenant(tenantB))
     response.resolve(usage(tenantA.id, 999))
     await request
 
     // Neither the usage panel nor the Settings rate limit shows tenant A's numbers under B.
-    expect(store.getState().apiKeyUsage.usage).toBeNull()
+    expect(store.getState().usage.usage).toBeNull()
     expect(store.getState().tenantSettings.rateLimitPerMinute).toBeUndefined()
   })
 
@@ -124,20 +124,20 @@ describe('tenantGuardMiddleware', () => {
 
   it('passes through results for the tenant still selected', async () => {
     const store = setupStore()
-    vi.mocked(getApiKeyUsage).mockResolvedValue(usage(tenantA.id, 500))
+    vi.mocked(getTenantUsage).mockResolvedValue(usage(tenantA.id, 500))
 
-    await store.dispatch(fetchApiKeyUsage())
+    await store.dispatch(fetchTenantUsage())
 
-    expect(store.getState().apiKeyUsage.usage).toEqual(usage(tenantA.id, 500))
+    expect(store.getState().usage.usage).toEqual(usage(tenantA.id, 500))
     expect(store.getState().tenantSettings.rateLimitPerMinute).toEqual({ EMAIL: 500, SMS: null })
   })
 
   it('still settles the thunk promise for callers when the result is dropped', async () => {
     const store = setupStore()
     const response = deferred<TenantUsageResponse>()
-    vi.mocked(getApiKeyUsage).mockReturnValue(response.promise)
+    vi.mocked(getTenantUsage).mockReturnValue(response.promise)
 
-    const request = store.dispatch(fetchApiKeyUsage())
+    const request = store.dispatch(fetchTenantUsage())
     store.dispatch(selectTenant(tenantB))
     response.resolve(usage(tenantA.id, 999))
 
@@ -160,7 +160,7 @@ describe('tenantGuardMiddleware', () => {
     tenantsResponse.resolve({ data: { tenants: [tenantA, tenantB] } })
     await Promise.all([adminRequest, tenantsRequest])
 
-    expect(store.getState().apiKeyUsage.adminCount).toBe(7)
+    expect(store.getState().usage.adminCount).toBe(7)
     expect(store.getState().cstar.tenants).toEqual([tenantA, tenantB])
     expect(store.getState().tenant.selectedTenant).toEqual(tenantB)
   })

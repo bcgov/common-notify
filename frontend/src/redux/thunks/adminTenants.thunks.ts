@@ -1,7 +1,7 @@
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import adminApi from '@/api/admin.api'
-import { getAdminUsageTenants } from '@/api/apiKeyUsage.api'
-import type { AdminTenantOption } from '@/api/apiKeyUsage.api'
+import { getAdminUsageTenants } from '@/api/usage.api'
+import type { AdminTenantOption } from '@/api/usage.api'
 
 export const fetchAllNotifyTenants = createAsyncThunk<
   Array<{

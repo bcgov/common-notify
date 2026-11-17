@@ -1,5 +1,5 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest'
-import * as api from './apiKeyUsage.api'
+import * as api from './usage.api'
 import { get, patch, post } from '@/common/api'
 vi.mock('@/common/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>()
@@ -9,9 +9,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   for (const method of [get, patch, post]) vi.mocked(method).mockResolvedValue({ ok: true })
 })
-describe('apiKeyUsage API', () => {
-  it('getApiKeyUsage returns results and translates failures', async () => {
-    const invoke = () => api.getApiKeyUsage()
+describe('usage API', () => {
+  it('getTenantUsage returns results and translates failures', async () => {
+    const invoke = () => api.getTenantUsage()
     await expect(invoke()).resolves.toEqual({ ok: true })
     for (const status of [401, 403, 409, 503, 500]) {
       for (const method of [get, patch, post])
@@ -29,8 +29,8 @@ describe('apiKeyUsage API', () => {
       )
     }
   })
-  it('getApiKeyUsageHistory returns results and translates failures', async () => {
-    const invoke = () => api.getApiKeyUsageHistory()
+  it('getTenantUsageHistory returns results and translates failures', async () => {
+    const invoke = () => api.getTenantUsageHistory()
     await expect(invoke()).resolves.toEqual({ ok: true })
     for (const status of [401, 403, 409, 503, 500]) {
       for (const method of [get, patch, post])
@@ -165,6 +165,6 @@ describe('apiKeyUsage API', () => {
         response: { status: 500, data: { message: 'database is down' } },
       }),
     )
-    await expect(api.getApiKeyUsage()).rejects.toThrow('Failed to load usage: database is down')
+    await expect(api.getTenantUsage()).rejects.toThrow('Failed to load usage: database is down')
   })
 })

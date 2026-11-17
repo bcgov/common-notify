@@ -1,16 +1,16 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest'
-import * as api from '@/api/apiKeyUsage.api'
+import * as api from '@/api/usage.api'
 import {
-  fetchApiKeyUsage,
-  fetchApiKeyUsageHistory,
+  fetchTenantUsage,
+  fetchTenantUsageHistory,
   fetchAllTenantsUsage,
   updateTenantLimits,
   updateThreshold,
-} from './apiKeyUsage.thunks'
+} from './usage.thunks'
 import type { RootState } from '../store'
-vi.mock('@/api/apiKeyUsage.api', () => ({
-  getApiKeyUsage: vi.fn(),
-  getApiKeyUsageHistory: vi.fn(),
+vi.mock('@/api/usage.api', () => ({
+  getTenantUsage: vi.fn(),
+  getTenantUsageHistory: vi.fn(),
   getAllTenantsUsage: vi.fn(),
   updateTenantLimits: vi.fn(),
   updateApiKeyThreshold: vi.fn(),
@@ -18,32 +18,32 @@ vi.mock('@/api/apiKeyUsage.api', () => ({
 const dispatch = vi.fn()
 const state = {
   tenant: { selectedTenant: { id: 'tenant' } },
-  apiKeyUsage: { adminPage: 2, adminLimit: 30, adminSearch: 'Ministry', adminFilters: {} },
+  usage: { adminPage: 2, adminLimit: 30, adminSearch: 'Ministry', adminFilters: {} },
 } as RootState
 beforeEach(() => vi.clearAllMocks())
-describe('apiKeyUsage thunks', () => {
-  it('fetchApiKeyUsage returns results and readable errors', async () => {
-    vi.mocked(api.getApiKeyUsage).mockResolvedValue({ id: 'response' } as never)
-    let result = await fetchApiKeyUsage(undefined)(dispatch, () => state, undefined)
+describe('usage thunks', () => {
+  it('fetchTenantUsage returns results and readable errors', async () => {
+    vi.mocked(api.getTenantUsage).mockResolvedValue({ id: 'response' } as never)
+    let result = await fetchTenantUsage(undefined)(dispatch, () => state, undefined)
     expect(result.meta.requestStatus).toBe('fulfilled')
     expect(result.payload).toEqual({ id: 'response' })
     for (const error of [new Error('Offline'), {}]) {
-      vi.mocked(api.getApiKeyUsage).mockRejectedValue(error)
-      result = await fetchApiKeyUsage(undefined)(dispatch, () => state, undefined)
+      vi.mocked(api.getTenantUsage).mockRejectedValue(error)
+      result = await fetchTenantUsage(undefined)(dispatch, () => state, undefined)
       expect(result.meta.requestStatus).toBe('rejected')
       expect(result.payload).toEqual(
         error instanceof Error ? 'Offline' : expect.stringMatching(/^Failed/),
       )
     }
   })
-  it('fetchApiKeyUsageHistory returns results and readable errors', async () => {
-    vi.mocked(api.getApiKeyUsageHistory).mockResolvedValue({ id: 'response' } as never)
-    let result = await fetchApiKeyUsageHistory(undefined)(dispatch, () => state, undefined)
+  it('fetchTenantUsageHistory returns results and readable errors', async () => {
+    vi.mocked(api.getTenantUsageHistory).mockResolvedValue({ id: 'response' } as never)
+    let result = await fetchTenantUsageHistory(undefined)(dispatch, () => state, undefined)
     expect(result.meta.requestStatus).toBe('fulfilled')
     expect(result.payload).toEqual({ id: 'response' })
     for (const error of [new Error('Offline'), {}]) {
-      vi.mocked(api.getApiKeyUsageHistory).mockRejectedValue(error)
-      result = await fetchApiKeyUsageHistory(undefined)(dispatch, () => state, undefined)
+      vi.mocked(api.getTenantUsageHistory).mockRejectedValue(error)
+      result = await fetchTenantUsageHistory(undefined)(dispatch, () => state, undefined)
       expect(result.meta.requestStatus).toBe('rejected')
       expect(result.payload).toEqual(
         error instanceof Error ? 'Offline' : expect.stringMatching(/^Failed/),
@@ -68,7 +68,7 @@ describe('apiKeyUsage thunks', () => {
     vi.mocked(api.getAllTenantsUsage).mockResolvedValue({ id: 'response' } as never)
     const sorted = {
       ...state,
-      apiKeyUsage: { ...state.apiKeyUsage, adminSortBy: 'usedThisYear', adminSortOrder: 'desc' },
+      usage: { ...state.usage, adminSortBy: 'usedThisYear', adminSortOrder: 'desc' },
     } as RootState
     await fetchAllTenantsUsage(undefined)(dispatch, () => sorted, undefined)
     expect(api.getAllTenantsUsage).toHaveBeenLastCalledWith(
@@ -130,21 +130,21 @@ describe('apiKeyUsage thunks', () => {
   })
   it('does not request tenant usage or history without tenant context', async () => {
     const getState = () => ({ ...state, tenant: { selectedTenant: null, showTenantModal: false } })
-    expect((await fetchApiKeyUsage()(dispatch, getState, undefined)).payload).toEqual({
+    expect((await fetchTenantUsage()(dispatch, getState, undefined)).payload).toEqual({
       tenantId: '',
       fiscalYearStart: '',
       channels: [],
     })
-    expect((await fetchApiKeyUsageHistory()(dispatch, getState, undefined)).payload).toEqual([])
-    expect(api.getApiKeyUsage).not.toHaveBeenCalled()
-    expect(api.getApiKeyUsageHistory).not.toHaveBeenCalled()
+    expect((await fetchTenantUsageHistory()(dispatch, getState, undefined)).payload).toEqual([])
+    expect(api.getTenantUsage).not.toHaveBeenCalled()
+    expect(api.getTenantUsageHistory).not.toHaveBeenCalled()
   })
   it('forwards committed pagination and omits empty searches', async () => {
     await fetchAllTenantsUsage()(dispatch, () => state, undefined)
     expect(api.getAllTenantsUsage).toHaveBeenCalledWith(2, 30, 'Ministry', undefined, undefined)
     await fetchAllTenantsUsage()(
       dispatch,
-      () => ({ ...state, apiKeyUsage: { ...state.apiKeyUsage, adminSearch: '' } }),
+      () => ({ ...state, usage: { ...state.usage, adminSearch: '' } }),
       undefined,
     )
     expect(api.getAllTenantsUsage).toHaveBeenLastCalledWith(2, 30, undefined, undefined, undefined)
@@ -154,7 +154,7 @@ describe('apiKeyUsage thunks', () => {
       dispatch,
       () => ({
         ...state,
-        apiKeyUsage: { ...state.apiKeyUsage, adminFilters: { channel: ['SMS'] } },
+        usage: { ...state.usage, adminFilters: { channel: ['SMS'] } },
       }),
       undefined,
     )

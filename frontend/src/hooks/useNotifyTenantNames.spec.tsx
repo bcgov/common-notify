@@ -4,10 +4,10 @@ import { configureStore } from '@reduxjs/toolkit'
 import { Provider } from 'react-redux'
 import type { ReactNode } from 'react'
 import adminTenantsReducer from '@/redux/slices/adminTenants.slice'
-import { getAdminUsageTenants } from '@/api/apiKeyUsage.api'
+import { getAdminUsageTenants } from '@/api/usage.api'
 import { useNotifyTenantNames } from './useNotifyTenantNames'
 
-vi.mock('@/api/apiKeyUsage.api', () => ({ getAdminUsageTenants: vi.fn() }))
+vi.mock('@/api/usage.api', () => ({ getAdminUsageTenants: vi.fn() }))
 vi.mock('@/api/admin.api', () => ({ default: { getAllTenants: vi.fn() } }))
 
 function setup(enabled?: boolean) {

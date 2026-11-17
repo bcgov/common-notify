@@ -4,7 +4,7 @@ import type { PaginatedResponse } from '@/interfaces/PaginatedNotificationRespon
 import { toListQueryString } from './listQuery'
 
 /**
- * API Key Usage / Limits API
+ * Tenant Usage / Limits API
  *
  * Frontend-facing endpoints for the authenticated tenant's notification limits and usage.
  * Backed by /api/v1/frontend/usage (NotifyFrontendRoleGuard + CSTAR roles).
@@ -94,7 +94,7 @@ export interface UpdateTenantLimitsRequest {
 /**
  * Get current usage vs configured limits for the selected tenant.
  */
-export async function getApiKeyUsage(): Promise<TenantUsageResponse> {
+export async function getTenantUsage(): Promise<TenantUsageResponse> {
   try {
     const params = generateApiParameters(BASE_URL)
     return await get<TenantUsageResponse>(params)
@@ -106,7 +106,7 @@ export async function getApiKeyUsage(): Promise<TenantUsageResponse> {
 /**
  * Get per-fiscal-year usage history for the selected tenant.
  */
-export async function getApiKeyUsageHistory(): Promise<UsageHistoryEntry[]> {
+export async function getTenantUsageHistory(): Promise<UsageHistoryEntry[]> {
   try {
     const params = generateApiParameters(`${BASE_URL}/history`)
     return await get<UsageHistoryEntry[]>(params)

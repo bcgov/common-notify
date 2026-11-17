@@ -11,7 +11,7 @@ vi.mock('@/api/apiKeys.api', () => ({
 const dispatch = vi.fn()
 const state = {
   tenant: { selectedTenant: { id: 'tenant' } },
-  apiKeyUsage: { adminPage: 2, adminLimit: 30, adminSearch: 'Ministry' },
+  usage: { adminPage: 2, adminLimit: 30, adminSearch: 'Ministry' },
 } as RootState
 beforeEach(() => vi.clearAllMocks())
 describe('apiKeys thunks', () => {
