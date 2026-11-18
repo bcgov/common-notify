@@ -87,6 +87,7 @@ describe('SMS numbers (database)', () => {
       );`)
     await dataSource.query(migration('tenant_requests'))
     await dataSource.query(migration('sms_numbers'))
+    await dataSource.query(migration('dismiss_tenant_requests'))
     await dataSource.query(
       `INSERT INTO notify.tenant (id, name) VALUES ($1, 'Parks'), ($2, 'Roads'), ($3, '100% Parks')`,
       [PARKS, ROADS, LANDS],
@@ -383,6 +384,45 @@ describe('SMS numbers (database)', () => {
         ['pending', 'Terry User'],
         ['cancelled', 'Terry User'],
       ])
+    })
+
+    it("lets a tenant dismiss a finished request from its settings, and nobody else's", async () => {
+      const request = await ask(PARKS)
+      await expect(requests.dismiss(PARKS, request.id, tenantUser)).rejects.toBeInstanceOf(
+        ConflictException,
+      )
+      await requests.reject(request.id, 'No use case given', admin)
+
+      await expect(requests.dismiss(ROADS, request.id, tenantUser)).rejects.toBeInstanceOf(
+        NotFoundException,
+      )
+      await expect(
+        requests.dismiss(PARKS, request.id, tenantUser, 'priority_lane'),
+      ).rejects.toBeInstanceOf(NotFoundException)
+      await requests.dismiss(PARKS, request.id, tenantUser, 'sms_number')
+      // Twice is harmless.
+      await requests.dismiss(PARKS, request.id, tenantUser, 'sms_number')
+
+      await expect(requests.findLatestForTenant(PARKS, 'sms_number')).resolves.toBeNull()
+      // Still a rejection on the admin's record.
+      await expect(requests.findById(request.id)).resolves.toMatchObject({
+        statusCode: 'rejected',
+      })
+      // A new request shows again.
+      const next = await ask(PARKS)
+      await expect(requests.findLatestForTenant(PARKS, 'sms_number')).resolves.toMatchObject({
+        id: next.id,
+      })
+    })
+
+    it('does not show an older request in place of a dismissed one', async () => {
+      const first = await ask(PARKS)
+      await requests.cancel(PARKS, first.id, tenantUser)
+      const second = await ask(PARKS)
+      await requests.reject(second.id, 'No', admin)
+      await requests.dismiss(PARKS, second.id, tenantUser)
+
+      await expect(requests.findLatestForTenant(PARKS, 'sms_number')).resolves.toBeNull()
     })
 
     it('cancels only a pending request', async () => {

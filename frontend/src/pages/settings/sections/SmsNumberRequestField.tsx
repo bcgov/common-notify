@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { FC } from 'react'
-import { Button, InlineAlert } from '@bcgov/design-system-react-components'
+import type { FC, ReactNode } from 'react'
+import { Button } from '@bcgov/design-system-react-components'
 import ConfirmDialog from '@/components/ConfirmDialog'
-import TenantRequestStatusBadge from '@/components/TenantRequestStatusBadge'
+import TenantRequestCard from '@/components/TenantRequestCard'
 import {
   cancelMySmsNumberRequest,
+  dismissMySmsNumberRequest,
   getMySmsNumberRequest,
   releaseMySmsNumber,
   requestSmsNumber,
@@ -12,7 +13,6 @@ import {
 import type { SmsNumberRequest } from '@/api/smsNumbers.api'
 import { useAppSelector } from '@/redux/hooks'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
-import { formatDate } from '@/utils/dates'
 import '@/scss/components/sms-number-request-field.scss'
 
 interface SmsNumberRequestFieldProps {
@@ -22,66 +22,56 @@ interface SmsNumberRequestFieldProps {
   smsEnabled: boolean
 }
 
-/** "the shared Notify number (+15551234567)", or without the number when it is not known. */
-const sharedNumber = (senderNumber: string | null): string =>
-  senderNumber ? `the shared Notify number (${senderNumber})` : 'the shared Notify number'
-
-/** " by Terry User", or nothing when no one is recorded. */
-const byWhom = (name: string | null): string => (name ? ` by ${name}` : '')
-
-/** " on Nov 18, 2026", or nothing when no date is recorded. */
-const onDate = (iso: string | null): string => (iso ? ` on ${formatDate(iso)}` : '')
-
-/** What a request's status means for the tenant. `senderNumber` is what it sends from now. */
-function describe(request: SmsNumberRequest, senderNumber: string | null): string {
-  switch (request.statusCode) {
-    case 'pending':
-      return `Requested${byWhom(request.requestedBy)}${onDate(request.requestedAt)}. A Notify administrator will review it. Until then, SMS is sent from ${sharedNumber(senderNumber)}.`
-    case 'approved':
-      return request.usesDefaultNumber
-        ? `Your SMS is sent from ${sharedNumber(senderNumber)} in this environment.`
-        : `Your SMS is sent from ${request.phoneNumber ?? 'your assigned number'}.`
-    case 'rejected':
-      return request.decisionReason ?? 'Your request was not approved.'
-    case 'cancelled':
-      return `Cancelled${byWhom(request.cancelledBy)}${onDate(request.cancelledAt)}. SMS is sent from ${sharedNumber(senderNumber)}.`
-    case 'released':
-      return `${request.phoneNumber ?? 'Your number'} was released${onDate(request.releasedAt)}. SMS is sent from ${sharedNumber(senderNumber)}.`
-    default:
-      return ''
-  }
+interface SenderLineProps {
+  /** The number SMS goes out from now, if known. */
+  number: string | null
+  /** Whether it is the tenant's own number rather than the shared one. */
+  ownNumber: boolean
+  note: string | null
 }
 
-/** The one action open to the tenant: cancel while pending, release once approved, else ask. */
-function actionLabel(request: SmsNumberRequest | null): string {
-  switch (request?.statusCode) {
-    case 'pending':
-      return 'Cancel request'
-    case 'approved':
-      return 'Release number'
-    case undefined:
-      return 'Request an SMS number'
-    default:
-      return 'Request another number'
-  }
-}
+/** "Sending from +15551234567 (shared Notify number)": the one fact the tenant most needs. */
+const SenderLine: FC<SenderLineProps> = ({ number, ownNumber, note }) => (
+  <>
+    <p className="sms-number-request__sender">
+      <span className="sms-number-request__sender-label">Sending from</span>{' '}
+      <strong>{number ?? 'the shared Notify number'}</strong>
+      {number && (
+        <span className="sms-number-request__sender-kind">
+          {' '}
+          ({ownNumber ? 'your number' : 'shared Notify number'})
+        </span>
+      )}
+    </p>
+    {note && <p className="sms-number-request__note">{note}</p>}
+  </>
+)
 
-function actionFor(
+/** The muted line under the sender: why the tenant is on the shared number, where that needs it. */
+function senderNote(
   request: SmsNumberRequest | null,
-  handlers: {
-    cancel: (pending: SmsNumberRequest) => void
-    release: () => void
-    request: () => void
-  },
-): () => void {
-  if (request?.statusCode === 'pending') return () => handlers.cancel(request)
-  if (request?.statusCode === 'approved') return handlers.release
-  return handlers.request
+  testEnvironment: boolean,
+  smsEnabled: boolean,
+): string | null {
+  if (request?.statusCode === 'approved' && request.usesDefaultNumber) {
+    return 'Your request was approved on the shared number for this environment.'
+  }
+  return testEnvironment && smsEnabled ? 'Test environment: every tenant shares this number.' : null
+}
+
+/** What the request means for the tenant now, beyond what the card already says. */
+function requestDetails(request: SmsNumberRequest): string | null {
+  if (request.statusCode === 'pending') return 'A Notify administrator will review it.'
+  if (request.statusCode === 'released' && request.phoneNumber) {
+    return `${request.phoneNumber} is no longer assigned to this tenant.`
+  }
+  return null
 }
 
 /**
- * The tenant's request for its own SMS number: where it stands, and the actions open to it. A
+ * The tenant's SMS number: what it sends from now, and its request for a number of its own. A
  * Notify administrator assigns the number; until then SMS is sent from the shared Notify number.
+ * Once approved, the request has done its job, so only the number and Release remain.
  */
 const SmsNumberRequestField: FC<SmsNumberRequestFieldProps> = ({ canEdit, smsEnabled }) => {
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
@@ -117,10 +107,11 @@ const SmsNumberRequestField: FC<SmsNumberRequestFieldProps> = ({ canEdit, smsEna
     if (selectedTenant) load()
   }, [selectedTenant, load])
 
-  async function act(action: () => Promise<SmsNumberRequest>, success: string) {
+  /** Runs an action; one with no request to return (dismiss) leaves none on screen. */
+  async function act(action: () => Promise<SmsNumberRequest | void>, success: string) {
     setBusy(true)
     try {
-      setRequest(await action())
+      setRequest((await action()) ?? null)
       showSuccessToast(success)
       setConfirmingRelease(false)
       // Releasing a number, say, changes what the tenant sends from.
@@ -132,57 +123,72 @@ const SmsNumberRequestField: FC<SmsNumberRequestFieldProps> = ({ canEdit, smsEna
     }
   }
 
+  const actionButton = (label: string, onPress: () => void) => (
+    <Button type="button" variant="secondary" size="small" isDisabled={busy} onPress={onPress}>
+      {label}
+    </Button>
+  )
+  const askForNumber = (label: string) =>
+    actionButton(label, () => act(requestSmsNumber, 'SMS number requested'))
+
+  /** The card's main action: cancel while pending, else ask again. */
+  function cardAction(current: SmsNumberRequest): ReactNode {
+    if (!canEdit) return null
+    if (current.statusCode !== 'pending') return askForNumber('Request another number')
+    return actionButton('Cancel request', () =>
+      act(() => cancelMySmsNumberRequest(current.id), 'SMS number request cancelled'),
+    )
+  }
+
+  /** Below the sender line: the request card, or Release once approved, or a first request. */
+  function renderRequest(): ReactNode {
+    if (request?.statusCode === 'approved') {
+      return canEdit ? (
+        <div className="sms-number-request__actions">
+          {actionButton('Release number', () => setConfirmingRelease(true))}
+        </div>
+      ) : null
+    }
+    if (request) {
+      return (
+        <TenantRequestCard
+          request={request}
+          typeLabel="Number request"
+          details={requestDetails(request)}
+          action={cardAction(request)}
+          onDismiss={
+            canEdit
+              ? () =>
+                  act(() => dismissMySmsNumberRequest(request.id), 'SMS number request dismissed')
+              : undefined
+          }
+          isBusy={busy}
+        />
+      )
+    }
+    return canEdit ? (
+      <div className="sms-number-request__actions">{askForNumber('Request an SMS number')}</div>
+    ) : null
+  }
+
   const loaded = !loading && !loadError
-  // The note is about the shared number, so not for a tenant approved onto a number of its own.
   const hasOwnNumber = request?.statusCode === 'approved' && !request.usesDefaultNumber
-  const showTestNote = loaded && testEnvironment && smsEnabled && !hasOwnNumber
-  const showActions = canEdit && loaded
 
   return (
     <div className="settings__field" aria-busy={loading}>
       <span className="settings__label">SMS number</span>
-      {showTestNote && (
-        <InlineAlert variant="info">
-          <span className="description">
-            This is a test environment. SMS is sent from {sharedNumber(senderNumber)} for testing,
-            and numbers aren&apos;t usually assigned to tenants here. You can still request one.
-          </span>
-        </InlineAlert>
-      )}
       <div className="sms-number-request" role="status" aria-live="polite">
-        {loading && <p className="sms-number-request__text">Loading…</p>}
-        {!loading && loadError && <p className="sms-number-request__text">{loadError}</p>}
-        {!loading && !loadError && !request && (
-          <p className="sms-number-request__text">
-            SMS is sent from {sharedNumber(senderNumber)}. Request a number of your own for this
-            tenant.
-          </p>
-        )}
-        {!loading && !loadError && request && (
-          <>
-            <TenantRequestStatusBadge status={request.statusCode} />
-            <p className="sms-number-request__text">{describe(request, senderNumber)}</p>
-          </>
+        {loading && <p className="sms-number-request__note">Loading…</p>}
+        {!loading && loadError && <p className="sms-number-request__note">{loadError}</p>}
+        {loaded && (
+          <SenderLine
+            number={senderNumber ?? (hasOwnNumber ? request.phoneNumber : null)}
+            ownNumber={hasOwnNumber}
+            note={hasOwnNumber ? null : senderNote(request, testEnvironment, smsEnabled)}
+          />
         )}
       </div>
-      {showActions && (
-        <div className="sms-number-request__actions">
-          <Button
-            type="button"
-            variant="secondary"
-            size="small"
-            isDisabled={busy}
-            onPress={actionFor(request, {
-              cancel: (pending) =>
-                act(() => cancelMySmsNumberRequest(pending.id), 'SMS number request cancelled'),
-              release: () => setConfirmingRelease(true),
-              request: () => act(requestSmsNumber, 'SMS number requested'),
-            })}
-          >
-            {actionLabel(request)}
-          </Button>
-        </div>
-      )}
+      {loaded && renderRequest()}
       {confirmingRelease && request && (
         <ConfirmDialog
           isOpen

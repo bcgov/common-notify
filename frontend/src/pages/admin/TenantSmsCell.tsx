@@ -1,6 +1,6 @@
 import type { FC } from 'react'
 import { StatusBadge } from '@/components/StatusBadge'
-import type { AdminTenantUsageRow } from '@/api/apiKeyUsage.api'
+import type { AdminTenantUsageRow } from '@/api/usage.api'
 import '@/scss/components/tenant-sms-cell.scss'
 
 type TenantSmsCellProps = Pick<AdminTenantUsageRow, 'smsEnabled' | 'smsFromNumber'>

@@ -1059,7 +1059,7 @@ routes:
 
   # /api/v1/frontend/sms-number-requests (frontend variant)
   # A tenant's own SMS number request: GET the latest, POST to request one, and
-  # POST /{id}/cancel or /{id}/release. Kong prefix-matches, so this covers those too.
+  # POST /{id}/cancel, /{id}/release or /{id}/dismiss. Kong prefix-matches, so this covers those too.
   - name: ${ROUTE_PREFIX}sms-number-requests-frontend
     tags: [${CONFIG_TAG}]
     hosts:

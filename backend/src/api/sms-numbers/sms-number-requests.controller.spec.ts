@@ -13,6 +13,7 @@ describe('SmsNumberRequestsController', () => {
       create: vi.fn().mockResolvedValue(pending),
       cancel: vi.fn().mockResolvedValue(pending),
       release: vi.fn().mockResolvedValue(pending),
+      dismiss: vi.fn().mockResolvedValue(undefined),
     }
     const handler = {
       toSmsDto: vi.fn(async (_manager: unknown, request: unknown) =>
@@ -51,7 +52,7 @@ describe('SmsNumberRequestsController', () => {
     await expect(controller.getLatest(req)).resolves.toMatchObject({ testEnvironment: false })
   })
 
-  it('keeps cancel and release to SMS number requests of the calling tenant', async () => {
+  it('keeps cancel, release and dismiss to SMS number requests of the calling tenant', async () => {
     const { controller, requests } = setup(true)
 
     await expect(controller.create(req)).resolves.toMatchObject({ id: 'request-1' })
@@ -68,5 +69,12 @@ describe('SmsNumberRequestsController', () => {
       tenantId: 'tenant-1',
       type: 'sms_number',
     })
+    await expect(controller.dismiss(req, 'request-1')).resolves.toBeUndefined()
+    expect(requests.dismiss).toHaveBeenCalledWith(
+      'tenant-1',
+      'request-1',
+      expect.anything(),
+      'sms_number',
+    )
   })
 })

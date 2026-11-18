@@ -63,6 +63,13 @@ const GRANTED_STATUSES = new Set<string>([
   TenantRequestStatus.RELEASED,
 ])
 
+/** Finished requests: nothing more can happen to them, so the tenant may clear them away. */
+const DISMISSABLE_STATUSES = new Set<string>([
+  TenantRequestStatus.REJECTED,
+  TenantRequestStatus.CANCELLED,
+  TenantRequestStatus.RELEASED,
+])
+
 /**
  * Tenants' requests for things a Notify admin must approve. A tenant asks; an admin approves it,
  * which the type's handler carries out, or rejects it with a reason. The tenant can cancel it while
@@ -89,13 +96,18 @@ export class TenantRequestsService {
     return { types: types.filter((type) => handled.has(type.code)), statuses }
   }
 
-  /** The tenant's most recent request of a type, or null if it has never made one. */
+  /**
+   * The tenant's most recent request of a type, or null if it has never made one or has dismissed
+   * it. An older request is never shown in place of a dismissed one.
+   */
   async findLatestForTenant(tenantId: string, type: string): Promise<TenantRequestDto | null> {
     const rows: RequestRow[] = await this.requestRepository.query(
       `SELECT ${REQUEST_COLUMNS} ${REQUEST_FROM}
-        WHERE r.tenant_id = $1 AND r.request_type_code = $2
-        ORDER BY r.created_at DESC
-        LIMIT 1`,
+        WHERE r.id = (SELECT latest.id FROM notify.tenant_request latest
+                       WHERE latest.tenant_id = $1 AND latest.request_type_code = $2
+                       ORDER BY latest.created_at DESC
+                       LIMIT 1)
+          AND r.dismissed_at IS NULL`,
       [tenantId, type],
     )
     return (await this.toDtos(rows))[0] ?? null
@@ -193,6 +205,29 @@ export class TenantRequestsService {
       await recordHistory(manager, request, actor)
     })
     return this.findById(requestId)
+  }
+
+  /**
+   * Clears a finished request from the tenant's own view. Its status, and the admin's record of
+   * it, are unchanged. With `type`, a request of another type is reported as missing.
+   */
+  async dismiss(
+    tenantId: string,
+    requestId: string,
+    actor: RequestActor,
+    type?: string,
+  ): Promise<void> {
+    await this.requestRepository.manager.transaction(async (manager) => {
+      const request = await lockRequest(manager, requestId, { tenantId, type })
+      if (!DISMISSABLE_STATUSES.has(request.statusCode)) {
+        throw new ConflictException(`A ${request.statusCode} request cannot be dismissed`)
+      }
+      if (request.dismissedAt) return
+      request.dismissedBy = actor.id
+      request.dismissedByName = actor.name
+      request.dismissedAt = new Date()
+      await manager.save(request)
+    })
   }
 
   /**
@@ -312,11 +347,11 @@ export class TenantRequestsService {
     }
     // A type with no handler any more still lists, just without an outcome.
     const described = await Promise.all(
-      [...idsByType].map(
-        ([type, ids]) =>
-          this.handlers.find(type)?.describeOutcomes(this.requestRepository.manager, ids) ??
-          new Map<string, string>(),
-      ),
+      [...idsByType].map(async ([type, ids]) => {
+        const handler = this.handlers.find(type)
+        if (!handler) return new Map<string, string>()
+        return handler.describeOutcomes(this.requestRepository.manager, ids)
+      }),
     )
     return new Map(described.flatMap((outcomes) => [...outcomes]))
   }

@@ -196,6 +196,18 @@ export async function cancelMySmsNumberRequest(requestId: string): Promise<SmsNu
   }
 }
 
+/** Clears the selected tenant's finished request from its settings. Admins still see it. */
+export async function dismissMySmsNumberRequest(requestId: string): Promise<void> {
+  try {
+    await post<void>({
+      ...generateApiParameters(`${REQUESTS_URL}/${encodeURIComponent(requestId)}/dismiss`),
+      data: {},
+    })
+  } catch (error) {
+    throw failed('dismiss the request', error)
+  }
+}
+
 /** Releases the number the selected tenant's approved request assigned it. */
 export async function releaseMySmsNumber(requestId: string): Promise<SmsNumberRequest> {
   try {

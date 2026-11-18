@@ -14,6 +14,7 @@ import {
   ApiBearerAuth,
   ApiCreatedResponse,
   ApiExcludeController,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -35,8 +36,8 @@ type TenantScopedRequest = Request & { tenant: Tenant }
 
 /**
  * A tenant's own SMS number request: ask for a number, see where the request stands, cancel it
- * while pending, and release the number once assigned. Tenants cannot assign numbers; a Notify
- * admin approves the request from the tenant requests page.
+ * while pending, release the number once assigned, and dismiss a finished request. Tenants cannot
+ * assign numbers; a Notify admin approves the request from the tenant requests page.
  */
 @ApiTags('sms-number-requests')
 // Not part of the service API; kept out of the published spec.
@@ -100,6 +101,21 @@ export class SmsNumberRequestsController {
     return this.toSmsDto(
       await this.requestsService.cancel(req.tenant.id, id, actorOf(req), SMS_NUMBER_REQUEST_TYPE),
     )
+  }
+
+  @Version('1')
+  @Post(':id/dismiss')
+  @HttpCode(204)
+  @Roles(CstarRole.NOTIFY_OPERATIONS_ADMIN)
+  @ApiOperation({
+    summary: "Clear a rejected, cancelled or released request from the tenant's settings",
+  })
+  @ApiNoContentResponse()
+  async dismiss(
+    @Req() req: TenantScopedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    await this.requestsService.dismiss(req.tenant.id, id, actorOf(req), SMS_NUMBER_REQUEST_TYPE)
   }
 
   @Version('1')

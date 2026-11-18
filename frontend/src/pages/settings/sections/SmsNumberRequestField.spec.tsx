@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import SmsNumberRequestField from './SmsNumberRequestField'
 import {
   cancelMySmsNumberRequest,
+  dismissMySmsNumberRequest,
   getMySmsNumberRequest,
   releaseMySmsNumber,
   requestSmsNumber,
@@ -21,6 +22,7 @@ vi.mock('@/api/smsNumbers.api', () => ({
   requestSmsNumber: vi.fn(),
   releaseMySmsNumber: vi.fn(),
   cancelMySmsNumberRequest: vi.fn(),
+  dismissMySmsNumberRequest: vi.fn(),
 }))
 vi.mock('@/redux/utils/toastUtils', () => ({ showErrorToast: vi.fn(), showSuccessToast: vi.fn() }))
 
@@ -65,7 +67,8 @@ describe('SmsNumberRequestField', () => {
     vi.mocked(requestSmsNumber).mockResolvedValue(request())
     render(<SmsNumberRequestField canEdit smsEnabled />)
 
-    expect(await screen.findByText(/sent from the shared Notify number/)).toBeInTheDocument()
+    expect(await screen.findByText('+15550009999')).toBeInTheDocument()
+    expect(screen.getByText('(shared Notify number)')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Request an SMS number' }))
 
     expect(requestSmsNumber).toHaveBeenCalled()
@@ -109,8 +112,10 @@ describe('SmsNumberRequestField', () => {
     vi.mocked(releaseMySmsNumber).mockResolvedValue(released)
     render(<SmsNumberRequestField canEdit smsEnabled />)
 
-    expect(await screen.findByText('Approved')).toBeInTheDocument()
-    expect(screen.getByText('Your SMS is sent from +15814360804.')).toBeInTheDocument()
+    expect(await screen.findByText('+15814360804')).toBeInTheDocument()
+    expect(screen.getByText('(your number)')).toBeInTheDocument()
+    // The request has done its job, so no card, just Release.
+    expect(screen.queryByText('Approved')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Release number' }))
     expect(releaseMySmsNumber).not.toHaveBeenCalled()
     const dialog = await screen.findByRole('dialog')
@@ -118,7 +123,10 @@ describe('SmsNumberRequestField', () => {
 
     expect(releaseMySmsNumber).toHaveBeenCalledWith('req-1')
     expect(await screen.findByText('Released')).toBeInTheDocument()
-    expect(screen.getByText(/\+15814360804 was released on/)).toBeInTheDocument()
+    expect(
+      screen.getByText('+15814360804 is no longer assigned to this tenant.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('(shared Notify number)')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Request another number' })).toBeInTheDocument()
   })
 
@@ -130,9 +138,10 @@ describe('SmsNumberRequestField', () => {
 
     expect(
       await screen.findByText(
-        'Your SMS is sent from the shared Notify number (+15550009999) in this environment.',
+        'Your request was approved on the shared number for this environment.',
       ),
     ).toBeInTheDocument()
+    expect(screen.getByText('(shared Notify number)')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Release number' })).toBeInTheDocument()
   })
 
@@ -140,27 +149,25 @@ describe('SmsNumberRequestField', () => {
     vi.mocked(getMySmsNumberRequest).mockResolvedValue(status(request()))
     render(<SmsNumberRequestField canEdit smsEnabled />)
 
-    expect(
-      await screen.findByText(
-        /Until then, SMS is sent from the shared Notify number \(\+15550009999\)\./,
-      ),
-    ).toBeInTheDocument()
+    expect(await screen.findByText('A Notify administrator will review it.')).toBeInTheDocument()
+    expect(screen.getByText('+15550009999')).toBeInTheDocument()
+    expect(screen.getByText('(shared Notify number)')).toBeInTheDocument()
   })
 
   it('explains the shared test number in a test environment while SMS is on', async () => {
     vi.mocked(getMySmsNumberRequest).mockResolvedValue(status(null, { testEnvironment: true }))
     const { unmount } = render(<SmsNumberRequestField canEdit smsEnabled />)
 
-    expect(await screen.findByText(/This is a test environment/)).toHaveTextContent(
-      'SMS is sent from the shared Notify number (+15550009999) for testing',
-    )
+    expect(
+      await screen.findByText('Test environment: every tenant shares this number.'),
+    ).toBeInTheDocument()
     // Requesting still works there.
     expect(screen.getByRole('button', { name: 'Request an SMS number' })).toBeInTheDocument()
     unmount()
 
     render(<SmsNumberRequestField canEdit smsEnabled={false} />)
     await screen.findByRole('button', { name: 'Request an SMS number' })
-    expect(screen.queryByText(/This is a test environment/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Test environment/)).not.toBeInTheDocument()
   })
 
   it('drops the test-environment note once the tenant has a number of its own', async () => {
@@ -172,11 +179,11 @@ describe('SmsNumberRequestField', () => {
     )
     render(<SmsNumberRequestField canEdit smsEnabled />)
 
-    expect(await screen.findByText('Your SMS is sent from +12364995305.')).toBeInTheDocument()
-    expect(screen.queryByText(/This is a test environment/)).not.toBeInTheDocument()
+    expect(await screen.findByText('(your number)')).toBeInTheDocument()
+    expect(screen.queryByText(/Test environment/)).not.toBeInTheDocument()
   })
 
-  it('keeps the note for an approval on the shared default number', async () => {
+  it('explains an approval on the shared default number in place of the test note', async () => {
     vi.mocked(getMySmsNumberRequest).mockResolvedValue(
       status(request({ statusCode: 'approved', usesDefaultNumber: true }), {
         testEnvironment: true,
@@ -184,7 +191,8 @@ describe('SmsNumberRequestField', () => {
     )
     render(<SmsNumberRequestField canEdit smsEnabled />)
 
-    expect(await screen.findByText(/This is a test environment/)).toBeInTheDocument()
+    expect(await screen.findByText(/approved on the shared number/)).toBeInTheDocument()
+    expect(screen.queryByText(/Test environment/)).not.toBeInTheDocument()
   })
 
   it('shows no test-environment note in prod', async () => {
@@ -192,17 +200,58 @@ describe('SmsNumberRequestField', () => {
     render(<SmsNumberRequestField canEdit smsEnabled />)
 
     await screen.findByRole('button', { name: 'Request an SMS number' })
-    expect(screen.queryByText(/This is a test environment/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Test environment/)).not.toBeInTheDocument()
   })
 
   it("shows the admin's reason for a rejection", async () => {
     vi.mocked(getMySmsNumberRequest).mockResolvedValue(
-      status(request({ statusCode: 'rejected', decisionReason: 'Describe your opt-out steps' })),
+      status(
+        request({
+          statusCode: 'rejected',
+          decisionReason: 'Describe your opt-out steps',
+          decidedBy: 'Pat Admin',
+          decidedAt: '2026-11-18T18:00:00.000Z',
+        }),
+      ),
     )
     render(<SmsNumberRequestField canEdit smsEnabled />)
 
     expect(await screen.findByText('Rejected')).toBeInTheDocument()
     expect(screen.getByText('Describe your opt-out steps')).toBeInTheDocument()
+    expect(screen.getByText(/Rejected by Pat Admin on/)).toBeInTheDocument()
+  })
+
+  it('dismisses a rejected request, so the tenant is offered a fresh one', async () => {
+    vi.mocked(getMySmsNumberRequest)
+      .mockResolvedValueOnce(
+        status(request({ statusCode: 'rejected', decisionReason: 'Not needed' })),
+      )
+      .mockResolvedValue(status(null))
+    vi.mocked(dismissMySmsNumberRequest).mockResolvedValue(undefined)
+    render(<SmsNumberRequestField canEdit smsEnabled />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Dismiss rejected request' }))
+
+    expect(dismissMySmsNumberRequest).toHaveBeenCalledWith('req-1')
+    expect(await screen.findByRole('button', { name: 'Request an SMS number' })).toBeInTheDocument()
+    expect(screen.queryByText('Rejected')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Dismiss/ })).not.toBeInTheDocument()
+    expect(showSuccessToast).toHaveBeenCalledWith('SMS number request dismissed')
+  })
+
+  it('offers no dismiss while a request is pending or approved', async () => {
+    vi.mocked(getMySmsNumberRequest).mockResolvedValue(status(request()))
+    const { unmount } = render(<SmsNumberRequestField canEdit smsEnabled />)
+    expect(await screen.findByRole('button', { name: 'Cancel request' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Dismiss/ })).not.toBeInTheDocument()
+    unmount()
+
+    vi.mocked(getMySmsNumberRequest).mockResolvedValue(
+      status(request({ statusCode: 'approved', phoneNumber: '+15550001111' })),
+    )
+    render(<SmsNumberRequestField canEdit smsEnabled />)
+    expect(await screen.findByRole('button', { name: 'Release number' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Dismiss/ })).not.toBeInTheDocument()
   })
 
   it('shows the status but no actions without the operations admin role', async () => {

@@ -47,6 +47,16 @@ export class TenantRequest {
   @Column({ type: 'timestamptz', nullable: true, name: 'cancelled_at' })
   cancelledAt: Date | null
 
+  /** Who cleared the finished request from the tenant's settings. The status is unchanged. */
+  @Column({ type: 'varchar', length: 200, nullable: true, name: 'dismissed_by' })
+  dismissedBy: string | null
+
+  @Column({ type: 'varchar', length: 200, nullable: true, name: 'dismissed_by_name' })
+  dismissedByName: string | null
+
+  @Column({ type: 'timestamptz', nullable: true, name: 'dismissed_at' })
+  dismissedAt: Date | null
+
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date
 
