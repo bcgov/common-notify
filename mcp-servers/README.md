@@ -34,9 +34,58 @@ Provision these environment variables in the adapter:
 - `PORT`: optional; defaults to 3101.
 
 OAuth is implemented as `client_secret_post`. Confirm this method, audience/scope, service-account
-group visibility, environment URLs and endpoint pagination with Chris/Shankar before deployment. The
-current adapter expects the complete `data.groups` and `data.users` arrays used by the existing
-integration; it does not implement a CSTAR pagination contract that has not yet been established.
+group visibility and pagination with Chris/Shankar before deployment. Group discovery uses
+`GET /api/v1/tenants/{tenantId}/groups`; member lookup uses the service-account-only
+`GET /api/v1/tenants/{tenantId}/groups/{groupId}/users` endpoint. Its response is `data.users[]`
+with a direct nullable `email` field (not `ssoUser.email`). One lookup is made per distinct group,
+with at most four member requests in flight. Any failed/malformed group response fails the complete
+recipient lookup. Only normalized, deduplicated emails are returned. The current upstream
+implementation returns complete arrays; no pagination is implemented here.
+
+## Live CSTAR DEV verification
+
+CSTAR confirmed service-account and headless access for Notify in **DEV only**:
+
+| Adapter variable      | DEV setting                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------- |
+| `CSTAR_API_URL`       | `https://dev.connect.digital.gov.bc.ca`                                               |
+| `CSTAR_TOKEN_URL`     | `https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/token` |
+| `CSTAR_CLIENT_ID`     | `notify-cstar-integration-6738`                                                       |
+| `CSTAR_CLIENT_SECRET` | Supplied through the DEV OpenShift Secret; never commit it                            |
+
+These are the **adapter-to-CSTAR** credentials, separate from `MCP_API_KEY`, the shared
+Notify-to-adapter key. Do not copy the DEV account or endpoints into TEST/PROD. CSTAR requires the
+tenant to have Notify associated, Notify's service-account client ID to be registered, and both
+service-account access and headless access enabled in that environment. Tenant-agnostic
+service-account roles do not remove those tenant/service association checks.
+
+In the updated adapter pod's OpenShift Terminal, run this read-only check using a known **DEV
+external tenant ID** and one of that tenant's **DEV group IDs**:
+
+```sh
+node src/verify-dev.js <DEV-tenant-id> <DEV-group-id>
+```
+
+It obtains a service-account token, lists groups and resolves the requested group's members. It
+prints only counts and pass/fail; no secrets, tokens, user records or email addresses. It rejects
+settings for another environment. An empty group can validly return zero emails; select a known
+populated group to prove member retrieval. Failures include the upstream HTTP status without logging
+the upstream body. Check token settings on 401; check CSTAR's four access conditions on 403; check
+IDs/environment on 404. These are troubleshooting starting points, not definitive diagnoses of each
+upstream status.
+
+After that check succeeds, enable the `cstar` registry entry, log into the matching DEV tenant, open
+an event's email settings, select a real group and use **Preview group recipients**. Confirm the
+normalized recipient set with the CSTAR team. Do not send a notification merely to test lookup. Also
+verify that an unassociated tenant/foreign group is rejected and that the existing user-login
+tenant/role flows still work.
+
+Deployment prerequisites: the adapter image must be published, the chart enabled, and the Secret
+referenced by `cstarMcp.secretName` must exist in the release namespace. The current adapter
+workflow builds/tests but does not publish, the chart defaults to disabled, and the PR frontend
+currently targets CSTAR TEST. A PR deploying in Notify DEV alone does not prove it targets CSTAR
+DEV: align the frontend/user-login CSTAR settings and adapter settings before the live test.
+TEST/PROD enablement needs separate CSTAR confirmation and credentials.
 
 ## Local development
 
@@ -91,56 +140,6 @@ Other hosts require HTTPS and an exact match in `MCP_ALLOWED_HOSTS` (comma-separ
 lowercased; empty by default). IPv4/IPv6 literals are rejected even if allowlisted; `localhost` is
 also rejected when `NODE_ENV=production`. Malformed URLs and other schemes are rejected before
 connecting; redirects remain disabled.
-
-## Local demo: real login, fictional groups and emails
-
-Authentication is unchanged: Keycloak validates login, CSTAR supplies your tenants,
-Notify syncs those tenants to its database, and CSTAR roles authorize event access.
-The mock replaces only the adapter's group/member client. It does not invent login
-permissions, grant access to other tenants, or change production configuration.
-
-1. Sign in normally at `http://localhost:3000` and select your real tenant.
-   Obtain its **external CSTAR tenant ID** from the response to
-   `/api/v1/frontend/auth/tenants` (the tenant object's `id`), or from the local
-   `notify.tenant.external_id` column. Do not use Notify's internal database UUID.
-2. In PowerShell at the repo root, enable fixtures for that tenant:
-
-   ```powershell
-   $env:CSTAR_MOCK_MODE = 'true'
-   $env:CSTAR_MOCK_TENANT_IDS = '<external-cstar-tenant-id>'
-   docker compose -f .devcontainer/docker-compose.yml up -d --build cstar-mcp backend frontend
-   docker compose -f .devcontainer/docker-compose.yml run --rm kong-routes
-   ```
-
-   Compose supplies `NODE_ENV=development`; the adapter refuses mock mode in other
-   environments. Multiple demo tenants can be configured with comma-separated IDs.
-   No CSTAR service-account credentials are needed for fixture lookup. The shared
-   MCP bearer key is still required and uses the local Compose default if unset.
-   Flyway V78 must already have created the registry tables.
-3. With an SSO NOTIFY_ADMIN account, open **Admin > MCP Servers > Edit cstar**.
-   Verify URL `http://cstar-mcp:3101/mcp`, credential reference `CSTAR_MCP_API_KEY`,
-   enabled tools `list_groups` (no parameters) and `get_recipients` (`groupIds`).
-   Check **Server enabled** and **Save server**. This replaces the manual SQL step.
-   Non-admin users cannot edit the registry, even by calling the API directly.
-4. Open **Notification Events**, create an event, then open **Email Notification**.
-   Choose **CSTAR Group(s)**, enable **To**, and select **Demo Operations** and
-   **Demo Communications**. Click **Preview group recipients**. Three unique
-   fictional `example.invalid` emails appear; Sam belongs to both groups but is
-   returned once. The preview makes a real MCP call but sends no notification.
-5. Select a sender and template as normal and save the email settings. This calls
-   `list_groups` again to verify ownership and stores only group IDs. Reopen the
-   event to demonstrate persistence. **Test Send** still uses its explicitly chosen
-   test recipient rather than expanding groups; the new preview demonstrates
-   `get_recipients` without attempting delivery to fictional addresses.
-6. Disable the registry server in Admin and repeat discovery/preview to show a
-   failure; re-enable it to restore the flow. Initial picker loading retains the
-   existing UI's silent error handling; preview has an explicit error message.
-
-Fixtures are tenant-specific, include an empty group, and reject another tenant's
-IDs. No fixture values are inserted into CSTAR or the Notify tenant directory.
-To return to live lookup, unset `CSTAR_MOCK_MODE` and `CSTAR_MOCK_TENANT_IDS`, supply
-real service-account settings, and recreate the adapter with Compose.
-The adapter's `/health` remains a process check, not proof of CSTAR availability.
 
 ## OpenShift handoff
 

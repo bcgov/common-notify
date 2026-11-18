@@ -31,8 +31,13 @@ export class CstarClient {
       redirect: 'error',
       signal: AbortSignal.timeout(10000),
     })
-    if (!response.ok) throw new Error('CSTAR authentication failed')
-    const result = await response.json()
+    if (!response.ok) throw new Error(`CSTAR authentication failed (HTTP ${response.status})`)
+    let result
+    try {
+      result = await response.json()
+    } catch {
+      throw new Error('Invalid CSTAR token response')
+    }
     if (typeof result.access_token !== 'string' || !result.access_token)
       throw new Error('Invalid token response')
     this.token = {
@@ -51,8 +56,12 @@ export class CstarClient {
       signal: AbortSignal.timeout(10000),
     })
     if (response.status === 401) this.token = null
-    if (!response.ok) throw new Error('CSTAR lookup failed')
-    return response.json()
+    if (!response.ok) throw new Error(`CSTAR lookup failed (HTTP ${response.status})`)
+    try {
+      return await response.json()
+    } catch {
+      throw new Error('Invalid CSTAR response')
+    }
   }
 
   async listGroups(tenantId) {
@@ -75,14 +84,23 @@ export class CstarClient {
     const { groups } = await this.listGroups(tenantId)
     const allowed = new Set(groups.map((group) => group.id))
     if (groupIds.some((id) => !allowed.has(id))) throw new Error('Group does not belong to tenant')
-    const body = await this.get(
-      `/api/v1/tenants/${tenantId}/users?groupIds=${encodeURIComponent(groupIds.join(','))}`,
-    )
-    if (!Array.isArray(body.data?.users)) throw new Error('Invalid CSTAR users response')
-    const emails = body.data.users
-      .map((user) => user?.ssoUser?.email)
-      .filter((email) => typeof email === 'string' && email.trim())
-      .map((email) => email.trim().toLowerCase())
+    const uniqueGroupIds = [...new Set(groupIds)]
+    const emails = []
+    // The service-account endpoint is scoped to a single tenant/group. Bound fan-out
+    // to four requests at a time and fail the whole lookup if any group fails.
+    for (let offset = 0; offset < uniqueGroupIds.length; offset += 4) {
+      const results = await Promise.all(
+        uniqueGroupIds.slice(offset, offset + 4).map(async (groupId) => {
+          const body = await this.get(`/api/v1/tenants/${tenantId}/groups/${groupId}/users`)
+          if (!Array.isArray(body.data?.users)) throw new Error('Invalid CSTAR users response')
+          return body.data.users
+            .map((user) => user?.email)
+            .filter((email) => typeof email === 'string' && email.trim())
+            .map((email) => email.trim().toLowerCase())
+        }),
+      )
+      emails.push(...results.flat())
+    }
     return { emails: [...new Set(emails)] }
   }
 }
