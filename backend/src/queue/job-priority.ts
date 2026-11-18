@@ -19,10 +19,15 @@ export function jobPriority(level: NotificationPriority, configService?: ConfigS
   return configService?.get<number>(`queue.priority.${level}`) || DEFAULT_JOB_PRIORITIES[level]
 }
 
-/** The level a send asked for; otherwise normal, or low for a merge (bulk) send. */
+/**
+ * The level a send asked for - at the top level, or else on `email`, where the email-only
+ * routes' body carries it - otherwise normal, or low for a merge (bulk) send.
+ */
 export function requestPriority(
-  request: { priority?: NotificationPriority } | undefined,
+  request:
+    | { priority?: NotificationPriority; email?: { priority?: NotificationPriority } }
+    | undefined,
   mailMerge: boolean,
 ): NotificationPriority {
-  return request?.priority ?? (mailMerge ? 'low' : 'normal')
+  return request?.priority ?? request?.email?.priority ?? (mailMerge ? 'low' : 'normal')
 }

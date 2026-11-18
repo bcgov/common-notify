@@ -26,4 +26,12 @@ describe('requestPriority', () => {
     expect(requestPriority({ priority: 'high' }, true)).toBe('high')
     expect(requestPriority({ priority: 'low' }, false)).toBe('low')
   })
+
+  it('uses the email channel’s priority when the request sets none', () => {
+    expect(requestPriority({ email: { priority: 'high' } }, true)).toBe('high')
+  })
+
+  it('prefers the request’s priority to the email channel’s', () => {
+    expect(requestPriority({ priority: 'low', email: { priority: 'high' } }, false)).toBe('low')
+  })
 })

@@ -998,6 +998,49 @@ describe('Notify Controllers', () => {
           })
         })
 
+        it('queues an email-only send at the priority its body asks for', async () => {
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple/email')
+            .send({ ...emailSend.email, priority: 'high' })
+            .expect(202)
+
+          await vi.waitFor(() => {
+            expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+              'notification-ingestion',
+              expect.any(Object),
+              expect.objectContaining({ priority: 1 }),
+            )
+          })
+        })
+
+        it('queues a frontend merge at the priority it asks for', async () => {
+          await request(app.getHttpServer())
+            .post('/api/v1/frontend/notifysimple')
+            .send({
+              content: { templateId: '12345678-1234-4234-8234-123456789012' },
+              recipients: { mergeArray: [['to'], ['alice@example.com']] },
+              priority: 'high',
+            })
+            .expect(202)
+
+          await vi.waitFor(() => {
+            expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+              'notification-ingestion',
+              expect.objectContaining({ mailMerge: true }),
+              expect.objectContaining({ priority: 1 }),
+            )
+          })
+        })
+
+        it('rejects an unknown priority on an email-only body', async () => {
+          await request(app.getHttpServer())
+            .post('/api/v1/notifysimple/email')
+            .send({ ...emailSend.email, priority: 'urgent' })
+            .expect(400)
+
+          expect(mockIngestionQueue.add).not.toHaveBeenCalled()
+        })
+
         it('rejects an unknown priority', async () => {
           await request(app.getHttpServer())
             .post('/api/v1/notifysimple')

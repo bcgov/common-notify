@@ -52,8 +52,8 @@ describe('applyNotifySchemaConstraints', () => {
   })
 
   // Accepted by the API but not advertised yet.
-  it('leaves priority out of NotifySimpleRequest', () => {
-    expect(schemas.NotifySimpleRequest.properties).not.toHaveProperty('priority')
+  it('leaves priority out of every schema', () => {
+    expect(JSON.stringify(schemas)).not.toContain('"priority"')
   })
 
   it('requires the field that identifies each branch', () => {
