@@ -89,6 +89,14 @@ describe('NotificationDedupService', () => {
       expect(service.fingerprint(changed)).not.toBe(service.fingerprint(base))
     })
 
+    it('ignores priority, on the request and on the email channel', () => {
+      const base = email({ to: ['a@x.ca'] })
+      expect(service.fingerprint({ ...base, priority: 'high' })).toBe(service.fingerprint(base))
+      expect(service.fingerprint(email({ to: ['a@x.ca'] }, { priority: 'low' }))).toBe(
+        service.fingerprint(base),
+      )
+    })
+
     it('hashes a mergeArray as given', () => {
       const merge = (rows: string[][]) => ({ email: { recipients: { mergeArray: rows } } })
       expect(service.fingerprint(merge([['to'], ['a@x.ca']]))).not.toBe(
