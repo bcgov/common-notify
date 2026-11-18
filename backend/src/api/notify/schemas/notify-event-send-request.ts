@@ -1,6 +1,8 @@
 import { ArrayMaxSize, IsArray, IsEmail, IsObject, IsOptional, IsUUID } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger'
 import { IsValidMergeArray } from './validators/merge-array.validator'
+import { PriorityProperty } from './priority-property.decorator'
+import type { NotificationPriority } from '../../../queue/job-priority'
 
 export const TEST_SEND_MAX_RECIPIENTS = 5
 
@@ -26,6 +28,10 @@ export class NotifyEventSendRequest {
   @IsOptional()
   @IsObject()
   params?: Record<string, unknown>
+
+  /** Queue priority. Defaults to normal, or low for a merge. */
+  @PriorityProperty()
+  priority?: NotificationPriority
 }
 
 @ApiSchema({

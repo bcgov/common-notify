@@ -887,6 +887,50 @@ describe('Notify Controllers', () => {
           expect(response.body).toMatchObject({ notifyId: ORIGINAL_ID, duplicate: true })
           expectNothingAccepted()
         })
+
+        it.each([
+          [undefined, 5],
+          ['high', 1],
+        ])('queues a full event send asking for priority %s at %d', async (priority, expected) => {
+          mockNotificationDedupService.findDuplicate.mockResolvedValue(null)
+
+          await request(app.getHttpServer())
+            .post('/api/v1/frontend/notifysimple/event')
+            .send({ eventId, priority })
+            .expect(202)
+
+          await vi.waitFor(() => {
+            expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+              'notification-ingestion',
+              expect.any(Object),
+              expect.objectContaining({ priority: expected }),
+            )
+          })
+        })
+
+        it('queues a test send at the priority it asks for', async () => {
+          await request(app.getHttpServer())
+            .post('/api/v1/frontend/notifysimple/event/test')
+            .send({ eventId, to: ['test@example.com'], priority: 'high' })
+            .expect(202)
+
+          await vi.waitFor(() => {
+            expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+              'notification-ingestion',
+              expect.any(Object),
+              expect.objectContaining({ priority: 1 }),
+            )
+          })
+        })
+
+        it('rejects an unknown priority on an event send', async () => {
+          await request(app.getHttpServer())
+            .post('/api/v1/frontend/notifysimple/event')
+            .send({ eventId, priority: 'urgent' })
+            .expect(400)
+
+          expect(mockEventNotificationResolver.resolveSend).not.toHaveBeenCalled()
+        })
       })
     })
 

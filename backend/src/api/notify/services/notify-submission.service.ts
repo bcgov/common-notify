@@ -122,7 +122,12 @@ export class NotifySubmissionService {
       let eventId: string | undefined
       if (options.eventSend) {
         eventId = (payload as { eventId?: string })?.eventId
-        payload = await this.resolveEventSend(options.eventSend, payload, caller)
+        // The resolver builds a new request from the event; the caller's priority goes on it.
+        const priority = (payload as NotifyEventTestSendRequest).priority
+        payload = {
+          ...(await this.resolveEventSend(options.eventSend, payload, caller)),
+          ...(priority && { priority }),
+        }
       }
 
       const mergeChannel = mergeRequestChannel(payload)
