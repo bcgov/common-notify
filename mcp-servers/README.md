@@ -25,6 +25,11 @@ have 10-second deadlines; the Notify MCP operation has a 15-second overall deadl
 
 ## Service account configuration
 
+The adapter obtains a token from CSS using **Notify's dedicated service-account integration**. CSTAR
+registers and trusts that client ID for selected read-only endpoints. CSTAR does not issue Notify
+another secret, and this flow uses neither the browser user's JWT nor token exchange. The client
+secret is sent only to CSS's token endpoint; CSTAR receives the resulting bearer token.
+
 Provision these environment variables in the adapter:
 
 - `MCP_API_KEY`: at least 32 characters; shared only with Notify.
@@ -57,7 +62,9 @@ These are the **adapter-to-CSTAR** credentials, separate from `MCP_API_KEY`, the
 Notify-to-adapter key. Do not copy the DEV account or endpoints into TEST/PROD. CSTAR requires the
 tenant to have Notify associated, Notify's service-account client ID to be registered, and both
 service-account access and headless access enabled in that environment. Tenant-agnostic
-service-account roles do not remove those tenant/service association checks.
+service-account roles do not remove those tenant/service association checks. Groups do not need
+Notify roles: a workflow team that never signs into Notify can still be a recipient group. The
+adapter validates tenant ownership, not whether members have Notify roles.
 
 In the updated adapter pod's OpenShift Terminal, run this read-only check using a known **DEV
 external tenant ID** and one of that tenant's **DEV group IDs**:
@@ -89,13 +96,30 @@ TEST/PROD enablement needs separate CSTAR confirmation and credentials.
 
 ## Local development
 
-From the repo root, export the account settings above and `CSTAR_MCP_API_KEY` (the Compose input
-used as the adapter's `MCP_API_KEY` and Notify's credential). Compose has a development-only default
-MCP key; supply a real secret elsewhere.
+OpenShift Secrets are not automatically available on a developer's laptop. Use the **existing
+Notify-owned CSS DEV service-account secret**, rather than creating a new account or copying a user
+JWT. For a local DEV test, from the repo root:
 
-```sh
-docker compose -f .devcontainer/docker-compose.yml up -d --build cstar-mcp backend
+```powershell
+# Preserve an existing privately populated file.
+if (-not (Test-Path mcp-servers/cstar/.env)) {
+  Copy-Item mcp-servers/cstar/.env.example mcp-servers/cstar/.env
+}
+# Privately fill CSTAR_CLIENT_SECRET in that .env file before starting the adapter.
+docker compose --env-file mcp-servers/cstar/.env -f .devcontainer/docker-compose.yml up -d --build --no-deps --force-recreate cstar-mcp
 ```
+
+The example contains the confirmed DEV API/token URLs and Notify CSS client ID, but no secret. The
+local `.env` is gitignored. Do not commit it or paste its contents into chat/logs. `--env-file`
+supplies Compose interpolation; the adapter's standalone `.env` is not loaded by Compose
+automatically. Existing PowerShell environment variables override the file: remove stale CSTAR
+variables or ensure they target the same DEV account. Backend/frontend and their dependencies must
+already be running when using `--no-deps` above.
+
+Compose uses `CSTAR_MCP_API_KEY` (with a development-only default) for Notify-to-adapter
+authentication, mapping it to the adapter's `MCP_API_KEY`. Leave that override unset to retain the
+existing local shared key; if you change it, recreate the backend with the same setting as well. It
+is unrelated to the CSS client secret. Use separately provisioned secrets in OpenShift.
 
 After Flyway applies V78, enable the local destination once in the local database:
 
@@ -122,11 +146,11 @@ destination URL in event code. Secret values remain in environment variables/Ope
 seeded entry is disabled until operators provision the adapter. Existing event feature flags and
 tenant authorization still apply; the old `mcp_api` flag is no longer used.
 
-An operator can register additional servers/tools through data changes and use the exported
-`McpClientService.call()` without adding another protocol client. The eventual super-admin screen is
-not included in this extraction. Only Streamable HTTP with bearer credentials is implemented; other
-transports/auth schemes require explicit support. Registry editing grants outbound network access
-and must remain restricted to trusted operators/super admins.
+An administrator can manage servers/tools through **Admin > MCP Servers**, protected by the existing
+`NOTIFY_ADMIN` SSO role, and use the exported `McpClientService.call()` without another protocol
+client. Only Streamable HTTP with bearer credentials is implemented; other transports/auth schemes
+require explicit support. Registry editing grants outbound network access and must remain restricted
+to trusted operators/super admins.
 
 When CSTAR offers a compatible MCP server, update the `cstar` row's URL and credential reference.
 Its tool names, argument/result shapes and tenant-context authentication must match this contract

@@ -16,9 +16,14 @@ test('service account resolves only tenant-owned groups and normalizes emails', 
     },
     async (url, options) => {
       calls.push([String(url), options])
-      if (String(url).endsWith('/token'))
+      if (String(url).endsWith('/token')) {
+        assert.equal(options.body.get('grant_type'), 'client_credentials')
+        assert.equal(options.body.get('client_id'), 'service-account')
+        assert.equal(options.body.get('client_secret'), 'test-secret')
         return Response.json({ access_token: 'service-token', expires_in: 300 })
+      }
       assert.equal(options.headers.Authorization, 'Bearer service-token')
+      assert.equal(options.body, undefined)
       if (String(url).endsWith('/groups'))
         return Response.json({ data: { groups: [{ id: 'group-a', name: 'A' }] } })
       return Response.json({
@@ -42,6 +47,46 @@ test('service account resolves only tenant-owned groups and normalizes emails', 
   )
   assert.equal(calls.filter(([url]) => url.endsWith('/token')).length, 1)
   await assert.rejects(client.listGroups('../escape'), /Invalid identifier/)
+})
+
+test('groups without Notify roles remain eligible for recipient lookup', async () => {
+  const calls = []
+  const client = new CstarClient(
+    { CSTAR_API_URL: 'https://cstar.example' },
+    async (url, options) => {
+      const path = new URL(url).pathname
+      calls.push(path)
+      assert.equal(options.headers.Authorization, 'Bearer notify-service-token')
+      if (path.endsWith('/groups'))
+        return Response.json({
+          data: {
+            groups: [{ id: 'workflow-team', name: 'Workflow Approvers', sharedServiceRoles: [] }],
+          },
+        })
+      return Response.json({ data: { users: [{ email: 'approver@example.com' }] } })
+    },
+  )
+  client.token = { value: 'notify-service-token', expiresAt: Date.now() + 300000 }
+  assert.deepEqual(await client.getRecipients('tenant-a', ['workflow-team']), {
+    emails: ['approver@example.com'],
+  })
+  assert.deepEqual(calls, [
+    '/api/v1/tenants/tenant-a/groups',
+    '/api/v1/tenants/tenant-a/groups/workflow-team/users',
+  ])
+})
+
+test('missing CSS settings are reported by name before any network call', async () => {
+  let calls = 0
+  const client = new CstarClient({ CSTAR_API_URL: 'https://cstar.example' }, async () => {
+    calls++
+    throw new Error('Unexpected request')
+  })
+  await assert.rejects(
+    client.listGroups('tenant-a'),
+    /Notify CSS service account is not configured: missing CSTAR_TOKEN_URL, CSTAR_CLIENT_ID, CSTAR_CLIENT_SECRET/,
+  )
+  assert.equal(calls, 0)
 })
 
 test('service-account endpoint deduplicates groups and emails and fails without partial results', async () => {

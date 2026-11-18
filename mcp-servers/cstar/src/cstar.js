@@ -5,7 +5,8 @@ export function validateIdentifier(value) {
   return value
 }
 
-// Credentials belong to this adapter, never to tool arguments or the calling user.
+// Notify owns the CSS service-account credentials. CSTAR trusts its registered
+// client ID; it does not issue these credentials or receive the client secret.
 export class CstarClient {
   constructor(config = process.env, request = fetch) {
     this.config = config
@@ -16,8 +17,11 @@ export class CstarClient {
   async accessToken() {
     if (this.token && this.token.expiresAt > Date.now() + 30000) return this.token.value
     const { CSTAR_TOKEN_URL, CSTAR_CLIENT_ID, CSTAR_CLIENT_SECRET, CSTAR_SCOPE } = this.config
-    if (!CSTAR_TOKEN_URL || !CSTAR_CLIENT_ID || !CSTAR_CLIENT_SECRET) {
-      throw new Error('CSTAR service account is not configured')
+    const missing = ['CSTAR_TOKEN_URL', 'CSTAR_CLIENT_ID', 'CSTAR_CLIENT_SECRET'].filter(
+      (name) => !this.config[name],
+    )
+    if (missing.length) {
+      throw new Error(`Notify CSS service account is not configured: missing ${missing.join(', ')}`)
     }
     const body = new URLSearchParams({
       grant_type: 'client_credentials',
