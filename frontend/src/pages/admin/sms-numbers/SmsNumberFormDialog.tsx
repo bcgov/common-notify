@@ -5,9 +5,7 @@ import EditModal from '@/components/EditModal'
 import { createSmsNumber, updateSmsNumber } from '@/api/smsNumbers.api'
 import type { SmsNumber, SmsNumberCodes } from '@/api/smsNumbers.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
-
-/** E.164, or a 5-6 digit short code: the backend's and the database's rule. */
-const NUMBER_PATTERN = /^(\+[1-9]\d{6,14}|\d{5,6})$/
+import { numberTypeRule } from './numberTypeRules'
 
 interface SmsNumberFormDialogProps {
   codes: SmsNumberCodes
@@ -18,8 +16,10 @@ interface SmsNumberFormDialogProps {
 }
 
 /**
- * Adds a number to the inventory, or edits one. A number's digits and provider are fixed once
- * added: changing them would move every tenant assigned it, so a new number is added instead.
+ * Adds a number to the inventory, or edits one. The type comes first, since it decides what the
+ * number must look like. A number's digits and provider are fixed once added: changing them would
+ * move every tenant assigned it, so a new number is added instead. Its type can still change, as
+ * long as the number fits the new one.
  * Render it keyed on the number so the fields start from it each time.
  */
 const SmsNumberFormDialog: FC<SmsNumberFormDialogProps> = ({ codes, number, onClose, onSaved }) => {
@@ -31,7 +31,8 @@ const SmsNumberFormDialog: FC<SmsNumberFormDialogProps> = ({ codes, number, onCl
   const [showErrors, setShowErrors] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const numberInvalid = !editing && !NUMBER_PATTERN.test(phoneNumber.trim())
+  const rule = numberTypeRule(numberTypeCode)
+  const numberInvalid = !rule.pattern.test(phoneNumber.trim())
 
   async function save() {
     if (numberInvalid) {
@@ -70,15 +71,26 @@ const SmsNumberFormDialog: FC<SmsNumberFormDialogProps> = ({ codes, number, onCl
       onSave={save}
     >
       <div className="d-flex flex-column gap-3">
+        <Select
+          label="Type"
+          items={codes.numberTypes.map((code) => ({ id: code.code, label: code.description }))}
+          value={numberTypeCode}
+          onChange={(key) => key != null && setNumberTypeCode(String(key))}
+          // Editing, the number is fixed, so a type it does not fit is the error.
+          isInvalid={editing && numberInvalid}
+          errorMessage={`${phoneNumber} is not a valid number of this type.`}
+          isDisabled={saving}
+          isRequired
+        />
         <TextField
           label="Number"
-          description="E.164, such as +15551234567, or a 5-6 digit short code"
+          description={editing ? 'Fixed once added' : rule.hint}
           value={phoneNumber}
           onChange={(value) => setPhoneNumber(value)}
           isReadOnly={editing}
           isRequired
-          isInvalid={showErrors && numberInvalid}
-          errorMessage="Enter an E.164 number or a 5-6 digit short code."
+          isInvalid={!editing && showErrors && numberInvalid}
+          errorMessage={rule.error}
           isDisabled={saving}
         />
         <Select
@@ -88,14 +100,6 @@ const SmsNumberFormDialog: FC<SmsNumberFormDialogProps> = ({ codes, number, onCl
           value={providerCode}
           onChange={(key) => key != null && setProviderCode(String(key))}
           isDisabled={editing || saving}
-          isRequired
-        />
-        <Select
-          label="Type"
-          items={codes.numberTypes.map((code) => ({ id: code.code, label: code.description }))}
-          value={numberTypeCode}
-          onChange={(key) => key != null && setNumberTypeCode(String(key))}
-          isDisabled={saving}
           isRequired
         />
         <TextArea

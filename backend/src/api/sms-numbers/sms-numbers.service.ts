@@ -1,4 +1,11 @@
-import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common'
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
 import { EntityManager, Repository } from 'typeorm'
@@ -6,6 +13,7 @@ import { SMS_ADAPTER } from '../../adapters'
 import type { ISmsTransport } from '../../adapters'
 import { TenantRequestsService } from '../tenant-requests/tenant-requests.service'
 import type { RequestActor } from '../tenant-requests/tenant-request-codes'
+import { numberTypeMismatch } from './sms-number-codes'
 import { SmsNumber } from './entities/sms-number.entity'
 import { TenantSmsNumber } from './entities/tenant-sms-number.entity'
 import {
@@ -172,6 +180,7 @@ export class SmsNumbersService {
   }
 
   async createNumber(dto: CreateSmsNumberDto, actor: RequestActor): Promise<SmsNumberDto> {
+    assertFitsType(dto.phoneNumber, dto.numberTypeCode)
     const existing = await this.numberRepository.findOne({
       where: { providerCode: dto.providerCode, phoneNumber: dto.phoneNumber, isDeleted: false },
     })
@@ -198,7 +207,11 @@ export class SmsNumbersService {
     actor: RequestActor,
   ): Promise<SmsNumberDto> {
     const number = await this.findNumber(id)
-    if (dto.numberTypeCode !== undefined) number.numberTypeCode = dto.numberTypeCode
+    // The number is fixed, so a new type has to fit the number already there.
+    if (dto.numberTypeCode !== undefined) {
+      assertFitsType(number.phoneNumber, dto.numberTypeCode)
+      number.numberTypeCode = dto.numberTypeCode
+    }
     if (dto.description !== undefined) number.description = dto.description
     number.updatedBy = actor.id
     await this.numberRepository.save(number)
@@ -349,4 +362,9 @@ function toDto(number: SmsNumber, tenants: SmsNumberDto['tenants']): SmsNumberDt
     isDefault: number.isDefault,
     tenants,
   }
+}
+
+function assertFitsType(phoneNumber: string, numberTypeCode: string): void {
+  const mismatch = numberTypeMismatch(phoneNumber, numberTypeCode)
+  if (mismatch) throw new BadRequestException(mismatch)
 }

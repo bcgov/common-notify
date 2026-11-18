@@ -10,6 +10,7 @@ import {
   getSmsNumbers,
   setDefaultSmsNumber,
   unassignSmsNumber,
+  updateSmsNumber,
 } from '@/api/smsNumbers.api'
 import type { SmsNumber } from '@/api/smsNumbers.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
@@ -131,7 +132,7 @@ describe('AdminSmsNumbers', () => {
     await userEvent.type(within(dialog).getByRole('textbox', { name: /^Number/ }), '581-436-0804')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Add number' }))
     expect(
-      await within(dialog).findByText('Enter an E.164 number or a 5-6 digit short code.'),
+      await within(dialog).findByText('Enter a long code in E.164 format, such as +15551234567.'),
     ).toBeInTheDocument()
     expect(createSmsNumber).not.toHaveBeenCalled()
 
@@ -147,6 +148,48 @@ describe('AdminSmsNumbers', () => {
         description: null,
       }),
     )
+  })
+
+  it('checks the number against the type chosen first', async () => {
+    vi.mocked(createSmsNumber).mockResolvedValue(twilioNumber)
+    setup()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Add number' }))
+    const dialog = await screen.findByRole('dialog')
+    const [typeField] = within(dialog).getAllByRole('button', { name: /Type/ })
+    await userEvent.click(typeField)
+    await userEvent.click(await screen.findByRole('option', { name: 'Short code' }))
+    expect(within(dialog).getByText('5 or 6 digits, such as 12345')).toBeInTheDocument()
+
+    await userEvent.type(within(dialog).getByRole('textbox', { name: /^Number/ }), '+15550001111')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Add number' }))
+    expect(await within(dialog).findByText('Enter a 5 or 6 digit short code.')).toBeInTheDocument()
+    expect(createSmsNumber).not.toHaveBeenCalled()
+
+    await userEvent.clear(within(dialog).getByRole('textbox', { name: /^Number/ }))
+    await userEvent.type(within(dialog).getByRole('textbox', { name: /^Number/ }), '12345')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Add number' }))
+    await waitFor(() =>
+      expect(createSmsNumber).toHaveBeenCalledWith(
+        expect.objectContaining({ phoneNumber: '12345', numberTypeCode: 'short_code' }),
+      ),
+    )
+  })
+
+  it("won't change a number's type to one the fixed number does not fit", async () => {
+    setup()
+
+    await chooseAction('Actions for +15814360804', 'Edit')
+    const dialog = await screen.findByRole('dialog')
+    const [typeField] = within(dialog).getAllByRole('button', { name: /Type/ })
+    await userEvent.click(typeField)
+    await userEvent.click(await screen.findByRole('option', { name: 'Short code' }))
+    expect(
+      await within(dialog).findByText('+15814360804 is not a valid number of this type.'),
+    ).toBeInTheDocument()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+    expect(updateSmsNumber).not.toHaveBeenCalled()
   })
 
   it('assigns a number to a tenant that does not have it yet', async () => {

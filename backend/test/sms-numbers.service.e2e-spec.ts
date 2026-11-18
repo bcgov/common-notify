@@ -142,6 +142,26 @@ describe('SMS numbers (database)', () => {
       await expect(dataSource.getRepository(TenantSmsNumber).count()).resolves.toBe(1)
     })
 
+    it("holds a number to its type's format, including when the type is changed", async () => {
+      await expect(
+        numbers.createNumber(
+          { phoneNumber: '+15551234567', providerCode: 'aws', numberTypeCode: 'toll_free' },
+          admin,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException)
+      const tollFree = await numbers.createNumber(
+        { phoneNumber: '+18005551234', providerCode: 'aws', numberTypeCode: 'toll_free' },
+        admin,
+      )
+
+      await expect(
+        numbers.updateNumber(tollFree.id, { numberTypeCode: 'short_code' }, admin),
+      ).rejects.toBeInstanceOf(BadRequestException)
+      await expect(
+        numbers.updateNumber(tollFree.id, { numberTypeCode: 'long_code' }, admin),
+      ).resolves.toMatchObject({ numberTypeCode: 'long_code' })
+    })
+
     it('lets one number serve several tenants, and lists them against it', async () => {
       const shortCode = await numbers.createNumber(
         { phoneNumber: '12345', providerCode: 'aws', numberTypeCode: 'short_code' },
