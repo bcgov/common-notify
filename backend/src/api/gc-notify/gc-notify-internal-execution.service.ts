@@ -2,9 +2,11 @@ import {
   Injectable,
   Inject,
   Logger,
+  Optional,
   BadRequestException,
   UnprocessableEntityException,
 } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import type { Queue } from 'bullmq'
@@ -60,6 +62,7 @@ import type { NotifyEmailChannel } from '../notify/schemas/notify-email-channel'
 import type { NotifyAttachment } from '../notify/schemas/notify-attachment'
 import type { StoredNotifyAttachment } from '../notify/schemas/stored-notify-attachment'
 import { INGESTION_JOB_OPTIONS } from '../../queue/job-options'
+import { jobPriority } from '../../queue/job-priority'
 
 const TEMPLATE_LIST_QUERY_CONFIG: QueryableFieldsConfig = {
   sortableFields: { name: 'template.name', updatedAt: 'template.updatedAt' },
@@ -190,6 +193,7 @@ export class GcNotifyInternalExecutionService {
     private readonly attachmentProcessingService: AttachmentProcessingService,
     private readonly bulkValidationService: GcNotifyBulkValidationService,
     private readonly submissionService: NotifySubmissionService,
+    @Optional() private readonly configService?: ConfigService,
   ) {}
 
   async sendEmail(
@@ -837,6 +841,9 @@ export class GcNotifyInternalExecutionService {
         await this.ingestionQueue.add(this.ingestionQueue.name, jobPayload, {
           jobId: notificationRecord.id,
           ...INGESTION_JOB_OPTIONS,
+          // GC Notify sends do not take a priority. One is still required: a job without one
+          // would be processed ahead of every prioritised job.
+          priority: jobPriority('normal', this.configService),
           ...(delayMs > 0 && { delay: delayMs }),
         })
 

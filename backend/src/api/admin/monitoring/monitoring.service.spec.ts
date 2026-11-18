@@ -538,6 +538,31 @@ describe('MonitoringService', () => {
     ],
   }
 
+  it('counts prioritized jobs as waiting, and measures the longest-waiting next job', async () => {
+    const queue = fakeQueue('email-delivery', {
+      getJobCounts: vi.fn().mockResolvedValue({ waiting: 1, prioritized: 4, active: 0 }),
+      getJobs: vi.fn().mockResolvedValue([
+        { timestamp: now - 10_000, opts: {} },
+        { timestamp: now - 90_000, opts: {} },
+      ]),
+    })
+    const service = new MonitoringService(
+      fakeRedis([livePod]),
+      null,
+      queue,
+      null,
+      null,
+      tenantRepository,
+      fakeDetailRepository(),
+    )
+
+    const result = await service.getQueueMonitoring()
+
+    expect(queue.getJobs).toHaveBeenCalledWith(['waiting', 'prioritized'], 0, 0, true)
+    expect(result.queues[0].counts.waiting).toBe(5)
+    expect(result.queues[0].oldestWaitingAgeMs).toBeGreaterThanOrEqual(90_000)
+  })
+
   it('reports Redis, every queue, live workers and the oldest waiting job', async () => {
     const service = new MonitoringService(
       fakeRedis([livePod]),

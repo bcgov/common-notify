@@ -7,6 +7,7 @@ import { WebhookJobPayload } from '../queue.types'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotificationRequestDto } from '../../api/notification/schemas/notification-request'
 import { WEBHOOK_JOB_OPTIONS } from '../job-options'
+import { jobPriority } from '../job-priority'
 import { buildRedisOptions } from '../redis-connection'
 
 /**
@@ -148,6 +149,7 @@ export class WebhookTriggerService implements OnModuleInit, OnModuleDestroy {
           await this.webhookQueue!.add(this.webhookQueue!.name, jobPayload, {
             jobId,
             ...WEBHOOK_JOB_OPTIONS,
+            priority: jobPriority('normal', this.configService),
           })
           this.logger.log(
             `[${notification.id}] Queued webhook delivery for webhook=${webhook.id} (status=${notificationStatus})`,

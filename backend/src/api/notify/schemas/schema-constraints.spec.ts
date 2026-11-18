@@ -51,6 +51,11 @@ describe('applyNotifySchemaConstraints', () => {
     expect(schemas[name].anyOf).toBeUndefined()
   })
 
+  // Accepted by the API but not advertised yet.
+  it('leaves priority out of NotifySimpleRequest', () => {
+    expect(schemas.NotifySimpleRequest.properties).not.toHaveProperty('priority')
+  })
+
   it('requires the field that identifies each branch', () => {
     expect(schemas.TemplateContent.required).toEqual(['templateId'])
     expect(schemas.EmailMailMerge.required).toEqual(['mergeArray'])

@@ -14,6 +14,7 @@ import { AttachmentService } from '../../api/attachment/attachment.service'
 import { PhoneNumberService } from '../../api/notify/services/phone-number.service'
 import { mergeJobDataFromRequest } from '../merge-batch-builder'
 import { DELIVERY_JOB_OPTIONS } from '../job-options'
+import { jobPriority, requestPriority } from '../job-priority'
 import { TenantsService } from '../../api/admin/tenants/tenants.service'
 import { describeError } from '../../common/utils/describe-error'
 
@@ -118,8 +119,14 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
         return { success: false, reason: 'Sending is disabled for this tenant' }
       }
 
+      // Delivery jobs inherit the ingestion job's priority. A job queued before priorities has
+      // none, and gets the default for its kind of send.
+      const priority =
+        job.opts.priority ||
+        jobPriority(requestPriority(job.data.request, !!job.data.mailMerge), this.configService)
+
       if (job.data.mailMerge && job.data.mailMergeData) {
-        return await this.fanOutMerge(job.data)
+        return await this.fanOutMerge(job.data, priority)
       }
 
       const request = this.normalizeSmsRecipients(job.data.request)
@@ -134,7 +141,7 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
         return { success: false, reason: 'Quarantined due to malware detection' }
       }
 
-      const queued = await this.fanOut(job.data, request, resumed)
+      const queued = await this.fanOut(job.data, request, resumed, priority)
 
       await this.notificationService.update(notifyId, tenantId, {
         status: NotificationStatus.PROCESSING,
@@ -204,7 +211,7 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
    * Split a merge's recipients into fixed-size batches and queue one delivery job per batch on
    * the merge's channel. Each batch's detail rows are written here, tagged with its batchId.
    */
-  private async fanOutMerge(data: IngestionJobPayload): Promise<unknown> {
+  private async fanOutMerge(data: IngestionJobPayload, priority: number): Promise<unknown> {
     const { notifyId, tenantId, request } = data
     const { content, params } = data.mailMergeData!
     const batchSize = this.configService?.get<number>('queue.batchSize') || 25
@@ -251,7 +258,11 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
         // Recipients stay in Postgres; the worker reads this batch's detail rows.
         mailMergeData: { content, params },
       }
-      await queue.add(queue.name, deliveryPayload, { jobId: batchId, ...DELIVERY_JOB_OPTIONS })
+      await queue.add(queue.name, deliveryPayload, {
+        jobId: batchId,
+        ...DELIVERY_JOB_OPTIONS,
+        priority,
+      })
 
       this.logger.log(
         `[${notifyId}] Queued mail merge batch ${batchIndex} (batchId=${batchId}, recipients=${chunk.length})`,
@@ -395,6 +406,7 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
     { notifyId, tenantId, scheduledFor }: IngestionJobPayload,
     request: IngestionRequest,
     resumed: boolean,
+    priority: number,
   ): Promise<number> {
     const deliveries: Array<{
       queue: Queue<DeliveryJobPayload>
@@ -452,6 +464,7 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
         jobId: jobKey,
         delay,
         ...DELIVERY_JOB_OPTIONS,
+        priority,
       })
 
       this.logger.log(
