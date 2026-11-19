@@ -101,12 +101,13 @@ backend:
     minAvailable: 1
   networkPolicy:
     enabled: true # enable NetworkPolicy to restrict traffic to backend
-    # Allows traffic from:
-    # 1. OpenShift Router (ingress policy-group)
-    # 2. Frontend pods in same release
-    # 3. Monitoring namespace (monitoring policy-group)
-    # 4. Any namespace on port 3000 (for Kong API Gateway)
-    # NOTE: More restrictive namespace selector needed from platform team
+    # Allows traffic from the OpenShift Router, the monitoring namespace, and
+    # Kong's Data Plane. The frontend is deliberately absent: Caddy proxies
+    # /api* and /gcnotify/* to the public gateway, never to the backend service.
+    #-- APS license plate for Kong's Data Plane. The platform labels every namespace
+    #-- `name: <plate>` and carries the environment in a separate label, so this one
+    #-- value matches the dev, test and prod data planes.
+    apiGatewayLicensePlate: 264e6f
   #-- which transport each channel sends through. The credentials for the selected adapter must
   #-- exist in app-api-secrets, or the adapter logs instead of sending.
   delivery:
