@@ -14,11 +14,9 @@ import {
   sendBulkNotifications,
   BulkNotificationsValidationError,
 } from '@/api/bulkNotifications.api'
-import { useAppSelector } from '@/redux/hooks'
-import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchSettings } from '@/redux/thunks/settings.thunks'
-import { showErrorToast, showInfoToast, showSuccessToast } from '@/redux/utils/toastUtils'
+import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
 import FileUpload from '@/components/FileUpload'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
