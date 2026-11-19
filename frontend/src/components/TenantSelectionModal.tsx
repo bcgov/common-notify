@@ -138,8 +138,8 @@ const TenantSelectionModal: FC = () => {
               {/* Tenants are explained in CSTAR, not in Notify. */}
               <p className="tenant-selection-description tenant-selection-description--start">
                 <Link href={config.CSTAR_TENANT_SETUP_URL} target="_blank" rel="noreferrer">
-                  Learn more about tenants
-                  <span className="visually-hidden"> (opens in a new tab)</span>
+                  Learn more about tenants{' '}
+                  <span className="visually-hidden">(opens in a new tab)</span>
                 </Link>
               </p>
             </>
