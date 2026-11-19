@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { FC } from 'react'
-import { AlertDialog, Button, Modal, Select } from '@bcgov/design-system-react-components'
+import { AlertDialog, Button, Link, Modal, Select } from '@bcgov/design-system-react-components'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { selectTenant } from '@/redux/slices/tenant.slice'
 import { fetchCstarRoles } from '@/redux/thunks/cstar.thunks'
@@ -28,6 +28,7 @@ const TenantSelectionModal: FC = () => {
   const showModal = useAppSelector((state) => state.tenant.showTenantModal)
   const tenants = useAppSelector((state) => state.cstar.tenants)
   const [pendingTenantId, setPendingTenantId] = useState<string | undefined>(undefined)
+  const [isSetupDismissed, setIsSetupDismissed] = useState(false)
 
   const tenantItems = useMemo(
     () =>
@@ -74,7 +75,10 @@ const TenantSelectionModal: FC = () => {
     window.location.href = config.CSTAR_TENANT_SETUP_URL
   }
 
-  const isZeroTenantState = tenants.length === 0
+  // Dismissing only closes the modal. Signing out would end the shared Keycloak session
+  // and log the user out of every other app on it.
+  const isZeroTenantState = tenants.length === 0 && !isSetupDismissed
+  const handleDismissSetup = () => setIsSetupDismissed(true)
   const isMultiTenantState = showModal && tenants.length > 1
 
   if (!isZeroTenantState && !isMultiTenantState) {
@@ -83,8 +87,8 @@ const TenantSelectionModal: FC = () => {
 
   const buttons = isZeroTenantState ? (
     <>
-      <Button variant="tertiary" type="button" onPress={handleSignOut}>
-        Sign out
+      <Button variant="tertiary" type="button" onPress={handleDismissSetup}>
+        Cancel
       </Button>
       <Button variant="primary" type="button" onPress={handleTenantSetupRedirect}>
         Create tenant
@@ -112,7 +116,12 @@ const TenantSelectionModal: FC = () => {
       isDismissable={false}
       isKeyboardDismissDisabled
       onOpenChange={(isOpen) => {
-        if (!isOpen) {
+        if (isOpen) {
+          return
+        }
+        if (isZeroTenantState) {
+          handleDismissSetup()
+        } else {
           handleSignOut()
         }
       }}
@@ -124,9 +133,19 @@ const TenantSelectionModal: FC = () => {
       >
         <div className="tenant-selection-modal-content">
           {isZeroTenantState ? (
-            <p className="tenant-selection-description">
-              You do not have a tenant set up yet. Create one to get started.
-            </p>
+            <>
+              <p className="tenant-selection-description tenant-selection-description--start">
+                To start sending and managing notifications, you need a tenant set up for your
+                program area or service.
+              </p>
+              {/* Tenants are explained in CSTAR, not in Notify. */}
+              <p className="tenant-selection-description tenant-selection-description--start">
+                <Link href={config.CSTAR_TENANT_SETUP_URL} target="_blank" rel="noreferrer">
+                  Learn more about tenants
+                  <span className="visually-hidden"> (opens in a new tab)</span>
+                </Link>
+              </p>
+            </>
           ) : (
             <>
               <p className="tenant-selection-description">Please choose a tenant to continue.</p>

@@ -42,9 +42,20 @@ describe('TenantSelectionModal', () => {
   it('offers setup for users with no tenants', async () => {
     setup([])
     expect(screen.getByText('Set up your tenant')).toBeInTheDocument()
+    expect(
+      screen.getByText(/you need a tenant set up for your program area or service/),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Learn more about tenants/ })).toHaveAttribute(
+      'target',
+      '_blank',
+    )
     expect(screen.getByRole('button', { name: 'Create tenant' })).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
-    expect(mocks.logout).toHaveBeenCalled()
+  })
+  it.each(['Cancel', 'Close'])('closes the setup modal on %s without signing out', async (name) => {
+    setup([])
+    await userEvent.click(screen.getByRole('button', { name }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(mocks.logout).not.toHaveBeenCalled()
   })
   it('allows administrators with no tenants to bypass selection', () => {
     mocks.admin = true
