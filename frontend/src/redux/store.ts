@@ -15,7 +15,7 @@ import featureFlagsReducer from './slices/featureFlags.slice'
 import adminTenantsReducer from './slices/adminTenants.slice'
 import adminNotificationsReducer from './slices/adminNotifications.slice'
 import apiKeysReducer from './slices/apiKeys.slice'
-import apiKeyUsageReducer from './slices/apiKeyUsage.slice'
+import usageReducer from './slices/usage.slice'
 import tenantSettingsReducer from './slices/tenantSettings.slice'
 import safelistReducer from './slices/safelist.slice'
 import emailSettingsReducer from './slices/emailSettings.slice'
@@ -39,7 +39,7 @@ export const reducers = {
   adminTenants: adminTenantsReducer,
   adminNotifications: adminNotificationsReducer,
   apiKeys: apiKeysReducer,
-  apiKeyUsage: apiKeyUsageReducer,
+  usage: usageReducer,
   tenantSettings: tenantSettingsReducer,
   safelist: safelistReducer,
   emailSettings: emailSettingsReducer,

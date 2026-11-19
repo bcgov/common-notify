@@ -8,6 +8,7 @@ import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
 import { CstarRole } from '@/enum/cstar-role.enum'
+import PreviousTemplateVersion from './PreviousTemplateVersion'
 import TemplateForm from './TemplateForm'
 import type { TemplateFormData } from './TemplateForm'
 
@@ -93,6 +94,8 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
           },
         ]}
       />
+
+      <PreviousTemplateVersion template={template} />
 
       <TemplateForm
         key={template.id}

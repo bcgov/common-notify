@@ -1,23 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, userEvent, waitFor, fireEvent, within } from '@/test-utils'
-import reducer, {
-  setAdminFilter,
-  setAdminSearch,
-  setAdminSort,
-} from '@/redux/slices/apiKeyUsage.slice'
+import reducer, { setAdminFilter, setAdminSearch, setAdminSort } from '@/redux/slices/usage.slice'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import AdminUsage from './AdminUsage'
-import { updateTenantLimits } from '@/redux/thunks/apiKeyUsage.thunks'
-import type * as UsageThunks from '@/redux/thunks/apiKeyUsage.thunks'
-import { getAdminUsageSummary, setTenantSending } from '@/api/apiKeyUsage.api'
-import type * as UsageApi from '@/api/apiKeyUsage.api'
+import { updateTenantLimits } from '@/redux/thunks/usage.thunks'
+import type * as UsageThunks from '@/redux/thunks/usage.thunks'
+import { getAdminUsageSummary, setTenantSending } from '@/api/usage.api'
+import type * as UsageApi from '@/api/usage.api'
 
-vi.mock('@/api/apiKeyUsage.api', async (importOriginal) => ({
+vi.mock('@/api/usage.api', async (importOriginal) => ({
   ...(await importOriginal<typeof UsageApi>()),
   getAdminUsageSummary: vi.fn(),
   setTenantSending: vi.fn(),
 }))
-vi.mock('@/redux/thunks/apiKeyUsage.thunks', async (importOriginal) => {
+vi.mock('@/redux/thunks/usage.thunks', async (importOriginal) => {
   const actual = await importOriginal<typeof UsageThunks>()
   return { ...actual, updateTenantLimits: vi.fn(actual.updateTenantLimits) }
 })
@@ -61,7 +57,7 @@ let tenantOptions: Array<{ id: string; name: string }> = []
 function setup(overrides = {}, roles = ['NOTIFY_OPERATIONS_ADMIN']) {
   usageState = { ...reducer(undefined, { type: 'init' }), ...overrides }
   mocks.state = {
-    apiKeyUsage: usageState,
+    usage: usageState,
     adminTenants: { notifyOptions: tenantOptions, notifyOptionsRequested: true },
     tenant: { selectedTenant: { id: 'tenant' } },
     user: { current: { cstarRoles: roles } },

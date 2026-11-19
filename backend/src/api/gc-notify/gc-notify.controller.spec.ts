@@ -23,7 +23,6 @@ describe('GcNotifyController', () => {
   }
 
   const TENANT_ID = 'tenant-1'
-  const API_KEY_CONSUMER_ID = 'consumer-1'
   const TENANT_EXTERNAL_ID = 'ext-tenant-1'
 
   // Guards run before the controller in production; for these unit tests we
@@ -31,7 +30,6 @@ describe('GcNotifyController', () => {
   const makeReq = () =>
     ({
       tenantId: TENANT_ID,
-      apiKeyConsumerId: API_KEY_CONSUMER_ID,
       tenantExternalId: TENANT_EXTERNAL_ID,
     }) as any
 
@@ -111,7 +109,6 @@ describe('GcNotifyController', () => {
       expect(mockGcNotifyInternalExecutionService.sendEmail).toHaveBeenCalledWith(
         emailBody,
         TENANT_ID,
-        API_KEY_CONSUMER_ID,
         undefined,
       )
     })
@@ -138,7 +135,6 @@ describe('GcNotifyController', () => {
       expect(mockGcNotifyInternalExecutionService.sendSms).toHaveBeenCalledWith(
         smsBody,
         TENANT_ID,
-        API_KEY_CONSUMER_ID,
         undefined,
       )
     })
@@ -167,7 +163,6 @@ describe('GcNotifyController', () => {
       expect(mockGcNotifyInternalExecutionService.sendBulk).toHaveBeenCalledWith(
         bulkBody,
         TENANT_ID,
-        API_KEY_CONSUMER_ID,
         undefined,
       )
     })

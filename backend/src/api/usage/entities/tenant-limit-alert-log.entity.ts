@@ -1,27 +1,27 @@
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm'
-import { ApiKeyConsumer } from './api-key-consumer.entity'
+import { Tenant } from '../../admin/tenants/entities/tenant.entity'
 
 export type LimitAlertLevel = 'WARN' | 'LIMIT_REACHED'
 export type LimitAlertPeriod = 'DAY' | 'YEAR'
 
 /**
- * ApiKeyLimitAlertLog Entity
+ * TenantLimitAlertLog Entity
  *
- * Deduplication and delivery-tracking record for API key limit alerts. One row per
- * (api_key_consumer, channel_code, period_type_code, period_start, alert_level)
- * claims a warning or limit-reached notification for a usage period (see migration V43).
+ * Deduplication and delivery-tracking record for tenant limit alerts. One row per
+ * (tenant, channel_code, period_type_code, period_start, alert_level) claims a warning or
+ * limit-reached notification for a usage period (see migration V81).
  */
-@Entity('api_key_limit_alert_log')
-export class ApiKeyLimitAlertLog {
+@Entity('tenant_limit_alert_log')
+export class TenantLimitAlertLog {
   @PrimaryGeneratedColumn('uuid')
   id: string
 
-  @Column({ name: 'api_key_consumer_id', type: 'uuid' })
-  apiKeyConsumerId: string
+  @Column({ name: 'tenant_id', type: 'uuid' })
+  tenantId: string
 
-  @ManyToOne(() => ApiKeyConsumer, { eager: false })
-  @JoinColumn({ name: 'api_key_consumer_id' })
-  apiKeyConsumer: ApiKeyConsumer
+  @ManyToOne(() => Tenant, { eager: false })
+  @JoinColumn({ name: 'tenant_id' })
+  tenant: Tenant
 
   @Column({ name: 'channel_code', type: 'varchar', length: 20 })
   channelCode: string

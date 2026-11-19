@@ -21,7 +21,7 @@ import {
 import { NotifyAdminGuard } from '../../common/guards/notify-admin.guard'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { SsoRole } from '../../enum/sso-role.enum'
-import { ApiKeyUsageService, adminUsageListQueryConfig } from './api-key-usage.service'
+import { TenantUsageService, adminUsageListQueryConfig } from './tenant-usage.service'
 import { parseListQuery } from '../../common/query/list-query.parser'
 import {
   AdminTenantOptionDto,
@@ -39,19 +39,19 @@ import { JwtUserExtractor } from '../../common/utils/jwt-user-extractor'
 /**
  * Admin API Controller for notification usage across all tenants.
  *
- * Route: /api/v1/frontend/admin/api-key-usage
+ * Route: /api/v1/frontend/admin/usage
  * Guarded by NotifyAdminGuard + NOTIFY_ADMIN (SSO role) — NOT tenant-scoped, so no
  * x-tenant-id header is required. Mirrors the feature-flag admin controller.
  */
-@ApiTags('api-key-usage')
+@ApiTags('usage')
 // Not part of the service API; kept out of the published spec.
 @ApiExcludeController()
-@Controller('frontend/admin/api-key-usage')
+@Controller('frontend/admin/usage')
 @UseGuards(NotifyAdminGuard)
 @ApiBearerAuth()
-export class ApiKeyUsageAdminController {
+export class TenantUsageAdminController {
   constructor(
-    private readonly apiKeyUsageService: ApiKeyUsageService,
+    private readonly tenantUsageService: TenantUsageService,
     private readonly tenantsService: TenantsService,
   ) {}
 
@@ -64,7 +64,7 @@ export class ApiKeyUsageAdminController {
     @Query() query: SearchableListQueryDto,
   ): Promise<PaginatedAdminUsageResponseDto> {
     const parsedQuery = parseListQuery(query, adminUsageListQueryConfig)
-    return this.apiKeyUsageService.getAllTenantsUsage(parsedQuery, query.search)
+    return this.tenantUsageService.getAllTenantsUsage(parsedQuery, query.search)
   }
 
   @Version('1')
@@ -73,7 +73,7 @@ export class ApiKeyUsageAdminController {
   @ApiOperation({ summary: 'How many tenants use Notify (admin only)' })
   @ApiOkResponse({ type: AdminUsageSummaryDto })
   getSummary(): Promise<AdminUsageSummaryDto> {
-    return this.apiKeyUsageService.getAdminUsageSummary()
+    return this.tenantUsageService.getAdminUsageSummary()
   }
 
   @Version('1')
@@ -82,7 +82,7 @@ export class ApiKeyUsageAdminController {
   @ApiOperation({ summary: 'Every tenant the usage table lists, by name (admin only)' })
   @ApiOkResponse({ type: [AdminTenantOptionDto] })
   listTenants(): Promise<AdminTenantOptionDto[]> {
-    return this.apiKeyUsageService.listNotifyTenants()
+    return this.tenantUsageService.listNotifyTenants()
   }
 
   @Version('1')
@@ -95,7 +95,7 @@ export class ApiKeyUsageAdminController {
     @Body() dto: UpdateTenantLimitsDto,
   ): Promise<AdminTenantUsageRowDto[]> {
     const updatedBy = (req as any).user?.sub as string | undefined
-    return this.apiKeyUsageService.updateTenantLimits(
+    return this.tenantUsageService.updateTenantLimits(
       dto.tenantId,
       dto.channel,
       dto.dailyLimit,

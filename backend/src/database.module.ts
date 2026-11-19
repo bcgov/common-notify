@@ -22,10 +22,10 @@ import { WebhookConfig } from './api/webhook/entities/webhook-config.entity'
 import { WebhookDeliveryLog } from './api/webhook/entities/webhook-delivery-log.entity'
 import { WebhookTypeCode } from './api/webhook/entities/webhook-type.entity'
 import { ApiKeyConsumer } from './api/api-keys/entities/api-key-consumer.entity'
-import { ApiKeyLimit } from './api/api-keys/entities/api-key-limit.entity'
-import { ApiKeyUsage } from './api/api-keys/entities/api-key-usage.entity'
-import { ApiKeyLimitAlert } from './api/api-keys/entities/api-key-limit-alert.entity'
-import { ApiKeyLimitAlertLog } from './api/api-keys/entities/api-key-limit-alert-log.entity'
+import { TenantLimit } from './api/usage/entities/tenant-limit.entity'
+import { TenantUsage } from './api/usage/entities/tenant-usage.entity'
+import { TenantLimitAlert } from './api/usage/entities/tenant-limit-alert.entity'
+import { TenantLimitAlertLog } from './api/usage/entities/tenant-limit-alert-log.entity'
 import { AttachmentEntity } from './api/attachment/entities/attachment.entity'
 import { TenantSettings } from './api/tenant-settings/entities/tenant-settings.entity'
 import { NotifyEvent } from './api/events/entities/event.entity'
@@ -77,10 +77,10 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         WebhookDeliveryLog,
         WebhookTypeCode,
         ApiKeyConsumer,
-        ApiKeyLimit,
-        ApiKeyUsage,
-        ApiKeyLimitAlert,
-        ApiKeyLimitAlertLog,
+        TenantLimit,
+        TenantUsage,
+        TenantLimitAlert,
+        TenantLimitAlertLog,
         AttachmentEntity,
         TenantSettings,
         NotifyEvent,

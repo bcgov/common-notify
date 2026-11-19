@@ -12,7 +12,7 @@ import { AttachmentValidationService } from '../notify/services/attachment-valid
 import { AttachmentProcessingService } from '../notify/services/attachment-processing.service'
 import { SafelistService } from '../safelist/safelist.service'
 import { GcNotifyBulkValidationService } from './gc-notify-bulk-validation.service'
-import { ApiKeyUsageService } from '../api-keys/api-key-usage.service'
+import { TenantUsageService } from '../usage/tenant-usage.service'
 import { SmsSegmentService } from '../notify/services/sms-segment.service'
 import { NotificationDedupService } from '../notify/services/notification-dedup.service'
 import { NotifySubmissionService } from '../notify/services/notify-submission.service'
@@ -49,7 +49,7 @@ describe('GcNotifyInternalExecutionService', () => {
   let mockAttachmentProcessingService: { processAttachments: ReturnType<typeof vi.fn> }
   let mockSafelistService: { findBlocked: ReturnType<typeof vi.fn> }
   const mockBulkValidationService = { validateRows: vi.fn() }
-  const mockApiKeyUsageService = { assertWithinLimits: vi.fn(), recordUsage: vi.fn() }
+  const mockTenantUsageService = { assertWithinLimits: vi.fn(), recordUsage: vi.fn() }
   const mockSmsSegmentService = { countSegments: vi.fn() }
   let mockTenantSettingsService: { resolveSenderAddress: ReturnType<typeof vi.fn> }
   // Disabled unless a test opts in, so the rest of the suite runs the undeduplicated path.
@@ -122,7 +122,7 @@ describe('GcNotifyInternalExecutionService', () => {
         },
         { provide: SafelistService, useValue: mockSafelistService },
         { provide: GcNotifyBulkValidationService, useValue: mockBulkValidationService },
-        { provide: ApiKeyUsageService, useValue: mockApiKeyUsageService },
+        { provide: TenantUsageService, useValue: mockTenantUsageService },
         { provide: SmsSegmentService, useValue: mockSmsSegmentService },
         { provide: TenantSettingsService, useValue: mockTenantSettingsService },
         { provide: getRepositoryToken(NotifyConfiguration), useValue: mockConfigurationRepository },
@@ -506,7 +506,7 @@ describe('GcNotifyInternalExecutionService', () => {
       })
     })
 
-    it('counts an email send as one message against the calling key', async () => {
+    it('counts an email send as one message against the tenant', async () => {
       mockTemplatesRepository.findById.mockResolvedValue({
         id: 'tpl-1',
         version: 3,
@@ -521,13 +521,12 @@ describe('GcNotifyInternalExecutionService', () => {
       await service.sendEmail(
         { email_address: 'user@example.com', template_id: 'tpl-1' },
         TENANT_ID,
-        'consumer-7',
       )
 
-      expect(enforceLimits).toHaveBeenCalledWith('consumer-7', [
+      expect(enforceLimits).toHaveBeenCalledWith(TENANT_ID, [
         { channel: NotificationChannel.EMAIL, count: 1 },
       ])
-      expect(recordAcceptedUsage).toHaveBeenCalledWith('consumer-7', [
+      expect(recordAcceptedUsage).toHaveBeenCalledWith(TENANT_ID, [
         { channel: NotificationChannel.EMAIL, count: 1 },
       ])
     })
@@ -544,21 +543,17 @@ describe('GcNotifyInternalExecutionService', () => {
       })
       resolveSmsSegments.mockResolvedValue(3)
 
-      await service.sendSms(
-        { phone_number: '+15555550100', template_id: 'tpl-2' },
-        TENANT_ID,
-        'consumer-7',
-      )
+      await service.sendSms({ phone_number: '+15555550100', template_id: 'tpl-2' }, TENANT_ID)
 
-      expect(enforceLimits).toHaveBeenCalledWith('consumer-7', [
+      expect(enforceLimits).toHaveBeenCalledWith(TENANT_ID, [
         { channel: NotificationChannel.SMS, count: 3 },
       ])
-      expect(recordAcceptedUsage).toHaveBeenCalledWith('consumer-7', [
+      expect(recordAcceptedUsage).toHaveBeenCalledWith(TENANT_ID, [
         { channel: NotificationChannel.SMS, count: 3 },
       ])
     })
 
-    it('rejects before enqueueing when the key is over its limit', async () => {
+    it('rejects before enqueueing when the tenant is over its limit', async () => {
       mockTemplatesRepository.findById.mockResolvedValue({
         id: 'tpl-1',
         version: 3,
@@ -572,11 +567,7 @@ describe('GcNotifyInternalExecutionService', () => {
       enforceLimits.mockRejectedValueOnce(new Error('over limit'))
 
       await expect(
-        service.sendEmail(
-          { email_address: 'user@example.com', template_id: 'tpl-1' },
-          TENANT_ID,
-          'consumer-7',
-        ),
+        service.sendEmail({ email_address: 'user@example.com', template_id: 'tpl-1' }, TENANT_ID),
       ).rejects.toThrow('over limit')
 
       expect(mockNotificationService.create).not.toHaveBeenCalled()
@@ -634,7 +625,7 @@ describe('GcNotifyInternalExecutionService', () => {
     it('fingerprints the recipient where recipients are normalised, and the template version', async () => {
       emailTemplate()
 
-      await service.sendEmail(emailBody, TENANT_ID, 'consumer-7')
+      await service.sendEmail(emailBody, TENANT_ID)
 
       expect(mockNotificationDedupService.fingerprint).toHaveBeenCalledWith({
         email: { recipients: { to: ['user@example.com'] } },
@@ -650,7 +641,7 @@ describe('GcNotifyInternalExecutionService', () => {
     it('creates the row with the claimed notifyId and returns it', async () => {
       emailTemplate()
 
-      const result = await service.sendEmail(emailBody, TENANT_ID, 'consumer-7')
+      const result = await service.sendEmail(emailBody, TENANT_ID)
 
       expect(mockNotificationService.create).toHaveBeenCalledWith(
         expect.objectContaining({ id: CLAIMED_ID }),
@@ -669,7 +660,6 @@ describe('GcNotifyInternalExecutionService', () => {
           personalisation: { name: 'Alice', doc: { file: 'aGVsbG8=', filename: 'a.pdf' } },
         },
         TENANT_ID,
-        'consumer-7',
       )
 
       expect(result.id).toBe(ORIGINAL_ID)
@@ -684,7 +674,7 @@ describe('GcNotifyInternalExecutionService', () => {
       emailTemplate()
       mockNotificationDedupService.claim.mockResolvedValue({ kind: 'duplicate', original })
 
-      const result = await service.sendEmail(emailBody, TENANT_ID, 'consumer-7')
+      const result = await service.sendEmail(emailBody, TENANT_ID)
 
       expect(result.id).toBe(ORIGINAL_ID)
       expect(mockNotificationService.create).not.toHaveBeenCalled()
@@ -696,9 +686,7 @@ describe('GcNotifyInternalExecutionService', () => {
       emailTemplate()
       mockNotificationService.create.mockRejectedValueOnce(new Error('database down'))
 
-      await expect(service.sendEmail(emailBody, TENANT_ID, 'consumer-7')).rejects.toThrow(
-        'database down',
-      )
+      await expect(service.sendEmail(emailBody, TENANT_ID)).rejects.toThrow('database down')
       expect(release).toHaveBeenCalledTimes(1)
     })
 
@@ -706,7 +694,7 @@ describe('GcNotifyInternalExecutionService', () => {
       smsTemplate()
       mockNotificationDedupService.findDuplicate.mockResolvedValue(original)
 
-      const result = await service.sendSms(smsBody, TENANT_ID, 'consumer-7')
+      const result = await service.sendSms(smsBody, TENANT_ID)
 
       expect(result.id).toBe(ORIGINAL_ID)
       expect(mockNotificationDedupService.fingerprint).toHaveBeenCalledWith({
@@ -1116,12 +1104,11 @@ describe('GcNotifyInternalExecutionService', () => {
       expect(acceptMerge).not.toHaveBeenCalled()
     })
 
-    it('counts the send against the calling API key, in billable segments for SMS', async () => {
-      await service.sendBulk(bulkBody, TENANT_ID, 'consumer-9')
+    it("counts the send against the calling tenant's usage", async () => {
+      await service.sendBulk(bulkBody, TENANT_ID)
 
-      const submission = acceptMerge.mock.calls[0][0]
-      // Without the consumer the merge path records nothing, so this argument is the whole feature.
-      expect(submission.apiKeyConsumerId).toBe('consumer-9')
+      // acceptMerge checks limits and records usage, in billable segments for SMS, by tenant.
+      expect(acceptMerge.mock.calls[0][0].tenantId).toBe(TENANT_ID)
     })
 
     it('carries a scheduled send through to the merge and back into the job shape', async () => {

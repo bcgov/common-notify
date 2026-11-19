@@ -4,50 +4,51 @@ import reducer, {
   setAdminLimit,
   setAdminSearch,
   setAdminFilter,
-} from './apiKeyUsage.slice'
+  setAdminSort,
+} from './usage.slice'
 import {
-  fetchApiKeyUsage,
-  fetchApiKeyUsageHistory,
+  fetchTenantUsage,
+  fetchTenantUsageHistory,
   fetchAllTenantsUsage,
   updateTenantLimits,
   updateThreshold,
-} from '../thunks/apiKeyUsage.thunks'
+} from '../thunks/usage.thunks'
 
-describe('apiKeyUsage request lifecycle', () => {
-  it('fetchApiKeyUsage starts and reports rejected requests', () => {
+describe('usage request lifecycle', () => {
+  it('fetchTenantUsage starts and reports rejected requests', () => {
     const pending = reducer(undefined, {
-      type: fetchApiKeyUsage.pending.type,
+      type: fetchTenantUsage.pending.type,
       meta: { requestId: 'request', arg: undefined },
     })
     expect(pending.isLoading).toBeTruthy()
     const failed = reducer(pending, {
-      type: fetchApiKeyUsage.rejected.type,
+      type: fetchTenantUsage.rejected.type,
       payload: 'Server unavailable',
       meta: { requestId: 'request', arg: undefined },
     })
     expect(failed.isLoading).toBeFalsy()
     expect(failed.error).toBe('Server unavailable')
     const fallback = reducer(pending, {
-      type: fetchApiKeyUsage.rejected.type,
+      type: fetchTenantUsage.rejected.type,
       meta: { requestId: 'request', arg: undefined },
     })
     expect(fallback.error).toMatch(/Failed/)
   })
-  it('fetchApiKeyUsageHistory starts and reports rejected requests', () => {
+  it('fetchTenantUsageHistory starts and reports rejected requests', () => {
     const pending = reducer(undefined, {
-      type: fetchApiKeyUsageHistory.pending.type,
+      type: fetchTenantUsageHistory.pending.type,
       meta: { requestId: 'request', arg: undefined },
     })
     expect(pending.historyLoading).toBeTruthy()
     const failed = reducer(pending, {
-      type: fetchApiKeyUsageHistory.rejected.type,
+      type: fetchTenantUsageHistory.rejected.type,
       payload: 'Server unavailable',
       meta: { requestId: 'request', arg: undefined },
     })
     expect(failed.historyLoading).toBeFalsy()
     expect(failed.historyError).toBe('Server unavailable')
     const fallback = reducer(pending, {
-      type: fetchApiKeyUsageHistory.rejected.type,
+      type: fetchTenantUsageHistory.rejected.type,
       meta: { requestId: 'request', arg: undefined },
     })
     expect(fallback.historyError).toMatch(/Failed/)
@@ -130,6 +131,15 @@ describe('usage results', () => {
       adminSearch: 'Health',
     })
   })
+  it('sets and clears the sort, returning to the first page', () => {
+    const state = reducer(undefined, setAdminPage(4))
+    const sorted = reducer(state, setAdminSort({ sortBy: 'usedToday', sortOrder: 'desc' }))
+    expect(sorted).toMatchObject({ adminPage: 1, adminSortBy: 'usedToday', adminSortOrder: 'desc' })
+    expect(reducer(sorted, setAdminSort({ sortBy: null, sortOrder: null }))).toMatchObject({
+      adminSortBy: null,
+      adminSortOrder: null,
+    })
+  })
   it('sets and clears column filters, returning to the first page', () => {
     const filtered = reducer(
       reducer(undefined, setAdminPage(3)),
@@ -145,8 +155,8 @@ describe('usage results', () => {
   const row = { tenantId: 'tenant', channel: 'EMAIL', warnThresholdPercent: 80 }
   const usage = { tenantId: 'tenant', channels: [row] }
   it.each([
-    [fetchApiKeyUsage, usage, 'usage'],
-    [fetchApiKeyUsageHistory, [row], 'history'],
+    [fetchTenantUsage, usage, 'usage'],
+    [fetchTenantUsageHistory, [row], 'history'],
     [
       fetchAllTenantsUsage,
       { data: [row], count: 1, page: 2, limit: 15, totalPages: 2 },

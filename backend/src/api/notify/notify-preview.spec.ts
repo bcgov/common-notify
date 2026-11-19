@@ -16,7 +16,7 @@ import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { ApiKeyConsumer } from '../api-keys/entities/api-key-consumer.entity'
 import { NotificationService } from '../notification/notification.service'
 import { NotificationRequestDetailService } from '../notification/notification-request-detail.service'
-import { ApiKeyUsageService } from '../api-keys/api-key-usage.service'
+import { TenantUsageService } from '../usage/tenant-usage.service'
 import { SafelistService } from '../safelist/safelist.service'
 import { QueueName } from '../../enum/queue-name.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
@@ -84,7 +84,7 @@ describe('Notify preview HTTP pipeline', () => {
         { provide: NotificationService, useValue: notification },
         { provide: NotificationRequestDetailService, useValue: details },
         { provide: QueueName.INGESTION, useValue: queue },
-        { provide: ApiKeyUsageService, useValue: usage },
+        { provide: TenantUsageService, useValue: usage },
         { provide: SafelistService, useValue: safelist },
       ],
     })
