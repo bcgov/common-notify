@@ -31,7 +31,7 @@ export default function GroupRecipientsPreview({ groupIds }: { groupIds: string[
     } catch {
       if (current === requestId.current)
         setError(
-          'Unable to resolve group recipients. Check that the MCP server is enabled and available.',
+          'Unable to retrieve the recipients using CSTAR. You can still enter recipients manually.',
         )
     } finally {
       if (current === requestId.current) setBusy(false)
@@ -43,7 +43,11 @@ export default function GroupRecipientsPreview({ groupIds }: { groupIds: string[
         {busy ? 'Resolving…' : 'Preview group recipients'}
       </Button>
       <p>Read-only lookup of selected groups. No notification is sent.</p>
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <p className="events__help" role="alert">
+          {error}
+        </p>
+      )}
       {emails !== null && (
         <div role="status">
           <p>

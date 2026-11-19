@@ -63,9 +63,13 @@ frontend:
   promtail:
     enabled: true
 
-# Enable after publishing the image and provisioning the service-account secret.
+# Adapter image follows the release tag through the existing build/import/promotion pipeline.
 cstarMcp:
-  enabled: false
-  image: ""
+  enabled: true
+  image: "" # Optional override; defaults to <global.registry>/<global.repository>/notify-cstar-mcp:<global.tag>.
   secretName: cstar-mcp-secrets
   replicaCount: 2
+  deploymentStrategy: RollingUpdate
+  pdb:
+    enabled: true
+    minAvailable: 1

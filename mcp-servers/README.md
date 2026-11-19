@@ -88,8 +88,8 @@ verify that an unassociated tenant/foreign group is rejected and that the existi
 tenant/role flows still work.
 
 Deployment prerequisites: the adapter image must be published, the chart enabled, and the Secret
-referenced by `cstarMcp.secretName` must exist in the release namespace. The current adapter
-workflow builds/tests but does not publish, the chart defaults to disabled, and the PR frontend
+referenced by `cstarMcp.secretName` must exist in the release namespace. The PR and merge workflows test, publish and import the adapter image alongside Notify,
+and the chart enables the adapter in every environment. The PR frontend
 currently targets CSTAR TEST. A PR deploying in Notify DEV alone does not prove it targets CSTAR
 DEV: align the frontend/user-login CSTAR settings and adapter settings before the live test.
 TEST/PROD enablement needs separate CSTAR confirmation and credentials.
@@ -121,7 +121,7 @@ authentication, mapping it to the adapter's `MCP_API_KEY`. Leave that override u
 existing local shared key; if you change it, recreate the backend with the same setting as well. It
 is unrelated to the CSS client secret. Use separately provisioned secrets in OpenShift.
 
-After Flyway applies V78, enable the local destination once in the local database:
+After Flyway applies V84, enable the local destination once in the local database:
 
 ```sql
 UPDATE notify.mcp_server SET enabled = TRUE WHERE name = 'cstar';
@@ -140,7 +140,7 @@ docker build -t notify-cstar-mcp .
 
 ## Stored Notify client configuration
 
-V78 creates `notify.mcp_server` and `notify.mcp_tool`. Each call reloads the enabled URL, transport,
+V84 creates `notify.mcp_server` and `notify.mcp_tool`. Each call reloads the enabled URL, transport,
 credential reference, tool permission and parameter-name allowlist from these tables. There is no
 destination URL in event code. Secret values remain in environment variables/OpenShift Secrets. The
 seeded entry is disabled until operators provision the adapter. Existing event feature flags and
@@ -167,16 +167,30 @@ connecting; redirects remain disabled.
 
 ## OpenShift handoff
 
-Build/publish `cstar/Dockerfile`, then provision Secret `cstar-mcp-secrets` with the adapter
+The existing PR/merge build matrix publishes `notify-cstar-mcp` from `cstar/Dockerfile`, imports
+it into the tools ImageStream and promotes its tag with backend/frontend/migrations. PRs use
+the PR number; main uses dev, then test, then prod. Provision Secret `cstar-mcp-secrets` with the adapter
 environment names above (including `MCP_API_KEY`). The backend chart reads the same key as
 `CSTAR_MCP_API_KEY`. Do not commit secret values.
 
-Enable `cstarMcp.enabled` and set `cstarMcp.image` in the app Helm release after the image/secret
-exist. The service is internal (`cstar-mcp:3101`), with readiness and liveness probes, rolling
+`cstarMcp.enabled` is true in DEV/PR, TEST and PROD. The image defaults to the release
+registry/repository/tag supplied by the existing deployer; `cstarMcp.image` is an optional
+full-image override. Secrets must exist in each target namespace before deployment. The service is internal (`<release>-cstar-mcp:3101`), with readiness and liveness probes, rolling
 updates, non-root containers and no API-server token. Test/prod value files set **two replicas**,
-node-spreading preferences, and a PDB keeps one available during voluntary disruption. These are
+preferred pod anti-affinity scoped to the release, and an enabled PDB keeps one available during voluntary disruption. These are
 deployment manifests, not evidence of live HA; coordinate quotas, placement, egress to CSTAR/SSO,
 secret rotation and image promotion with Nikhil. No deployment or team messages have been sent as
 part of this change. Enable the registry entry only after rollout.
 
-Historical V77 is retained to avoid changing an already-applied Flyway checksum.
+Like Notify's ClamAV deployment, all adapter resources and selectors are scoped to the Helm
+release. DEV/PR defaults to one replica, Recreate and no PDB. TEST/PROD uses two replicas,
+RollingUpdate and a PDB with minAvailable 1. Configure these using cstarMcp.deploymentStrategy
+and cstarMcp.pdb. Separate nodes are preferred, not required.
+
+The backend chart supplies CSTAR_MCP_URL for its release's internal service. The MCP client
+uses this only for the seeded http://cstar-mcp:3101/mcp registry destination; explicit custom
+registry URLs remain authoritative. Local Compose continues to use cstar-mcp. No applied
+migration needs editing. Existing deployments with the old fixed-name adapter should coordinate
+its retirement after the release-specific deployment is ready; this change does not modify a live cluster.
+
+Historical V83 is retained to avoid changing an already-applied Flyway checksum.

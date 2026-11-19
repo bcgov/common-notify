@@ -24,6 +24,23 @@ import type { ParsedListQuery } from '../../common/query/list-query.types'
 describe('EventsService', () => {
   let service: EventsService
 
+  it('reports disabled tools without contacting CSTAR', async () => {
+    mockMcpGroupsService.isEnabled.mockResolvedValueOnce(false)
+    await expect(service.listCstarGroups({ tenantId: 'external-tenant' })).resolves.toEqual({
+      groups: [],
+      enabled: false,
+    })
+    expect(mockMcpGroupsService.getTenantGroups).not.toHaveBeenCalled()
+  })
+
+  it('propagates lookup failures when tools are enabled instead of reporting disablement', async () => {
+    mockMcpGroupsService.isEnabled.mockResolvedValueOnce(true)
+    mockMcpGroupsService.getTenantGroups.mockRejectedValueOnce(new Error('MCP lookup failed'))
+    await expect(service.listCstarGroups({ tenantId: 'external-tenant' })).rejects.toThrow(
+      'MCP lookup failed',
+    )
+  })
+
   const tenantId = 'tenant-uuid-1'
   const eventId = 'event-uuid-1'
   const logoId = 'logo-uuid-1'
@@ -136,6 +153,7 @@ describe('EventsService', () => {
   }
 
   const mockMcpGroupsService = {
+    isEnabled: vi.fn().mockResolvedValue(true),
     getTenantGroups: vi.fn(),
   }
 

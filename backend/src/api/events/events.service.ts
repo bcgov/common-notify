@@ -320,9 +320,11 @@ export class EventsService {
    * @param cstar Authenticated tenant context; credentials are owned by the MCP adapter
    */
   async listCstarGroups(cstar: CstarRequestContext): Promise<CstarGroupListResponseDto> {
+    if (!(await this.mcpGroups.isEnabled())) return { groups: [], enabled: false }
     const groups = await this.mcpGroups.getTenantGroups(cstar.tenantId)
 
     return {
+      enabled: true,
       groups: groups.map((group) => ({
         id: group.id,
         name: group.name,

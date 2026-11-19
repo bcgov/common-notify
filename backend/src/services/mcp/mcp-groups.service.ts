@@ -5,6 +5,10 @@ import { McpClientService } from './mcp-client.service'
 export class McpGroupsService {
   constructor(private readonly client: McpClientService) {}
 
+  isEnabled() {
+    return this.client.areToolsEnabled('cstar', ['list_groups', 'get_recipients'])
+  }
+
   async getTenantGroups(tenantId: string) {
     const result = await this.client.call('cstar', 'list_groups', tenantId, {})
     const groups = result.groups

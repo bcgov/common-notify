@@ -33,6 +33,7 @@ describe('stored MCP server policy', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.stubEnv('CSTAR_MCP_API_KEY', 'test-credential')
+    vi.stubEnv('CSTAR_MCP_URL', '')
     vi.stubEnv('FOO_MCP_API_KEY', 'test-credential')
     vi.stubEnv('MCP_ALLOWED_HOSTS', '')
     vi.stubEnv('NODE_ENV', 'test')
@@ -148,12 +149,33 @@ describe('stored MCP server policy', () => {
     expect(mocks.close).toHaveBeenCalled()
     expect(mocks.transportClose).toHaveBeenCalled()
   })
+  it('routes the seeded destination to the current release without overriding custom destinations', async () => {
+    vi.stubEnv('CSTAR_MCP_URL', 'http://notify-337-cstar-mcp:3101/mcp')
+    await service.call('cstar', 'get_recipients', 'tenant-a', { groupIds: [] })
+    expect(mocks.options.mock.calls[0][0].href).toBe('http://notify-337-cstar-mcp:3101/mcp')
+    registryRow({ url: 'http://custom-cstar:3101/mcp' })
+    await service.call('cstar', 'get_recipients', 'tenant-a', { groupIds: [] })
+    expect(mocks.options.mock.calls[1][0].href).toBe('http://custom-cstar:3101/mcp')
+  })
+
   it('blocks unknown arguments before connecting', async () => {
     await expect(
       service.call('cstar', 'get_recipients', 'tenant-a', { groupIds: [], tenantId: 'victim' }),
     ).rejects.toThrow('parameter is not permitted')
     expect(mocks.connect).not.toHaveBeenCalled()
   })
+  it('requires every group tool to be enabled before offering CSTAR recipients', async () => {
+    query.mockResolvedValue([{ name: 'list_groups' }])
+    await expect(service.areToolsEnabled('cstar', ['list_groups', 'get_recipients'])).resolves.toBe(
+      false,
+    )
+    query.mockResolvedValue([{ name: 'list_groups' }, { name: 'get_recipients' }])
+    await expect(service.areToolsEnabled('cstar', ['list_groups', 'get_recipients'])).resolves.toBe(
+      true,
+    )
+    expect(mocks.connect).not.toHaveBeenCalled()
+  })
+
   it('blocks disabled or unregistered tools', async () => {
     query.mockResolvedValue([])
     await expect(service.call('cstar', 'unregistered', 'tenant-a', {})).rejects.toThrow(

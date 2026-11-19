@@ -22,6 +22,7 @@ import { useChannelTemplates } from '@/hooks/useChannelTemplates'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import type { ApprovedEmailLogo } from '@/interfaces/tenant-settings.interface'
 import type { CstarGroup } from '@/api/cstar.api'
+import type { CstarGroupsStatus } from '@/hooks/useCstarGroups'
 
 // Shown by both guards on these settings: the route blocker below, and the page's own guard on
 // the tab bar, which is not routing and so has to intercept the switch itself.
@@ -52,6 +53,7 @@ type EventsEmailTabProps = {
    */
   onUnsavedChangesChange?: (hasUnsavedChanges: boolean) => void
   /** The tenant's CSTAR groups, the options the group picker offers. */
+  cstarGroupsStatus?: CstarGroupsStatus
   cstarGroups?: CstarGroup[]
 }
 
@@ -68,6 +70,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
   tenantName,
   onUnsavedChangesChange,
   cstarGroups = [],
+  cstarGroupsStatus = 'ready',
 }) => {
   // Seeded once at mount, the same way EventsTab does it: the page passes the saved settings
   // back in via `values`, which is what the change check below compares against.
@@ -221,6 +224,7 @@ const EventsEmailTab: FC<EventsEmailTabProps> = ({
             recipients={recipients}
             invalidAddresses={invalidRecipients}
             cstarGroups={cstarGroups}
+            cstarGroupsStatus={cstarGroupsStatus}
             isDisabled={areFieldsDisabled}
             errorMessage={displayedRecipientSelectionError}
             onChange={() => setSettingsChanged(true)}

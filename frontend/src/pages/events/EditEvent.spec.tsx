@@ -59,7 +59,9 @@ vi.mock('@/api/settings.api', async () => {
 })
 
 vi.mock('@/api/cstar.api', () => ({
-  cstarApi: { fetchTenantGroups: vi.fn().mockResolvedValue([]) },
+  cstarApi: {
+    fetchTenantGroupAvailability: vi.fn().mockResolvedValue({ groups: [], enabled: true }),
+  },
 }))
 
 vi.mock('@/api/templates.api', async () => {

@@ -76,6 +76,10 @@ export const cstarApi = {
    * @returns Promise with the tenant's groups
    */
   async fetchTenantGroups(): Promise<CstarGroup[]> {
+    return (await cstarApi.fetchTenantGroupAvailability()).groups
+  },
+
+  async fetchTenantGroupAvailability(): Promise<{ groups: CstarGroup[]; enabled: boolean }> {
     const parameters = generateApiParameters<never>(
       '/api/v1/frontend/events/cstar-groups',
       undefined,
@@ -83,8 +87,8 @@ export const cstarApi = {
       true, // Requires JWT auth
     )
 
-    const response = (await get(parameters)) as { groups?: CstarGroup[] }
-    return response.groups || []
+    const response = (await get(parameters)) as { groups?: CstarGroup[]; enabled?: boolean }
+    return { groups: response.groups || [], enabled: response.enabled !== false }
   },
 }
 

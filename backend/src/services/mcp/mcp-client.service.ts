@@ -42,6 +42,16 @@ export function validateMcpRegistryPolicy(server: { url: string; credential_env:
 export class McpClientService {
   constructor(private readonly database: DataSource) {}
 
+  async areToolsEnabled(serverName: string, tools: string[]): Promise<boolean> {
+    const rows = await this.database.query(
+      `SELECT t.name FROM notify.mcp_server s JOIN notify.mcp_tool t ON t.server_name = s.name
+       WHERE s.name = $1 AND s.enabled AND t.enabled AND s.protocol = 'streamable-http'
+       AND t.name = ANY($2::text[])`,
+      [serverName, tools],
+    )
+    return tools.every((tool) => rows.some((row: { name: string }) => row.name === tool))
+  }
+
   async call(
     serverName: string,
     tool: string,
@@ -64,7 +74,14 @@ export class McpClientService {
     ) {
       throw new ForbiddenException('MCP parameter is not permitted')
     }
-    const destination = validateMcpRegistryPolicy(server)
+    validateMcpRegistryPolicy(server)
+    // The seeded local destination follows the release's service name in OpenShift.
+    // Explicit operator-managed registry destinations remain authoritative.
+    const url =
+      serverName === 'cstar' && server.url === 'http://cstar-mcp:3101/mcp'
+        ? process.env.CSTAR_MCP_URL || server.url
+        : server.url
+    const destination = validateMcpRegistryPolicy({ ...server, url })
     const credential = process.env[server.credential_env]
     if (!credential) throw new BadGatewayException('MCP credentials are not configured')
     const client = new Client({ name: 'notify', version: '1.0.0' })
