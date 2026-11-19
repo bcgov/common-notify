@@ -159,7 +159,8 @@ export class EventsFrontendController {
     CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
   )
   previewGroupRecipients(@Req() req: express.Request, @Body() input: PreviewGroupRecipientsDto) {
-    return this.eventsService.previewGroupRecipients(this.getTenant(req).externalId, input.groupIds)
+    const tenant = this.getTenant(req)
+    return this.eventsService.previewGroupRecipients(tenant.id, tenant.externalId, input.groupIds)
   }
 
   /**

@@ -42,9 +42,11 @@ describe('EventsFrontendController', () => {
     await expect(
       controller.previewGroupRecipients(request, { groupIds: ['group-a'] }),
     ).resolves.toEqual({ emails: ['alex@example.invalid'] })
-    expect(mockEventsService.previewGroupRecipients).toHaveBeenCalledWith('cstar-tenant-a', [
-      'group-a',
-    ])
+    expect(mockEventsService.previewGroupRecipients).toHaveBeenCalledWith(
+      tenantId,
+      'cstar-tenant-a',
+      ['group-a'],
+    )
   })
 
   // Bypasses authentication and populates request.tenant, mirroring what

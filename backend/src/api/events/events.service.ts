@@ -334,8 +334,25 @@ export class EventsService {
   }
 
   /** Read-only resolution for the UI: never creates or queues a notification. */
-  async previewGroupRecipients(tenantExternalId: string, groupIds: string[]) {
+  async previewGroupRecipients(
+    tenantId: string,
+    tenantExternalId: string,
+    groupIds: string[],
+  ) {
+    await this.assertMcpApiEnabled(tenantId)
     return { emails: await this.mcpGroups.getGroupMemberEmails(tenantExternalId, groupIds) }
+  }
+
+  /**
+   * Gates the MCP-backed recipient preview. V83 seeds `mcp_api` off, so this stays denied
+   * until a tenant is deliberately opted in, and it is the only off-switch that does not
+   * need a redeploy.
+   */
+  private async assertMcpApiEnabled(tenantId: string): Promise<void> {
+    const flags = await this.featureFlagService.getFlagsForTenant(tenantId)
+    if (!(flags[FeatureFlagCode.MCP_API] ?? false)) {
+      throw new ForbiddenException('The MCP API is not enabled for this tenant')
+    }
   }
 
   /**
