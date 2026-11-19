@@ -57,6 +57,11 @@ describe('TenantSelectionModal', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(mocks.logout).not.toHaveBeenCalled()
   })
+  it('signs out when the tenant selection modal is closed', async () => {
+    setup()
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(mocks.logout).toHaveBeenCalled()
+  })
   it('allows administrators with no tenants to bypass selection', () => {
     mocks.admin = true
     setup([])

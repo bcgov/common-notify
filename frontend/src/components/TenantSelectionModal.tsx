@@ -85,6 +85,8 @@ const TenantSelectionModal: FC = () => {
     return null
   }
 
+  const handleClose = isZeroTenantState ? handleDismissSetup : handleSignOut
+
   const buttons = isZeroTenantState ? (
     <>
       <Button variant="tertiary" type="button" onPress={handleDismissSetup}>
@@ -116,13 +118,8 @@ const TenantSelectionModal: FC = () => {
       isDismissable={false}
       isKeyboardDismissDisabled
       onOpenChange={(isOpen) => {
-        if (isOpen) {
-          return
-        }
-        if (isZeroTenantState) {
-          handleDismissSetup()
-        } else {
-          handleSignOut()
+        if (!isOpen) {
+          handleClose()
         }
       }}
     >
