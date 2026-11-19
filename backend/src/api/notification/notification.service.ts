@@ -419,6 +419,19 @@ export class NotificationService {
    * then the tenant's own International SMS setting decides. Only runs when a request has an
    * international number.
    */
+  /**
+   * The error for any international numbers this tenant may not send to, or null when there are
+   * none. Shared by every single-send path, so they all reject with the same message.
+   */
+  async findInternationalSmsError(tenantId: string, numbers: string[]): Promise<string | null> {
+    const international = numbers.filter((number) =>
+      this.phoneNumberService.isInternational(number),
+    )
+    if (international.length === 0 || (await this.isInternationalSmsAllowed(tenantId))) return null
+
+    return `SMS cannot be sent to international number(s): ${international.join(', ')}. ${INTERNATIONAL_SMS_HINT}`
+  }
+
   private async isInternationalSmsAllowed(tenantId: string): Promise<boolean> {
     if (!(await this.featureFlagService.isEnabled(FeatureFlagCode.INTERNATIONAL_SMS, tenantId))) {
       return false
@@ -724,14 +737,11 @@ export class NotificationService {
         )
       }
 
-      const international = request.sms.recipients.to.filter((number) =>
-        this.phoneNumberService.isInternational(number),
+      const internationalError = await this.findInternationalSmsError(
+        tenantId,
+        request.sms.recipients.to,
       )
-      if (international.length > 0 && !(await this.isInternationalSmsAllowed(tenantId))) {
-        errors.push(
-          `SMS cannot be sent to international number(s): ${international.join(', ')}. ${INTERNATIONAL_SMS_HINT}`,
-        )
-      }
+      if (internationalError) errors.push(internationalError)
 
       // Only validate content if not using a template (template provides body)
       if (!smsTemplateId) {
