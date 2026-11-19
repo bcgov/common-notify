@@ -81,11 +81,10 @@ the upstream body. Check token settings on 401; check CSTAR's four access condit
 IDs/environment on 404. These are troubleshooting starting points, not definitive diagnoses of each
 upstream status.
 
-After that check succeeds, log into the matching DEV tenant, open
-an event's email settings, select a real group and use **Preview group recipients**. Confirm the
-normalized recipient set with the CSTAR team. Do not send a notification merely to test lookup. Also
-verify that an unassociated tenant/foreign group is rejected and that the existing user-login
-tenant/role flows still work.
+After that check succeeds, log into the matching DEV tenant, open an event's email settings, select
+a real group and use **Preview group recipients**. Confirm the normalized recipient set with the
+CSTAR team. Do not send a notification merely to test lookup. Also verify that an unassociated
+tenant/foreign group is rejected and that the existing user-login tenant/role flows still work.
 
 Deployment prerequisites: the adapter image must be published, the chart enabled, and the Secret
 referenced by `cstarMcp.secretName` must exist in the release namespace. The PR and merge workflows
@@ -122,8 +121,8 @@ authentication, mapping it to the adapter's `MCP_API_KEY`. Leave that override u
 existing local shared key; if you change it, recreate the backend with the same setting as well. It
 is unrelated to the CSS client secret. Use separately provisioned secrets in OpenShift.
 
-Flyway V85 enables the built-in CSTAR destination automatically for both new and existing
-databases. No manual registry activation is needed.
+Flyway V85 enables the built-in CSTAR destination automatically for both new and existing databases.
+No manual registry activation is needed.
 
 Notify calls `http://cstar-mcp:3101/mcp`; host-side MCP clients use `http://localhost:3101/mcp` and
 must supply both headers. The existing event group picker/save/send flows now use this adapter.
@@ -141,8 +140,8 @@ docker build -t notify-cstar-mcp .
 V84 creates `notify.mcp_server` and `notify.mcp_tool`. Each call reloads the enabled URL, transport,
 credential reference, tool permission and parameter-name allowlist from these tables. There is no
 destination URL in event code. Secret values remain in environment variables/OpenShift Secrets. The
-seeded CSTAR entry is enabled automatically by V85. Existing event feature flags and
-tenant authorization still apply; the old `mcp_api` flag is no longer used.
+seeded CSTAR entry is enabled automatically by V85. Existing event feature flags and tenant
+authorization still apply; the old `mcp_api` flag is no longer used.
 
 An administrator can manage servers/tools through **Admin > MCP Servers**, protected by the existing
 `NOTIFY_ADMIN` SSO role, and use the exported `McpClientService.call()` without another protocol
@@ -167,9 +166,16 @@ connecting; redirects remain disabled.
 
 The existing PR/merge build matrix publishes `notify-cstar-mcp` from `cstar/Dockerfile`, imports it
 into the tools ImageStream and promotes its tag with backend/frontend/migrations. PRs use the PR
-number; main uses dev, then test, then prod. Provision Secret `cstar-mcp-secrets` with the adapter
-environment names above (including `MCP_API_KEY`). The backend chart reads the same key as
-`CSTAR_MCP_API_KEY`. Do not commit secret values.
+number; main uses dev, then test, then prod. The adapter reads `CSTAR_API_URL` directly from
+`app-api-secrets`, using the same key as Notify's backend. Do not duplicate that URL in the adapter
+secret; the explicit mapping overrides any old value there.
+
+Provision Secret `cstar-mcp-secrets` with `MCP_API_KEY`, `CSTAR_TOKEN_URL`, `CSTAR_CLIENT_ID`,
+`CSTAR_CLIENT_SECRET`, and optional `CSTAR_SCOPE`. The backend chart reads `MCP_API_KEY` from that
+same Secret as `CSTAR_MCP_API_KEY`. The CSS account and token endpoint must match the environment
+selected by `app-api-secrets.CSTAR_API_URL`. The previous CSTAR client forwarded user tokens; it did
+not establish a stored service-account credential mapping. Confirm the existing service-account
+Secret/key before copying or remapping credentials. Do not commit secret values.
 
 `cstarMcp.enabled` is true in DEV/PR, TEST and PROD. The image defaults to the release
 registry/repository/tag supplied by the existing deployer; `cstarMcp.image` is an optional
