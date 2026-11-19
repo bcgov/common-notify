@@ -58,10 +58,14 @@ jobs:
           # deploy failures fall through and are NOT retried.
           SIGNATURE='dial tcp .*:6443|i/o timeout|connection refused|TLS handshake timeout|Unable to connect to the server|error: You must be logged in to the server|couldn'\''t get current server API group list|the server has asked for the client to provide credentials|Client.Timeout exceeded while awaiting headers|net/http: request canceled|429 Too Many Requests|toomanyrequests|You have reached your (pull rate|unauthenticated) limit'
 
-          if echo "${LOG}" | grep -qiE "${SIGNATURE}"; then
+          # Match with a here-string, not `echo | grep`. Under `pipefail`, `grep -q`
+          # exits on its first hit and SIGPIPEs the still-writing `echo`, so the
+          # pipeline reports 141 and a real match silently took the `else` branch.
+          if grep -qiE "${SIGNATURE}" <<<"${LOG}"; then
             echo "::notice::Transient cluster-API / IP-rejection signature detected — re-running failed jobs."
             echo "Matched lines:"
-            echo "${LOG}" | grep -iE "${SIGNATURE}" | head -5
+            # `-m5` rather than `| head -5`, so this line has no pipe to break either.
+            grep -m5 -iE "${SIGNATURE}" <<<"${LOG}" || true
             gh run rerun "${RUN_ID}" --failed
           else
             echo "::notice::Failure does not match a transient network signature — treating as a genuine failure, not retrying."
