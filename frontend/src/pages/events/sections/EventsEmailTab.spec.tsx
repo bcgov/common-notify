@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Mock } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { configureStore } from '@reduxjs/toolkit'
+import { Provider } from 'react-redux'
+import tenantReducer from '@/redux/slices/tenant.slice'
 import EventsEmailTab from './EventsEmailTab'
 import type { EmailSettingsValues } from '../utils/emailSettings'
 import { NotificationChannel, TemplateEngine } from '@/api/templates.api'
@@ -118,6 +121,24 @@ function renderTab({
   onDeactivate = vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
   ...rest
 }: RenderOptions = {}) {
+  const store = configureStore({
+    reducer: { tenant: tenantReducer },
+    preloadedState: {
+      tenant: {
+        selectedTenant: {
+          id: 'tenant-1',
+          name: 'Test tenant',
+          ministryName: 'Test ministry',
+          createdDateTime: '2026-08-01T00:00:00.000Z',
+          updatedDateTime: '2026-08-01T00:00:00.000Z',
+          createdBy: 'test-user',
+          updatedBy: 'test-user',
+          users: [],
+        },
+        showTenantModal: false,
+      },
+    },
+  })
   const view = render(
     <EventsEmailTab
       values={values}
@@ -127,6 +148,7 @@ function renderTab({
       isDisabled={isDisabled}
       {...rest}
     />,
+    { wrapper: ({ children }) => <Provider store={store}>{children}</Provider> },
   )
   return { ...view, onSave, onDeactivate }
 }
