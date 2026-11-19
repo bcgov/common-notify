@@ -1,31 +1,35 @@
 // Sidebar.tsx
-import { useState } from 'react'
-import type { FC } from 'react'
-import { Link } from '@tanstack/react-router'
+import { useId, useState } from 'react'
+import type { FC, ReactNode } from 'react'
+import { Link, useLocation } from '@tanstack/react-router'
 import '@/scss/components/sidebar.scss'
 import { useAppSelector } from '@/redux/hooks'
 import UserService from '@/service/user-service'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
+import { useDashboardAccess } from '@/hooks/useDashboardAccess'
 import { useBulkNotificationsAccess } from '@/hooks/useBulkNotificationsAccess'
 import { useFeatureFlag } from '@/config/featureFlags/useFeatureFlag'
 import { SsoRole } from '@/enum/sso-role.enum'
 
 // Icons
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
+import SpaceDashboardOutlinedIcon from '@mui/icons-material/SpaceDashboardOutlined'
+import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined'
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined'
-import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
-// import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
+import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
+import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
 import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined'
-import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
-import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
+import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
+// import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
-import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
-import WorkspacesOutlinedIcon from '@mui/icons-material/WorkspacesOutlined'
 import { CSTAR_ROLE_DISPLAY } from '@/enum/cstar-role.enum'
 import { Button, Tooltip, SvgInfoIcon } from '@bcgov/design-system-react-components'
 import TooltipTrigger from '@/components/TooltipTrigger'
+import SidebarNavGroup from '@/components/SidebarNavGroup'
+import type { SidebarNavGroupProps } from '@/components/SidebarNavGroup'
 
 const navItems = [
   {
@@ -36,22 +40,22 @@ const navItems = [
   {
     label: 'Dashboard',
     to: '/dashboard',
-    icon: <WorkspacesOutlinedIcon />,
+    icon: <SpaceDashboardOutlinedIcon />,
+  },
+  {
+    label: 'Notification Templates',
+    to: '/templates',
+    icon: <InsertDriveFileOutlinedIcon />,
   },
   {
     label: 'Notification Events',
     to: '/events',
-    icon: <WorkspacesOutlinedIcon />,
+    icon: <FolderOutlinedIcon />,
   },
   {
-    label: 'Send Batch Notification',
+    label: 'Send Batch Notifications',
     to: '/bulk-notifications',
     icon: <SendOutlinedIcon />,
-  },
-  {
-    label: 'Templates',
-    to: '/templates',
-    icon: <FolderOutlinedIcon />,
   },
   {
     label: 'Usage & Limits',
@@ -65,32 +69,49 @@ const navItems = [
   },
 ]
 
+// Grouped by what an admin is there to do. These links need no role check of their own: the
+// whole menu is NOTIFY_ADMIN only, and routes/admin/route.tsx guards every /admin/* path.
 const adminItems = {
   label: 'Admin',
   icon: <AdminPanelSettingsOutlinedIcon />,
-  subItems: [
+  groups: [
     {
-      label: 'Feature Flags',
-      to: '/admin/feature-flags',
+      label: 'Monitor',
+      links: [
+        { label: 'Overview', to: '/admin', exact: true },
+        { label: 'System', to: '/admin/monitoring' },
+        { label: 'Notifications', to: '/admin/notifications' },
+      ],
     },
     {
-      label: 'Usage & Limits',
-      to: '/admin/usage',
-    },
-    {
-      label: 'Monitoring',
-      to: '/admin/monitoring',
-    },
-    {
-      label: 'MCP Servers',
-      to: '/admin/mcp-servers',
+      label: 'Manage',
+      links: [
+        { label: 'Tenants', to: '/admin/tenants' },
+        { label: 'Feature Flags', to: '/admin/feature-flags' },
+        { label: 'MCP Servers', to: '/admin/mcp-servers' },
+      ],
     },
   ],
-} as const
+} as const satisfies {
+  label: string
+  icon: ReactNode
+  groups: readonly SidebarNavGroupProps[]
+}
 
 const Sidebar: FC = () => {
   const [collapsed, setCollapsed] = useState(false)
-  const [adminExpanded, setAdminExpanded] = useState(false)
+  const adminMenuId = useId()
+  const { pathname } = useLocation()
+  const onAdminPage = pathname === '/admin' || pathname.startsWith('/admin/')
+  // Open on arrival at an admin page so the current page's link is visible, but leave it to
+  // the user after that: closing it on an admin page keeps it closed until they leave and
+  // come back. Adjusted during render rather than in an effect, so there is no closed flash.
+  const [adminExpanded, setAdminExpanded] = useState(onAdminPage)
+  const [wasOnAdminPage, setWasOnAdminPage] = useState(onAdminPage)
+  if (onAdminPage !== wasOnAdminPage) {
+    setWasOnAdminPage(onAdminPage)
+    if (onAdminPage) setAdminExpanded(true)
+  }
   // Get user from Redux store (populated from JWT token)
   const user = useAppSelector((state) => state.auth.user)
   const cstarTenants = useAppSelector((state) => state.cstar.tenants)
@@ -99,6 +120,7 @@ const Sidebar: FC = () => {
   const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
   // Same check the /bulk-notifications route makes, so a hidden link and a typed URL agree.
   const { canAccess: canBulkNotify } = useBulkNotificationsAccess()
+  const { canAccess: canDashboard } = useDashboardAccess()
   // Events are behind a feature flag; hide the nav item until it is enabled for the tenant
   const eventsEnabled = useFeatureFlag('events', selectedTenant?.id)
 
@@ -145,7 +167,7 @@ const Sidebar: FC = () => {
           // visibility on it means a rename silently hides the link.
           const shouldShow =
             (item.to === '/' && hasTenantRole) ||
-            (item.to === '/dashboard' && hasTenantRole) ||
+            (item.to === '/dashboard' && canDashboard) ||
             (item.to === '/events' && hasTenantRole && eventsEnabled) ||
             (item.to === '/templates' && hasTenantRole) ||
             (item.to === '/bulk-notifications' && canBulkNotify) ||
@@ -173,9 +195,10 @@ const Sidebar: FC = () => {
                 beside it. Passing className replaces the design system's own classes, so
                 there is deliberately no variant here — it would have no effect. */}
             <Button
-              className="sidebar__item"
+              className={`sidebar__item${onAdminPage ? ' active' : ''}`}
               aria-label={collapsed ? adminItems.label : undefined}
               aria-expanded={!collapsed && adminExpanded}
+              aria-controls={adminExpanded && !collapsed ? adminMenuId : undefined}
               onPress={() => {
                 if (collapsed) {
                   setCollapsed(false)
@@ -199,43 +222,10 @@ const Sidebar: FC = () => {
               )}
             </Button>
             {adminExpanded && !collapsed && (
-              <div className="sidebar__submenu">
-                {isAdmin && (
-                  <Link
-                    to="/admin/feature-flags"
-                    className="sidebar__subitem"
-                    activeProps={{ className: 'active' }}
-                  >
-                    <span className="sidebar__label">Feature Flags</span>
-                  </Link>
-                )}
-                {isAdmin && (
-                  <Link
-                    to="/admin/usage"
-                    className="sidebar__subitem"
-                    activeProps={{ className: 'active' }}
-                  >
-                    <span className="sidebar__label">Usage &amp; Limits</span>
-                  </Link>
-                )}
-                {isAdmin && (
-                  <Link
-                    to="/admin/monitoring"
-                    className="sidebar__subitem"
-                    activeProps={{ className: 'active' }}
-                  >
-                    <span className="sidebar__label">Monitoring</span>
-                  </Link>
-                )}
-                {isAdmin && (
-                  <Link
-                    to="/admin/mcp-servers"
-                    className="sidebar__subitem"
-                    activeProps={{ className: 'active' }}
-                  >
-                    <span className="sidebar__label">MCP Servers</span>
-                  </Link>
-                )}
+              <div id={adminMenuId} className="sidebar__submenu">
+                {adminItems.groups.map((group) => (
+                  <SidebarNavGroup key={group.label} label={group.label} links={group.links} />
+                ))}
               </div>
             )}
           </div>

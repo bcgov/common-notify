@@ -19,13 +19,16 @@ import { Button } from '@bcgov/design-system-react-components'
 import { Toggle } from './Toggle'
 import { StatusBadge } from './StatusBadge'
 import GenericModal from './GenericModal'
+import ConfirmDialog from './ConfirmDialog'
+import FeatureFlagHistoryModal from './FeatureFlagHistoryModal'
 
 /**
  * Feature Flag Admin Component
  *
  * Allows administrators to:
  * - View all feature flags (global + tenant overrides)
- * - Toggle feature flags on/off
+ * - Toggle feature flags on/off, after confirming
+ * - See who enabled or disabled each flag, and when
  * - Create tenant-specific overrides
  * - Remove tenant overrides
  *
@@ -39,6 +42,9 @@ const FeatureFlagAdmin: FC = () => {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null)
+  // A toggle waits here for confirmation: it takes effect for live traffic immediately.
+  const [pendingToggle, setPendingToggle] = useState<FeatureFlag | null>(null)
+  const [historyFlag, setHistoryFlag] = useState<FeatureFlag | null>(null)
 
   const handleToggle = async (id: string, currentEnabled: boolean) => {
     setTogglingId(id)
@@ -52,10 +58,20 @@ const FeatureFlagAdmin: FC = () => {
     }
   }
 
+  const confirmToggle = async () => {
+    if (!pendingToggle) return
+    await handleToggle(pendingToggle.id, pendingToggle.enabled)
+    setPendingToggle(null)
+  }
+
   // Helper: Get tenant name by ID
   const getTenantName = (tenantId: string): string => {
     return tenants.find((t) => t.id === tenantId)?.name || `Unknown (${tenantId.slice(0, 8)}...)`
   }
+
+  const getFlagName = (flag: FeatureFlag): string => flag.flagCode?.displayName || flag.code
+  const getScope = (flag: FeatureFlag): string =>
+    flag.tenantId ? getTenantName(flag.tenantId) : 'All Tenants'
 
   // Define table columns
   const columns: TableColumn<FeatureFlag>[] = [
@@ -63,7 +79,7 @@ const FeatureFlagAdmin: FC = () => {
       key: 'code',
       label: 'Feature Flag',
       width: '220px',
-      render: (_, row) => row.flagCode?.displayName || row.code,
+      render: (_, row) => getFlagName(row),
     },
     {
       key: 'enabled',
@@ -95,14 +111,36 @@ const FeatureFlagAdmin: FC = () => {
       render: (_, row) => (
         <Toggle
           checked={row.enabled}
-          onChange={() => handleToggle(row.id, row.enabled)}
+          onChange={() => setPendingToggle(row)}
           disabled={togglingId === row.id}
           ariaLabel={row.enabled ? 'Disable feature flag' : 'Enable feature flag'}
           title={row.enabled ? 'Click to disable' : 'Click to enable'}
         />
       ),
     },
+    {
+      key: 'updatedAt',
+      label: 'History',
+      width: '100px',
+      render: (_, row) => (
+        <Button
+          variant="link"
+          size="small"
+          onPress={() => setHistoryFlag(row)}
+          aria-label={`View history for ${getFlagName(row)} (${getScope(row)})`}
+        >
+          View
+        </Button>
+      ),
+    },
   ]
+
+  const pendingAction = pendingToggle?.enabled ? 'Disable' : 'Enable'
+  // A global change does not reach tenants that have their own override for the same flag.
+  const pendingHasOverrides =
+    !!pendingToggle &&
+    !pendingToggle.tenantId &&
+    flags.some((f) => f.code === pendingToggle.code && f.tenantId)
 
   return (
     <div className="page">
@@ -130,6 +168,32 @@ const FeatureFlagAdmin: FC = () => {
           onClose={() => setSelectedTenantId(null)}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={pendingToggle !== null}
+        isBusy={pendingToggle !== null && togglingId === pendingToggle.id}
+        title={pendingToggle ? `${pendingAction} ${getFlagName(pendingToggle)}?` : ''}
+        confirmLabel={pendingAction}
+        danger={pendingToggle?.enabled}
+        onCancel={() => setPendingToggle(null)}
+        onConfirm={confirmToggle}
+      >
+        {pendingToggle && (
+          <>
+            This turns {getFlagName(pendingToggle)} {pendingToggle.enabled ? 'off' : 'on'} for{' '}
+            {pendingToggle.tenantId ? getScope(pendingToggle) : 'all tenants'}, effective
+            immediately.
+            {pendingHasOverrides && ' Tenants with their own override for this flag keep it.'}
+          </>
+        )}
+      </ConfirmDialog>
+
+      <FeatureFlagHistoryModal
+        flagId={historyFlag?.id ?? null}
+        flagName={historyFlag ? getFlagName(historyFlag) : ''}
+        scope={historyFlag ? getScope(historyFlag) : ''}
+        onClose={() => setHistoryFlag(null)}
+      />
 
       <DataTable<FeatureFlag>
         columns={columns}

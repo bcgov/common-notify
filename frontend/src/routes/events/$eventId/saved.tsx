@@ -1,11 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router'
-import EventsEmailSaved from '@/pages/events/sections/EventsEmailSaved'
+import EventsSettingsSaved from '@/pages/events/sections/EventsSettingsSaved'
+import type { SavedChannel } from '@/pages/events/sections/EventsSettingsSaved'
 
 export const Route = createFileRoute('/events/$eventId/saved')({
-  component: EventsEmailSavedPage,
+  component: EventsSettingsSavedPage,
+  // `channel` is the tab the save came from; anything else falls back to email.
+  validateSearch: (search: Record<string, unknown>): { channel?: SavedChannel } =>
+    search.channel === 'sms' ? { channel: 'sms' } : {},
 })
 
-function EventsEmailSavedPage() {
+function EventsSettingsSavedPage() {
   const params = Route.useParams()
-  return <EventsEmailSaved key={params.eventId} eventId={params.eventId} />
+  const { channel = 'email' } = Route.useSearch()
+  return <EventsSettingsSaved key={params.eventId} eventId={params.eventId} channel={channel} />
 }

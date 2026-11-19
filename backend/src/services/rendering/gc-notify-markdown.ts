@@ -234,15 +234,22 @@ export function toGcNotifyEmailHtml(body: string): string {
 }
 
 /**
- * Render a GC Notify subject line: escaped, collapsed to one line, and never markdown. The
- * typography pass applies here too.
+ * The subject line a recipient receives: collapsed to one line and never markdown. The typography
+ * pass applies here too. Not escaped, because a mail subject is plain text and a client shows an
+ * entity literally: "Q&amp;A".
  */
-export function toGcNotifySubject(subject: string): string {
+export function toGcNotifyDeliverySubject(subject: string): string {
   if (!subject) {
     return ''
   }
 
-  return markdown.utils.escapeHtml(
-    stripGcNotifyBlockMarkers(applyTypography(subject)).replace(/\s+/g, ' ').trim(),
-  )
+  return stripGcNotifyBlockMarkers(applyTypography(subject)).replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * The subject line a GC Notify API response reports: the delivery subject, HTML-escaped. GC Notify
+ * builds the two separately, and only its response form is escaped.
+ */
+export function toGcNotifySubject(subject: string): string {
+  return markdown.utils.escapeHtml(toGcNotifyDeliverySubject(subject))
 }

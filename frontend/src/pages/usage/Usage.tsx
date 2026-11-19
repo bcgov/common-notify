@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import type { FC } from 'react'
-import type { ChannelUsage } from '@/api/apiKeyUsage.api'
+import type { ChannelUsage } from '@/api/usage.api'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
 import {
-  fetchApiKeyUsage,
-  fetchApiKeyUsageHistory,
+  fetchTenantUsage,
+  fetchTenantUsageHistory,
   updateThreshold,
-} from '@/redux/thunks/apiKeyUsage.thunks'
+} from '@/redux/thunks/usage.thunks'
 import PageHeading from '@/components/PageHeading'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
@@ -14,13 +14,13 @@ import UsageCell from '@/components/UsageCell'
 import EditModal from '@/components/EditModal'
 import NumberInputField from '@/components/NumberInputField'
 import { showSuccessToast, showErrorToast } from '@/redux/utils/toastUtils'
-import { formatChannel } from '@/utils/usage'
+import { formatChannel } from '@/utils/channels'
 
 const OPERATIONS_ADMIN_ROLE = 'NOTIFY_OPERATIONS_ADMIN'
 
 const Usage: FC = () => {
   const dispatch = useAppDispatch()
-  const { usage, isLoading, updatingChannel, error } = useAppSelector((state) => state.apiKeyUsage)
+  const { usage, isLoading, updatingChannel, error } = useAppSelector((state) => state.usage)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const cstarRoles = useAppSelector((state) => state.user.current?.cstarRoles)
 
@@ -31,8 +31,8 @@ const Usage: FC = () => {
 
   useEffect(() => {
     if (selectedTenant) {
-      dispatch(fetchApiKeyUsage())
-      dispatch(fetchApiKeyUsageHistory())
+      dispatch(fetchTenantUsage())
+      dispatch(fetchTenantUsageHistory())
     }
   }, [selectedTenant, dispatch])
 

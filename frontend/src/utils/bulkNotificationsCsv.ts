@@ -1,5 +1,6 @@
 import Papa from 'papaparse'
 import { parsePhoneNumberFromString } from 'libphonenumber-js'
+import { isValidEmail } from './email'
 
 /**
  * Header the recipient's address goes under, as the design specifies and as the spreadsheet the
@@ -37,8 +38,8 @@ export const MAX_REPORTED_ISSUES = 100
 /**
  * A problem with one cell, shown in the results table as Row / Column / Value found / Issue.
  *
- * The issue is split in two: `title` names the problem, `detail` says how to fix it. Both are
- * shown, the title above the detail, so keep the detail to a sentence - it sits in a table cell.
+ * The issue is split in two: `title` names the problem, `detail` says how to fix it. The title is
+ * shown above any detail, so keep the detail to a sentence - it sits in a table cell.
  */
 export interface RowIssue {
   /** Row number as the spreadsheet shows it: the header is row 1, so the first recipient is row 2. */
@@ -49,7 +50,9 @@ export interface RowIssue {
   /** Short label naming the problem. */
   title: string
   /** One sentence on how to fix it, shown under the title. */
-  detail: string
+  detail?: string
+  /** Shown for review, but the file can still be sent. */
+  isWarning?: boolean
 }
 
 export interface ValidationResult {
@@ -66,15 +69,6 @@ export interface ValidationResult {
 export interface ParsedCsv {
   headers: string[]
   rows: string[][]
-}
-
-// Deliberately permissive: the address is checked properly by the API before anything is sent.
-// This only needs to catch the typos worth showing someone a row number for.
-const EMAIL_PATTERN =
-  /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i
-
-function isValidEmail(value: string): boolean {
-  return value.length <= 254 && !value.includes('..') && EMAIL_PATTERN.test(value)
 }
 
 /**
@@ -206,7 +200,7 @@ export function readFileWithProgress(
     }
     reader.onload = () => {
       onProgress(100)
-      resolve(String(reader.result ?? ''))
+      resolve(typeof reader.result === 'string' ? reader.result : '')
     }
     reader.onerror = () => reject(reader.error ?? new Error('Could not read the file'))
 
@@ -334,7 +328,12 @@ function checkRecipient(
   return null
 }
 
-/** One issue per empty cell, plus whatever the recipient cell is guilty of. */
+/**
+ * One issue per empty cell, plus whatever the recipient cell is guilty of.
+ *
+ * An empty placeholder is only a warning: it prints nothing, and allowing for that is up to the
+ * template. A row without a recipient has nobody to send to, and the API rejects the whole file.
+ */
 function checkCell(
   value: string,
   rowNumber: number,
@@ -344,15 +343,23 @@ function checkCell(
   firstSeenAt: Map<string, number>,
 ): RowIssue | null {
   if (!value) {
-    return {
-      row: rowNumber,
-      column,
-      title: 'Missing or invalid value',
-      detail: `The '${column}' column is empty. Fill it in, or delete the row.`,
-    }
+    const title = 'Missing or invalid value'
+    return isRecipient
+      ? {
+          row: rowNumber,
+          column,
+          title,
+          detail: `The '${column}' column is empty. Fill it in, or delete the row.`,
+        }
+      : { row: rowNumber, column, title, isWarning: true }
   }
 
   return isRecipient ? checkRecipient(value, rowNumber, column, channel, firstSeenAt) : null
+}
+
+/** Whether any of these issues has to be fixed before the file can be sent. */
+export function hasBlockingIssue(issues: RowIssue[]): boolean {
+  return issues.some((issue) => !issue.isWarning)
 }
 
 /**
@@ -373,11 +380,13 @@ export function validateCsv(
   if (fileIssue) return { fileIssue, rowIssues: [] }
 
   const recipientIndex = headers.indexOf(recipientColumn)
-  const rowIssues: RowIssue[] = []
+  const blocking: RowIssue[] = []
+  const warnings: RowIssue[] = []
   const firstSeenAt = new Map<string, number>()
 
-  // The cap is checked per row, not per cell, so one row can carry it past the limit.
-  for (let index = 0; index < rows.length && rowIssues.length < MAX_REPORTED_ISSUES; index++) {
+  // Every row is checked, because warnings must not use up the cap before a later row turns up
+  // something that stops the send.
+  for (let index = 0; index < rows.length; index++) {
     const row = rows[index]
     const rowNumber = index + 2 // header occupies row 1
 
@@ -390,11 +399,11 @@ export function validateCsv(
         channel,
         firstSeenAt,
       )
-      if (issue) rowIssues.push(issue)
+      if (issue) (issue.isWarning ? warnings : blocking).push(issue)
     }
   }
 
-  return { fileIssue: null, rowIssues }
+  return { fileIssue: null, rowIssues: [...blocking, ...warnings].slice(0, MAX_REPORTED_ISSUES) }
 }
 
 /**

@@ -1,4 +1,5 @@
 import type { AxiosError } from 'axios'
+import { getApiErrorMessage } from '@/utils/apiErrorMessage'
 import { get, patch, generateApiParameters, STATUS_CODES } from '@/common/api'
 import type {
   ApprovedEmailLogo,
@@ -83,7 +84,6 @@ export async function updateSmsSettings(data: SmsSettingsValues): Promise<Tenant
 
 function toReadableError(error: unknown, resource: string, verb: 'load' | 'update'): Error {
   const axiosError = error as AxiosError
-  const responseData = (axiosError.response?.data as any) || {}
 
   if (axiosError.response?.status === STATUS_CODES.Unauthorized) {
     return new Error(`You are not authorized to view ${resource}`)
@@ -92,9 +92,5 @@ function toReadableError(error: unknown, resource: string, verb: 'load' | 'updat
     return new Error(`You do not have permission to modify the ${resource}`)
   }
 
-  return new Error(
-    `Failed to ${verb} ${resource}: ${
-      responseData.message || (error instanceof Error ? error.message : 'Unknown error')
-    }`,
-  )
+  return new Error(`Failed to ${verb} ${resource}: ${getApiErrorMessage(error)}`)
 }

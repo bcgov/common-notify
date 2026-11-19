@@ -2,8 +2,10 @@ import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { IsNull, Repository } from 'typeorm'
 import { FeatureFlag } from './entities/feature-flag.entity'
+import { FeatureFlagHistory } from './entities/feature-flag-history.entity'
 import { CreateFeatureFlagDto } from './schemas/create-feature-flag.dto'
 import { UpdateFeatureFlagDto } from './schemas/update-feature-flag.dto'
+import { PaginatedFeatureFlagHistoryResponse } from './schemas/paginated-feature-flag-history-response'
 
 /**
  * Feature Flag Service
@@ -18,6 +20,12 @@ import { UpdateFeatureFlagDto } from './schemas/update-feature-flag.dto'
  *   // Check global flag
  *   const sseEnabled = await this.featureFlagService.isEnabled('sse_notifications');
  */
+/** Who made a change: the stable id stored as updatedBy, and a name to show for it. */
+export interface FeatureFlagActor {
+  id: string
+  name: string | null
+}
+
 @Injectable()
 export class FeatureFlagService {
   private readonly logger = new Logger(FeatureFlagService.name)
@@ -25,6 +33,8 @@ export class FeatureFlagService {
   constructor(
     @InjectRepository(FeatureFlag)
     private readonly featureFlagRepository: Repository<FeatureFlag>,
+    @InjectRepository(FeatureFlagHistory)
+    private readonly historyRepository: Repository<FeatureFlagHistory>,
   ) {}
 
   /**
@@ -118,39 +128,94 @@ export class FeatureFlagService {
   }
 
   /**
-   * Create a new feature flag
+   * Create a new feature flag, recording its creation in the history
    * @param dto - Create DTO with code, enabled, tenantId
-   * @param userId - User ID for audit trail
+   * @param actor - Who is creating it
    * @returns Created feature flag entity
    */
-  async create(dto: CreateFeatureFlagDto, userId: string): Promise<FeatureFlag> {
-    const flag = this.featureFlagRepository.create({
-      ...dto,
-      createdBy: userId,
-      updatedBy: userId,
+  create(dto: CreateFeatureFlagDto, actor: FeatureFlagActor): Promise<FeatureFlag> {
+    return this.featureFlagRepository.manager.transaction(async (manager) => {
+      const flag = await manager.save(
+        manager.create(FeatureFlag, { ...dto, createdBy: actor.id, updatedBy: actor.id }),
+      )
+      await manager.save(
+        manager.create(FeatureFlagHistory, {
+          featureFlagId: flag.id,
+          code: flag.code,
+          tenantId: flag.tenantId ?? null,
+          enabled: flag.enabled,
+          createdBy: actor.id,
+          createdByName: actor.name,
+        }),
+      )
+      return flag
     })
-
-    return this.featureFlagRepository.save(flag)
   }
 
   /**
-   * Update an existing feature flag
+   * Update an existing feature flag, recording an enable/disable in the history
    * @param id - Feature flag UUID
    * @param dto - Update DTO (enabled, updatedBy)
-   * @param userId - User ID for audit trail
+   * @param actor - Who is making the change
    * @returns Updated feature flag entity
    */
-  async update(id: string, dto: UpdateFeatureFlagDto, userId: string): Promise<FeatureFlag> {
-    const flag = await this.featureFlagRepository.findOneOrFail({ where: { id } })
+  update(id: string, dto: UpdateFeatureFlagDto, actor: FeatureFlagActor): Promise<FeatureFlag> {
+    return this.featureFlagRepository.manager.transaction(async (manager) => {
+      // Row lock: two admins making the same change at once (on different pods) would otherwise
+      // both read the old value and both record a change.
+      const flag = await manager.findOneOrFail(FeatureFlag, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      })
+      const wasEnabled = flag.enabled
 
-    if (dto.enabled !== undefined) {
-      flag.enabled = dto.enabled
-    }
+      if (dto.enabled !== undefined) {
+        flag.enabled = dto.enabled
+      }
 
-    flag.updatedBy = userId
-    flag.updatedAt = new Date()
+      flag.updatedBy = actor.id
+      flag.updatedAt = new Date()
 
-    return this.featureFlagRepository.save(flag)
+      const saved = await manager.save(flag)
+
+      // A PATCH that sets the value it already had is not a change worth recording.
+      if (saved.enabled !== wasEnabled) {
+        await manager.save(
+          manager.create(FeatureFlagHistory, {
+            featureFlagId: id,
+            code: saved.code,
+            tenantId: saved.tenantId ?? null,
+            enabled: saved.enabled,
+            createdBy: actor.id,
+            createdByName: actor.name,
+          }),
+        )
+      }
+
+      return saved
+    })
+  }
+
+  /**
+   * Get one page of the change history for a feature flag, newest first
+   * @param featureFlagId - Feature flag UUID
+   * @param page - 1-indexed page number
+   * @param limit - Rows per page
+   */
+  async getHistory(
+    featureFlagId: string,
+    page: number,
+    limit: number,
+  ): Promise<PaginatedFeatureFlagHistoryResponse> {
+    const [data, count] = await this.historyRepository.findAndCount({
+      where: { featureFlagId },
+      // id breaks createdAt ties so a row cannot appear on two pages, or on neither.
+      order: { createdAt: 'DESC', id: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    })
+
+    return { data, count, page, limit, totalPages: Math.ceil(count / limit) }
   }
 
   /**

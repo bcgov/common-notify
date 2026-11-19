@@ -5,18 +5,10 @@ import type {
   SafelistEntry,
   SafelistResponse,
 } from '@/interfaces/safelist.interface'
+import { getApiErrorMessage } from '@/utils/apiErrorMessage'
 import type { RootState } from '../store'
 
 const SAFELIST_URL = '/api/v1/frontend/safelist'
-
-/** Message an axios error carries from the API, falling back to the supplied default. */
-const apiErrorMessage = (error: unknown, fallback: string): string => {
-  const response = (error as { response?: { data?: { message?: string | string[] } } })?.response
-  const message = response?.data?.message
-  if (Array.isArray(message)) return message.join(' ')
-  if (typeof message === 'string' && message.length > 0) return message
-  return error instanceof Error ? error.message : fallback
-}
 
 export const fetchSafelist = createAsyncThunk<
   SafelistResponse | null,
@@ -29,7 +21,7 @@ export const fetchSafelist = createAsyncThunk<
 
     return await get<SafelistResponse>({ url: SAFELIST_URL })
   } catch (error) {
-    return rejectWithValue(apiErrorMessage(error, 'Failed to load the safelist'))
+    return rejectWithValue(getApiErrorMessage(error, 'Failed to load the safelist'))
   }
 })
 
@@ -44,7 +36,7 @@ export const addSafelistEntry = createAsyncThunk<
       data: payload,
     })
   } catch (error) {
-    return rejectWithValue(apiErrorMessage(error, 'Failed to add the recipient'))
+    return rejectWithValue(getApiErrorMessage(error, 'Failed to add the recipient'))
   }
 })
 
@@ -55,7 +47,7 @@ export const removeSafelistEntry = createAsyncThunk<string, string, { rejectValu
       await deleteMethod<void>({ url: `${SAFELIST_URL}/${id}` })
       return id
     } catch (error) {
-      return rejectWithValue(apiErrorMessage(error, 'Failed to remove the recipient'))
+      return rejectWithValue(getApiErrorMessage(error, 'Failed to remove the recipient'))
     }
   },
 )

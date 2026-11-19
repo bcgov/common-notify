@@ -1,29 +1,7 @@
 import type { AxiosError } from 'axios'
 import { get, post, generateApiParameters, STATUS_CODES } from '@/common/api'
 import type { PaginatedEventResponse } from '@/interfaces/PaginatedNotificationResponse'
-
-/** The error body the backend returns: Nest's own shape, plus ValidationExceptionFilter's. */
-interface ApiErrorBody {
-  message?: string | string[]
-  errors?: string[]
-}
-
-/**
- * ValidationExceptionFilter always sets `message` to the generic 'Validation failed' but
- * includes the real per-field detail in `errors` - prefer that when present.
- */
-function extractErrorMessage(responseData: ApiErrorBody, fallback: string): string {
-  if (Array.isArray(responseData.errors) && responseData.errors.length > 0) {
-    return responseData.errors.join('; ')
-  }
-  if (Array.isArray(responseData.message)) {
-    return responseData.message.join(', ')
-  }
-  if (typeof responseData.message === 'string') {
-    return responseData.message
-  }
-  return fallback
-}
+import { getApiErrorMessage, getApiResponseMessage } from '@/utils/apiErrorMessage'
 
 /** What to say for each way a call can fail. Only the statuses a call can return need a message. */
 type EventApiMessages = {
@@ -44,7 +22,6 @@ type EventApiMessages = {
  */
 function toEventApiError(error: unknown, messages: EventApiMessages): Error {
   const axiosError = error as AxiosError
-  const responseData = (axiosError.response?.data as ApiErrorBody) ?? {}
   const status = axiosError.response?.status
 
   if (status === STATUS_CODES.NotFound && messages.notFound) {
@@ -54,7 +31,7 @@ function toEventApiError(error: unknown, messages: EventApiMessages): Error {
     return Object.assign(new Error(messages.conflict), { status: STATUS_CODES.Conflict })
   }
   if (status === STATUS_CODES.BadRequest) {
-    return new Error(extractErrorMessage(responseData, 'Validation failed'))
+    return new Error(getApiResponseMessage(error, { detailedErrors: true }) || 'Validation failed')
   }
   if (status === STATUS_CODES.Unauthorized) {
     return new Error(messages.unauthorized)
@@ -64,10 +41,7 @@ function toEventApiError(error: unknown, messages: EventApiMessages): Error {
   }
 
   return new Error(
-    `${messages.action}: ${extractErrorMessage(
-      responseData,
-      error instanceof Error ? error.message : 'Unknown error',
-    )}`,
+    `${messages.action}: ${getApiErrorMessage(error, undefined, { detailedErrors: true })}`,
   )
 }
 

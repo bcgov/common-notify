@@ -82,6 +82,26 @@ describe('GcNotifyBulkValidationService', () => {
     })
   })
 
+  it.each(['Phone_Number', 'PHONE-NUMBER', 'numéro de téléphone'])(
+    'validates recipients under the %s header, which GC Notify also accepts',
+    (column) => {
+      expect(service.validateRows([[column], ['12345']])).toEqual({
+        valid: false,
+        errors: ['Row 1: "12345" is not a valid E.164 phone number'],
+      })
+    },
+  )
+
+  it.each(['email_address', 'Email-Address', 'adresse courriel'])(
+    'treats the %s header as an email bulk',
+    (column) => {
+      expect(service.validateRows([[column], ['alice@example.com']])).toEqual({
+        valid: true,
+        errors: [],
+      })
+    },
+  )
+
   it('does not apply phone validation to an email bulk header', () => {
     expect(
       service.validateRows([

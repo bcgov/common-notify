@@ -12,7 +12,7 @@ import { QueueName } from '../../../enum/queue-name.enum'
 import { NotificationChannel } from '../../../enum/notification-channel.enum'
 import { NotificationService } from '../../notification/notification.service'
 import { NotificationRequestDetailService } from '../../notification/notification-request-detail.service'
-import { ApiKeyUsageService, RecordedUsageResult } from '../../api-keys/api-key-usage.service'
+import { TenantUsageService, RecordedUsageResult } from '../../usage/tenant-usage.service'
 import { SafelistService } from '../../safelist/safelist.service'
 import type { SafelistCandidate } from '../../safelist/safelist.service'
 import { EventNotificationResolver } from '../../events/event-notification.resolver'
@@ -30,6 +30,7 @@ import { extractRequestRoute } from '../../../common/utils/extract-request-route
 import { describeError } from '../../../common/utils/describe-error'
 import { mergeRequestChannel } from '../../../queue/merge-batch-builder'
 import { INGESTION_JOB_OPTIONS } from '../../../queue/job-options'
+import { TenantsService } from '../../admin/tenants/tenants.service'
 
 interface AcceptedUsageResult extends RecordedUsageResult {
   channelCode: string
@@ -55,7 +56,6 @@ export interface SubmitOptions {
 interface Caller {
   tenantId: string
   tenantExternalId?: string
-  apiKeyConsumerId?: string
   requestRoute?: string
   uploadedBy: string
   email?: unknown
@@ -65,7 +65,6 @@ export interface MergeSubmission {
   tenantId: string
   dto: NotifySimpleRequest
   channel: NotificationChannel
-  apiKeyConsumerId?: string
   requestRoute?: string
   eventId?: string
   skipDedup?: boolean
@@ -89,11 +88,12 @@ export class NotifySubmissionService {
     private readonly attachmentValidationService: AttachmentValidationService,
     private readonly attachmentProcessingService: AttachmentProcessingService,
     private readonly notificationRequestDetailService: NotificationRequestDetailService,
-    private readonly apiKeyUsageService: ApiKeyUsageService,
+    private readonly tenantUsageService: TenantUsageService,
     private readonly safelistService: SafelistService,
     private readonly smsSegmentService: SmsSegmentService,
     private readonly notificationDedupService: NotificationDedupService,
     private readonly eventNotificationResolver: EventNotificationResolver,
+    private readonly tenantsService: TenantsService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Queue,
     @Optional() private readonly limitAlertNotificationService?: LimitAlertNotificationService,
   ) {}
@@ -127,7 +127,6 @@ export class NotifySubmissionService {
           tenantId: caller.tenantId,
           dto: payload as NotifySimpleRequest,
           channel: mergeChannel,
-          apiKeyConsumerId: caller.apiKeyConsumerId,
           requestRoute: caller.requestRoute,
           eventId,
           skipDedup,
@@ -150,7 +149,8 @@ export class NotifySubmissionService {
    * creates the per-recipient detail rows.
    */
   async acceptMerge(submission: MergeSubmission): Promise<NotificationAcceptanceResponse> {
-    const { tenantId, dto, channel, apiKeyConsumerId, requestRoute, eventId } = submission
+    const { tenantId, dto, channel, requestRoute, eventId } = submission
+    await this.tenantsService.assertCanSend(tenantId)
     const isSms = channel === NotificationChannel.SMS
     const channelPayload = (isSms ? dto.sms : dto.email)!
     const channelName = isSms ? 'sms' : 'email'
@@ -187,7 +187,7 @@ export class NotifySubmissionService {
     }
 
     const usage = [{ channel, count: messageCount }]
-    await this.enforceLimits(apiKeyConsumerId, usage)
+    await this.enforceLimits(tenantId, usage)
 
     const claim = await this.claimSend(tenantId, fingerprint)
     if (claim.kind === 'duplicate') return duplicateResponse(claim.original, [channelName])
@@ -206,8 +206,8 @@ export class NotifySubmissionService {
 
     await this.recordBlockedMergeRecipients(notificationRecord.id, tenantId, channel, blocked)
 
-    const usageResults = await this.recordAcceptedUsage(apiKeyConsumerId, usage)
-    await this.processLimitAlerts(apiKeyConsumerId, usageResults)
+    const usageResults = await this.recordAcceptedUsage(tenantId, usage)
+    await this.processLimitAlerts(tenantId, usageResults)
 
     const delayedSend = channelPayload.delayedSend
     const label = isSms ? 'SMS merge' : 'Email merge'
@@ -291,36 +291,29 @@ export class NotifySubmissionService {
   }
 
   /**
-   * Enforce the API key's daily/annual limits BEFORE a send is accepted. Throws HTTP 429 if any
+   * Enforce the tenant's daily/annual limits BEFORE a send is accepted. Throws HTTP 429 if any
    * channel would exceed its limit. Unlike usage recording this is NOT swallowed — a rejected
-   * request must fail. Skipped when there is no bound API key.
+   * request must fail. Applies to every send, with an API key or from the Notify UI.
    */
-  async enforceLimits(apiKeyConsumerId: string | undefined, entries: UsageEntry[]): Promise<void> {
-    if (!apiKeyConsumerId) return
-    await this.apiKeyUsageService.assertWithinLimits(apiKeyConsumerId, entries)
+  async enforceLimits(tenantId: string, entries: UsageEntry[]): Promise<void> {
+    await this.tenantUsageService.assertWithinLimits(tenantId, entries)
   }
 
   /**
-   * Attribute accepted notifications against the authenticating API key's usage limits.
-   * Non-fatal: usage tracking must never block or fail an accepted send. Skipped when the
-   * request has no bound API key.
+   * Count accepted notifications against the tenant's usage, whichever route sent them.
+   * Non-fatal: usage tracking must never block or fail an accepted send.
    */
   async recordAcceptedUsage(
-    apiKeyConsumerId: string | undefined,
+    tenantId: string,
     entries: UsageEntry[],
   ): Promise<AcceptedUsageResult[]> {
-    if (!apiKeyConsumerId) return []
     // One entry per channel, and each channel upserts its own rows, so the writes can overlap.
     const perChannel = await Promise.all(
       entries
         .filter(({ count }) => count > 0)
         .map(async ({ channel, count }): Promise<AcceptedUsageResult[]> => {
           try {
-            const usageRows = await this.apiKeyUsageService.recordUsage(
-              apiKeyConsumerId,
-              channel,
-              count,
-            )
+            const usageRows = await this.tenantUsageService.recordUsage(tenantId, channel, count)
             return usageRows.map(({ periodTypeCode, periodStart, sentCount }) => ({
               channelCode: channel,
               periodTypeCode,
@@ -329,7 +322,7 @@ export class NotifySubmissionService {
             }))
           } catch (error) {
             this.logger.warn(
-              `Failed to record ${channel} usage for API key ${apiKeyConsumerId}: ${describeError(error)}`,
+              `Failed to record ${channel} usage for tenant ${tenantId}: ${describeError(error)}`,
             )
             return []
           }
@@ -357,7 +350,6 @@ export class NotifySubmissionService {
     return {
       tenantId: tenant.id,
       tenantExternalId: tenant.externalId,
-      apiKeyConsumerId: req?.apiKeyConsumerId,
       requestRoute: extractRequestRoute(req),
       uploadedBy,
       email: user?.email,
@@ -415,7 +407,8 @@ export class NotifySubmissionService {
     eventId: string | undefined,
     skipDedup: boolean,
   ): Promise<NotificationAcceptanceResponse> {
-    const { tenantId, apiKeyConsumerId } = caller
+    const { tenantId } = caller
+    await this.tenantsService.assertCanSend(tenantId)
     const channels: string[] = []
     if (payload.email) channels.push('email')
     if (payload.sms) channels.push('sms')
@@ -445,9 +438,9 @@ export class NotifySubmissionService {
     const usage = await this.simpleUsageEntries(tenantId, processed)
 
     // Non-production guardrail, then limits (HTTP 429): both reject before anything is
-    // persisted, queued or counted against the API key.
+    // persisted, queued or counted against the tenant.
     await this.enforceSafelist(tenantId, processed)
-    await this.enforceLimits(apiKeyConsumerId, usage)
+    await this.enforceLimits(tenantId, usage)
 
     // Nothing between here and the create can reject the request, so a duplicate handed this
     // claim's notifyId while the row is still being written gets an id that will exist.
@@ -465,8 +458,8 @@ export class NotifySubmissionService {
       `Notification record created in DB with PENDING status: ${notificationRecord.id} (tenant=${tenantId})`,
     )
 
-    const usageResults = await this.recordAcceptedUsage(apiKeyConsumerId, usage)
-    await this.processLimitAlerts(apiKeyConsumerId, usageResults)
+    const usageResults = await this.recordAcceptedUsage(tenantId, usage)
+    await this.processLimitAlerts(tenantId, usageResults)
 
     const delayedSend =
       processed.email?.delayedSend || processed.sms?.delayedSend || processed.msgApp?.delayedSend
@@ -636,17 +629,12 @@ export class NotifySubmissionService {
   }
 
   private async processLimitAlerts(
-    apiKeyConsumerId: string | undefined,
+    tenantId: string,
     usageResults: AcceptedUsageResult[],
   ): Promise<void> {
-    if (!apiKeyConsumerId || usageResults.length === 0 || !this.limitAlertNotificationService) {
-      return
-    }
+    if (usageResults.length === 0 || !this.limitAlertNotificationService) return
     try {
-      await this.limitAlertNotificationService.processAcceptedUsage({
-        apiKeyConsumerId,
-        usageResults,
-      })
+      await this.limitAlertNotificationService.processAcceptedUsage({ tenantId, usageResults })
     } catch (error) {
       this.logger.warn(`Failed to process usage limit alerts: ${describeError(error)}`)
     }
@@ -742,7 +730,7 @@ export class NotifySubmissionService {
 
 /**
  * The 202 for a request identical to one already accepted in the window. Nothing new is
- * persisted, queued or counted against the API key; the caller gets the original's id.
+ * persisted, queued or counted against the tenant; the caller gets the original's id.
  */
 function duplicateResponse(
   original: DuplicateNotification,

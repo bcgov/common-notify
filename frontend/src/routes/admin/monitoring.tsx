@@ -1,32 +1,23 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
-import QueueMonitoring, { MONITORING_TABS } from '@/pages/admin/monitoring/QueueMonitoring'
-import type { MonitoringTab } from '@/pages/admin/monitoring/QueueMonitoring'
-import UserService from '@/service/user-service'
-import { SsoRole } from '@/enum/sso-role.enum'
+import System from '@/pages/admin/monitoring/System'
+
+/**
+ * This page used to hold every monitoring view behind ?tab=. Bookmarks and shared links still
+ * carry the tab, so each one is sent to the page its content now lives on.
+ */
+const LEGACY_TABS: Record<string, '/admin' | '/admin/monitoring'> = {
+  overview: '/admin',
+  failures: '/admin',
+  system: '/admin/monitoring',
+}
 
 export const Route = createFileRoute('/admin/monitoring')({
-  beforeLoad: () => {
-    if (!UserService.hasRole(SsoRole.NOTIFY_ADMIN)) {
-      throw redirect({ to: '/not-authorized' })
+  validateSearch: (search: Record<string, unknown>): { tab?: string } =>
+    typeof search.tab === 'string' ? { tab: search.tab } : {},
+  beforeLoad: ({ search }) => {
+    if (search.tab !== undefined) {
+      throw redirect({ to: LEGACY_TABS[search.tab] ?? '/admin/monitoring', replace: true })
     }
   },
-  // The tab is in the URL so a refresh or a shared link opens the same view.
-  validateSearch: (search: Record<string, unknown>): { tab?: MonitoringTab } =>
-    typeof search.tab === 'string' && MONITORING_TABS.includes(search.tab as MonitoringTab)
-      ? { tab: search.tab as MonitoringTab }
-      : {},
-  component: MonitoringPage,
+  component: System,
 })
-
-function MonitoringPage() {
-  const { tab = 'overview' } = Route.useSearch()
-  const navigate = Route.useNavigate()
-  return (
-    <QueueMonitoring
-      tab={tab}
-      onTabChange={(next) =>
-        navigate({ search: next === 'overview' ? {} : { tab: next }, replace: true })
-      }
-    />
-  )
-}

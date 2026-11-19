@@ -3,6 +3,7 @@ import axios from 'axios'
 import config from '@/config'
 import UserService from '@/service/user-service'
 import { showErrorToast } from '@/redux/utils/toastUtils'
+import { getApiResponseMessage } from '@/utils/apiErrorMessage'
 import { trackRequestEnd, trackRequestStart } from '@/redux/utils/globalLoading'
 
 declare module 'axios' {
@@ -110,8 +111,7 @@ if (!responseInterceptorRegistered) {
         // 2. Missing tenant context - show error to user
         // 3. Admin endpoint user lacks permission - fail silently
 
-        const responseData = (response.data as any) || {}
-        const errorMessage = responseData.message || ''
+        const errorMessage = getApiResponseMessage(error) || ''
         const url = config?.url || ''
 
         // Don't redirect for admin endpoints, let them fail silently.  We don't care if non-adin users can't list all tenants since they don't need (and shouldn't see) a list of tenants

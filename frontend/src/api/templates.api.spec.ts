@@ -4,6 +4,7 @@ import {
   TemplateEngine,
   createTemplate,
   deleteTemplate,
+  getPreviousTemplateVersion,
   getTemplateById,
   getTemplateUsage,
   getTemplates,
@@ -122,6 +123,45 @@ describe('templates.api', () => {
     })
   })
 
+  describe('getPreviousTemplateVersion', () => {
+    it('reads the previous version and skips the app-wide spinner', async () => {
+      vi.mocked(get).mockResolvedValue({ version: 1 })
+
+      await expect(getPreviousTemplateVersion('t1')).resolves.toEqual({ version: 1 })
+      expect(get).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: `${BASE_URL}/t1/previous-version`,
+          skipGlobalLoading: true,
+        }),
+      )
+    })
+
+    it.each([
+      [404, 'No previous version of this template was found'],
+      [401, 'You are not authorized to view this template'],
+    ])('explains a %i', async (status, message) => {
+      vi.mocked(get).mockRejectedValue(httpError(status))
+
+      await expect(getPreviousTemplateVersion('t1')).rejects.toThrow(message)
+    })
+
+    it('passes along the reason for any other failure', async () => {
+      vi.mocked(get).mockRejectedValue(new Error('network down'))
+
+      await expect(getPreviousTemplateVersion('t1')).rejects.toThrow(
+        'Failed to fetch previous version: network down',
+      )
+    })
+
+    it('still reports a failure that is not an Error', async () => {
+      vi.mocked(get).mockRejectedValue('nope')
+
+      await expect(getPreviousTemplateVersion('t1')).rejects.toThrow(
+        'Failed to fetch previous version: Unknown error',
+      )
+    })
+  })
+
   describe('previewTemplate', () => {
     it('posts sample values and skips the app-wide spinner', async () => {
       vi.mocked(post).mockResolvedValue({ body: 'Hi Jane' })
@@ -209,6 +249,7 @@ describe('templates.api', () => {
     it.each([
       [401, 'You are not authorized to create templates'],
       [403, 'You do not have permission to create templates'],
+      [500, 'Failed to create template: Request failed with status code 500'],
     ])('explains a %i', async (status, message) => {
       vi.mocked(post).mockRejectedValue(httpError(status))
 
@@ -237,6 +278,7 @@ describe('templates.api', () => {
       [404, 'Template not found'],
       [401, 'You are not authorized to update this template'],
       [403, 'You do not have permission to update this template'],
+      [500, 'Failed to update template: Request failed with status code 500'],
     ])('explains a %i', async (status, message) => {
       vi.mocked(post).mockRejectedValue(httpError(status))
 
@@ -281,6 +323,7 @@ describe('templates.api', () => {
       [401, 'You are not authorized to delete this template'],
       [403, 'You do not have permission to delete this template'],
       [409, 'This template is in use by an event and cannot be deleted'],
+      [500, 'Failed to delete template: Request failed with status code 500'],
     ])('explains a %i', async (status, message) => {
       vi.mocked(deleteMethod).mockRejectedValue(httpError(status))
 

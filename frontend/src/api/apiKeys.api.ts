@@ -1,4 +1,5 @@
 import type { AxiosError } from 'axios'
+import { getApiErrorMessage, getApiResponseMessage } from '@/utils/apiErrorMessage'
 import { get, patch, post, generateApiParameters, STATUS_CODES } from '@/common/api'
 import type { ApiKey, IssuedApiKey } from '@/interfaces/api-key.interface'
 
@@ -66,7 +67,6 @@ export async function updateApiKeyNotes(clientId: string, notes: string | null):
 
 function toReadableError(error: unknown, verb: string): Error {
   const axiosError = error as AxiosError
-  const responseData = (axiosError.response?.data as any) || {}
   const status = axiosError.response?.status
 
   if (status === STATUS_CODES.Unauthorized || status === STATUS_CODES.Forbidden) {
@@ -76,16 +76,13 @@ function toReadableError(error: unknown, verb: string): Error {
   // implying the user did something wrong.
   if (status === STATUS_CODES.ServiceUnavailable) {
     return new Error(
-      responseData.message || 'The API gateway is unavailable right now. Please try again shortly.',
+      getApiResponseMessage(error) ||
+        'The API gateway is unavailable right now. Please try again shortly.',
     )
   }
   if (status === STATUS_CODES.Conflict) {
-    return new Error(responseData.message || 'This tenant already has an API key')
+    return new Error(getApiResponseMessage(error) || 'This tenant already has an API key')
   }
 
-  return new Error(
-    `Failed to ${verb} the API key: ${
-      responseData.message || (error instanceof Error ? error.message : 'Unknown error')
-    }`,
-  )
+  return new Error(`Failed to ${verb} the API key: ${getApiErrorMessage(error)}`)
 }

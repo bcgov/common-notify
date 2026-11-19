@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { Tenant } from './api/admin/tenants/entities/tenant.entity'
 import { TenantStatusCode } from './api/admin/tenants/entities/tenant-status-code.entity'
+import { TenantSendingHistory } from './api/admin/tenants/entities/tenant-sending-history.entity'
 import { NotifyUser } from './api/admin/users/entities/notify-user.entity'
 import { Template } from './api/templates/entities/template.entity'
 import { TemplateVersion } from './api/templates/entities/template-version.entity'
@@ -15,14 +16,15 @@ import { MimeTypeCode } from './api/notification/entities/mime-type-code.entity'
 import { NotifyConfiguration } from './api/notification/entities/configuration.entity'
 import { FeatureFlag } from './api/feature-flag/entities/feature-flag.entity'
 import { FeatureFlagCode } from './api/feature-flag/entities/feature-flag-code.entity'
+import { FeatureFlagHistory } from './api/feature-flag/entities/feature-flag-history.entity'
 import { WebhookConfig } from './api/webhook/entities/webhook-config.entity'
 import { WebhookDeliveryLog } from './api/webhook/entities/webhook-delivery-log.entity'
 import { WebhookTypeCode } from './api/webhook/entities/webhook-type.entity'
 import { ApiKeyConsumer } from './api/api-keys/entities/api-key-consumer.entity'
-import { ApiKeyLimit } from './api/api-keys/entities/api-key-limit.entity'
-import { ApiKeyUsage } from './api/api-keys/entities/api-key-usage.entity'
-import { ApiKeyLimitAlert } from './api/api-keys/entities/api-key-limit-alert.entity'
-import { ApiKeyLimitAlertLog } from './api/api-keys/entities/api-key-limit-alert-log.entity'
+import { TenantLimit } from './api/usage/entities/tenant-limit.entity'
+import { TenantUsage } from './api/usage/entities/tenant-usage.entity'
+import { TenantLimitAlert } from './api/usage/entities/tenant-limit-alert.entity'
+import { TenantLimitAlertLog } from './api/usage/entities/tenant-limit-alert-log.entity'
 import { AttachmentEntity } from './api/attachment/entities/attachment.entity'
 import { TenantSettings } from './api/tenant-settings/entities/tenant-settings.entity'
 import { NotifyEvent } from './api/events/entities/event.entity'
@@ -54,6 +56,7 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
       entities: [
         Tenant,
         TenantStatusCode,
+        TenantSendingHistory,
         NotifyUser,
         NotificationRequest,
         NotificationRequestDetail,
@@ -67,14 +70,15 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         TemplateEngineCode,
         FeatureFlag,
         FeatureFlagCode,
+        FeatureFlagHistory,
         WebhookConfig,
         WebhookDeliveryLog,
         WebhookTypeCode,
         ApiKeyConsumer,
-        ApiKeyLimit,
-        ApiKeyUsage,
-        ApiKeyLimitAlert,
-        ApiKeyLimitAlertLog,
+        TenantLimit,
+        TenantUsage,
+        TenantLimitAlert,
+        TenantLimitAlertLog,
         AttachmentEntity,
         TenantSettings,
         NotifyEvent,

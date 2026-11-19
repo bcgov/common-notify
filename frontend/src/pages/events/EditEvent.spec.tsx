@@ -7,8 +7,8 @@ import { configureStore } from '@reduxjs/toolkit'
 import EditEvent from './EditEvent'
 import tenantReducer, { selectTenant } from '@/redux/slices/tenant.slice'
 import tenantSettingsReducer from '@/redux/slices/tenantSettings.slice'
-import apiKeyUsageReducer from '@/redux/slices/apiKeyUsage.slice'
-import { getApiKeyUsage } from '@/api/apiKeyUsage.api'
+import usageReducer from '@/redux/slices/usage.slice'
+import { getTenantUsage } from '@/api/usage.api'
 import emailSettingsReducer from '@/redux/slices/emailSettings.slice'
 import userReducer from '@/redux/slices/user.slice'
 import {
@@ -17,11 +17,13 @@ import {
   getEventById,
   updateEvent,
   updateEventEmailSettings,
+  updateEventSmsSettings,
 } from '@/api/events.api'
 import type * as EventsApi from '@/api/events.api'
 import type { EventResponse } from '@/api/events.api'
 import { getApprovedEmailLogos, getSettings } from '@/api/settings.api'
 import type * as SettingsApi from '@/api/settings.api'
+import { NotificationChannel, getTemplates } from '@/api/templates.api'
 import type * as TemplatesApi from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import type { Tenant } from '@/interfaces/CstarTenant'
@@ -29,7 +31,7 @@ import type { Tenant } from '@/interfaces/CstarTenant'
 const navigateMock = vi.fn()
 
 vi.mock('@/config/featureFlags/useFeatureFlag', () => ({ useFeatureFlag: () => true }))
-vi.mock('@/api/apiKeyUsage.api', () => ({ getApiKeyUsage: vi.fn() }))
+vi.mock('@/api/usage.api', () => ({ getTenantUsage: vi.fn() }))
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
@@ -116,7 +118,7 @@ function makeStore(
     reducer: {
       tenant: tenantReducer,
       tenantSettings: tenantSettingsReducer,
-      apiKeyUsage: apiKeyUsageReducer,
+      usage: usageReducer,
       emailSettings: emailSettingsReducer,
       user: userReducer,
     },
@@ -139,18 +141,18 @@ function renderPage({
   selectedTenant,
   eventId = 'event-1',
   initialTab,
-  editEmail,
+  editChannel,
 }: {
   cstarRoles?: string[]
   selectedTenant?: Tenant | null
   eventId?: string
   initialTab?: 'settings' | 'email' | 'sms' | 'third-party'
-  editEmail?: boolean
+  editChannel?: boolean
 } = {}) {
   const store = makeStore(cstarRoles, selectedTenant)
   const view = render(
     <Provider store={store}>
-      <EditEvent eventId={eventId} initialTab={initialTab} editEmail={editEmail} />
+      <EditEvent eventId={eventId} initialTab={initialTab} editChannel={editChannel} />
     </Provider>,
   )
   return { store, ...view }
@@ -166,7 +168,7 @@ describe('EditEvent', () => {
       event({ emailSettings: { ...configuredEmail, active: false } }),
     )
     vi.mocked(getSettings).mockResolvedValue(null)
-    vi.mocked(getApiKeyUsage).mockResolvedValue({
+    vi.mocked(getTenantUsage).mockResolvedValue({
       tenantId: 'tenant-1',
       fiscalYearStart: '2026-04-01',
       channels: [],
@@ -374,6 +376,7 @@ describe('EditEvent', () => {
         expect(navigateMock).toHaveBeenCalledWith({
           to: '/events/$eventId/saved',
           params: { eventId: 'event-1' },
+          search: { channel: 'email' },
           replace: true,
         }),
       )
@@ -392,6 +395,7 @@ describe('EditEvent', () => {
         expect(navigateMock).toHaveBeenCalledWith({
           to: '/events/$eventId/saved',
           params: { eventId: 'event-1' },
+          search: { channel: 'email' },
           replace: true,
         }),
       )
@@ -409,7 +413,7 @@ describe('EditEvent', () => {
 
     it('sends the tab settings and hands off to the saved page', async () => {
       vi.mocked(getEventById).mockResolvedValue(event({ emailSettings: configuredEmail }))
-      renderPage({ initialTab: 'email', editEmail: true })
+      renderPage({ initialTab: 'email', editChannel: true })
 
       const senderField = await screen.findByRole('textbox', { name: /Sender email address/ })
       await userEvent.clear(senderField)
@@ -435,12 +439,13 @@ describe('EditEvent', () => {
       expect(navigateMock).toHaveBeenCalledWith({
         to: '/events/$eventId/saved',
         params: { eventId: 'event-1' },
+        search: { channel: 'email' },
       })
     })
 
     it('switches the channel off on its own, once confirmed', async () => {
       vi.mocked(getEventById).mockResolvedValue(event({ emailSettings: configuredEmail }))
-      renderPage({ initialTab: 'email', editEmail: true })
+      renderPage({ initialTab: 'email', editChannel: true })
 
       await userEvent.click(await screen.findByRole('switch', { name: 'Activate channel' }))
       await userEvent.click(await screen.findByRole('button', { name: 'Deactivate' }))
@@ -448,6 +453,60 @@ describe('EditEvent', () => {
       await waitFor(() => expect(deactivateEventEmailChannel).toHaveBeenCalledWith('event-1'))
       expect(updateEventEmailSettings).not.toHaveBeenCalled()
       expect(navigateMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('the SMS channel', () => {
+    const configuredSms = { active: true, templateId: 'sms-template', to: ['+12505551234'] }
+
+    it('hands an active channel off to the saved page', async () => {
+      vi.mocked(getEventById).mockResolvedValue(event({ smsSettings: configuredSms }))
+      renderPage({ initialTab: 'sms' })
+
+      await waitFor(() =>
+        expect(navigateMock).toHaveBeenCalledWith({
+          to: '/events/$eventId/saved',
+          params: { eventId: 'event-1' },
+          search: { channel: 'sms' },
+          replace: true,
+        }),
+      )
+      expect(screen.queryByRole('switch', { name: 'Activate channel' })).not.toBeInTheDocument()
+    })
+
+    it('sends the tab settings and hands off to the saved page', async () => {
+      vi.mocked(getEventById).mockResolvedValue(
+        event({ smsSettings: configuredSms, senderPhoneNumber: '+15551234567' }),
+      )
+      vi.mocked(updateEventSmsSettings).mockResolvedValue(event({ smsSettings: configuredSms }))
+      vi.mocked(getTemplates).mockResolvedValueOnce({
+        data: [
+          {
+            id: 'sms-template',
+            name: 'SMS template',
+            body: 'Hello',
+            channelCode: NotificationChannel.SMS,
+          } as Awaited<ReturnType<typeof getTemplates>>['data'][number],
+        ],
+        count: 1,
+        page: 1,
+        limit: 100,
+        totalPages: 1,
+      })
+      renderPage({ initialTab: 'sms', editChannel: true })
+
+      await screen.findByRole('switch', { name: 'Activate channel' })
+      await waitFor(() => expect(getTemplates).toHaveBeenCalled())
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      await waitFor(() =>
+        expect(updateEventSmsSettings).toHaveBeenCalledWith('event-1', configuredSms),
+      )
+      expect(navigateMock).toHaveBeenCalledWith({
+        to: '/events/$eventId/saved',
+        params: { eventId: 'event-1' },
+        search: { channel: 'sms' },
+      })
     })
   })
 
@@ -461,7 +520,7 @@ describe('EditEvent', () => {
 
     it('leaves the email channel switch locked', async () => {
       vi.mocked(getEventById).mockResolvedValue(event({ emailSettings: configuredEmail }))
-      renderPage({ cstarRoles: ['NOTIFY_VIEWER'], initialTab: 'email', editEmail: true })
+      renderPage({ cstarRoles: ['NOTIFY_VIEWER'], initialTab: 'email', editChannel: true })
 
       expect(await screen.findByRole('switch', { name: 'Activate channel' })).toBeDisabled()
       expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()

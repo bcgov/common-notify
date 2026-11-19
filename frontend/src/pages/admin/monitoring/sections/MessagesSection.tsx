@@ -4,7 +4,8 @@ import Sparkline from '@/components/Sparkline'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
 import type { MessageChannelStats } from '@/interfaces/queueMonitoring.interface'
-import { formatDuration, formatMessageChannel, formatRate } from '@/utils/monitoring'
+import { formatDuration, formatRate } from '@/utils/monitoring'
+import { formatChannel } from '@/utils/channels'
 
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0)
 
@@ -18,7 +19,7 @@ const columns: TableColumn<MessageChannelStats>[] = [
   {
     key: 'channel',
     label: 'Channel',
-    render: (_, row) => <span className="fw-semibold">{formatMessageChannel(row.channel)}</span>,
+    render: (_, row) => <span className="fw-semibold">{formatChannel(row.channel)}</span>,
   },
   { key: 'pending', label: 'Pending', render: (_, row) => row.pending.toLocaleString() },
   {
@@ -34,7 +35,7 @@ const columns: TableColumn<MessageChannelStats>[] = [
     label: 'Last 60 min',
     render: (_, row) => (
       <Sparkline
-        label={`${formatMessageChannel(row.channel)}, last 60 minutes: ${sum(row.sent).toLocaleString()} sent, ${sum(row.failed).toLocaleString()} failed`}
+        label={`${formatChannel(row.channel)}, last 60 minutes: ${sum(row.sent).toLocaleString()} sent, ${sum(row.failed).toLocaleString()} failed`}
         series={[
           { variant: 'out', values: row.sent },
           { variant: 'failed', values: row.failed },

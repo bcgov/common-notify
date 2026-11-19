@@ -1,0 +1,71 @@
+@import '../variables';
+
+// Tenant search beside the date range, wrapping under it on narrow screens.
+.admin-notifications__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: $spacing-md;
+}
+
+.admin-notifications__search {
+  flex: 1 1 320px;
+  max-width: 480px;
+}
+
+.admin-notification__summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: $spacing-md $spacing-lg;
+  margin: 0;
+
+  dt {
+    font-size: $font-size-sm;
+    color: $text-secondary;
+  }
+
+  dd {
+    margin: $spacing-xs 0 0;
+  }
+}
+
+.admin-notification__history {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  margin: 0;
+  padding-left: $spacing-lg;
+
+  li {
+    display: flex;
+    gap: $spacing-md;
+    align-items: center;
+  }
+
+  time {
+    color: $text-secondary;
+  }
+}
+
+.admin-notification__counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-sm $spacing-lg;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// Raw error and provider text: kept as written, wrapped so a long token can't widen the table.
+.admin-notification__error-text {
+  margin: 0;
+  font-size: $font-size-sm;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.admin-notification__provider-id {
+  display: block;
+  font-size: $font-size-sm;
+  color: $text-secondary;
+}

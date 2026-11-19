@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import SmsSettings from './SmsSettings'
 import { showSuccessToast } from '@/redux/utils/toastUtils'
 import { updateSmsSettings } from '@/redux/thunks/settings.thunks'
-import { fetchApiKeyUsage } from '@/redux/thunks/apiKeyUsage.thunks'
+import { fetchTenantUsage } from '@/redux/thunks/usage.thunks'
 import { CstarRole } from '@/enum/cstar-role.enum'
 
 const dispatchMock = vi.fn()
@@ -24,8 +24,8 @@ vi.mock('@/redux/thunks/settings.thunks', () => ({
   updateSmsSettings: vi.fn((payload) => ({ type: 'smsSettings/update', payload })),
 }))
 
-vi.mock('@/redux/thunks/apiKeyUsage.thunks', () => ({
-  fetchApiKeyUsage: vi.fn(() => ({ type: 'apiKeyUsage/fetch' })),
+vi.mock('@/redux/thunks/usage.thunks', () => ({
+  fetchTenantUsage: vi.fn(() => ({ type: 'usage/fetch' })),
 }))
 
 vi.mock('@/redux/utils/toastUtils', () => ({
@@ -62,7 +62,7 @@ const SAVED_SMS = {
 function renderWithRoles(roles: CstarRole[] = [CstarRole.NOTIFY_OPERATIONS_ADMIN]) {
   state = {
     tenant: { selectedTenant: { id: 'tenant-1', name: 'Tenant One' } },
-    apiKeyUsage: {
+    usage: {
       isLoading: false,
       usage: { channels: [{ channel: 'SMS', dailyLimit: 1000, annualLimit: 50000 }] },
     },
@@ -104,7 +104,7 @@ describe('SmsSettings section', () => {
   it('renders the usage limits from the store without re-fetching them', () => {
     renderWithRoles()
 
-    expect(fetchApiKeyUsage).not.toHaveBeenCalled()
+    expect(fetchTenantUsage).not.toHaveBeenCalled()
     expect(screen.getByText('1,000 SMS/day')).toBeInTheDocument()
     expect(screen.getByText('50,000 SMS/year')).toBeInTheDocument()
   })
@@ -152,7 +152,7 @@ describe('SmsSettings section', () => {
 
   it('reports Not set when a limit is missing', () => {
     renderWithRoles()
-    state = { ...state, apiKeyUsage: { isLoading: false, usage: { channels: [] } } }
+    state = { ...state, usage: { isLoading: false, usage: { channels: [] } } }
     render(<SmsSettings />)
 
     expect(screen.getAllByText('Not set').length).toBeGreaterThan(0)

@@ -26,7 +26,10 @@ import { TenantSettingsService } from '../tenant-settings/tenant-settings.servic
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { ListQueryDto } from '../../common/query/list-query.dto'
 import { parseListQuery } from '../../common/query/list-query.parser'
-import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
+import {
+  andWhereJsonbHasAny,
+  applyParsedListQueryToQueryBuilder,
+} from '../../common/query/typeorm-list-query.util'
 import type { QueryableFieldsConfig } from '../../common/query/list-query.types'
 
 const notificationListQueryConfig: QueryableFieldsConfig = {
@@ -503,12 +506,12 @@ export class NotificationService {
     applyParsedListQueryToQueryBuilder(queryBuilder, parsedQuery, notificationListQueryConfig)
 
     // Match requests whose channel_codes array contains any of the requested channels.
-    if (channelCodeValues.length > 0) {
-      queryBuilder.andWhere(
-        'jsonb_exists_any(notification.channel_codes, ARRAY[:...channelCodeValues]::text[])',
-        { channelCodeValues },
-      )
-    }
+    andWhereJsonbHasAny(
+      queryBuilder,
+      'notification.channel_codes',
+      channelCodeValues,
+      'channelCodeValues',
+    )
 
     const [notifications, total] = await queryBuilder.getManyAndCount()
 
@@ -853,7 +856,7 @@ export class NotificationService {
 /** Keys that would reach Object.prototype if written blindly into a nested object. */
 const UNSAFE_PARAM_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype'])
 
-const MAIL_MERGE_ERRORS_OMITTED = `Additional invalid rows omitted (showing first ${MAIL_MERGE_MAX_REPORTED_ERRORS})`
+export const MAIL_MERGE_ERRORS_OMITTED = `Additional invalid rows omitted (showing first ${MAIL_MERGE_MAX_REPORTED_ERRORS})`
 
 /** A scheduled send must be in the future and at most 10 days out. Returns null when valid. */
 function validateDelayedSend(delayedSend: string | undefined): string | null {

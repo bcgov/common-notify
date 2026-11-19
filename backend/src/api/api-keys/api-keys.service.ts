@@ -1,42 +1,9 @@
 import { Injectable, Logger, ForbiddenException, ConflictException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { In, Repository } from 'typeorm'
+import { Repository } from 'typeorm'
 import { ApiKeyConsumer } from './entities/api-key-consumer.entity'
-import { ApiKeyLimit } from './entities/api-key-limit.entity'
-import { ApiKeyLimitAlert } from './entities/api-key-limit-alert.entity'
-import { lowestLimitsByChannel, lowestThresholdsByChannel } from './tenant-limits'
+import { seedTenantLimitDefaults } from '../usage/tenant-limit-defaults'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
-import { NotificationChannel } from '../../enum/notification-channel.enum'
-
-/**
- * Default notification limits applied per channel when a tenant's first API key is bound.
- * Mirrors the seed values in migration V40.
- */
-const DEFAULT_LIMITS: Array<{
-  channelCode: string
-  rateLimitPerMinute: number
-  dailyLimit: number
-  annualLimit: number
-}> = [
-  {
-    channelCode: NotificationChannel.EMAIL,
-    rateLimitPerMinute: 1000,
-    dailyLimit: 100000,
-    annualLimit: 20000000,
-  },
-  {
-    channelCode: NotificationChannel.SMS,
-    rateLimitPerMinute: 1000,
-    dailyLimit: 10000,
-    annualLimit: 100000,
-  },
-]
-
-/** Channels that receive default alert configuration on bind. */
-const ALERT_CHANNELS: string[] = [NotificationChannel.EMAIL, NotificationChannel.SMS]
-
-/** Default warning threshold (percent of a limit) for a newly bound key. */
-const DEFAULT_WARN_THRESHOLD_PERCENT = 80
 
 @Injectable()
 export class ApiKeysService {
@@ -45,74 +12,9 @@ export class ApiKeysService {
   constructor(
     @InjectRepository(ApiKeyConsumer)
     private readonly apiKeyConsumerRepository: Repository<ApiKeyConsumer>,
-    @InjectRepository(ApiKeyLimit)
-    private readonly apiKeyLimitRepository: Repository<ApiKeyLimit>,
-    @InjectRepository(ApiKeyLimitAlert)
-    private readonly apiKeyLimitAlertRepository: Repository<ApiKeyLimitAlert>,
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
   ) {}
-
-  /**
-   * Ensure an API key has its per-channel limit rows AND alert configuration.
-   *
-   * Limits are tenant-wide and the lowest across a tenant's keys is enforced, so a key joining
-   * a tenant that already has keys copies their limits and thresholds. Seeding it with the
-   * defaults instead would quietly override any limit an admin had set on the tenant.
-   *
-   * Idempotent: existing rows are left untouched (ON CONFLICT DO NOTHING), so re-binding
-   * never clobbers customized limits or thresholds.
-   *
-   * Public because ApiKeyIssuanceService seeds self-issued keys the same way — a key must
-   * land on the tenant's limits regardless of how it was created.
-   */
-  async ensureDefaults(apiKeyConsumerId: string, tenantId: string): Promise<void> {
-    const siblingIds = (await this.apiKeyConsumerRepository.find({ where: { tenantId } }))
-      .map(({ id }) => id)
-      .filter((id) => id !== apiKeyConsumerId)
-
-    const [siblingLimits, siblingAlerts]: [ApiKeyLimit[], ApiKeyLimitAlert[]] =
-      siblingIds.length > 0
-        ? await Promise.all([
-            this.apiKeyLimitRepository.find({ where: { apiKeyConsumerId: In(siblingIds) } }),
-            this.apiKeyLimitAlertRepository.find({ where: { apiKeyConsumerId: In(siblingIds) } }),
-          ])
-        : [[], []]
-    const tenantLimits = lowestLimitsByChannel(siblingLimits)
-    const tenantThresholds = lowestThresholdsByChannel(siblingAlerts)
-
-    await this.apiKeyLimitRepository
-      .createQueryBuilder()
-      .insert()
-      .into(ApiKeyLimit)
-      .values(
-        DEFAULT_LIMITS.map((limit) => ({
-          ...limit,
-          ...tenantLimits.get(limit.channelCode),
-          apiKeyConsumerId,
-          createdBy: 'system',
-          updatedBy: 'system',
-        })),
-      )
-      .orIgnore()
-      .execute()
-
-    await this.apiKeyLimitAlertRepository
-      .createQueryBuilder()
-      .insert()
-      .into(ApiKeyLimitAlert)
-      .values(
-        ALERT_CHANNELS.map((channelCode) => ({
-          apiKeyConsumerId,
-          channelCode,
-          warnThresholdPercent: tenantThresholds.get(channelCode) ?? DEFAULT_WARN_THRESHOLD_PERCENT,
-          createdBy: 'system',
-          updatedBy: 'system',
-        })),
-      )
-      .orIgnore()
-      .execute()
-  }
 
   /**
    * Load-test-only: bind an API key to a dedicated throwaway load-test tenant,
@@ -151,6 +53,7 @@ export class ApiKeysService {
           updatedAt: now,
         }),
       )
+      await seedTenantLimitDefaults(this.tenantRepository.manager, tenant.id)
       this.logger.warn(`[LOADTEST] Created load-test tenant ${tenant.id}`)
     }
 

@@ -25,7 +25,7 @@ export interface EmailHeaderOverride {
  * Height a sender's own logo is rendered at. The width follows it, so a wide logo stays wide.
  * The preview on the test send screen uses the same figure.
  */
-const LOGO_HEIGHT_PX = 110
+const LOGO_HEIGHT_PX = 85
 
 /**
  * Gap between the logo/title row and the rule under it.

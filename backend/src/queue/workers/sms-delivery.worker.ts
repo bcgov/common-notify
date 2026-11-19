@@ -78,7 +78,9 @@ export class SmsDeliveryWorker extends DeliveryWorker {
       hasInlineContent: (content) => !!content?.body,
       send: async (recipient, params, { template, inline }) => {
         const { body } = template
-          ? await this.templatesService.renderTemplateContent(template, params)
+          ? await this.templatesService.renderTemplateContent(template, params, undefined, {
+              allowEmptyValues: true,
+            })
           : await this.inlineRenderingService.renderSms(inline, params)
         const result = await this.sendSms(
           { recipients: { to: [recipient.address] }, content: { body } },

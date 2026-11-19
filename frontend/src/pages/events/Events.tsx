@@ -15,6 +15,7 @@ import { ChannelBadge } from '@/components/ChannelBadge'
 import NoDataCard from '@/components/NoDataCard'
 import { showErrorToast } from '@/redux/utils/toastUtils'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
+import { channelFilterOptions } from '@/utils/channels'
 import '@/scss/components/events.scss'
 
 const formatDate = (value: string): string =>
@@ -42,10 +43,7 @@ const columns: TableColumn<EventResponse>[] = [
     key: 'channelCodes',
     label: 'Channel',
     width: '17%',
-    filterOptions: [
-      { label: 'Email', value: 'EMAIL' },
-      { label: 'SMS', value: 'SMS' },
-    ],
+    filterOptions: channelFilterOptions(['EMAIL', 'SMS']),
     render: (_, row) => <ChannelBadge channels={row.channelCodes ?? []} />,
   },
   {
@@ -102,7 +100,7 @@ const Events: FC = () => {
 
   useEffect(() => {
     if (selectedTenant) {
-      dispatch(fetchEvents())
+      void dispatch(fetchEvents())
     }
   }, [page, limit, search, sortBy, sortOrder, filters, selectedTenant, dispatch])
 
@@ -119,7 +117,7 @@ const Events: FC = () => {
     // retry path (after a failed load), so that is the only case that dispatches directly -
     // doing both would fire two requests for every search.
     if (searchInput === search) {
-      dispatch(fetchEvents())
+      void dispatch(fetchEvents())
     } else {
       dispatch(setSearch(searchInput))
     }

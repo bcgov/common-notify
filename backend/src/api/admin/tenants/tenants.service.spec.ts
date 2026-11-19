@@ -1,9 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
-import { BadRequestException, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common'
 import { vi } from 'vitest'
-import { TenantsService } from './tenants.service'
+import { TenantsService, sendingDisabledMessage } from './tenants.service'
+import { TenantSendingHistory } from './entities/tenant-sending-history.entity'
 import { Tenant } from './entities/tenant.entity'
+import { seedTenantLimitDefaults } from '../../usage/tenant-limit-defaults'
+
+vi.mock('../../usage/tenant-limit-defaults', () => ({ seedTenantLimitDefaults: vi.fn() }))
 
 describe('TenantsService', () => {
   let service: TenantsService
@@ -27,6 +31,10 @@ describe('TenantsService', () => {
     updatedAt: new Date(),
     updatedBy: 'user@example.com',
     isDeleted: false,
+    disabledReason: null,
+    disabledBy: null,
+    disabledByName: null,
+    disabledAt: null,
   }
 
   const mockRepository = {
@@ -35,6 +43,13 @@ describe('TenantsService', () => {
     create: vi.fn(),
     save: vi.fn(),
     update: vi.fn(),
+    manager: {} as unknown,
+  }
+
+  // New tenants are saved through a transaction; its save delegates to the repository mock so
+  // tests can stub and assert one save.
+  const txManager = {
+    save: (_entity: unknown, value: Tenant) => mockRepository.save(value),
   }
 
   beforeEach(async () => {
@@ -50,6 +65,9 @@ describe('TenantsService', () => {
 
     service = module.get<TenantsService>(TenantsService)
     vi.clearAllMocks()
+    mockRepository.manager = {
+      transaction: (work: (m: typeof txManager) => unknown) => work(txManager),
+    }
   })
 
   describe('create', () => {
@@ -77,6 +95,22 @@ describe('TenantsService', () => {
         }),
       )
       expect(mockRepository.save).toHaveBeenCalled()
+      expect(seedTenantLimitDefaults).toHaveBeenCalledWith(txManager, mockTenant.id)
+    })
+
+    it('fails the create when the default limits cannot be seeded', async () => {
+      mockRepository.findOne.mockResolvedValue(null)
+      mockRepository.create.mockReturnValue(mockTenant)
+      mockRepository.save.mockResolvedValue(mockTenant)
+      vi.mocked(seedTenantLimitDefaults).mockRejectedValueOnce(new Error('insert failed'))
+
+      await expect(
+        service.create({
+          name: 'test-tenant',
+          externalId: 'ext-123',
+          createdBy: 'user@example.com',
+        }),
+      ).rejects.toThrow('insert failed')
     })
 
     it('should auto-generate slug from name if not provided', async () => {
@@ -290,6 +324,150 @@ describe('TenantsService', () => {
       mockRepository.update.mockRejectedValue(new Error('Database error'))
 
       await expect(service.delete('uuid-1')).rejects.toThrow(Error)
+    })
+  })
+
+  describe('sending controls', () => {
+    const actor = { id: 'padmin', name: 'Pat Admin' }
+    const tenantRow = (status: string, disabledReason: string | null = null) => {
+      const qb = {
+        select: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        getOne: vi.fn().mockResolvedValue({ id: 'uuid-1', status, disabledReason }),
+      }
+      ;(mockRepository as Record<string, unknown>).createQueryBuilder = vi.fn(() => qb)
+    }
+
+    describe('assertCanSend', () => {
+      it('rejects a disabled tenant with the reason the admin gave', async () => {
+        tenantRow('disabled', 'Unpaid invoice')
+
+        await expect(service.assertCanSend('uuid-1')).rejects.toThrow(
+          new ForbiddenException(
+            'Sending is disabled for this tenant by the Notify team: Unpaid invoice',
+          ),
+        )
+      })
+
+      it('lets an active tenant send', async () => {
+        tenantRow('active')
+
+        await expect(service.assertCanSend('uuid-1')).resolves.toBeUndefined()
+      })
+    })
+
+    it('words the rejection without a reason when none was recorded', () => {
+      expect(sendingDisabledMessage(null)).toBe(
+        'Sending is disabled for this tenant by the Notify team.',
+      )
+    })
+
+    describe('setSending', () => {
+      function withTransaction(current: { status: string } | null) {
+        const manager = {
+          findOne: vi.fn().mockResolvedValue(current && { id: 'uuid-1', ...current }),
+          query: vi.fn().mockResolvedValue(undefined),
+          create: vi.fn((_entity, values) => values),
+          save: vi.fn().mockResolvedValue(undefined),
+        }
+        ;(mockRepository as Record<string, unknown>).manager = {
+          transaction: (work: (m: typeof manager) => unknown) => work(manager),
+        }
+        return manager
+      }
+
+      it('requires a reason to disable, before touching the database', async () => {
+        const manager = withTransaction({ status: 'active' })
+
+        await expect(service.setSending('uuid-1', false, '   ', actor)).rejects.toBeInstanceOf(
+          BadRequestException,
+        )
+        expect(manager.findOne).not.toHaveBeenCalled()
+      })
+
+      it('disables under a row lock, recording who, why and the history row', async () => {
+        const manager = withTransaction({ status: 'active' })
+
+        await expect(service.setSending('uuid-1', false, ' Unpaid invoice ', actor)).resolves.toBe(
+          false,
+        )
+
+        expect(manager.findOne).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ lock: { mode: 'pessimistic_write' } }),
+        )
+        const [, params] = manager.query.mock.calls[0]
+        expect(params).toEqual([
+          'uuid-1',
+          'disabled',
+          'Unpaid invoice',
+          'padmin',
+          'Pat Admin',
+          expect.any(Date),
+          'padmin',
+        ])
+        expect(manager.create).toHaveBeenCalledWith(TenantSendingHistory, {
+          tenantId: 'uuid-1',
+          enabled: false,
+          reason: 'Unpaid invoice',
+          createdBy: 'padmin',
+          createdByName: 'Pat Admin',
+        })
+      })
+
+      it('enables, clearing the disabled details but keeping them in the history', async () => {
+        const manager = withTransaction({ status: 'disabled' })
+
+        await service.setSending('uuid-1', true, 'ignored', actor)
+
+        const [, params] = manager.query.mock.calls[0]
+        expect(params).toEqual(['uuid-1', 'active', null, null, null, null, 'padmin'])
+        expect(manager.create).toHaveBeenCalledWith(
+          TenantSendingHistory,
+          expect.objectContaining({ enabled: true, reason: null }),
+        )
+      })
+
+      it('changes and records nothing when the tenant is already in that state', async () => {
+        const manager = withTransaction({ status: 'disabled' })
+
+        await service.setSending('uuid-1', false, 'Again', actor)
+
+        expect(manager.query).not.toHaveBeenCalled()
+        expect(manager.save).not.toHaveBeenCalled()
+      })
+
+      it('reports a tenant that does not exist', async () => {
+        withTransaction(null)
+
+        await expect(service.setSending('missing', true, undefined, actor)).rejects.toBeInstanceOf(
+          NotFoundException,
+        )
+      })
+    })
+
+    it('gives a tenant first synced from CSTAR the default limits', async () => {
+      mockRepository.findOne.mockResolvedValue(null)
+      mockRepository.create.mockReturnValue(mockTenant)
+      mockRepository.save.mockResolvedValue(mockTenant)
+
+      await service.upsertFromCstar({ id: 'ext-123', name: 'test-tenant' })
+
+      expect(seedTenantLimitDefaults).toHaveBeenCalledWith(txManager, mockTenant.id)
+    })
+
+    it("updates only CSTAR's fields on sync, so it can't undo a disable", async () => {
+      mockRepository.findOne.mockResolvedValueOnce({ ...mockTenant, status: 'disabled' })
+      mockRepository.update.mockResolvedValueOnce({ affected: 1 })
+
+      await service.upsertFromCstar({ id: 'ext-123', name: 'Renamed' })
+
+      expect(mockRepository.update).toHaveBeenCalledWith('uuid-1', {
+        name: 'Renamed',
+        slug: 'test-tenant',
+        updatedAt: expect.any(Date),
+      })
+      expect(mockRepository.save).not.toHaveBeenCalled()
     })
   })
 })

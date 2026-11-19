@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common'
+import type { Request } from 'express'
 import { JwtUserExtractor } from './jwt-user-extractor'
 
 describe('JwtUserExtractor', () => {
@@ -348,6 +349,56 @@ describe('JwtUserExtractor', () => {
         const result = JwtUserExtractor.extractUser(req)
         expect(result).toBe('jane.doe@example.com')
       })
+    })
+  })
+
+  describe('extractDisplayName', () => {
+    const reqWith = (headers: Record<string, string>) => ({ headers }) as unknown as Request
+    const withClaims = (claims: Record<string, unknown>) =>
+      reqWith({ authorization: `Bearer ${createJwt(claims)}` })
+
+    it.each([
+      [{ display_name: 'Falk, Barrett', name: 'Barrett Falk', email: 'b@x.ca' }, 'Falk, Barrett'],
+      [{ name: 'Barrett Falk', email: 'b@x.ca' }, 'Barrett Falk'],
+      [{ email: 'b@x.ca' }, 'b@x.ca'],
+      [{ preferred_username: 'guid@azureidir' }, null],
+    ])('reads %o as %s', (claims, expected) => {
+      expect(JwtUserExtractor.extractDisplayName(withClaims(claims))).toBe(expected)
+    })
+
+    it('returns null without a usable bearer token', () => {
+      expect(JwtUserExtractor.extractDisplayName(undefined)).toBeNull()
+      expect(JwtUserExtractor.extractDisplayName(reqWith({}))).toBeNull()
+      expect(
+        JwtUserExtractor.extractDisplayName(reqWith({ authorization: 'Bearer not-a-jwt' })),
+      ).toBeNull()
+    })
+  })
+
+  describe('extractFullName', () => {
+    const reqWith = (headers: Record<string, string>) => ({ headers }) as unknown as Request
+    const withClaims = (claims: Record<string, unknown>) =>
+      reqWith({ authorization: `Bearer ${createJwt(claims)}` })
+
+    it.each([
+      [
+        { given_name: 'Barrett', family_name: 'Falk', display_name: 'Falk, Barrett CITZ:EX' },
+        'Barrett Falk',
+      ],
+      [{ given_name: 'Barrett', display_name: 'Falk, Barrett CITZ:EX' }, 'Barrett'],
+      [{ family_name: 'Falk' }, 'Falk'],
+      [{ display_name: 'Falk, Barrett CITZ:EX' }, 'Falk, Barrett CITZ:EX'],
+      [{ preferred_username: 'guid@azureidir' }, null],
+    ])('reads %o as %s', (claims, expected) => {
+      expect(JwtUserExtractor.extractFullName(withClaims(claims))).toBe(expected)
+    })
+
+    it('returns null without a usable bearer token', () => {
+      expect(JwtUserExtractor.extractFullName(undefined)).toBeNull()
+      expect(JwtUserExtractor.extractFullName(reqWith({}))).toBeNull()
+      expect(
+        JwtUserExtractor.extractFullName(reqWith({ authorization: 'Bearer not-a-jwt' })),
+      ).toBeNull()
     })
   })
 })

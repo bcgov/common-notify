@@ -58,7 +58,7 @@ vi.mock('@/api/templates.api', async () => {
 
 // The preview and its modal have specs of their own; here they only need to show what they were
 // handed, and the modal to hand back a set of applied values.
-vi.mock('../components/EventEmailPreview', () => ({
+vi.mock('../components/EventsEmailPreview', () => ({
   default: ({
     envelope,
     rendered,
@@ -73,7 +73,7 @@ vi.mock('../components/EventEmailPreview', () => ({
   ),
 }))
 
-vi.mock('../components/EventEmailPreviewModal', () => ({
+vi.mock('../components/EventsTestSendPreviewModal', () => ({
   default: ({ isOpen, onApply }: { isOpen: boolean; onApply: (applied: unknown) => void }) =>
     isOpen ? (
       <button
@@ -605,6 +605,30 @@ describe('EventsEmailTestSend', () => {
 
       await waitFor(() => expect(showErrorToast).toHaveBeenCalled())
       expect(sendEventTestEmailMock).not.toHaveBeenCalled()
+    })
+
+    it('warns about an empty placeholder but still sends the row', async () => {
+      renderPage()
+      await chooseManyRecipients()
+      await upload('email,firstName\na@gov.bc.ca,')
+
+      expect(await screen.findByText('1 item requires attention.')).toBeInTheDocument()
+      expect(screen.queryByText('All required data passed validation.')).not.toBeInTheDocument()
+
+      await userEvent.click(sendButton(1))
+
+      await waitFor(() =>
+        expect(sendEventTestEmailMock).toHaveBeenCalledWith(
+          'event-1',
+          {},
+          {
+            mergeArray: [
+              ['to', 'firstName'],
+              ['a@gov.bc.ca', ''],
+            ],
+          },
+        ),
+      )
     })
 
     it('ignores problems on rows past the first five, which are never sent', async () => {

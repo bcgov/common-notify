@@ -21,6 +21,7 @@
     "@bcgov/design-system-react-components": "^0.8.1",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
+    "@internationalized/date": "3.12.4",
     "@microsoft/fetch-event-source": "^2.0.1",
     "@mui/icons-material": "^9.0.1",
     "@mui/material": "^9.0.0",
@@ -33,6 +34,7 @@
     "libphonenumber-js": "^1.13.11",
     "papaparse": "^5.7.0",
     "react": "^19.0.0",
+    "react-aria-components": "1.17.0",
     "react-bootstrap": "^2.10.9",
     "react-dom": "^19.0.0",
     "react-redux": "^9.2.0",
@@ -50,8 +52,8 @@
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^6.0.0",
-    "@vitest/coverage-v8": "^5.0.0",
-    "@vitest/ui": "^5.0.0",
+    "@vitest/coverage-v8": "^5.1.0",
+    "@vitest/ui": "^5.1.0",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.2.3",
@@ -65,16 +67,13 @@
     "typescript-eslint": "^8.46.2",
     "vite": "^8.0.0",
     "vite-tsconfig-paths": "^6.0.0",
-    "vitest": "^5.0.0"
+    "vitest": "^5.1.0"
   },
   "overrides": {
     "rollup@<4.22.4": "^4.22.4",
     "@types/react": "^19.0.10",
     "brace-expansion@1": "^1.1.12",
     "brace-expansion@5": "^5.0.8",
-    "esbuild": "^0.28.1",
-    "@vitest/mocker": {
-      "msw": "$msw"
-    }
+    "esbuild": "^0.28.1"
   }
 }

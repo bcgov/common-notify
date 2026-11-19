@@ -16,11 +16,18 @@ export interface FilterOption {
 
 export interface TableColumn<T> {
   key: keyof T & string
+  /**
+   * Identifies the column, for sorting and React keys, when more than one renders from the same
+   * `key`. Defaults to `key`.
+   */
+  id?: string
   label: string
   sortable?: boolean
   sortLabel?: string
   sortType?: 'text' | 'numeric' | 'date'
   filterOptions?: FilterOption[]
+  /** The field the column's filter applies to, when it isn't `key`. */
+  filterKey?: string
   width?: string
   render?: (value: unknown, row: T) => ReactNode
   className?: string
@@ -158,7 +165,7 @@ export function DataTable<T extends object>({
           const cell = col.render ? col.render(rawValue, row) : String(rawValue ?? '')
           return (
             <TableCell
-              key={col.key}
+              key={col.id ?? col.key}
               className={col.className}
               style={col.width ? { width: col.width } : undefined}
             >
@@ -201,18 +208,22 @@ export function DataTable<T extends object>({
           <TableRow>
             {columns.map((col) => (
               <TableHeaderCell
-                key={col.key}
+                key={col.id ?? col.key}
                 className={col.className}
                 style={col.width ? { width: col.width } : undefined}
                 sortable={col.sortable}
                 sortLabel={col.sortLabel}
                 sortType={col.sortType}
-                sortOrder={sortBy === col.key ? sortOrder : null}
-                onSort={col.sortable ? (order) => onSort?.(col.key, order) : undefined}
+                sortOrder={sortBy === (col.id ?? col.key) ? sortOrder : null}
+                onSort={col.sortable ? (order) => onSort?.(col.id ?? col.key, order) : undefined}
                 filterOptions={col.filterOptions}
                 filterTitle={`Filter by ${col.label}`}
-                activeFilterValues={activeFilters?.[col.key]}
-                onFilter={col.filterOptions ? (values) => onFilter?.(col.key, values) : undefined}
+                activeFilterValues={activeFilters?.[col.filterKey ?? col.key]}
+                onFilter={
+                  col.filterOptions
+                    ? (values) => onFilter?.(col.filterKey ?? col.key, values)
+                    : undefined
+                }
               >
                 {col.label}
               </TableHeaderCell>
