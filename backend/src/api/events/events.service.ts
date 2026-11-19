@@ -334,11 +334,7 @@ export class EventsService {
   }
 
   /** Read-only resolution for the UI: never creates or queues a notification. */
-  async previewGroupRecipients(
-    tenantId: string,
-    tenantExternalId: string,
-    groupIds: string[],
-  ) {
+  async previewGroupRecipients(tenantId: string, tenantExternalId: string, groupIds: string[]) {
     await this.assertMcpApiEnabled(tenantId)
     return { emails: await this.mcpGroups.getGroupMemberEmails(tenantExternalId, groupIds) }
   }
