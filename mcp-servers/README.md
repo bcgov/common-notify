@@ -81,7 +81,7 @@ the upstream body. Check token settings on 401; check CSTAR's four access condit
 IDs/environment on 404. These are troubleshooting starting points, not definitive diagnoses of each
 upstream status.
 
-After that check succeeds, enable the `cstar` registry entry, log into the matching DEV tenant, open
+After that check succeeds, log into the matching DEV tenant, open
 an event's email settings, select a real group and use **Preview group recipients**. Confirm the
 normalized recipient set with the CSTAR team. Do not send a notification merely to test lookup. Also
 verify that an unassociated tenant/foreign group is rejected and that the existing user-login
@@ -122,11 +122,8 @@ authentication, mapping it to the adapter's `MCP_API_KEY`. Leave that override u
 existing local shared key; if you change it, recreate the backend with the same setting as well. It
 is unrelated to the CSS client secret. Use separately provisioned secrets in OpenShift.
 
-After Flyway applies V84, enable the local destination once in the local database:
-
-```sql
-UPDATE notify.mcp_server SET enabled = TRUE WHERE name = 'cstar';
-```
+Flyway V85 enables the built-in CSTAR destination automatically for both new and existing
+databases. No manual registry activation is needed.
 
 Notify calls `http://cstar-mcp:3101/mcp`; host-side MCP clients use `http://localhost:3101/mcp` and
 must supply both headers. The existing event group picker/save/send flows now use this adapter.
@@ -144,7 +141,7 @@ docker build -t notify-cstar-mcp .
 V84 creates `notify.mcp_server` and `notify.mcp_tool`. Each call reloads the enabled URL, transport,
 credential reference, tool permission and parameter-name allowlist from these tables. There is no
 destination URL in event code. Secret values remain in environment variables/OpenShift Secrets. The
-seeded entry is disabled until operators provision the adapter. Existing event feature flags and
+seeded CSTAR entry is enabled automatically by V85. Existing event feature flags and
 tenant authorization still apply; the old `mcp_api` flag is no longer used.
 
 An administrator can manage servers/tools through **Admin > MCP Servers**, protected by the existing
@@ -182,7 +179,7 @@ containers and no API-server token. Test/prod value files set **two replicas**, 
 anti-affinity scoped to the release, and an enabled PDB keeps one available during voluntary
 disruption. These are deployment manifests, not evidence of live HA; coordinate quotas, placement,
 egress to CSTAR/SSO, secret rotation and image promotion with Nikhil. No deployment or team messages
-have been sent as part of this change. Enable the registry entry only after rollout.
+have been sent as part of this change. V85 enables the CSTAR registry entry during deployment.
 
 Like Notify's ClamAV deployment, all adapter resources and selectors are scoped to the Helm release.
 DEV/PR defaults to one replica, Recreate and no PDB. TEST/PROD uses two replicas, RollingUpdate and
