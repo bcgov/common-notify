@@ -43,6 +43,27 @@ export class UserResponseDto {
 }
 
 /**
+ * A single entry in the user directory list.
+ *
+ * Deliberately minimal: the list is readable by any authenticated user and is used only to
+ * resolve a record's created_by/updated_by id to a name for display. It must not leak
+ * contact details (email, username) or the full IDP identity of every Notify user across
+ * every tenant. See SEC-6 in docs/security-findings-jira.md.
+ */
+export class UserDirectoryEntryDto {
+  @ApiProperty({ description: 'Internal UUID for this user' })
+  id: string
+
+  @ApiProperty({
+    description: 'External ID from identity provider (matches created_by/updated_by)',
+  })
+  externalId: string
+
+  @ApiProperty({ description: 'Display name (full name) from identity provider' })
+  displayName: string
+}
+
+/**
  * Response when upserting a user
  */
 export class UpsertUserResponseDto {
