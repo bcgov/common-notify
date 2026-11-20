@@ -12,6 +12,7 @@ const testClients = {
   'LOCAL002-DEF456': 'LOCAL002-SECRET-DEF456XYZ789',
   'LOCAL003-GHI789': 'LOCAL003-SECRET-GHI789XYZ789',
   'sa-notify-service': 'notify-service-secret-12345678901234', // Service account for API key management
+  'sa-notify-cstar': 'notify-cstar-secret', // CSTAR service account (CSTAR_CLIENT_ID)
 }
 
 // JWT signing secrets (must match Kong JWT credentials created with 'secret' field)
@@ -20,6 +21,7 @@ const jwtSecrets = {
   'LOCAL002-DEF456': 'jwt-secret-local002',
   'LOCAL003-GHI789': 'jwt-secret-local003',
   'sa-notify-service': 'notify-service-secret-12345678901234', // Same as client secret for service account
+  'sa-notify-cstar': 'notify-cstar-secret',
 }
 
 // Issuer (should match API_GATEWAY_KEYCLOAK_ISSUER in backend)
@@ -234,6 +236,144 @@ app.get('/api/v1/tenants/:tenantId/ssousers/:ssoUserId/shared-service-roles', (r
   res.json({
     data: {
       sharedServiceRoles: roles,
+    },
+  })
+})
+
+// CSTAR tenant users, user search and group reads, for the NOTIFY_ADMIN CSTAR pages and the
+// service-account group lookups. In-memory, so additions and removals last until restart.
+const cstarTenantUsers = {
+  [TENANT_1_ID]: [
+    {
+      id: 'a1b2c3d4-0000-4000-8000-000000000001',
+      createdDateTime: '2026-01-01T00:00:00Z',
+      updatedDateTime: '2026-01-01T00:00:00Z',
+      ssoUser: {
+        ssoUserId: 'user-001',
+        firstName: 'Local',
+        lastName: 'Admin',
+        displayName: 'Admin, Local CITZ:EX',
+        userName: 'LADMIN',
+        email: 'local.admin@gov.bc.ca',
+        idpType: 'idir',
+      },
+      roles: [{ id: 'tenant-role-owner', name: 'TENANT_OWNER', description: 'Tenant owner' }],
+    },
+  ],
+}
+const cstarGroups = {
+  [TENANT_1_ID]: [
+    { id: '3a3fafee-d41b-4fbe-92df-62dbebf0f73a', name: 'Development Team', description: null },
+  ],
+}
+
+const findTenantUser = (tenantId, tenantUserId) =>
+  (cstarTenantUsers[tenantId] || []).find((user) => user.id === tenantUserId)
+
+app.get('/api/v1/tenants/:tenantId/users', (req, res) => {
+  res.json({ data: { users: cstarTenantUsers[req.params.tenantId] || [] } })
+})
+
+app.get('/api/v1/tenants/:tenantId/users/:tenantUserId', (req, res) => {
+  const user = findTenantUser(req.params.tenantId, req.params.tenantUserId)
+  if (!user) return res.status(404).json({ message: 'Tenant user not found' })
+  res.json({ data: { tenantUser: user } })
+})
+
+app.get('/api/v1/tenants/:tenantId/users/:tenantUserId/roles', (req, res) => {
+  const user = findTenantUser(req.params.tenantId, req.params.tenantUserId)
+  res.json({ data: { roles: user ? user.roles : [] } })
+})
+
+app.post('/api/v1/tenants/:tenantId/users', (req, res) => {
+  const { user } = req.body || {}
+  if (!user?.ssoUserId) return res.status(400).json({ message: 'user is required' })
+  if (req.body.roles || req.body.groups) {
+    return res
+      .status(400)
+      .json({ message: 'roles and groups are not allowed with a shared service token' })
+  }
+  const users = (cstarTenantUsers[req.params.tenantId] ||= [])
+  if (users.some((existing) => existing.ssoUser.ssoUserId === user.ssoUserId)) {
+    return res.status(409).json({ message: 'User is already a member of this tenant' })
+  }
+  const now = new Date().toISOString()
+  const tenantUser = {
+    id: crypto.randomUUID(),
+    createdDateTime: now,
+    updatedDateTime: now,
+    ssoUser: user,
+    roles: [{ id: 'tenant-role-service-user', name: 'SERVICE_USER', description: 'Service user' }],
+  }
+  users.push(tenantUser)
+  res.status(201).json({ data: { user: tenantUser } })
+})
+
+app.delete('/api/v1/tenants/:tenantId/users/:tenantUserId', (req, res) => {
+  const user = findTenantUser(req.params.tenantId, req.params.tenantUserId)
+  if (!user) return res.status(404).json({ message: 'Tenant user not found' })
+  if (user.roles.some((role) => role.name !== 'SERVICE_USER')) {
+    return res.status(403).json({ message: 'Only SERVICE_USER-only users can be removed' })
+  }
+  cstarTenantUsers[req.params.tenantId] = cstarTenantUsers[req.params.tenantId].filter(
+    (existing) => existing !== user,
+  )
+  res.status(204).end()
+})
+
+app.get('/api/v1/users/bcgovssousers/idir/search', (req, res) => {
+  if (!req.query.tenantId) return res.status(400).json({ message: 'tenantId is required' })
+  res.json({
+    data: [
+      {
+        firstName: 'Jordan',
+        lastName: 'Smith',
+        email: 'jordan.smith@gov.bc.ca',
+        username: 'a1b2c3d4e5f6478899aabbccddeeff00@idir',
+        attributes: {
+          idir_user_guid: ['A1B2C3D4E5F6478899AABBCCDDEEFF00'],
+          idir_username: ['JSMITH'],
+          display_name: ['Smith, Jordan CITZ:EX'],
+        },
+      },
+    ],
+  })
+})
+
+app.get('/api/v1/users/bcgovssousers/bceid/search', (req, res) => {
+  if (!req.query.tenantId) return res.status(400).json({ message: 'tenantId is required' })
+  res.json({
+    data: [
+      {
+        firstName: 'Casey',
+        lastName: 'Lee',
+        email: 'casey.lee@example.com',
+        username: 'b1c2d3e4f5a6478899aabbccddeeff00@bceidbusiness',
+        attributes: {
+          bceid_user_guid: ['B1C2D3E4F5A6478899AABBCCDDEEFF00'],
+          bceid_business_guid: ['C1D2E3F4A5B6478899AABBCCDDEEFF00'],
+          display_name: ['Casey Lee'],
+        },
+      },
+    ],
+  })
+})
+
+app.get('/api/v1/tenants/:tenantId/groups', (req, res) => {
+  res.json({ data: { groups: cstarGroups[req.params.tenantId] || [] } })
+})
+
+// CSTAR accepts only service account tokens here.
+app.get('/api/v1/tenants/:tenantId/groups/:groupId/users', (req, res) => {
+  res.json({
+    data: {
+      users: (cstarTenantUsers[req.params.tenantId] || []).map(({ ssoUser }) => ({
+        firstName: ssoUser.firstName,
+        lastName: ssoUser.lastName,
+        displayName: ssoUser.displayName,
+        email: ssoUser.email ?? null,
+        idpType: ssoUser.idpType,
+      })),
     },
   })
 })
@@ -511,6 +651,11 @@ app.listen(PORT, () => {
   console.log(
     `   GET  http://localhost:${PORT}/api/v1/tenants/:tenantId/ssousers/:ssoUserId/shared-service-roles`,
   )
+  console.log(`   GET|POST http://localhost:${PORT}/api/v1/tenants/:tenantId/users`)
+  console.log(`   GET|DELETE http://localhost:${PORT}/api/v1/tenants/:tenantId/users/:tenantUserId`)
+  console.log(`   GET  http://localhost:${PORT}/api/v1/tenants/:tenantId/users/:tenantUserId/roles`)
+  console.log(`   GET  http://localhost:${PORT}/api/v1/users/bcgovssousers/{idir,bceid}/search`)
+  console.log(`   GET  http://localhost:${PORT}/api/v1/tenants/:tenantId/groups[/:groupId/users]`)
   console.log('')
   console.log('APS Directory API Mock (Credential Issuer) — backed by Kong at ' + KONG_ADMIN_URL)
   console.log(`   GET  http://localhost:${PORT}/ds/api/v3/gateways/${GATEWAY_ID}/products`)
