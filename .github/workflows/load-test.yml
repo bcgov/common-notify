@@ -69,12 +69,12 @@ jobs:
           done
           echo "::error::Auto-bind failed after retries"; exit 1
 
-      - uses: grafana/setup-k6-action@43b9fc21641a76002687994433dd586f56e791b1 # v1.2.2
+      - uses: grafana/setup-k6-action@c47136d33d365efbeb9ae7266908b5dcf98cdece # v1.3.0
 
       # ── Queue-drain FIRST (empty baseline) ────────────────────────────────
       - name: Queue-drain burst (producer)
         continue-on-error: true
-        uses: grafana/run-k6-action@4082a08c7e40cf6d65863911077dfb60ae0a4f04 # v1.5.0
+        uses: grafana/run-k6-action@54385d2a25c222a08b4a3aec6b653b8fb370a1ed # v1.6.0
         env:
           BACKEND_URL: ${{ env.GATEWAY_URL }}
           API_KEY: ${{ secrets.LOAD_TEST_API_KEY }}
@@ -169,7 +169,7 @@ jobs:
       #    "Evaluate" step fails the job if any breached its thresholds) ──────
       - name: Ingress ramp
         continue-on-error: true
-        uses: grafana/run-k6-action@4082a08c7e40cf6d65863911077dfb60ae0a4f04 # v1.5.0
+        uses: grafana/run-k6-action@54385d2a25c222a08b4a3aec6b653b8fb370a1ed # v1.6.0
         env:
           BACKEND_URL: ${{ env.GATEWAY_URL }}
           API_KEY: ${{ secrets.LOAD_TEST_API_KEY }}
@@ -180,7 +180,7 @@ jobs:
 
       - name: Template-render ramp
         continue-on-error: true
-        uses: grafana/run-k6-action@4082a08c7e40cf6d65863911077dfb60ae0a4f04 # v1.5.0
+        uses: grafana/run-k6-action@54385d2a25c222a08b4a3aec6b653b8fb370a1ed # v1.6.0
         env:
           BACKEND_URL: ${{ env.GATEWAY_URL }}
           API_KEY: ${{ secrets.LOAD_TEST_API_KEY }}
@@ -192,7 +192,7 @@ jobs:
 
       - name: Attachment + ClamAV ramp
         continue-on-error: true
-        uses: grafana/run-k6-action@4082a08c7e40cf6d65863911077dfb60ae0a4f04 # v1.5.0
+        uses: grafana/run-k6-action@54385d2a25c222a08b4a3aec6b653b8fb370a1ed # v1.6.0
         env:
           BACKEND_URL: ${{ env.GATEWAY_URL }}
           API_KEY: ${{ secrets.LOAD_TEST_API_KEY }}
