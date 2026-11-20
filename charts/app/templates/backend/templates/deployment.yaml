@@ -258,10 +258,8 @@ spec:
                   name: app-api-secrets
                   key: NOTIFY_CLIENT_ID
             {{- if .Values.cstarMcp.enabled }}
-            - name: NODE_EXTRA_CA_CERTS
-              value: /run/secrets/mcp-ca/service-ca.crt
             - name: CSTAR_MCP_URL
-              value: "https://{{ .Release.Name }}-cstar-mcp.{{ .Release.Namespace }}.svc:3101/mcp"
+              value: "http://{{ .Release.Name }}-cstar-mcp:3101/mcp"
             - name: CSTAR_MCP_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -315,11 +313,6 @@ spec:
               cpu: 4
               memory: 8Gi
           volumeMounts:
-            {{- if .Values.cstarMcp.enabled }}
-            - name: mcp-ca
-              mountPath: /run/secrets/mcp-ca
-              readOnly: true
-            {{- end }}
             - name: email-logo-seed-assets
               mountPath: /app/email-logo-seed-assets
               readOnly: true
@@ -329,14 +322,6 @@ spec:
               mountPath: /run/secrets/aws-sms
               readOnly: true
       volumes:
-        {{- if .Values.cstarMcp.enabled }}
-        - name: mcp-ca
-          configMap:
-            name: {{ .Release.Name }}-cstar-mcp-ca
-            items:
-              - key: service-ca.crt
-                path: service-ca.crt
-        {{- end }}
         - name: email-logo-seed-assets
           emptyDir: {}
         # Optional so a namespace without it still starts; SMS sends then fail until it exists.

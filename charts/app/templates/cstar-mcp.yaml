@@ -63,14 +63,6 @@ spec:
             - secretRef:
                 name: {{ .Values.cstarMcp.secretName }}
           env:
-            - name: MCP_TLS_CERT_FILE
-              value: /run/secrets/mcp-tls/tls.crt
-            - name: MCP_TLS_KEY_FILE
-              value: /run/secrets/mcp-tls/tls.key
-            - name: MCP_TLS_CA_FILE
-              value: /run/secrets/mcp-ca/service-ca.crt
-            - name: MCP_TLS_SERVER_NAME
-              value: "{{ .Release.Name }}-cstar-mcp.{{ .Release.Namespace }}.svc"
             # Use the same CSTAR environment as Notify's backend. An explicit env
             # entry takes precedence over any stale URL in the adapter secret.
             - name: CSTAR_API_URL
@@ -78,50 +70,23 @@ spec:
                 secretKeyRef:
                   name: app-api-secrets
                   key: CSTAR_API_URL
-          volumeMounts:
-            - name: mcp-tls
-              mountPath: /run/secrets/mcp-tls
-              readOnly: true
-            - name: mcp-ca
-              mountPath: /run/secrets/mcp-ca
-              readOnly: true
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities: { drop: ["ALL"] }
           readinessProbe:
-            httpGet: { path: /health, port: http, scheme: HTTPS }
+            httpGet: { path: /health, port: http }
             initialDelaySeconds: 2
           livenessProbe:
-            httpGet: { path: /health, port: http, scheme: HTTPS }
+            httpGet: { path: /health, port: http }
             initialDelaySeconds: 10
           resources:
             requests: { cpu: 25m, memory: 64Mi }
             limits: { cpu: 250m, memory: 256Mi }
-      volumes:
-        - name: mcp-tls
-          secret:
-            secretName: {{ .Release.Name }}-cstar-mcp-tls
-        - name: mcp-ca
-          configMap:
-            name: {{ .Release.Name }}-cstar-mcp-ca
-            items:
-              - key: service-ca.crt
-                path: service-ca.crt
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ .Release.Name }}-cstar-mcp-ca
-  namespace: {{ .Release.Namespace }}
-  annotations:
-    service.beta.openshift.io/inject-cabundle: "true"
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    service.beta.openshift.io/serving-cert-secret-name: {{ .Release.Name }}-cstar-mcp-tls
   name: {{ .Release.Name }}-cstar-mcp
   namespace: {{ .Release.Namespace }}
   labels:
