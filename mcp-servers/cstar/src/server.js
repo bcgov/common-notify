@@ -1,7 +1,4 @@
 import express from 'express'
-import { createServer as createHttpsServer } from 'node:https'
-import { createServer as createHttpServer } from 'node:http'
-import { readFileSync } from 'node:fs'
 import { timingSafeEqual } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
@@ -79,26 +76,8 @@ export function createApp(config = process.env, cstar = new CstarClient(config))
   return app
 }
 
-export function createListener(config = process.env, cstar) {
-  const app = createApp(config, cstar)
-  const { MCP_TLS_CERT_FILE, MCP_TLS_KEY_FILE } = config
-  if (MCP_TLS_CERT_FILE || MCP_TLS_KEY_FILE) {
-    if (!MCP_TLS_CERT_FILE || !MCP_TLS_KEY_FILE)
-      throw new Error('Both MCP TLS certificate and key are required')
-    return createHttpsServer(
-      {
-        cert: readFileSync(MCP_TLS_CERT_FILE),
-        key: readFileSync(MCP_TLS_KEY_FILE),
-        minVersion: 'TLSv1.2',
-      },
-      app,
-    )
-  }
-  return createHttpServer(app)
-}
-
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const listener = createListener().listen(Number(process.env.PORT ?? 3101), '0.0.0.0')
+  const listener = createApp().listen(Number(process.env.PORT ?? 3101), '0.0.0.0')
   const shutdown = () => {
     listener.close(() => process.exit(0))
     setTimeout(() => process.exit(1), 25000).unref()

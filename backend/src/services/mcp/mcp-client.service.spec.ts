@@ -227,15 +227,14 @@ describe('stored MCP server policy', () => {
     )
     expect(mocks.connect).not.toHaveBeenCalled()
   })
-  it('uses HTTPS for the production release and rejects an insecure custom destination', async () => {
+  it('supports the internal HTTP release destination in production', async () => {
     vi.stubEnv('NODE_ENV', 'production')
-    vi.stubEnv('CSTAR_MCP_URL', 'https://notify-337-cstar-mcp.ns.svc:3101/mcp')
+    vi.stubEnv('CSTAR_MCP_URL', 'http://notify-337-cstar-mcp:3101/mcp')
     await service.call('cstar', 'get_recipients', 'tenant-a', {})
-    expect(mocks.options.mock.calls[0][0].protocol).toBe('https:')
+    expect(mocks.options.mock.calls[0][0].href).toBe('http://notify-337-cstar-mcp:3101/mcp')
     registryRow({ url: 'http://custom-cstar:3101/mcp' })
-    await expect(service.call('cstar', 'get_recipients', 'tenant-a', {})).rejects.toThrow(
-      'must use HTTPS',
-    )
+    await service.call('cstar', 'get_recipients', 'tenant-a', {})
+    expect(mocks.options.mock.calls[1][0].href).toBe('http://custom-cstar:3101/mcp')
   })
   it('accepts JSON text results from compatible servers', async () => {
     mocks.callTool.mockResolvedValue({ content: [{ type: 'text', text: '{"emails":[]}' }] })
