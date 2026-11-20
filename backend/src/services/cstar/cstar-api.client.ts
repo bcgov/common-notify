@@ -72,7 +72,6 @@ export class CstarApiClient {
   private readonly tokenUrl: string
   private readonly clientId: string
   private readonly clientSecret: string
-  private readonly scope?: string
   private accessToken: string | null = null
   private tokenExpiresAt = 0
 
@@ -84,7 +83,6 @@ export class CstarApiClient {
     this.tokenUrl = this.configService.get<string>('cstar.tokenUrl') || ''
     this.clientId = this.configService.get<string>('cstar.clientId') || ''
     this.clientSecret = this.configService.get<string>('cstar.clientSecret') || ''
-    this.scope = this.configService.get<string>('cstar.scope') || undefined
   }
 
   private validatePathSegment(value: string, fieldName: string): string {
@@ -808,9 +806,6 @@ export class CstarApiClient {
       client_id: this.clientId,
       client_secret: this.clientSecret,
     })
-    if (this.scope) {
-      form.set('scope', this.scope)
-    }
 
     try {
       const response = await fetch(this.tokenUrl, {

@@ -572,13 +572,6 @@ describe('CstarApiClient service account', () => {
     expect(cstarCalls()[2][1].headers.Authorization).toBe('Bearer sa-token-2')
   })
 
-  it('sends the scope when one is configured', async () => {
-    route({ data: { groups: [] } })
-
-    await buildClient({ 'cstar.scope': 'cstar' }).getTenantGroupsAsServiceAccount(TENANT)
-    expect(new URLSearchParams(fetchMock.mock.calls[0][1].body).get('scope')).toBe('cstar')
-  })
-
   it('is unavailable when the service account is not configured', async () => {
     await expect(
       buildClient({ 'cstar.clientSecret': undefined }).getTenantGroupsAsServiceAccount(TENANT),
