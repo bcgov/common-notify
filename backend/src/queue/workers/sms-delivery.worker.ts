@@ -23,6 +23,9 @@ import { NotificationStatus } from '../../enum/notification-status.enum'
 import { ISmsTransport, SMS_ADAPTER, SmsRecipientResult } from '../../adapters'
 import { StructuredLoggerService } from '../../common/logger'
 import { PhoneNumberService } from '../../api/notify/services/phone-number.service'
+import { SmsNumbersService } from '../../api/sms-numbers/sms-numbers.service'
+import { TenantSettingsService } from '../../api/tenant-settings/tenant-settings.service'
+import { withSmsSenderName } from '../../common/utils/sms-sender-name'
 
 type SmsPayload = DeliveryJobPayload['payload']
 
@@ -66,13 +69,32 @@ export class SmsDeliveryWorker extends DeliveryWorker {
     mergeBatches: MergeBatchRunner,
     failures: DeliveryFailureHandler,
     @Optional() structuredLogger?: StructuredLoggerService,
+    @Optional() private readonly smsNumbersService?: SmsNumbersService,
+    @Optional() private readonly tenantSettingsService?: TenantSettingsService,
   ) {
     super(mergeBatches, failures, structuredLogger)
   }
 
+  /**
+   * Who a tenant's SMS is from. `from` is its number for the provider this transport sends
+   * through, else that provider's default; undefined leaves the transport its
+   * DEFAULT_SMS_FROM_NUMBER. `senderName` starts each body, when the tenant includes its name.
+   */
+  private async resolveSender(
+    tenantId: string,
+  ): Promise<{ from: string | undefined; senderName: string | null }> {
+    const [from, senderName] = await Promise.all([
+      this.smsNumbersService?.getFromNumber(tenantId, this.smsAdapter.name),
+      this.tenantSettingsService?.getSmsSenderName(tenantId),
+    ])
+    return { from: from ?? undefined, senderName: senderName ?? null }
+  }
+
   /** Render each merge recipient's body from their own params and send it. */
   protected mergeSender(job: Job<DeliveryJobPayload>): MergeSender {
-    const { notifyId } = job.data
+    const { notifyId, tenantId } = job.data
+    // Looked up once per batch rather than once per recipient.
+    let sender: ReturnType<SmsDeliveryWorker['resolveSender']> | undefined
     return {
       channel: SMS_CHANNEL,
       hasInlineContent: (content) => !!content?.body,
@@ -82,9 +104,15 @@ export class SmsDeliveryWorker extends DeliveryWorker {
               allowEmptyValues: true,
             })
           : await this.inlineRenderingService.renderSms(inline, params)
+        sender ??= this.resolveSender(tenantId)
+        const { from, senderName } = await sender
         const result = await this.sendSms(
-          { recipients: { to: [recipient.address] }, content: { body } },
+          {
+            recipients: { to: [recipient.address] },
+            content: { body: withSmsSenderName(body, senderName) },
+          },
           notifyId,
+          from,
         )
         return result.externalId
       },
@@ -135,7 +163,18 @@ export class SmsDeliveryWorker extends DeliveryWorker {
       resolved = { ...resolved, recipients: { ...resolved.recipients, to: remaining } }
     }
 
-    const result = await this.sendSms(resolved, notifyId)
+    const { from, senderName } = await this.resolveSender(tenantId)
+    const result = await this.sendSms(
+      {
+        ...resolved,
+        content: {
+          ...resolved.content,
+          body: withSmsSenderName(resolved.content?.body, senderName),
+        },
+      },
+      notifyId,
+      from,
+    )
     this.logger.debug(`[${notifyId}] SMS sent: ${result.providerResponse ?? ''}`)
 
     const finalStatus = await this.recordOutcome(notifyId, result)
@@ -287,11 +326,20 @@ export class SmsDeliveryWorker extends DeliveryWorker {
     return NotificationStatus.PARTIALLY_COMPLETED
   }
 
-  private async sendSms(payload: any, notifyId: string): Promise<SmsSendResult> {
+  private async sendSms(
+    payload: any,
+    notifyId: string,
+    from: string | undefined,
+  ): Promise<SmsSendResult> {
     this.logger.debug(`[${notifyId}] Sending SMS via ${this.smsAdapter.name} adapter`)
 
     // Tagged with our id so a provider delivery report can be matched back to this notification.
-    const result = await this.smsAdapter.send({ ...(payload as object), tag: notifyId } as any)
+    // No `from` leaves the transport to send from its default number.
+    const result = await this.smsAdapter.send({
+      ...(payload as object),
+      ...(from && { from }),
+      tag: notifyId,
+    } as any)
 
     return {
       externalId:

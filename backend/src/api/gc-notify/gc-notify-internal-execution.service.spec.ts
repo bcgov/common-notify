@@ -38,6 +38,7 @@ describe('GcNotifyInternalExecutionService', () => {
     update: ReturnType<typeof vi.fn>
     findOne: ReturnType<typeof vi.fn>
     findAll: ReturnType<typeof vi.fn>
+    findInternationalSmsError: ReturnType<typeof vi.fn>
   }
   let mockNotificationRequestDetailService: {
     createPending: ReturnType<typeof vi.fn>
@@ -81,6 +82,7 @@ describe('GcNotifyInternalExecutionService', () => {
       update: vi.fn(),
       findOne: vi.fn(),
       findAll: vi.fn(),
+      findInternationalSmsError: vi.fn().mockResolvedValue(null),
     }
     mockNotificationRequestDetailService = { createPending: vi.fn(), updateStatus: vi.fn() }
     mockConfigurationRepository = { findOne: vi.fn().mockResolvedValue(null) }
@@ -1137,6 +1139,39 @@ describe('GcNotifyInternalExecutionService', () => {
       await expect(service.sendSms(body, TENANT_ID)).rejects.toMatchObject({
         response: { errors: [{ error: 'ValidationError', message: 'Template not found' }] },
       })
+    })
+
+    it('rejects an international number the tenant may not send to, before accepting it', async () => {
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'tpl-2',
+        version: 1,
+        channelCode: NotificationChannel.SMS,
+      })
+      mockTemplatesService.renderTemplateContent.mockResolvedValue({
+        body: 'Your code is 123456',
+        bodyType: 'text',
+      })
+      mockNotificationService.findInternationalSmsError.mockResolvedValue(
+        'SMS cannot be sent to international number(s): +12065550123.',
+      )
+
+      await expect(
+        service.sendSms({ ...body, phone_number: '+12065550123' }, TENANT_ID),
+      ).rejects.toMatchObject({
+        response: {
+          errors: [
+            {
+              error: 'ValidationError',
+              message: 'SMS cannot be sent to international number(s): +12065550123.',
+            },
+          ],
+        },
+      })
+      expect(mockNotificationService.findInternationalSmsError).toHaveBeenCalledWith(TENANT_ID, [
+        '+12065550123',
+      ])
+      expect(mockNotificationService.create).not.toHaveBeenCalled()
+      expect(mockIngestionQueue.add).not.toHaveBeenCalled()
     })
 
     it('renders the template and returns a GC Notify-shaped SMS response', async () => {

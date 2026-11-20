@@ -14,7 +14,6 @@ import type { Relation } from 'typeorm'
 import { NotifyEvent } from './event.entity'
 import { EventChannelRecipient } from './event-channel-recipient.entity'
 import { EventChannelCstarGroup } from './event-channel-cstar-group.entity'
-import { ProvisionedPhoneNumber } from './provisioned-phone-number.entity'
 import { Template } from '../../templates/entities/template.entity'
 import { NotificationChannelCode } from '../../notification/entities/notification-channel-code.entity'
 
@@ -22,9 +21,9 @@ import { NotificationChannelCode } from '../../notification/entities/notificatio
  * Event channel setting
  *
  * One row per (event, channel), backing the Email settings and SMS settings tabs.
- * Channel-specific columns are constrained in the database so EMAIL rows carry
- * sender_email and SMS rows carry from_phone_number_id. Recipients are rows in
- * EventChannelRecipient.
+ * Channel-specific columns are constrained in the database so only EMAIL rows carry
+ * sender_email and header values; SMS sends from the tenant's SMS number, so its rows carry
+ * no sender. Recipients are rows in EventChannelRecipient.
  */
 @Entity('event_channel_setting')
 @Index('idx_event_channel_setting_event', ['eventId'])
@@ -69,16 +68,6 @@ export class EventChannelSetting {
    */
   @Column({ name: 'sender_email', type: 'varchar', length: 320, nullable: true })
   senderEmail: string | null
-
-  /**
-   * Provisioned number used as the from number for SMS sends. NULL on EMAIL rows.
-   */
-  @Column({ name: 'from_phone_number_id', type: 'uuid', nullable: true })
-  fromPhoneNumberId: string | null
-
-  @ManyToOne(() => ProvisionedPhoneNumber)
-  @JoinColumn({ name: 'from_phone_number_id' })
-  fromPhoneNumber: ProvisionedPhoneNumber | null
 
   /**
    * Manually entered recipients for this channel. EMAIL rows can carry TO/CC/BCC; SMS rows are

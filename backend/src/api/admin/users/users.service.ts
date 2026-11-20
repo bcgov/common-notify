@@ -3,7 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { NotifyUser } from './entities/notify-user.entity'
 import { UpsertUserDto } from './schemas/upsert-user.dto'
-import { UserResponseDto, UpsertUserResponseDto } from './schemas/user-response.dto'
+import {
+  UserResponseDto,
+  UpsertUserResponseDto,
+  UserDirectoryEntryDto,
+} from './schemas/user-response.dto'
 
 /**
  * UsersService
@@ -115,11 +119,16 @@ export class UsersService {
   }
 
   /**
-   * Get all non-deleted users
+   * Get all non-deleted users as a minimal directory for name lookups.
    *
-   * @returns Array of UserResponseDto
+   * Returns only id, externalId and displayName — never contact details. This list is
+   * readable by any authenticated user and spans all tenants, so it exposes only what is
+   * needed to turn a record's created_by/updated_by id into a display name. See SEC-6 in
+   * docs/security-findings-jira.md. (Tenant-scoping the list is tracked separately — SEC-6b.)
+   *
+   * @returns Array of UserDirectoryEntryDto
    */
-  async findAll(): Promise<UserResponseDto[]> {
+  async findAll(): Promise<UserDirectoryEntryDto[]> {
     const users = await this.userRepository.find({
       where: {
         isDeleted: false,
@@ -129,7 +138,11 @@ export class UsersService {
       },
     })
 
-    return users.map((user) => this.mapToResponseDto(user))
+    return users.map((user) => ({
+      id: user.id,
+      externalId: user.externalId,
+      displayName: user.displayName,
+    }))
   }
 
   /**

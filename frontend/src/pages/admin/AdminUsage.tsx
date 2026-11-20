@@ -26,6 +26,7 @@ import EditModal from '@/components/EditModal'
 import NumberInputField from '@/components/NumberInputField'
 import { showSuccessToast, showErrorToast } from '@/redux/utils/toastUtils'
 import TenantSendingCell from './TenantSendingCell'
+import TenantSmsCell from './TenantSmsCell'
 import TenantSendingDialog from './TenantSendingDialog'
 import {
   adoptionSummaryText,
@@ -214,6 +215,11 @@ const AdminUsage: FC = () => {
       render: (_, tenant) => <TenantSendingCell {...tenant} />,
     },
     {
+      key: 'smsFromNumber',
+      label: 'SMS',
+      render: (_, tenant) => <TenantSmsCell {...tenant} />,
+    },
+    {
       key: 'channels',
       label: 'Channel',
       filterKey: 'channel',
@@ -316,23 +322,6 @@ const AdminUsage: FC = () => {
               thresholdPercent={row.warnThresholdPercent}
             />
           )}
-        />
-      ),
-    },
-    {
-      key: 'channels',
-      id: 'threshold',
-      label: 'Alert threshold',
-      render: (_, tenant) => (
-        <ChannelValues
-          rows={tenant.channels}
-          render={(row) =>
-            row.warnThresholdPercent === null ? (
-              <span className="text-muted">Not set</span>
-            ) : (
-              `${row.warnThresholdPercent}%`
-            )
-          }
         />
       ),
     },

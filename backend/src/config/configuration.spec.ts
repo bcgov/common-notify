@@ -77,3 +77,26 @@ describe('configuration redis.sentinels', () => {
     ])
   })
 })
+
+describe('configuration smsNumbers.defaultNumberAssignable', () => {
+  const original = process.env.NAMESPACE
+
+  afterEach(() => {
+    if (original === undefined) delete process.env.NAMESPACE
+    else process.env.NAMESPACE = original
+  })
+
+  it.each([
+    ['f6bc3f-dev', true],
+    ['f6bc3f-test', true],
+    ['f6bc3f-prod', false],
+  ])('in %s is %s', (namespace, expected) => {
+    process.env.NAMESPACE = namespace
+    expect(configuration().smsNumbers.defaultNumberAssignable).toBe(expected)
+  })
+
+  it('is true running locally, with no namespace', () => {
+    delete process.env.NAMESPACE
+    expect(configuration().smsNumbers.defaultNumberAssignable).toBe(true)
+  })
+})
