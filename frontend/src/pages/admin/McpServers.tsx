@@ -14,7 +14,7 @@ const blank: McpServer = {
   url: '',
   protocol: 'streamable-http',
   credentialEnv: '',
-  enabled: false,
+  enabled: true,
   tools: [],
 }
 function message(error: unknown): string {
@@ -56,6 +56,7 @@ export default function McpServers() {
     try {
       await saveMcpServer({
         ...editing,
+        enabled: true,
         tools: editing.tools.map((tool, index) => ({
           ...tool,
           permittedParameters: (parameterInputs[index] ?? '')
@@ -78,6 +79,7 @@ export default function McpServers() {
     <div className="page mcp-servers">
       <PageHeading title="MCP Servers" />
       <p>Manage the servers Notify uses to look up recipients. Changes apply to all tenants.</p>
+      <p>Enable or disable the MCP feature in Feature Flags.</p>
       <p>
         Login, tenant selection and event permissions continue to use CSTAR. This registry controls
         group and email lookups.
@@ -105,7 +107,6 @@ export default function McpServers() {
           <tr>
             <th scope="col">Server</th>
             <th scope="col">Destination</th>
-            <th scope="col">Status</th>
             <th scope="col">Tools</th>
             <th scope="col">Actions</th>
           </tr>
@@ -115,7 +116,6 @@ export default function McpServers() {
             <tr key={server.name}>
               <th scope="row">{server.name}</th>
               <td>{server.url}</td>
-              <td>{server.enabled ? 'Enabled' : 'Disabled'}</td>
               <td>
                 {server.tools
                   .filter((tool) => tool.enabled)
@@ -180,15 +180,6 @@ export default function McpServers() {
             Enter a reference such as CSTAR_MCP_API_KEY. Secret values are managed outside this
             screen.
           </p>
-          <label>
-            <input
-              type="checkbox"
-              checked={editing.enabled}
-              disabled={busy}
-              onChange={(event) => setEditing({ ...editing, enabled: event.target.checked })}
-            />{' '}
-            Server enabled
-          </label>
           <h3>Permitted tools</h3>
           {editing.tools.map((tool, index) => (
             <fieldset key={index}>

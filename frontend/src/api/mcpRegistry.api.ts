@@ -18,9 +18,3 @@ const base = '/api/v1/frontend/admin/mcp-servers'
 export const listMcpServers = () => get<McpServer[]>(generateApiParameters(base))
 export const saveMcpServer = ({ name, ...input }: McpServer) =>
   post({ ...generateApiParameters(`${base}/${encodeURIComponent(name)}`), data: input })
-
-export const previewGroupRecipients = (groupIds: string[]) =>
-  post<{ emails: string[] }>({
-    ...generateApiParameters('/api/v1/frontend/events/cstar-group-recipients'),
-    data: { groupIds },
-  })

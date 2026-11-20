@@ -41,25 +41,6 @@ describe('EventsService', () => {
     )
   })
 
-  it('refuses the recipient preview when the mcp_api flag is off for the tenant', async () => {
-    mockFeatureFlagService.getFlagsForTenant.mockResolvedValueOnce({ mcp_api: false })
-    await expect(
-      service.previewGroupRecipients('tenant-1', 'external-tenant', ['group-a']),
-    ).rejects.toThrow('The MCP API is not enabled for this tenant')
-    expect(mockMcpGroupsService.getGroupMemberEmails).not.toHaveBeenCalled()
-  })
-
-  it('previews recipients once the mcp_api flag is on', async () => {
-    mockFeatureFlagService.getFlagsForTenant.mockResolvedValueOnce({ mcp_api: true })
-    mockMcpGroupsService.getGroupMemberEmails.mockResolvedValueOnce(['alex@example.invalid'])
-    await expect(
-      service.previewGroupRecipients('tenant-1', 'external-tenant', ['group-a']),
-    ).resolves.toEqual({ emails: ['alex@example.invalid'] })
-    expect(mockMcpGroupsService.getGroupMemberEmails).toHaveBeenCalledWith('external-tenant', [
-      'group-a',
-    ])
-  })
-
   const tenantId = 'tenant-uuid-1'
   const eventId = 'event-uuid-1'
   const logoId = 'logo-uuid-1'

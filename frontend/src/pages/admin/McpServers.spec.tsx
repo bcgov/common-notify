@@ -30,14 +30,14 @@ describe('MCP server administration', () => {
     ])
     vi.mocked(saveMcpServer).mockResolvedValue({ name: 'cstar' })
   })
-  it('lets an administrator enable a server without entering secret values', async () => {
+  it('saves server configuration without a separate feature enable switch', async () => {
     const user = userEvent.setup()
     render(<McpServers />)
     await user.click(await screen.findByRole('button', { name: 'Edit cstar' }))
     expect(screen.getByLabelText(/Credential environment variable/)).toHaveValue(
       'CSTAR_MCP_API_KEY',
     )
-    await user.click(screen.getByLabelText('Server enabled'))
+    expect(screen.queryByLabelText('Server enabled')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Save server' }))
     await waitFor(() =>
       expect(saveMcpServer).toHaveBeenCalledWith(

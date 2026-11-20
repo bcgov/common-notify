@@ -229,7 +229,7 @@ describe('Sidebar', () => {
 
     it('groups the admin pages under Monitor and Manage', async () => {
       const user = userEvent.setup()
-      renderSidebar()
+      renderSidebar(mockUser, ['NOTIFY_VIEWER'], { mcp_api: true })
       await user.click(screen.getByRole('button', { name: 'Admin' }))
 
       const linksIn = (group: string) =>
@@ -248,6 +248,13 @@ describe('Sidebar', () => {
         ['MCP Servers', '/admin/mcp-servers'],
       ])
       expect(screen.queryByRole('list', { name: 'Report' })).not.toBeInTheDocument()
+    })
+
+    it('hides MCP administration when its feature flag is off', async () => {
+      renderSidebar(mockUser, ['NOTIFY_VIEWER'], { mcp_api: false })
+      await userEvent.click(screen.getByRole('button', { name: 'Admin' }))
+      expect(screen.queryByRole('link', { name: 'MCP Servers' })).not.toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Feature Flags' })).toBeInTheDocument()
     })
 
     it('starts closed away from the admin pages, and reports its state', async () => {

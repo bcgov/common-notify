@@ -2,7 +2,6 @@ import { useState } from 'react'
 import type { FC } from 'react'
 import { Checkbox, Select } from '@bcgov/design-system-react-components'
 import type { CstarGroup } from '@/api/cstar.api'
-import GroupRecipientsPreview from './GroupRecipientsPreview'
 
 export type CstarGroupFieldId = 'to' | 'cc' | 'bcc'
 /** Selected CSTAR group IDs per recipient field. */
@@ -143,7 +142,6 @@ const EventsEmailCstarGroups: FC<EventsEmailCstarGroupsProps> = ({
           )
         })}
       </div>
-      <GroupRecipientsPreview groupIds={Object.values(exportSelections(fields)).flat()} />
     </fieldset>
   )
 }

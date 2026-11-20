@@ -81,10 +81,10 @@ the upstream body. Check token settings on 401; check CSTAR's four access condit
 IDs/environment on 404. These are troubleshooting starting points, not definitive diagnoses of each
 upstream status.
 
-After that check succeeds, log into the matching DEV tenant, open an event's email settings, select
-a real group and use **Preview group recipients**. Confirm the normalized recipient set with the
-CSTAR team. Do not send a notification merely to test lookup. Also verify that an unassociated
-tenant/foreign group is rejected and that the existing user-login tenant/role flows still work.
+After that check succeeds, log into the matching tenant and confirm the event group picker loads the
+expected groups. Use the read-only adapter verification above to check membership; the demo
+recipient-preview UI has been removed. Also verify that an unassociated tenant/foreign group is
+rejected and that the existing user-login tenant/role flows still work.
 
 Deployment prerequisites: the adapter image must be published, the chart enabled, and the Secret
 referenced by `cstarMcp.secretName` must exist in the release namespace. The PR and merge workflows
@@ -141,13 +141,13 @@ V84 creates `notify.mcp_server` and `notify.mcp_tool`. Each call reloads the ena
 credential reference, tool permission and parameter-name allowlist from these tables. There is no
 destination URL in event code. Secret values remain in environment variables/OpenShift Secrets. The
 seeded CSTAR entry is enabled automatically by V85. Existing event feature flags and tenant
-authorization still apply; the old `mcp_api` flag is no longer used.
+authorization still apply; the `mcp_api` feature flag controls MCP administration.
 
-An administrator can manage servers/tools through **Admin > MCP Servers**, protected by the existing
-`NOTIFY_ADMIN` SSO role, and use the exported `McpClientService.call()` without another protocol
-client. Only Streamable HTTP with bearer credentials is implemented; other transports/auth schemes
-require explicit support. Registry editing grants outbound network access and must remain restricted
-to trusted operators/super admins.
+An administrator can manage servers/tools through **Admin > MCP Servers**, protected by the
+`mcp_api` feature flag and existing `NOTIFY_ADMIN` SSO role, and use the exported
+`McpClientService.call()` without another protocol client. Only Streamable HTTP with bearer
+credentials is implemented; other transports/auth schemes require explicit support. Registry editing
+grants outbound network access and must remain restricted to trusted operators/super admins.
 
 When CSTAR offers a compatible MCP server, update the `cstar` row's URL and credential reference.
 Its tool names, argument/result shapes and tenant-context authentication must match this contract
@@ -177,15 +177,16 @@ selected by `app-api-secrets.CSTAR_API_URL`. The previous CSTAR client forwarded
 not establish a stored service-account credential mapping. Confirm the existing service-account
 Secret/key before copying or remapping credentials. Do not commit secret values.
 
-`cstarMcp.enabled` is true in DEV/PR, TEST and PROD. The image defaults to the release
-registry/repository/tag supplied by the existing deployer; `cstarMcp.image` is an optional
-full-image override. Secrets must exist in each target namespace before deployment. The service is
-internal (`<release>-cstar-mcp:3101`), with readiness and liveness probes, rolling updates, non-root
-containers and no API-server token. Test/prod value files set **two replicas**, preferred pod
-anti-affinity scoped to the release, and an enabled PDB keeps one available during voluntary
-disruption. These are deployment manifests, not evidence of live HA; coordinate quotas, placement,
-egress to CSTAR/SSO, secret rotation and image promotion with Nikhil. No deployment or team messages
-have been sent as part of this change. V85 enables the CSTAR registry entry during deployment.
+`cstarMcp.enabled` is true in DEV/PR and TEST; PROD remains off pending a follow-up rollout. The
+image defaults to the release registry/repository/tag supplied by the existing deployer;
+`cstarMcp.image` is an optional full-image override. Secrets must exist in each target namespace
+before deployment. The service is internal (`<release>-cstar-mcp:3101`), with readiness and liveness
+probes, rolling updates, non-root containers and no API-server token. Test/prod value files set
+**two replicas**, preferred pod anti-affinity scoped to the release, and an enabled PDB keeps one
+available during voluntary disruption. These are deployment manifests, not evidence of live HA;
+coordinate quotas, placement, egress to CSTAR/SSO, secret rotation and image promotion with Nikhil.
+No deployment or team messages have been sent as part of this change. V85 enables the CSTAR registry
+entry during deployment.
 
 Like Notify's ClamAV deployment, all adapter resources and selectors are scoped to the Helm release.
 DEV/PR defaults to one replica, Recreate and no PDB. TEST/PROD uses two replicas, RollingUpdate and

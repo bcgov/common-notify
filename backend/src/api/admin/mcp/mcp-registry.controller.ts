@@ -5,11 +5,15 @@ import { NotifyAdminGuard } from '../../../common/guards/notify-admin.guard'
 import { Roles } from '../../../common/decorators/roles.decorator'
 import { SsoRole } from '../../../enum/sso-role.enum'
 import { McpRegistryService } from './mcp-registry.service'
+import { FeatureFlagGuard } from '../../../common/guards/feature-flag.guard'
+import { FeatureFlag } from '../../../common/decorators/feature-flag.decorator'
+import { FeatureFlagCode } from '../../../enum/feature-flag-code.enum'
 import { SaveMcpServerDto } from './mcp-registry.dto'
 
 @ApiExcludeController()
 @Controller({ path: 'frontend/admin/mcp-servers', version: '1' })
-@UseGuards(NotifyAdminGuard)
+@UseGuards(NotifyAdminGuard, FeatureFlagGuard)
+@FeatureFlag(FeatureFlagCode.MCP_API)
 @Roles(SsoRole.NOTIFY_ADMIN)
 export class McpRegistryController {
   constructor(private readonly registry: McpRegistryService) {}

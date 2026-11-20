@@ -42,7 +42,6 @@ import { EventListQueryDto } from './schemas/event-list-query.dto'
 import { PaginatedEventResponse } from './schemas/paginated-event-response'
 import { parseListQuery } from '../../common/query/list-query.parser'
 import { CstarGroupListResponseDto } from './schemas/cstar-group-response.dto'
-import { PreviewGroupRecipientsDto } from './schemas/preview-group-recipients.dto'
 
 /** The channels an event can be configured for, and so the only values its filter accepts. */
 const EVENT_CHANNEL_CODES = new Set([NotificationChannel.EMAIL, NotificationChannel.SMS])
@@ -148,19 +147,6 @@ export class EventsFrontendController {
     return this.eventsService.listCstarGroups({
       tenantId: tenant.externalId,
     })
-  }
-
-  @Version('1')
-  @Post('cstar-group-recipients')
-  @HttpCode(200)
-  @Roles(
-    CstarRoleEnum.NOTIFY_VIEWER,
-    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
-    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
-  )
-  previewGroupRecipients(@Req() req: express.Request, @Body() input: PreviewGroupRecipientsDto) {
-    const tenant = this.getTenant(req)
-    return this.eventsService.previewGroupRecipients(tenant.id, tenant.externalId, input.groupIds)
   }
 
   /**

@@ -6,6 +6,8 @@ import { plainToInstance } from 'class-transformer'
 import { McpRegistryService } from './mcp-registry.service'
 import { McpRegistryController } from './mcp-registry.controller'
 import { SaveMcpServerDto } from './mcp-registry.dto'
+import { FeatureFlagGuard } from '../../../common/guards/feature-flag.guard'
+import { FEATURE_FLAG_KEY } from '../../../common/decorators/feature-flag.decorator'
 import { NotifyAdminGuard } from '../../../common/guards/notify-admin.guard'
 import { ROLES_KEY } from '../../../common/decorators/roles.decorator'
 import { SsoRole } from '../../../enum/sso-role.enum'
@@ -32,6 +34,8 @@ describe('MCP registry administration', () => {
 
   it('requires the existing admin guard and SSO admin role on all registry endpoints', () => {
     expect(Reflect.getMetadata(GUARDS_METADATA, McpRegistryController)).toContain(NotifyAdminGuard)
+    expect(Reflect.getMetadata(GUARDS_METADATA, McpRegistryController)).toContain(FeatureFlagGuard)
+    expect(Reflect.getMetadata(FEATURE_FLAG_KEY, McpRegistryController)).toBe('mcp_api')
     expect(Reflect.getMetadata(ROLES_KEY, McpRegistryController)).toEqual([SsoRole.NOTIFY_ADMIN])
   })
   it('saves server and tool permissions atomically using only a credential reference', async () => {

@@ -2,7 +2,6 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import EventsEmailCstarGroups from './EventsEmailCstarGroups'
 import type { CstarGroupSelections } from './EventsEmailCstarGroups'
-vi.mock('./GroupRecipientsPreview', () => ({ default: () => null }))
 import type { CstarGroup } from '@/api/cstar.api'
 
 vi.mock('@bcgov/design-system-react-components', () => ({
