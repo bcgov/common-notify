@@ -1,0 +1,31 @@
+@import '../variables';
+
+.sms-number-request {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+}
+
+.sms-number-request__sender {
+  margin: 0;
+}
+
+.sms-number-request__sender-label {
+  color: $text-secondary;
+}
+
+.sms-number-request__sender-kind {
+  color: $text-secondary;
+}
+
+.sms-number-request__note {
+  margin: 0;
+  font-size: $font-size-sm;
+  color: $text-secondary;
+}
+
+.sms-number-request__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-sm;
+}

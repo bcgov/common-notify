@@ -48,7 +48,7 @@ export default function EventsSmsTab({
 }: EventsSmsTabProps) {
   const senderError = senderPhoneNumber
     ? ''
-    : 'A sender number must be assigned to your tenant before SMS can be activated.'
+    : 'No SMS number is set up to send from. Contact a Notify administrator before activating SMS.'
   const [channelActive, setChannelActive] = useState(values.active)
   const [to, setTo] = useState(values.to)
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>(

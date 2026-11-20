@@ -118,7 +118,11 @@ spec:
             - name: DELIVERY_EMAIL_ADAPTER
               value: {{ .Values.backend.delivery.emailAdapter | default "ches" | quote }}
             - name: DELIVERY_SMS_ADAPTER
-              value: {{ .Values.backend.delivery.smsAdapter | default "acs" | quote }}
+              value: {{ .Values.backend.delivery.smsAdapter | default "aws" | quote }}
+            - name: AWS_REGION
+              value: {{ .Values.backend.awsSms.region | quote }}
+            - name: AWS_SMS_CREDENTIALS_DIR
+              value: /run/secrets/aws-sms
             - name: REDIS_HOST
               value: {{ .Values.global.config.redisHost | default (printf "%s-redis-master" .Release.Name) }}
             - name: REDIS_PORT
@@ -303,9 +307,19 @@ spec:
             - name: email-logo-seed-assets
               mountPath: /app/email-logo-seed-assets
               readOnly: true
+            # Mounted whole, never with subPath: a subPath mount does not see the Secret change,
+            # and the key in it rotates every two days.
+            - name: aws-sms-credentials
+              mountPath: /run/secrets/aws-sms
+              readOnly: true
       volumes:
         - name: email-logo-seed-assets
           emptyDir: {}
+        # Optional so a namespace without it still starts; SMS sends then fail until it exists.
+        - name: aws-sms-credentials
+          secret:
+            secretName: {{ .Values.backend.awsSms.credentialsSecret | quote }}
+            optional: true
       {{- with .Values.backend.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

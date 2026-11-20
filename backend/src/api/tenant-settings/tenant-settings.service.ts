@@ -55,6 +55,23 @@ export class TenantSettingsService {
     )
   }
 
+  /**
+   * The name this tenant's SMS starts with, or null when its "Include tenant name in SMS" setting
+   * is off. On when the tenant has no settings row yet, matching the column's default.
+   */
+  async getSmsSenderName(tenantId: string): Promise<string | null> {
+    const rows: Array<{ name: string; include: boolean }> =
+      await this.tenantSettingsRepository.query(
+        `SELECT t.name, COALESCE(ts.include_tenant_name_in_sms, TRUE) AS include
+         FROM notify.tenant t
+         LEFT JOIN notify.tenant_settings ts ON ts.tenant_id = t.id AND NOT ts.is_deleted
+        WHERE t.id = $1`,
+        [tenantId],
+      )
+    const row = rows[0]
+    return row?.include ? row.name.trim() || null : null
+  }
+
   async upsert(
     tenantId: string,
     dto: UpdateTenantSettingsDto,
