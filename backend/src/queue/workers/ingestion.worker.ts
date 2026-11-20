@@ -227,7 +227,8 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
     )
 
     let batchIndex = 0
-    // In order, one batch at a time: each batch's rows are written before its job is queued.
+    // In order, one batch at a time: each batch's rows are written before its job is queued, and
+    // a large merge would otherwise hit the database with every batch at once (hence NOSONAR).
     for (let start = 0; start < recipients.length; start += batchSize, batchIndex++) {
       const chunk = recipients.slice(start, start + batchSize)
       // {notification_request id}-{channel}-{index}, reused as the delivery jobId so a failed
@@ -236,8 +237,8 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
 
       // A retried ingestion job re-runs this loop. Rows already written for a batch mean an
       // earlier run created it; writing them again would send those recipients twice.
-      if ((await this.requestDetailService.countBatch(notifyId, batchId)) === 0) {
-        await this.requestDetailService.createMergePending(
+      if ((await /* NOSONAR */ this.requestDetailService.countBatch(notifyId, batchId)) === 0) {
+        await /* NOSONAR */ this.requestDetailService.createMergePending(
           notifyId,
           batchId,
           chunk,
@@ -258,7 +259,7 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
         // Recipients stay in Postgres; the worker reads this batch's detail rows.
         mailMergeData: { content, params },
       }
-      await queue.add(queue.name, deliveryPayload, {
+      await /* NOSONAR */ queue.add(queue.name, deliveryPayload, {
         jobId: batchId,
         ...DELIVERY_JOB_OPTIONS,
         priority,
