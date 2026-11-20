@@ -10,7 +10,7 @@ import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import type { EntityManager } from 'typeorm'
-import { ProvisionedPhoneNumber } from './entities/provisioned-phone-number.entity'
+import { SmsNumbersService } from '../sms-numbers/sms-numbers.service'
 import { NotifyEvent } from './entities/event.entity'
 import { EventChannelSetting } from './entities/event-channel-setting.entity'
 import { EventChannelRecipient } from './entities/event-channel-recipient.entity'
@@ -124,8 +124,7 @@ export class EventsService {
     private readonly templatesRepository: TemplatesRepository,
     private readonly configService: ConfigService,
     private readonly cstarApiClient: CstarApiClient,
-    @InjectRepository(ProvisionedPhoneNumber)
-    private readonly provisionedPhoneNumberRepository: Repository<ProvisionedPhoneNumber>,
+    private readonly smsNumbersService: SmsNumbersService,
     private readonly featureFlagService: FeatureFlagService,
     private readonly tenantSettingsService: TenantSettingsService,
   ) {}
@@ -205,8 +204,10 @@ export class EventsService {
   async getEvent(tenantId: string, eventId: string): Promise<EventResponseDto> {
     const event = await this.findEvent(tenantId, eventId)
     if (!(await this.isSmsEnabled(tenantId))) return this.toResponseDto(event)
-    const number = await this.findTenantPhoneNumber(tenantId)
-    return { ...this.toResponseDto(event), senderPhoneNumber: number?.phoneNumber ?? null }
+    return {
+      ...this.toResponseDto(event),
+      senderPhoneNumber: await this.smsNumbersService.resolveSenderNumber(tenantId),
+    }
   }
 
   private async isSmsEnabled(tenantId: string): Promise<boolean> {
@@ -240,12 +241,6 @@ export class EventsService {
         `SMS cannot be sent to international number(s): ${international.join(', ')}. ${INTERNATIONAL_SMS_HINT}`,
       )
     }
-  }
-
-  private findTenantPhoneNumber(tenantId: string) {
-    return this.provisionedPhoneNumberRepository.findOne({
-      where: { tenantId, isDeleted: false },
-    })
   }
 
   /**
@@ -456,8 +451,8 @@ export class EventsService {
    * the tab's active toggle is local until the settings are applied, so `active` arrives here
    * alongside the data it depends on.
    *
-   * The sender is resolved from the tenant's live provisioned number; the caller cannot
-   * select another tenant's number or supply a sender ID.
+   * No sender is stored: a send uses the tenant's SMS number for the active provider (see
+   * SmsNumbersService), so the caller cannot select another tenant's number or supply one.
    *
    * @param tenantId The tenant ID
    * @param eventId The event ID
@@ -487,17 +482,12 @@ export class EventsService {
     )
 
     const setting = this.findOrCreateSmsSetting(event, userId)
-    const number = await this.findTenantPhoneNumber(tenantId)
-    setting.fromPhoneNumberId = number?.id ?? null
     // Mirrors chk_event_channel_setting_active_complete, checked against the incoming `active`
     // rather than the stored one: switching the channel on requires the settings being saved
     // with it to be complete. An inactive channel can be saved half-filled.
-    if (
-      updateDto.active &&
-      (!this.hasToRecipient(recipients) || !templateId || !setting.fromPhoneNumberId)
-    ) {
+    if (updateDto.active && (!this.hasToRecipient(recipients) || !templateId)) {
       throw new BadRequestException(
-        'The SMS channel cannot be activated until a sender phone number, at least one recipient, and a template are set',
+        'The SMS channel cannot be activated until at least one recipient and a template are set',
       )
     }
 

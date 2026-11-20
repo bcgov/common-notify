@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { toast } from 'react-toastify'
 import type { ToastOptions } from 'react-toastify'
 
@@ -15,7 +16,7 @@ const BASE_OPTIONS: ToastOptions = {
   draggable: true,
 }
 
-function body(message: string, description?: string) {
+function body(message: string, description?: ReactNode) {
   if (!description) {
     return <span className="toast__title">{message}</span>
   }
@@ -29,21 +30,33 @@ function body(message: string, description?: string) {
 }
 
 /** Show a success toast notification */
-export const showSuccessToast = (message: string, description?: string, options?: ToastOptions) => {
+export const showSuccessToast = (
+  message: string,
+  description?: ReactNode,
+  options?: ToastOptions,
+) => {
   toast.success(body(message, description), { ...BASE_OPTIONS, ...options })
 }
 
 /** Show an error toast notification */
-export const showErrorToast = (message: string, description?: string, options?: ToastOptions) => {
+export const showErrorToast = (
+  message: string,
+  description?: ReactNode,
+  options?: ToastOptions,
+) => {
   toast.error(body(message, description), { ...BASE_OPTIONS, ...options })
 }
 
 /** Show an info toast notification */
-export const showInfoToast = (message: string, description?: string, options?: ToastOptions) => {
+export const showInfoToast = (message: string, description?: ReactNode, options?: ToastOptions) => {
   toast.info(body(message, description), { ...BASE_OPTIONS, ...options })
 }
 
 /** Show a warning toast notification */
-export const showWarningToast = (message: string, description?: string, options?: ToastOptions) => {
+export const showWarningToast = (
+  message: string,
+  description?: ReactNode,
+  options?: ToastOptions,
+) => {
   toast.warning(body(message, description), { ...BASE_OPTIONS, ...options })
 }

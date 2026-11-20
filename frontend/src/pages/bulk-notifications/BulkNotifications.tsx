@@ -14,8 +14,9 @@ import {
   sendBulkNotifications,
   BulkNotificationsValidationError,
 } from '@/api/bulkNotifications.api'
-import { useAppSelector } from '@/redux/hooks'
-import { showErrorToast, showInfoToast, showSuccessToast } from '@/redux/utils/toastUtils'
+import { useAppDispatch, useAppSelector } from '@/redux/hooks'
+import { fetchSettings } from '@/redux/thunks/settings.thunks'
+import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import PageHeading from '@/components/PageHeading'
 import FileUpload from '@/components/FileUpload'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
@@ -32,8 +33,7 @@ import {
 import BulkNotificationsPreviewModal from './sections/BulkNotificationsPreviewModal'
 import CsvIssuesTable from './sections/CsvIssuesTable'
 import TemplatePreview from './sections/TemplatePreview'
-import SendResultPanel from './sections/SendResultPanel'
-import type { SendResult } from './sections/SendResultPanel'
+import { showSendResultToast } from './sections/sendResultToast'
 import '@/scss/components/bulk-notifications.scss'
 
 /** Channels the screen offers. SMS is offered but not selectable - see the radio group below. */
@@ -45,6 +45,12 @@ const BulkNotifications: FC = () => {
   // frontend notifysimple endpoint. `canEdit` is exactly that pair.
   const { canEdit: canSend } = useCstarRoles()
   const smsEnabled = useFeatureFlag('sms_notifications', selectedTenant?.id)
+  const dispatch = useAppDispatch()
+  const internationalSmsFlag = useFeatureFlag('international_sms', selectedTenant?.id)
+  const internationalSmsEnabled = useAppSelector(
+    (state) => state.smsSettings?.internationalSmsEnabled,
+  )
+  const internationalSmsAllowed = internationalSmsFlag && internationalSmsEnabled === true
 
   const [channel, setChannel] = useState<Channel | null>(null)
   const [templates, setTemplates] = useState<TemplateResponse[]>([])
@@ -54,14 +60,20 @@ const BulkNotifications: FC = () => {
   const [submitAttempted, setSubmitAttempted] = useState(false)
   const [isPreviewOpen, setPreviewOpen] = useState(false)
   const [isSending, setSending] = useState(false)
-  const [result, setResult] = useState<SendResult | null>(null)
 
   const placeholders = templateDetail?.placeholders?.paths ?? []
   const unsupported = templateDetail?.placeholders?.unsupported ?? []
 
   // Email until a channel is chosen; nothing downstream is reachable before that.
-  const csv = useCsvUpload(placeholders, channel ?? 'email')
+  const csv = useCsvUpload(placeholders, channel ?? 'email', internationalSmsAllowed)
   const { reset: resetCsv } = csv
+
+  // The tenant's International SMS setting, for the file checks above. Loaded per tenant, the same
+  // way EditEvent does for the event SMS tab.
+  useEffect(() => {
+    if (!selectedTenant) return
+    dispatch(fetchSettings())
+  }, [dispatch, selectedTenant])
 
   // Fetched here rather than read from the templates slice: that slice holds the Templates page's
   // paginated, filtered query, and reusing it would mean rewriting its filters on every visit.
@@ -128,7 +140,6 @@ const BulkNotifications: FC = () => {
   const clearUpload = useCallback(() => {
     resetCsv()
     setSubmitAttempted(false)
-    setResult(null)
   }, [resetCsv])
 
   // A different tenant means different templates, so nothing from the previous one still applies.
@@ -173,7 +184,6 @@ const BulkNotifications: FC = () => {
   }
 
   const handleFileChange = async (nextFile: File | null) => {
-    setResult(null)
     setSubmitAttempted(false)
     await csv.handleFileChange(nextFile)
   }
@@ -192,18 +202,12 @@ const BulkNotifications: FC = () => {
         toMergeArray(csv.parsed, channel ?? 'email'),
         channel ?? 'email',
       )
-      setResult({
+      showSendResultToast({
         notifyId: response.notifyId,
         recipientCount: response.recipientCount ?? rowCount,
-        blockedRecipientCount: response.blockedRecipientCount,
         blockedMessage: response.blockedMessage,
         duplicate: response.duplicate,
       })
-      if (response.duplicate) {
-        showInfoToast('Already sent. Nothing new was sent.')
-      } else {
-        showSuccessToast('Notifications queued.')
-      }
       csv.reset()
     } catch (error) {
       if (error instanceof BulkNotificationsValidationError) {
@@ -310,7 +314,7 @@ const BulkNotifications: FC = () => {
           {channel === 'sms' && (
             <p className="bulk-notifications__hint">
               Use digits with optional spaces, hyphens, periods, or parentheses, for example{' '}
-              +1-778-123-1234. Canadian numbers may omit +1. Letters and extensions are not
+              +1-250-555-0100. Canadian numbers may omit +1. Letters and extensions are not
               supported.
             </p>
           )}
@@ -326,8 +330,6 @@ const BulkNotifications: FC = () => {
           )}
         </>
       )}
-
-      {result && <SendResultPanel result={result} />}
 
       <div className="bulk-notifications__actions">
         <Button

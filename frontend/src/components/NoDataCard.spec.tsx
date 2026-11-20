@@ -39,6 +39,23 @@ describe('NoDataCard', () => {
     expect(navigateMock).toHaveBeenCalledWith({ to: '/template-create' })
   })
 
+  it('runs an in-page action instead of navigating', () => {
+    const onAction = vi.fn()
+    render(
+      <NoDataCard
+        title="No SMS numbers yet."
+        message="Add one."
+        actionLabel="Add number"
+        onAction={onAction}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add number' }))
+
+    expect(onAction).toHaveBeenCalled()
+    expect(navigateMock).not.toHaveBeenCalled()
+  })
+
   it('renders without an action when none is given', () => {
     render(<NoDataCard title="No changes recorded yet." message="Nothing to show." />)
 

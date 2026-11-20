@@ -73,6 +73,20 @@ export class AdminTenantUsageRowDto {
   disabledBy: string | null
 
   @ApiProperty({
+    description: 'Whether the sms_notifications feature flag lets the tenant send SMS',
+  })
+  smsEnabled: boolean
+
+  @ApiProperty({
+    description:
+      "The number the tenant's SMS is sent from through the active provider. Null when it sends from the service-wide default.",
+    example: '+15551234567',
+    nullable: true,
+    type: String,
+  })
+  smsFromNumber: string | null
+
+  @ApiProperty({
     description: 'API rate limit per minute. Null when the tenant has no limit on this channel.',
     example: 1000,
     nullable: true,

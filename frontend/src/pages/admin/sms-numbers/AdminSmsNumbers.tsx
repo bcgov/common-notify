@@ -1,0 +1,245 @@
+import { useCallback, useEffect, useState } from 'react'
+import type { FC } from 'react'
+import { Button } from '@bcgov/design-system-react-components'
+import PageHeading from '@/components/PageHeading'
+import NoDataCard from '@/components/NoDataCard'
+import DataTable from '@/components/DataTable/DataTable'
+import type { TableColumn } from '@/components/DataTable/DataTable'
+import RowActionsMenu from '@/components/RowActionsMenu'
+import type { RowActionGroup } from '@/components/RowActionsMenu'
+import { getSmsNumberCodes, getSmsNumbers } from '@/api/smsNumbers.api'
+import type { SmsNumber, SmsNumberCodes } from '@/api/smsNumbers.api'
+import { useAppDispatch, useAppSelector } from '@/redux/hooks'
+import { fetchNotifyTenantOptions } from '@/redux/thunks/adminTenants.thunks'
+import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
+import SmsNumberDialogs from './SmsNumberDialogs'
+import SmsDefaultNumbersSummary from './SmsDefaultNumbersSummary'
+import SmsDefaultTag from './SmsDefaultTag'
+import type { SmsNumberAction, SmsNumberDialog } from './smsNumberDialog'
+import { codeLabel } from './smsNumberLabels'
+import '@/scss/components/admin-sms-numbers.scss'
+
+const NUMBERS_PAGE_SIZES = [15, 30]
+
+/**
+ * The inventory of SMS numbers, each provider's default, and the tenants assigned each number.
+ * Tenants' requests for a number are decided on the Tenant Requests page. NOTIFY_ADMIN only,
+ * through routes/admin/route.tsx.
+ */
+const AdminSmsNumbers: FC = () => {
+  const dispatch = useAppDispatch()
+  const tenants = useAppSelector((state) => state.adminTenants.notifyOptions)
+  const [numbers, setNumbers] = useState<SmsNumber[]>([])
+  const [numbersPage, setNumbersPage] = useState(1)
+  const [numbersLimit, setNumbersLimit] = useState(NUMBERS_PAGE_SIZES[0])
+  const [codes, setCodes] = useState<SmsNumberCodes | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [dialog, setDialog] = useState<SmsNumberDialog | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [nextNumbers, nextCodes] = await Promise.all([getSmsNumbers(), getSmsNumberCodes()])
+      setNumbers(nextNumbers)
+      setCodes(nextCodes)
+      setError(null)
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Failed to load SMS numbers')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+    dispatch(fetchNotifyTenantOptions())
+  }, [load, dispatch])
+
+  const close = () => setDialog(null)
+  const providers = codes?.providers ?? []
+
+  async function runConfirmed(action: () => Promise<void>, success: string) {
+    setBusy(true)
+    try {
+      await action()
+      showSuccessToast(success)
+      close()
+      await load()
+    } catch (actionError) {
+      showErrorToast(actionError instanceof Error ? actionError.message : 'Something went wrong')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function numberActionGroups(number: SmsNumber): RowActionGroup[] {
+    const groups: RowActionGroup[] = [
+      {
+        id: 'manage',
+        actions: [
+          { id: 'edit', label: 'Edit' },
+          { id: 'assign', label: 'Assign to a tenant' },
+          number.isDefault
+            ? { id: 'clearDefault', label: 'Stop using as the default' }
+            : { id: 'makeDefault', label: 'Make the default' },
+        ],
+      },
+    ]
+    if (number.tenants.length > 0) {
+      groups.push({
+        id: 'unassign',
+        actions: number.tenants.map((tenant) => ({
+          id: `unassign:${tenant.tenantId}`,
+          label: `Unassign from ${tenant.tenantName}`,
+        })),
+      })
+    }
+    groups.push({ id: 'remove', actions: [{ id: 'remove', label: 'Remove' }] })
+    return groups
+  }
+
+  function handleNumberAction(number: SmsNumber, actionId: string) {
+    if (actionId.startsWith('unassign:')) {
+      const tenant = number.tenants.find((t) => `unassign:${t.tenantId}` === actionId)
+      if (tenant) setDialog({ kind: 'unassign', number, tenant })
+      return
+    }
+    setDialog({ kind: actionId as SmsNumberAction, number })
+  }
+
+  const numberColumns: TableColumn<SmsNumber>[] = [
+    {
+      key: 'phoneNumber',
+      label: 'Number',
+      render: (_, number) => (
+        <div className="admin-sms-numbers__number-cell">
+          <span className="fw-semibold admin-sms-numbers__number">{number.phoneNumber}</span>
+          {number.isDefault && <SmsDefaultTag />}
+        </div>
+      ),
+    },
+    {
+      key: 'numberTypeCode',
+      label: 'Type',
+      render: (_, number) => codeLabel(codes?.numberTypes ?? [], number.numberTypeCode),
+    },
+    {
+      key: 'providerCode',
+      label: 'Provider',
+      render: (_, number) => codeLabel(providers, number.providerCode),
+    },
+    {
+      key: 'tenants',
+      label: 'Tenants',
+      render: (_, number) =>
+        number.tenants.length === 0 ? (
+          <span className="admin-sms-numbers__detail">Not assigned</span>
+        ) : (
+          <ul className="admin-sms-numbers__tenants">
+            {number.tenants.map((tenant) => (
+              <li key={tenant.tenantId}>{tenant.tenantName}</li>
+            ))}
+          </ul>
+        ),
+    },
+    {
+      key: 'description',
+      label: 'Description',
+      render: (_, number) => number.description ?? '',
+    },
+    {
+      key: 'id',
+      label: 'Actions',
+      render: (_, number) => (
+        <RowActionsMenu
+          label={`Actions for ${number.phoneNumber}`}
+          groups={numberActionGroups(number)}
+          onAction={(actionId) => handleNumberAction(number, actionId)}
+        />
+      ),
+    },
+  ]
+
+  // The inventory is small and the dialogs need all of it, so it is paged here, not by the API.
+  const numbersOnPage = numbers.slice((numbersPage - 1) * numbersLimit, numbersPage * numbersLimit)
+
+  /** A card until there is a number, then the defaults and the table. */
+  function renderNumbers() {
+    if (!loading && !error && numbers.length === 0) {
+      return (
+        <NoDataCard
+          title="No SMS numbers yet."
+          message="Add the numbers Notify sends SMS from, then assign them to tenants or make one a provider's default."
+          actionLabel="Add number"
+          onAction={() => setDialog({ kind: 'add' })}
+          isActionDisabled={!codes}
+        />
+      )
+    }
+    return (
+      <>
+        {codes && (
+          <SmsDefaultNumbersSummary
+            codes={codes}
+            numbers={numbers}
+            onChange={(providerCode) => setDialog({ kind: 'chooseDefault', providerCode })}
+          />
+        )}
+        <div className="page__toolbar">
+          <Button
+            variant="primary"
+            size="small"
+            isDisabled={!codes}
+            onPress={() => setDialog({ kind: 'add' })}
+          >
+            Add number
+          </Button>
+        </div>
+        <DataTable
+          columns={numberColumns}
+          data={numbersOnPage}
+          keyExtractor={(number) => number.id}
+          multiline
+          isLoading={loading}
+          emptyMessage="No SMS numbers yet."
+          currentPage={numbersPage}
+          pageSize={numbersLimit}
+          totalCount={numbers.length}
+          onPageChange={setNumbersPage}
+          onPageSizeChange={(size) => {
+            setNumbersLimit(size)
+            setNumbersPage(1)
+          }}
+          pageSizeOptions={NUMBERS_PAGE_SIZES}
+          label="SMS numbers"
+        />
+      </>
+    )
+  }
+
+  return (
+    <div className="page">
+      <PageHeading title="SMS Numbers" />
+      {error && <div role="alert">{error}</div>}
+
+      {renderNumbers()}
+
+      {dialog && (
+        <SmsNumberDialogs
+          dialog={dialog}
+          codes={codes}
+          numbers={numbers}
+          tenants={tenants}
+          busy={busy}
+          onClose={close}
+          onSaved={load}
+          onConfirm={runConfirmed}
+        />
+      )}
+    </div>
+  )
+}
+
+export default AdminSmsNumbers

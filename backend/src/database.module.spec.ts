@@ -36,6 +36,25 @@ describe('entity column declarations', () => {
   })
 })
 
+describe('entity registration', () => {
+  // The DataSource lists its entities by hand. One missing compiles, starts, and passes every
+  // unit test, then fails its first query with "No metadata for <Entity> was found".
+  it('registers every @Entity class with the DataSource', () => {
+    const moduleSource = readFileSync(join(__dirname, 'database.module.ts'), 'utf8')
+    const listed = /entities:\s*\[([^\]]*)\]/.exec(moduleSource)?.[1] ?? ''
+    const registered = new Set(listed.split(',').map((name) => name.trim()))
+
+    const declared = collectEntityFiles(join(__dirname)).flatMap((file) =>
+      [...readFileSync(file, 'utf8').matchAll(/@Entity\([^)]*\)\s*export class (\w+)/g)].map(
+        (match) => match[1],
+      ),
+    )
+
+    expect(declared.length).toBeGreaterThan(20)
+    expect(declared.filter((name) => !registered.has(name))).toEqual([])
+  })
+})
+
 function collectEntityFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
     const full = join(dir, entry)
