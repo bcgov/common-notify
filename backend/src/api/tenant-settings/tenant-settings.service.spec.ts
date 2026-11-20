@@ -32,6 +32,7 @@ describe('TenantSettingsService', () => {
   }
 
   const mockRepository = {
+    query: vi.fn(),
     findOne: vi.fn(),
     create: vi.fn(),
     save: vi.fn(),
@@ -120,6 +121,23 @@ describe('TenantSettingsService', () => {
       mockRepository.findOne.mockResolvedValue(null)
 
       await expect(service.getSenderAddress('tenant-uuid-1')).resolves.toBeNull()
+    })
+  })
+
+  describe('getSmsSenderName', () => {
+    it.each([
+      ['the setting is on', [{ name: 'Parks Booking', include: true }], 'Parks Booking'],
+      ['the setting is off', [{ name: 'Parks Booking', include: false }], null],
+      ['the tenant does not exist', [], null],
+      ['the name is blank', [{ name: '  ', include: true }], null],
+    ])('when %s', async (_, rows, expected) => {
+      mockRepository.query.mockResolvedValue(rows)
+
+      await expect(service.getSmsSenderName('tenant-uuid-1')).resolves.toBe(expected)
+      expect(mockRepository.query).toHaveBeenCalledWith(
+        expect.stringContaining('COALESCE(ts.include_tenant_name_in_sms, TRUE)'),
+        ['tenant-uuid-1'],
+      )
     })
   })
 

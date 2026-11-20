@@ -59,6 +59,10 @@ export interface AdminTenantUsageRow {
   disabledReason: string | null
   disabledAt: string | null
   disabledBy: string | null
+  /** Whether the sms_notifications feature flag lets the tenant send SMS. */
+  smsEnabled: boolean
+  /** The number the tenant's SMS is sent from; null when it uses the service-wide default. */
+  smsFromNumber: string | null
   /** ISO time of the tenant's last send on this channel, from any source; null if never. */
   lastSentAt: string | null
   /** Recipients per month over the last 12 full months; null with no full month yet. */

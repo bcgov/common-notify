@@ -9,14 +9,27 @@ interface NoDataCardAction {
   actionLabel: string
   /** Route of the page that creates the first item, e.g. '/template-create'. */
   actionTo: LinkProps['to']
+  onAction?: never
   isActionDisabled?: boolean
 }
 
-/** The action is optional, but a label without a route (or the reverse) is not allowed. */
+/** An action that stays on the page, e.g. opening an "Add" dialog or clearing a filter. */
+interface NoDataCardPressAction {
+  actionLabel: string
+  onAction: () => void
+  actionTo?: never
+  isActionDisabled?: boolean
+}
+
+/** The action is optional, but a label without a route or handler (or the reverse) is not allowed. */
 type NoDataCardProps = {
   title: string
   message: string
-} & (NoDataCardAction | { actionLabel?: never; actionTo?: never; isActionDisabled?: never })
+} & (
+  | NoDataCardAction
+  | NoDataCardPressAction
+  | { actionLabel?: never; actionTo?: never; onAction?: never; isActionDisabled?: never }
+)
 
 // Its own component so useNavigate only runs when there is somewhere to go: a card without an
 // action can render outside a router, e.g. in a modal.
@@ -45,6 +58,7 @@ const NoDataCard: FC<NoDataCardProps> = ({
   message,
   actionLabel,
   actionTo,
+  onAction,
   isActionDisabled,
 }) => (
   <div className="no-data-card">
@@ -59,6 +73,11 @@ const NoDataCard: FC<NoDataCardProps> = ({
         actionTo={actionTo}
         isActionDisabled={isActionDisabled}
       />
+    )}
+    {actionLabel && onAction && (
+      <Button variant="link" size="small" isDisabled={isActionDisabled} onPress={onAction}>
+        {actionLabel}
+      </Button>
     )}
   </div>
 )

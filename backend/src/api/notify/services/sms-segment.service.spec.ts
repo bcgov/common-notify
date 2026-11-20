@@ -4,6 +4,7 @@ import { TemplatesService } from '../../templates/templates.service'
 import { InlineRenderingService } from '../../../services/rendering/inline-rendering.service'
 import { SmsSegmentService } from './sms-segment.service'
 import type { NotifySimpleRequest } from '../schemas/notify-simple-request'
+import type { TenantSettingsService } from '../../tenant-settings/tenant-settings.service'
 
 describe('SmsSegmentService.countSegmentsPerRecipient', () => {
   const templatesRepository = { findById: vi.fn() }
@@ -158,5 +159,44 @@ describe('SmsSegmentService.countMergeSegments', () => {
 
     expect(await service.countMergeSegments('tenant-1', merge, [{}, {}, {}])).toBe(3)
     expect(templatesService.renderTemplateContent).not.toHaveBeenCalled()
+  })
+})
+
+describe('SmsSegmentService with the tenant name', () => {
+  const tenantSettings = { getSmsSenderName: vi.fn() }
+  const service = new SmsSegmentService(
+    { findById: vi.fn() } as unknown as TemplatesRepository,
+    { renderTemplateContent: vi.fn() } as unknown as TemplatesService,
+    { renderSms: vi.fn() } as unknown as InlineRenderingService,
+    tenantSettings as unknown as TenantSettingsService,
+  )
+  // 150 characters is one segment on its own; "Parks Booking: " makes it two.
+  const body = 'a'.repeat(150)
+  const literal = {
+    sms: { recipients: { to: ['+15551234567'] }, content: { body } },
+  } as unknown as NotifySimpleRequest
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('bills the name the tenant starts its SMS with, as it is sent', async () => {
+    tenantSettings.getSmsSenderName.mockResolvedValue('Parks Booking')
+
+    expect(await service.countSegmentsPerRecipient('tenant-1', literal)).toBe(2)
+    expect(await service.countMergeSegments('tenant-1', literal, [{}, {}])).toBe(4)
+    expect(tenantSettings.getSmsSenderName).toHaveBeenCalledWith('tenant-1')
+  })
+
+  it('bills the body alone when the tenant leaves its name out', async () => {
+    tenantSettings.getSmsSenderName.mockResolvedValue(null)
+
+    expect(await service.countSegmentsPerRecipient('tenant-1', literal)).toBe(1)
+  })
+
+  it('fails open to the body alone if the name cannot be read', async () => {
+    tenantSettings.getSmsSenderName.mockRejectedValue(new Error('database down'))
+
+    expect(await service.countSegmentsPerRecipient('tenant-1', literal)).toBe(1)
   })
 })

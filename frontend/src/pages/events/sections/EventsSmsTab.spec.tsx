@@ -71,7 +71,7 @@ describe('SMS event MVP', () => {
     expect(onSave).not.toHaveBeenCalled()
     expect(
       screen.getByText(
-        'A sender number must be assigned to your tenant before SMS can be activated.',
+        'No SMS number is set up to send from. Contact a Notify administrator before activating SMS.',
       ),
     ).toBeVisible()
   })

@@ -1,0 +1,14 @@
+@import '../variables';
+
+// Lines stacked in one cell: a request's date and who made it, or its decision.
+.tenant-requests__stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: $spacing-xs;
+}
+
+.tenant-requests__detail {
+  color: $text-secondary;
+  font-size: $font-size-sm;
+}
