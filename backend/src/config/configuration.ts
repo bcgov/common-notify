@@ -239,6 +239,12 @@ export default function configuration() {
       ),
       jobRetries: Number.parseInt(process.env.JOB_RETRIES || '3', 10),
       jobBackoffDelay: Number.parseInt(process.env.JOB_BACKOFF_DELAY || '2000', 10),
+      // BullMQ job priority per send priority; lower is processed first. See job-priority.ts.
+      priority: {
+        high: Number.parseInt(process.env.QUEUE_PRIORITY_HIGH || '1', 10),
+        normal: Number.parseInt(process.env.QUEUE_PRIORITY_NORMAL || '5', 10),
+        low: Number.parseInt(process.env.QUEUE_PRIORITY_LOW || '10', 10),
+      },
     },
 
     // Identical sends (same tenant, recipients and content) within this window are answered with

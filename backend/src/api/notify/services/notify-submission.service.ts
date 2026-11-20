@@ -7,6 +7,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common'
 import type { Queue } from 'bullmq'
+import { ConfigService } from '@nestjs/config'
 import { NotificationStatus } from '../../../enum/notification-status.enum'
 import { QueueName } from '../../../enum/queue-name.enum'
 import { NotificationChannel } from '../../../enum/notification-channel.enum'
@@ -30,6 +31,7 @@ import { extractRequestRoute } from '../../../common/utils/extract-request-route
 import { describeError } from '../../../common/utils/describe-error'
 import { mergeRequestChannel } from '../../../queue/merge-batch-builder'
 import { INGESTION_JOB_OPTIONS } from '../../../queue/job-options'
+import { jobPriority, requestPriority } from '../../../queue/job-priority'
 import { TenantsService } from '../../admin/tenants/tenants.service'
 
 interface AcceptedUsageResult extends RecordedUsageResult {
@@ -97,6 +99,7 @@ export class NotifySubmissionService {
     private readonly tenantsService: TenantsService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Queue,
     @Optional() private readonly limitAlertNotificationService?: LimitAlertNotificationService,
+    @Optional() private readonly configService?: ConfigService,
   ) {}
 
   /** Entry point for the /notifysimple send routes. */
@@ -119,7 +122,12 @@ export class NotifySubmissionService {
       let eventId: string | undefined
       if (options.eventSend) {
         eventId = (payload as { eventId?: string })?.eventId
-        payload = await this.resolveEventSend(options.eventSend, payload, caller)
+        // The resolver builds a new request from the event; the caller's priority goes on it.
+        const priority = (payload as NotifyEventTestSendRequest).priority
+        payload = {
+          ...(await this.resolveEventSend(options.eventSend, payload, caller)),
+          ...(priority && { priority }),
+        }
       }
 
       const mergeChannel = mergeRequestChannel(payload)
@@ -232,14 +240,22 @@ export class NotifySubmissionService {
       }),
     }
 
-    this.enqueueInBackground(notificationRecord.id, tenantId, delayedSend, 'mail merge job', {
-      request: { templateId: channelPayload.content?.templateId },
-      mailMerge: true,
-      mailMergeChannel: channel,
-      // Recipients are not carried: ingestion reads them from the request stored above, so a
-      // large merge is not held in Redis.
-      mailMergeData: { content: channelPayload.content, params: globalParams },
-    })
+    const priority = jobPriority(requestPriority(dto, true), this.configService)
+    this.enqueueInBackground(
+      notificationRecord.id,
+      tenantId,
+      delayedSend,
+      'mail merge job',
+      priority,
+      {
+        request: { templateId: channelPayload.content?.templateId },
+        mailMerge: true,
+        mailMergeChannel: channel,
+        // Recipients are not carried: ingestion reads them from the request stored above, so a
+        // large merge is not held in Redis.
+        mailMergeData: { content: channelPayload.content, params: globalParams },
+      },
+    )
 
     return response
   }
@@ -477,7 +493,8 @@ export class NotifySubmissionService {
         : 'Notification accepted, queuing in progress',
     }
 
-    this.enqueueInBackground(notificationRecord.id, tenantId, delayedSend, 'job', {
+    const priority = jobPriority(requestPriority(processed, false), this.configService)
+    this.enqueueInBackground(notificationRecord.id, tenantId, delayedSend, 'job', priority, {
       request: processed,
     })
 
@@ -682,6 +699,7 @@ export class NotifySubmissionService {
     tenantId: string,
     delayedSend: string | undefined,
     label: string,
+    priority: number,
     job: Record<string, unknown>,
   ): void {
     const delayMs = delayedSend ? Math.max(0, new Date(delayedSend).getTime() - Date.now()) : 0
@@ -701,6 +719,7 @@ export class NotifySubmissionService {
           {
             jobId: notifyId,
             ...INGESTION_JOB_OPTIONS,
+            priority,
             ...(delayMs > 0 && { delay: delayMs }),
           },
         )
