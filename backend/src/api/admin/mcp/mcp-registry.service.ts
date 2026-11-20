@@ -33,11 +33,22 @@ export class McpRegistryService {
         [name, input.url, input.protocol, input.credentialEnv, input.enabled],
       )
       await manager.query('DELETE FROM notify.mcp_tool WHERE server_name = $1', [name])
-      for (const tool of input.tools) {
+      if (input.tools.length) {
         await manager.query(
           `INSERT INTO notify.mcp_tool (server_name, name, permitted_parameters, enabled)
-          VALUES ($1, $2, $3::jsonb, $4)`,
-          [name, tool.name, JSON.stringify(tool.permittedParameters), tool.enabled],
+           SELECT $1, tool.name, tool.parameters, tool.enabled
+           FROM jsonb_to_recordset($2::jsonb)
+             AS tool(name text, parameters jsonb, enabled boolean)`,
+          [
+            name,
+            JSON.stringify(
+              input.tools.map((tool) => ({
+                name: tool.name,
+                parameters: tool.permittedParameters,
+                enabled: tool.enabled,
+              })),
+            ),
+          ],
         )
       }
     })

@@ -48,7 +48,10 @@ describe('MCP registry administration', () => {
       'CSTAR_MCP_API_KEY',
       true,
     ])
-    expect(query.mock.calls[3][1]).toEqual(['cstar', 'get_recipients', '["groupIds"]', true])
+    expect(JSON.parse(query.mock.calls[2][1][1])).toEqual([
+      { name: 'list_groups', parameters: [], enabled: true },
+      { name: 'get_recipients', parameters: ['groupIds'], enabled: true },
+    ])
   })
   it.each([
     { credentialEnv: 'DATABASE_PASSWORD' },
@@ -70,5 +73,37 @@ describe('MCP registry administration', () => {
     expect(errors.map((error) => error.property)).toEqual(
       expect.arrayContaining(['secret', 'tools']),
     )
+  })
+  it('lists registry metadata without reading secret values', async () => {
+    query.mockResolvedValueOnce([{ name: 'cstar', credentialEnv: 'CSTAR_MCP_API_KEY' }])
+    await expect(service.list()).resolves.toEqual([
+      { name: 'cstar', credentialEnv: 'CSTAR_MCP_API_KEY' },
+    ])
+  })
+  it('handles servers with no tools without inserting an empty recordset', async () => {
+    await service.save('directory', { ...input(), tools: [] }, 'admin')
+    expect(query).toHaveBeenCalledTimes(2)
+  })
+  it('rejects invalid server names before starting a transaction', async () => {
+    await expect(service.save('../bad', input(), 'admin')).rejects.toThrow(
+      'Invalid MCP server name',
+    )
+    expect(transaction).not.toHaveBeenCalled()
+  })
+  it('propagates database errors rather than reporting a successful update', async () => {
+    query.mockRejectedValueOnce(new Error('Database unavailable'))
+    await expect(service.save('cstar', input(), 'admin')).rejects.toThrow('Database unavailable')
+  })
+  it('passes the authenticated actor from the controller and handles an absent actor', async () => {
+    const registry = {
+      list: vi.fn().mockResolvedValue([]),
+      save: vi.fn().mockResolvedValue({ name: 'cstar' }),
+    }
+    const controller = new McpRegistryController(registry as unknown as McpRegistryService)
+    await expect(controller.list()).resolves.toEqual([])
+    await controller.save('cstar', input(), { user: { sub: 'admin' } } as never)
+    expect(registry.save).toHaveBeenLastCalledWith('cstar', input(), 'admin')
+    await controller.save('cstar', input(), {} as never)
+    expect(registry.save).toHaveBeenLastCalledWith('cstar', input(), 'unknown')
   })
 })

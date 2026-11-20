@@ -64,7 +64,7 @@ export class McpClientService {
        WHERE s.name = $1 AND t.name = $2 AND s.enabled AND t.enabled`,
       [serverName, tool],
     )
-    if (!server || server.protocol !== 'streamable-http')
+    if (server?.protocol !== 'streamable-http')
       throw new ForbiddenException('MCP tool is not enabled')
     if (!tenantId || !/^[A-Za-z0-9_-]{1,128}$/.test(tenantId))
       throw new ForbiddenException('Invalid tenant context')
@@ -77,11 +77,22 @@ export class McpClientService {
     validateMcpRegistryPolicy(server)
     // The seeded local destination follows the release's service name in OpenShift.
     // Explicit operator-managed registry destinations remain authoritative.
+    const registered = new URL(server.url)
     const url =
-      serverName === 'cstar' && server.url === 'http://cstar-mcp:3101/mcp'
+      serverName === 'cstar' &&
+      registered.protocol === 'http:' &&
+      registered.hostname === 'cstar-mcp' &&
+      registered.port === '3101' &&
+      registered.pathname === '/mcp' &&
+      !registered.search &&
+      !registered.hash &&
+      !registered.username &&
+      !registered.password
         ? process.env.CSTAR_MCP_URL || server.url
         : server.url
     const destination = validateMcpRegistryPolicy({ ...server, url })
+    if (process.env.NODE_ENV === 'production' && destination.protocol !== 'https:')
+      throw new ForbiddenException('MCP destinations must use HTTPS in production')
     const credential = process.env[server.credential_env]
     if (!credential) throw new BadGatewayException('MCP credentials are not configured')
     const client = new Client({ name: 'notify', version: '1.0.0' })

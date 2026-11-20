@@ -9,7 +9,11 @@ import type { McpServer } from '@/api/mcpRegistry.api'
 import { showSuccessToast } from '@/redux/utils/toastUtils'
 import '@/scss/pages/mcp-servers.scss'
 
-const blank: McpServer = {
+type EditableServer = Omit<McpServer, 'tools'> & {
+  tools: Array<McpServer['tools'][number] & { id: string }>
+}
+
+const blank: EditableServer = {
   name: '',
   url: '',
   protocol: 'streamable-http',
@@ -20,15 +24,15 @@ const blank: McpServer = {
 function message(error: unknown): string {
   const body = (error as { response?: { data?: { message?: string | string[] } } })?.response?.data
     ?.message
-  return Array.isArray(body)
-    ? body.join('; ')
-    : (body ?? (error instanceof Error ? error.message : 'Request failed'))
+  if (Array.isArray(body)) return body.join('; ')
+  if (body) return body
+  return error instanceof Error ? error.message : 'Request failed'
 }
 
 export default function McpServers() {
   const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
   const [servers, setServers] = useState<McpServer[]>([])
-  const [editing, setEditing] = useState<McpServer | null>(null)
+  const [editing, setEditing] = useState<EditableServer | null>(null)
   const [isNew, setIsNew] = useState(false)
   const [parameterInputs, setParameterInputs] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
@@ -58,7 +62,8 @@ export default function McpServers() {
         ...editing,
         enabled: true,
         tools: editing.tools.map((tool, index) => ({
-          ...tool,
+          name: tool.name,
+          enabled: tool.enabled,
           permittedParameters: (parameterInputs[index] ?? '')
             .split(',')
             .map((name) => name.trim())
@@ -127,7 +132,10 @@ export default function McpServers() {
                   isDisabled={busy}
                   aria-label={`Edit ${server.name}`}
                   onPress={() => {
-                    setEditing(structuredClone(server))
+                    setEditing({
+                      ...structuredClone(server),
+                      tools: server.tools.map((tool) => ({ ...tool, id: crypto.randomUUID() })),
+                    })
                     setParameterInputs(
                       server.tools.map((tool) => tool.permittedParameters.join(', ')),
                     )
@@ -182,7 +190,7 @@ export default function McpServers() {
           </p>
           <h3>Permitted tools</h3>
           {editing.tools.map((tool, index) => (
-            <fieldset key={index}>
+            <fieldset key={tool.id}>
               <legend>Tool {index + 1}</legend>
               <TextField
                 label="Tool name"
@@ -237,7 +245,10 @@ export default function McpServers() {
               onPress={() => {
                 setEditing({
                   ...editing,
-                  tools: [...editing.tools, { name: '', enabled: true, permittedParameters: [] }],
+                  tools: [
+                    ...editing.tools,
+                    { id: crypto.randomUUID(), name: '', enabled: true, permittedParameters: [] },
+                  ],
                 })
                 setParameterInputs([...parameterInputs, ''])
               }}

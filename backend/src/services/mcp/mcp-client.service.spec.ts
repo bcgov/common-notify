@@ -156,6 +156,9 @@ describe('stored MCP server policy', () => {
     registryRow({ url: 'http://custom-cstar:3101/mcp' })
     await service.call('cstar', 'get_recipients', 'tenant-a', { groupIds: [] })
     expect(mocks.options.mock.calls[1][0].href).toBe('http://custom-cstar:3101/mcp')
+    registryRow({ url: 'https://cstar-mcp:3101/mcp' })
+    await service.call('cstar', 'get_recipients', 'tenant-a', { groupIds: [] })
+    expect(mocks.options.mock.calls[2][0].href).toBe('https://cstar-mcp:3101/mcp')
   })
 
   it('blocks unknown arguments before connecting', async () => {
@@ -195,5 +198,70 @@ describe('stored MCP server policy', () => {
     await expect(
       new McpGroupsService(service).getGroupMemberEmails('tenant-a', ['group-a']),
     ).rejects.toThrow('Invalid MCP recipients response')
+  })
+  it.each(['', 'tenant/escape', 'x'.repeat(129)])(
+    'rejects invalid tenant context %s',
+    async (tenant) => {
+      await expect(service.call('cstar', 'get_recipients', tenant, {})).rejects.toThrow(
+        'Invalid tenant context',
+      )
+      expect(mocks.connect).not.toHaveBeenCalled()
+    },
+  )
+  it('rejects an unsupported transport', async () => {
+    registryRow({ protocol: 'stdio' })
+    await expect(service.call('cstar', 'get_recipients', 'tenant-a', {})).rejects.toThrow(
+      'not enabled',
+    )
+  })
+  it('rejects malformed argument policies', async () => {
+    registryRow({ permitted_parameters: null })
+    await expect(service.call('cstar', 'get_recipients', 'tenant-a', {})).rejects.toThrow(
+      'parameter is not permitted',
+    )
+  })
+  it('reports missing credentials before connecting', async () => {
+    vi.stubEnv('CSTAR_MCP_API_KEY', '')
+    await expect(service.call('cstar', 'get_recipients', 'tenant-a', {})).rejects.toThrow(
+      'credentials are not configured',
+    )
+    expect(mocks.connect).not.toHaveBeenCalled()
+  })
+  it('uses HTTPS for the production release and rejects an insecure custom destination', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('CSTAR_MCP_URL', 'https://notify-337-cstar-mcp.ns.svc:3101/mcp')
+    await service.call('cstar', 'get_recipients', 'tenant-a', {})
+    expect(mocks.options.mock.calls[0][0].protocol).toBe('https:')
+    registryRow({ url: 'http://custom-cstar:3101/mcp' })
+    await expect(service.call('cstar', 'get_recipients', 'tenant-a', {})).rejects.toThrow(
+      'must use HTTPS',
+    )
+  })
+  it('accepts JSON text results from compatible servers', async () => {
+    mocks.callTool.mockResolvedValue({ content: [{ type: 'text', text: '{"emails":[]}' }] })
+    await expect(service.call('cstar', 'get_recipients', 'tenant-a', {})).resolves.toEqual({
+      emails: [],
+    })
+  })
+  it.each([
+    {},
+    { content: [] },
+    { content: [{ type: 'text', text: 'oops' }] },
+    { content: [{ type: 'text', text: '[]' }] },
+    { content: [{ type: 'text', text: 'null' }] },
+  ])('rejects unusable MCP results %j', async (result) => {
+    mocks.callTool.mockResolvedValue(result)
+    await expect(service.call('cstar', 'get_recipients', 'tenant-a', {})).rejects.toThrow(
+      'MCP lookup failed',
+    )
+    expect(mocks.close).toHaveBeenCalled()
+  })
+  it('cleans up even when connection or cleanup fails', async () => {
+    mocks.connect.mockRejectedValueOnce(new Error('Connection refused'))
+    mocks.close.mockRejectedValueOnce(new Error('Already closed'))
+    await expect(service.call('cstar', 'get_recipients', 'tenant-a', {})).rejects.toThrow(
+      'MCP lookup failed',
+    )
+    expect(mocks.transportClose).toHaveBeenCalled()
   })
 })
