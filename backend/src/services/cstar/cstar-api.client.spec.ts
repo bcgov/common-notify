@@ -423,6 +423,48 @@ describe('CstarApiClient tenant users', () => {
     await expect(result).rejects.toThrow('Cannot remove the last tenant owner')
   })
 
+  describe("reading CSTAR's error message", () => {
+    const failWith = (status: number, body: string) =>
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status,
+        statusText: 'error',
+        text: async () => body,
+      })
+
+    it('prefers detail over message', async () => {
+      failWith(400, JSON.stringify({ detail: 'From detail', message: 'From message' }))
+
+      await expect(buildClient().removeTenantUser(TENANT, TENANT_USER)).rejects.toThrow(
+        'From detail',
+      )
+    })
+
+    it('falls back to the first entry of errors', async () => {
+      failWith(400, JSON.stringify({ errors: [{ message: 'From errors' }] }))
+
+      await expect(buildClient().removeTenantUser(TENANT, TENANT_USER)).rejects.toThrow(
+        'From errors',
+      )
+    })
+
+    it('passes a non-JSON body through as the message', async () => {
+      failWith(400, 'Bad things happened')
+
+      const result = buildClient().removeTenantUser(TENANT, TENANT_USER)
+      await expect(result).rejects.toThrow(BadRequestException)
+      await expect(result).rejects.toThrow('Bad things happened')
+    })
+
+    it('maps an unexpected status to a server error carrying the message', async () => {
+      failWith(502, JSON.stringify({ message: 'Upstream down' }))
+
+      const result = buildClient().removeTenantUser(TENANT, TENANT_USER)
+      await expect(result).rejects.toThrow(InternalServerErrorException)
+      await expect(result).rejects.toThrow('CSTAR API error: 502 - Upstream down')
+    })
+  })
+
   it('keeps mapping a 404 on a read to forbidden', async () => {
     fetchMock.mockResolvedValue(cstarError(404, 'Tenant not found'))
 

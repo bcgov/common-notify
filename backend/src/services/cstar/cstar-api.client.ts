@@ -1,4 +1,5 @@
 import {
+  HttpException,
   Injectable,
   Logger,
   UnauthorizedException,
@@ -140,20 +141,7 @@ export class CstarApiClient {
       })
 
       if (!response.ok) {
-        const errBody = await response.text()
-        let errData: CstarErrorResponse | null = null
-        try {
-          errData = JSON.parse(errBody) as CstarErrorResponse
-        } catch {
-          this.logger.debug(`CSTAR API returned non-JSON error body: ${errBody.slice(0, 100)}`)
-        }
-
-        const message =
-          errData?.detail ??
-          errData?.message ??
-          errData?.errors?.[0]?.message ??
-          errBody ??
-          response.statusText
+        const message = await this.readCstarError(response)
 
         if (response.status === 401) {
           this.logger.warn(`CSTAR authentication failed for user ${ssoUserId}`, { tenantId })
@@ -187,10 +175,7 @@ export class CstarApiClient {
 
       return roleNames
     } catch (error) {
-      if (error instanceof UnauthorizedException) {
-        throw error
-      }
-      if (error instanceof ForbiddenException) {
+      if (error instanceof UnauthorizedException || error instanceof ForbiddenException) {
         throw error
       }
 
@@ -335,20 +320,7 @@ export class CstarApiClient {
       })
 
       if (!response.ok) {
-        const errBody = await response.text()
-        let errData: CstarErrorResponse | null = null
-        try {
-          errData = JSON.parse(errBody) as CstarErrorResponse
-        } catch {
-          this.logger.debug(`CSTAR API returned non-JSON error body: ${errBody.slice(0, 100)}`)
-        }
-
-        const message =
-          errData?.detail ??
-          errData?.message ??
-          errData?.errors?.[0]?.message ??
-          errBody ??
-          response.statusText
+        const message = await this.readCstarError(response)
 
         if (response.status === 401) {
           this.logger.warn(`CSTAR authentication failed for user ${ssoUserId}`)
@@ -874,8 +846,7 @@ export class CstarApiClient {
 
   /**
    * A request to CSTAR, mapping its failures onto the same exceptions the role and tenant
-   * lookups above raise. Those two predate this helper and each inline their own copy; this
-   * exists so the other lookups do not add more.
+   * lookups above raise.
    *
    * @param path Absolute request path, already encoded
    * @param authHeader JWT Authorization header to pass through to CSTAR
@@ -915,43 +886,8 @@ export class CstarApiClient {
     }
 
     if (!response.ok) {
-      const errBody = await response.text()
-      let errData: CstarErrorResponse | null = null
-      try {
-        errData = JSON.parse(errBody) as CstarErrorResponse
-      } catch {
-        this.logger.debug(`CSTAR API returned non-JSON error body: ${errBody.slice(0, 100)}`)
-      }
-
-      const message =
-        errData?.detail ??
-        errData?.message ??
-        errData?.errors?.[0]?.message ??
-        errBody ??
-        response.statusText
-
-      // Logged before mapping: the read branch below replaces CSTAR's reason with a generic one.
-      this.logger.debug(
-        `CSTAR returned ${response.status} for ${method} ${description}: ${message}`,
-      )
-
-      if (response.status === 401) {
-        throw new UnauthorizedException(`Not authenticated with CSTAR: ${message}`)
-      }
-      // A 404 on a read is a tenant or group the caller cannot see, which is indistinguishable
-      // from one that does not exist - both mean "not yours to read".
-      if (method === 'GET' && (response.status === 403 || response.status === 404)) {
-        throw new ForbiddenException(`Not authorized to read ${description}`)
-      }
-      // On the rest CSTAR's reason is passed through, so an admin can see why a change was
-      // refused - e.g. removing a user who holds more than the SERVICE_USER role.
-      if (response.status === 400) throw new BadRequestException(message)
-      if (response.status === 403) throw new ForbiddenException(message)
-      if (response.status === 404) throw new NotFoundException(message)
-      if (response.status === 409) throw new ConflictException(message)
-
-      this.logger.error(`CSTAR API error on ${description}: ${response.status} ${message}`)
-      throw new InternalServerErrorException(`CSTAR API error: ${response.status} - ${message}`)
+      const message = await this.readCstarError(response)
+      throw this.toCstarException(method, response.status, message, description)
     }
 
     if (response.status === 204) {
@@ -964,5 +900,53 @@ export class CstarApiClient {
       this.logger.error(`CSTAR returned an unparseable body for ${description}`)
       throw new InternalServerErrorException(`Failed to ${method} ${description} on CSTAR`)
     }
+  }
+
+  /** CSTAR's explanation of a failed response, from whichever field it used. */
+  private async readCstarError(response: Response): Promise<string> {
+    const errBody = await response.text()
+    let errData: CstarErrorResponse | null = null
+    try {
+      errData = JSON.parse(errBody) as CstarErrorResponse
+    } catch {
+      this.logger.debug(`CSTAR API returned non-JSON error body: ${errBody.slice(0, 100)}`)
+    }
+
+    return (
+      errData?.detail ??
+      errData?.message ??
+      errData?.errors?.[0]?.message ??
+      errBody ??
+      response.statusText
+    )
+  }
+
+  /** The exception for a failed cstarRequest, returned for the caller to throw. */
+  private toCstarException(
+    method: string,
+    status: number,
+    message: string,
+    description: string,
+  ): HttpException {
+    // Logged before mapping: the read branch below replaces CSTAR's reason with a generic one.
+    this.logger.debug(`CSTAR returned ${status} for ${method} ${description}: ${message}`)
+
+    if (status === 401) {
+      return new UnauthorizedException(`Not authenticated with CSTAR: ${message}`)
+    }
+    // A 404 on a read is a tenant or group the caller cannot see, which is indistinguishable
+    // from one that does not exist - both mean "not yours to read".
+    if (method === 'GET' && (status === 403 || status === 404)) {
+      return new ForbiddenException(`Not authorized to read ${description}`)
+    }
+    // On the rest CSTAR's reason is passed through, so an admin can see why a change was
+    // refused - e.g. removing a user who holds more than the SERVICE_USER role.
+    if (status === 400) return new BadRequestException(message)
+    if (status === 403) return new ForbiddenException(message)
+    if (status === 404) return new NotFoundException(message)
+    if (status === 409) return new ConflictException(message)
+
+    this.logger.error(`CSTAR API error on ${description}: ${status} ${message}`)
+    return new InternalServerErrorException(`CSTAR API error: ${status} - ${message}`)
   }
 }
