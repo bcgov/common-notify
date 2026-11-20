@@ -47,12 +47,11 @@ spec:
             readOnlyRootFilesystem: true
           image: "{{ .Values.global.registry | default "ghcr.io" }}/{{.Values.global.repository}}/frontend:{{ .Values.global.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ default "Always" .Values.frontend.imagePullPolicy }}
-          {{- if .Values.frontend.promtail.enabled }}
           env:
+            {{- if .Values.frontend.promtail.enabled }}
             - name: CADDY_LOG_OUTPUT
               value: "file:/var/log/caddy/access.log"
-          {{- end }}
-          env:
+            {{- end }}
             - name: BACKEND_URL
               value: "http://{{ .Release.Name }}-backend"
             - name: LOG_LEVEL

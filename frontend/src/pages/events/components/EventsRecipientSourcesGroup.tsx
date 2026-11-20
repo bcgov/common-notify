@@ -10,6 +10,7 @@ type EventsRecipientSourcesGroupProps = {
   errorMessage?: string
   /** False on channels that cannot address CSTAR groups yet. */
   isCstarEnabled?: boolean
+  showCstar?: boolean
 }
 
 /** The "Recipient(s)" checkboxes that choose which recipient sources a channel sends to. */
@@ -19,6 +20,7 @@ const EventsRecipientSourcesGroup: FC<EventsRecipientSourcesGroupProps> = ({
   isDisabled,
   errorMessage,
   isCstarEnabled = true,
+  showCstar = true,
 }) => (
   <CheckboxGroup
     label="Recipient(s)"
@@ -35,9 +37,11 @@ const EventsRecipientSourcesGroup: FC<EventsRecipientSourcesGroupProps> = ({
     <Checkbox value={SUBSCRIPTION_SERVICE_ID} isDisabled>
       Subscription Service
     </Checkbox>
-    <Checkbox value={CSTAR_GROUPS_ID} isDisabled={!isCstarEnabled}>
-      CSTAR Group(s)
-    </Checkbox>
+    {showCstar && (
+      <Checkbox value={CSTAR_GROUPS_ID} isDisabled={!isCstarEnabled}>
+        CSTAR Group(s)
+      </Checkbox>
+    )}
     <Checkbox value={ADDITIONAL_RECIPIENTS_ID}>Additional recipient(s)</Checkbox>
   </CheckboxGroup>
 )

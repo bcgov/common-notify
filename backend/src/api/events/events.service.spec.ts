@@ -17,7 +17,7 @@ import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { EmailLogoService } from '../email-logo/email-logo.service'
 import { PhoneNumberService } from '../notify/services/phone-number.service'
 import { TemplatesRepository } from '../templates/templates.repository'
-import { CstarApiClient } from '../../services/cstar/cstar-api.client'
+import { McpGroupsService } from '../../services/mcp/mcp-groups.service'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import type { ParsedListQuery } from '../../common/query/list-query.types'
 
@@ -135,8 +135,10 @@ describe('EventsService', () => {
     findById: vi.fn(),
   }
 
-  const mockCstarApiClient = {
+  const mockMcpGroupsService = {
+    isEnabled: vi.fn().mockResolvedValue(true),
     getTenantGroups: vi.fn(),
+    getGroupMemberEmails: vi.fn(),
   }
 
   /** Unset by default, so senderEmailDomain falls back to gov.bc.ca. */
@@ -187,7 +189,7 @@ describe('EventsService', () => {
           useValue: mockConfigurationRepository,
         },
         { provide: TemplatesRepository, useValue: mockTemplatesRepository },
-        { provide: CstarApiClient, useValue: mockCstarApiClient },
+        { provide: McpGroupsService, useValue: mockMcpGroupsService },
         { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile()
@@ -216,6 +218,23 @@ describe('EventsService', () => {
     mockManager.find.mockResolvedValue([])
     mockManager.create.mockImplementation((_entity: unknown, data: object) => ({ ...data }))
     mockManager.save.mockImplementation((_entity: unknown, data: unknown) => Promise.resolve(data))
+  })
+
+  it('reports disabled tools without contacting CSTAR', async () => {
+    mockMcpGroupsService.isEnabled.mockResolvedValueOnce(false)
+    await expect(service.listCstarGroups({ tenantId: 'external-tenant' })).resolves.toEqual({
+      groups: [],
+      enabled: false,
+    })
+    expect(mockMcpGroupsService.getTenantGroups).not.toHaveBeenCalled()
+  })
+
+  it('propagates lookup failures when tools are enabled instead of reporting disablement', async () => {
+    mockMcpGroupsService.isEnabled.mockResolvedValueOnce(true)
+    mockMcpGroupsService.getTenantGroups.mockRejectedValueOnce(new Error('MCP lookup failed'))
+    await expect(service.listCstarGroups({ tenantId: 'external-tenant' })).rejects.toThrow(
+      'MCP lookup failed',
+    )
   })
 
   describe('tenant SMS sender', () => {
@@ -1207,7 +1226,7 @@ describe('EventsService', () => {
   describe('CSTAR group sync', () => {
     const GROUP_ONE = 'group-1'
     const GROUP_TWO = 'group-2'
-    const cstar = { tenantId: 'cstar-tenant-guid', authHeader: 'Bearer token' }
+    const cstar = { tenantId: 'cstar-tenant-guid' }
 
     const emailSetting = () =>
       ({
@@ -1239,7 +1258,7 @@ describe('EventsService', () => {
 
     beforeEach(() => {
       mockEventRepository.findOne.mockResolvedValue(buildEvent([emailSetting()]))
-      mockCstarApiClient.getTenantGroups.mockResolvedValue([
+      mockMcpGroupsService.getTenantGroups.mockResolvedValue([
         { id: GROUP_ONE, name: 'CSTAR Group 1' },
         { id: GROUP_TWO, name: 'CSTAR Group 2' },
       ])
@@ -1373,7 +1392,7 @@ describe('EventsService', () => {
         cstar,
       )
 
-      expect(mockCstarApiClient.getTenantGroups).not.toHaveBeenCalled()
+      expect(mockMcpGroupsService.getTenantGroups).not.toHaveBeenCalled()
     })
 
     it('activates the channel on a TO group alone, with no typed-in address', async () => {

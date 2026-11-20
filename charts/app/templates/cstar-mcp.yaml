@@ -1,0 +1,149 @@
+{{- if .Values.cstarMcp.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-cstar-mcp
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: cstar-mcp
+    app.kubernetes.io/name: cstar-mcp
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.cstarMcp.replicaCount }}
+  strategy:
+    type: {{ .Values.cstarMcp.deploymentStrategy }}
+    {{- if eq .Values.cstarMcp.deploymentStrategy "RollingUpdate" }}
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+    {{- end }}
+  selector:
+    matchLabels:
+      app: cstar-mcp
+      app.kubernetes.io/name: cstar-mcp
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      annotations:
+        rollme: {{ randAlphaNum 5 | quote }}
+      labels:
+        app: cstar-mcp
+        app.kubernetes.io/name: cstar-mcp
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+      {{- if gt (int .Values.cstarMcp.replicaCount) 1 }}
+      # Match ClamAV: prefer separate nodes without blocking scheduling during shortages.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app: cstar-mcp
+                    app.kubernetes.io/instance: {{ .Release.Name }}
+      {{- end }}
+      containers:
+        - name: cstar-mcp
+          {{- if .Values.cstarMcp.image }}
+          image: {{ .Values.cstarMcp.image | quote }}
+          {{- else }}
+          image: "{{ .Values.global.registry | default "ghcr.io" }}/{{ .Values.global.repository }}/notify-cstar-mcp:{{ .Values.global.tag | default .Chart.AppVersion }}"
+          {{- end }}
+          imagePullPolicy: Always
+          ports:
+            - { name: http, containerPort: 3101 }
+          envFrom:
+            - secretRef:
+                name: {{ .Values.cstarMcp.secretName }}
+          env:
+            # Use the same CSTAR environment as Notify's backend. An explicit env
+            # entry takes precedence over any stale URL in the adapter secret.
+            - name: CSTAR_API_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-api-secrets
+                  key: CSTAR_API_URL
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 2
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 10
+          resources:
+            requests: { cpu: 25m, memory: 64Mi }
+            limits: { cpu: 250m, memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-cstar-mcp
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: cstar-mcp
+    app.kubernetes.io/name: cstar-mcp
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  selector:
+    app: cstar-mcp
+    app.kubernetes.io/name: cstar-mcp
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - { name: http, port: 3101, targetPort: http }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-cstar-mcp
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: cstar-mcp
+    app.kubernetes.io/name: cstar-mcp
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  podSelector:
+    matchLabels:
+      app: cstar-mcp
+      app.kubernetes.io/name: cstar-mcp
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "backend.selectorLabels" . | nindent 14 }}
+      ports:
+        - { protocol: TCP, port: 3101 }
+{{- if .Values.cstarMcp.pdb.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}-cstar-mcp
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: cstar-mcp
+    app.kubernetes.io/name: cstar-mcp
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  minAvailable: {{ .Values.cstarMcp.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      app: cstar-mcp
+      app.kubernetes.io/name: cstar-mcp
+      app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+{{- end }}

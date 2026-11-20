@@ -1,0 +1,234 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { CstarClient } from '../src/cstar.js'
+import { createApp } from '../src/server.js'
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+
+test('recipient expansion shares cancellation across batches and never returns partial recipients', async () => {
+  const controller = new AbortController()
+  let userRequests = 0
+  const client = new CstarClient(
+    { CSTAR_API_URL: 'https://cstar.example' },
+    async (url, options) => {
+      options.signal.throwIfAborted()
+      if (String(url).endsWith('/groups'))
+        return Response.json({
+          data: {
+            groups: Array.from({ length: 5 }, (_, i) => ({ id: `g${i}`, name: `Group ${i}` })),
+          },
+        })
+      userRequests++
+      if (userRequests === 4) controller.abort(new Error('Operation deadline reached'))
+      return Response.json({ data: { users: [{ email: 'member@example.com' }] } })
+    },
+  )
+  client.token = { value: 'token', expiresAt: Date.now() + 300000 }
+  await assert.rejects(
+    client.getRecipients('tenant-a', ['g0', 'g1', 'g2', 'g3', 'g4'], controller.signal),
+    /Operation deadline reached/,
+  )
+  assert.equal(userRequests, 4)
+})
+
+test('cancelled lookups also cancel service-account authentication', async () => {
+  const controller = new AbortController()
+  controller.abort(new Error('Operation deadline reached'))
+  const client = new CstarClient(
+    {
+      CSTAR_API_URL: 'https://cstar.example',
+      CSTAR_TOKEN_URL: 'https://sso.example/token',
+      CSTAR_CLIENT_ID: 'client',
+      CSTAR_CLIENT_SECRET: 'secret',
+    },
+    async (_url, options) => {
+      options.signal.throwIfAborted()
+      throw new Error('Should not reach upstream')
+    },
+  )
+  await assert.rejects(
+    client.listGroups('tenant-a', controller.signal),
+    /Operation deadline reached/,
+  )
+})
+
+test('service account resolves only tenant-owned groups and normalizes emails', async () => {
+  const calls = []
+  const client = new CstarClient(
+    {
+      CSTAR_API_URL: 'https://cstar.example',
+      CSTAR_TOKEN_URL: 'https://sso.example/token',
+      CSTAR_CLIENT_ID: 'service-account',
+      CSTAR_CLIENT_SECRET: 'test-secret',
+    },
+    async (url, options) => {
+      calls.push([String(url), options])
+      if (String(url).endsWith('/token')) {
+        assert.equal(options.body.get('grant_type'), 'client_credentials')
+        assert.equal(options.body.get('client_id'), 'service-account')
+        assert.equal(options.body.get('client_secret'), 'test-secret')
+        return Response.json({ access_token: 'service-token', expires_in: 300 })
+      }
+      assert.equal(options.headers.Authorization, 'Bearer service-token')
+      assert.equal(options.body, undefined)
+      if (String(url).endsWith('/groups'))
+        return Response.json({ data: { groups: [{ id: 'group-a', name: 'A' }] } })
+      return Response.json({
+        data: {
+          users: [
+            { firstName: 'A', email: ' A@Example.com ', idpType: 'idir' },
+            { email: 'a@example.com' },
+            { email: null },
+          ],
+        },
+      })
+    },
+  )
+  assert.deepEqual(await client.getRecipients('tenant-a', ['group-a']), {
+    emails: ['a@example.com'],
+  })
+  await assert.rejects(client.getRecipients('tenant-a', ['foreign-group']), /does not belong/)
+  assert.deepEqual(
+    calls.filter(([url]) => url.endsWith('/users')).map(([url]) => url),
+    ['https://cstar.example/api/v1/tenants/tenant-a/groups/group-a/users'],
+  )
+  assert.equal(calls.filter(([url]) => url.endsWith('/token')).length, 1)
+  await assert.rejects(client.listGroups('../escape'), /Invalid identifier/)
+})
+
+test('groups without Notify roles remain eligible for recipient lookup', async () => {
+  const calls = []
+  const client = new CstarClient(
+    { CSTAR_API_URL: 'https://cstar.example' },
+    async (url, options) => {
+      const path = new URL(url).pathname
+      calls.push(path)
+      assert.equal(options.headers.Authorization, 'Bearer notify-service-token')
+      if (path.endsWith('/groups'))
+        return Response.json({
+          data: {
+            groups: [{ id: 'workflow-team', name: 'Workflow Approvers', sharedServiceRoles: [] }],
+          },
+        })
+      return Response.json({ data: { users: [{ email: 'approver@example.com' }] } })
+    },
+  )
+  client.token = { value: 'notify-service-token', expiresAt: Date.now() + 300000 }
+  assert.deepEqual(await client.getRecipients('tenant-a', ['workflow-team']), {
+    emails: ['approver@example.com'],
+  })
+  assert.deepEqual(calls, [
+    '/api/v1/tenants/tenant-a/groups',
+    '/api/v1/tenants/tenant-a/groups/workflow-team/users',
+  ])
+})
+
+test('missing CSS settings are reported by name before any network call', async () => {
+  let calls = 0
+  const client = new CstarClient({ CSTAR_API_URL: 'https://cstar.example' }, async () => {
+    calls++
+    throw new Error('Unexpected request')
+  })
+  await assert.rejects(
+    client.listGroups('tenant-a'),
+    /Notify CSS service account is not configured: missing CSTAR_TOKEN_URL, CSTAR_CLIENT_ID, CSTAR_CLIENT_SECRET/,
+  )
+  assert.equal(calls, 0)
+})
+
+test('service-account endpoint deduplicates groups and emails and fails without partial results', async () => {
+  const calls = []
+  let failedGroup = ''
+  let invalidResponse = false
+  const client = new CstarClient({ CSTAR_API_URL: 'https://cstar.example' }, async (url) => {
+    const path = new URL(url).pathname
+    calls.push(path)
+    if (path.endsWith('/groups'))
+      return Response.json({
+        data: {
+          groups: [
+            { id: 'a', name: 'A' },
+            { id: 'b', name: 'B' },
+          ],
+        },
+      })
+    if (path.endsWith(`/groups/${failedGroup}/users`)) return new Response(null, { status: 403 })
+    if (invalidResponse) return Response.json({ data: {} })
+    return Response.json({
+      data: {
+        users: path.endsWith('/a/users')
+          ? [{ email: 'first@example.com' }, { email: ' SAME@example.com ' }]
+          : [{ email: 'same@example.com' }, { email: 'second@example.com' }, { email: null }],
+      },
+    })
+  })
+  client.token = { value: 'service-token', expiresAt: Date.now() + 300000 }
+  assert.deepEqual(await client.getRecipients('tenant-a', ['a', 'b', 'a']), {
+    emails: ['first@example.com', 'same@example.com', 'second@example.com'],
+  })
+  assert.equal(calls.filter((path) => path.endsWith('/a/users')).length, 1)
+  failedGroup = 'b'
+  await assert.rejects(client.getRecipients('tenant-a', ['a', 'b']), /CSTAR lookup failed/)
+  failedGroup = ''
+  invalidResponse = true
+  await assert.rejects(client.getRecipients('tenant-a', ['a']), /Invalid CSTAR users response/)
+})
+
+test('HTTP MCP contract enforces credentials, tenant context and strict tool fields', async (t) => {
+  const key = 'test-key-'.repeat(8)
+  const received = []
+  const app = createApp(
+    { MCP_API_KEY: key },
+    {
+      listGroups: async (tenant) => {
+        received.push(tenant)
+        return { groups: [{ id: 'g', name: 'Group' }] }
+      },
+      getRecipients: async (tenant, ids) => {
+        received.push([tenant, ids])
+        return { emails: ['a@example.com'] }
+      },
+    },
+  )
+  const listener = app.listen(0, '127.0.0.1')
+  await new Promise((resolve) => listener.once('listening', resolve))
+  t.after(
+    () =>
+      new Promise((resolve) => {
+        listener.close(resolve)
+        listener.closeAllConnections()
+      }),
+  )
+  const url = new URL(`http://127.0.0.1:${listener.address().port}/mcp`)
+  assert.equal((await fetch(url, { method: 'POST' })).status, 401)
+  assert.equal(
+    (await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${key}` } })).status,
+    400,
+  )
+  const transport = new StreamableHTTPClientTransport(url, {
+    requestInit: {
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'x-tenant-id': 'tenant-a',
+      },
+    },
+  })
+  const client = new Client({ name: 'test', version: '1' })
+  t.after(() => client.close())
+  await client.connect(transport)
+  const tools = await client.listTools()
+  assert.deepEqual(tools.tools.map((tool) => tool.name).sort(), ['get_recipients', 'list_groups'])
+  assert.deepEqual(
+    (await client.callTool({ name: 'list_groups', arguments: {} })).structuredContent,
+    { groups: [{ id: 'g', name: 'Group' }] },
+  )
+  const rejected = await client.callTool({
+    name: 'get_recipients',
+    arguments: { groupIds: ['g'], tenantId: 'victim' },
+  })
+  assert.equal(rejected.isError, true)
+  assert.deepEqual(received, ['tenant-a'])
+  const result = await client.callTool({ name: 'get_recipients', arguments: { groupIds: ['g'] } })
+  assert.deepEqual(result.structuredContent, { emails: ['a@example.com'] })
+  assert.deepEqual(received.at(-1), ['tenant-a', ['g']])
+})

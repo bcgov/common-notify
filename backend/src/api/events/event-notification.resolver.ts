@@ -10,7 +10,7 @@ import { Repository } from 'typeorm'
 import { NotifyEvent } from './entities/event.entity'
 import { EventChannelSetting } from './entities/event-channel-setting.entity'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
-import { CstarApiClient } from '../../services/cstar/cstar-api.client'
+import { McpGroupsService } from '../../services/mcp/mcp-groups.service'
 import { EventRecipientKind } from '../../enum/event-recipient-kind.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import type { CstarRequestContext } from './events.service'
@@ -59,7 +59,7 @@ export class EventNotificationResolver {
     private readonly channelSettingRepository: Repository<EventChannelSetting>,
     @InjectRepository(NotifyConfiguration)
     private readonly configurationRepository: Repository<NotifyConfiguration>,
-    private readonly cstarApiClient: CstarApiClient,
+    private readonly mcpGroups: McpGroupsService,
   ) {}
 
   /**
@@ -232,11 +232,7 @@ export class EventNotificationResolver {
 
     // Deliberately not caught: sending to fewer people than the event was configured for is
     // worse than not sending, so a CSTAR failure fails the request.
-    const members = await this.cstarApiClient.getGroupMemberEmails(
-      cstar.tenantId,
-      groupIds,
-      cstar.authHeader,
-    )
+    const members = await this.mcpGroups.getGroupMemberEmails(cstar.tenantId, groupIds)
 
     this.logger.debug(
       `Resolved ${groupIds.length} CSTAR group(s) for ${kind} to ${members.length} address(es)`,

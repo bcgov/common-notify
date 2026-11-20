@@ -1,4 +1,5 @@
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsEmail,
@@ -92,7 +93,7 @@ export class UpdateEmailChannelSettingDto {
   bcc?: string[]
 
   /**
-   * CSTAR groups addressed in the To field. Any number of groups; their members are resolved
+   * CSTAR groups addressed in the To field. Up to 100 groups; their members are resolved
    * from CSTAR at send time.
    * @example ["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
    */
@@ -100,6 +101,7 @@ export class UpdateEmailChannelSettingDto {
   @IsArray()
   @IsString({ each: true })
   @Matches(CSTAR_GROUP_ID_PATTERN, { each: true })
+  @ArrayMaxSize(100)
   cstarGroupIdsTo?: string[]
 
   /**
@@ -110,6 +112,7 @@ export class UpdateEmailChannelSettingDto {
   @IsArray()
   @IsString({ each: true })
   @Matches(CSTAR_GROUP_ID_PATTERN, { each: true })
+  @ArrayMaxSize(100)
   cstarGroupIdsCc?: string[]
 
   /**
@@ -120,6 +123,7 @@ export class UpdateEmailChannelSettingDto {
   @IsArray()
   @IsString({ each: true })
   @Matches(CSTAR_GROUP_ID_PATTERN, { each: true })
+  @ArrayMaxSize(100)
   cstarGroupIdsBcc?: string[]
 
   /**

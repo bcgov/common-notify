@@ -65,3 +65,14 @@ frontend:
   #-- have no data for this environment.
   promtail:
     enabled: true
+
+# Adapter image follows the release tag through the existing build/import/promotion pipeline.
+cstarMcp:
+  enabled: true
+  image: "" # Optional override; defaults to <global.registry>/<global.repository>/notify-cstar-mcp:<global.tag>.
+  secretName: cstar-mcp-secrets
+  replicaCount: 2
+  deploymentStrategy: RollingUpdate
+  pdb:
+    enabled: true
+    minAvailable: 1

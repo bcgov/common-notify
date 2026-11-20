@@ -7,6 +7,7 @@ import { useAppSelector } from '@/redux/hooks'
 import UserService from '@/service/user-service'
 import { useCstarRoles } from '@/hooks/useCstarRoles'
 import { useDashboardAccess } from '@/hooks/useDashboardAccess'
+import { useTenantFeatureAccess } from '@/hooks/useTenantFeatureAccess'
 import { useBulkNotificationsAccess } from '@/hooks/useBulkNotificationsAccess'
 import { useFeatureFlag } from '@/config/featureFlags/useFeatureFlag'
 import { SsoRole } from '@/enum/sso-role.enum'
@@ -90,6 +91,7 @@ const adminItems = {
         { label: 'Tenant Requests', to: '/admin/tenant-requests' },
         { label: 'SMS Numbers', to: '/admin/sms-numbers' },
         { label: 'Feature Flags', to: '/admin/feature-flags' },
+        { label: 'MCP Servers', to: '/admin/mcp-servers' },
       ],
     },
   ],
@@ -124,6 +126,7 @@ const Sidebar: FC = () => {
   const { canAccess: canDashboard } = useDashboardAccess()
   // Events are behind a feature flag; hide the nav item until it is enabled for the tenant
   const eventsEnabled = useFeatureFlag('events', selectedTenant?.id)
+  const { canAccess: mcpEnabled } = useTenantFeatureAccess('mcp_api')
 
   // Determine which menu items to show based on roles
   // Dashboard and Templates require CSTAR roles (assume NOTIFY_VIEWER or similar)
@@ -225,7 +228,13 @@ const Sidebar: FC = () => {
             {adminExpanded && !collapsed && (
               <div id={adminMenuId} className="sidebar__submenu">
                 {adminItems.groups.map((group) => (
-                  <SidebarNavGroup key={group.label} label={group.label} links={group.links} />
+                  <SidebarNavGroup
+                    key={group.label}
+                    label={group.label}
+                    links={group.links.filter(
+                      (link) => link.to !== '/admin/mcp-servers' || mcpEnabled,
+                    )}
+                  />
                 ))}
               </div>
             )}

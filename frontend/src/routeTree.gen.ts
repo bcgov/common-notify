@@ -20,6 +20,7 @@ import { Route as UsageRouteImport } from './routes/usage'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminFeatureFlagsRouteImport } from './routes/admin/feature-flags'
 import { Route as AdminHealthRouteImport } from './routes/admin/health'
+import { Route as AdminMcpServersRouteImport } from './routes/admin/mcp-servers'
 import { Route as AdminMonitoringRouteImport } from './routes/admin/monitoring'
 import { Route as AdminSmsNumbersRouteImport } from './routes/admin/sms-numbers'
 import { Route as AdminTenantRequestsRouteImport } from './routes/admin/tenant-requests'
@@ -89,6 +90,11 @@ const AdminFeatureFlagsRoute = AdminFeatureFlagsRouteImport.update({
 const AdminHealthRoute = AdminHealthRouteImport.update({
   id: '/health',
   path: '/health',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminMcpServersRoute = AdminMcpServersRouteImport.update({
+  id: '/mcp-servers',
+  path: '/mcp-servers',
   getParentRoute: () => AdminRouteRoute,
 } as any)
 const AdminMonitoringRoute = AdminMonitoringRouteImport.update({
@@ -181,6 +187,7 @@ export interface FileRoutesByFullPath {
   '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/admin/health': typeof AdminHealthRoute
+  '/admin/mcp-servers': typeof AdminMcpServersRoute
   '/admin/monitoring': typeof AdminMonitoringRoute
   '/admin/sms-numbers': typeof AdminSmsNumbersRoute
   '/admin/tenant-requests': typeof AdminTenantRequestsRoute
@@ -208,6 +215,7 @@ export interface FileRoutesByTo {
   '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/admin/health': typeof AdminHealthRoute
+  '/admin/mcp-servers': typeof AdminMcpServersRoute
   '/admin/monitoring': typeof AdminMonitoringRoute
   '/admin/sms-numbers': typeof AdminSmsNumbersRoute
   '/admin/tenant-requests': typeof AdminTenantRequestsRoute
@@ -237,6 +245,7 @@ export interface FileRoutesById {
   '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/admin/health': typeof AdminHealthRoute
+  '/admin/mcp-servers': typeof AdminMcpServersRoute
   '/admin/monitoring': typeof AdminMonitoringRoute
   '/admin/sms-numbers': typeof AdminSmsNumbersRoute
   '/admin/tenant-requests': typeof AdminTenantRequestsRoute
@@ -267,6 +276,7 @@ export interface FileRouteTypes {
     | '/usage'
     | '/admin/feature-flags'
     | '/admin/health'
+    | '/admin/mcp-servers'
     | '/admin/monitoring'
     | '/admin/sms-numbers'
     | '/admin/tenant-requests'
@@ -294,6 +304,7 @@ export interface FileRouteTypes {
     | '/usage'
     | '/admin/feature-flags'
     | '/admin/health'
+    | '/admin/mcp-servers'
     | '/admin/monitoring'
     | '/admin/sms-numbers'
     | '/admin/tenant-requests'
@@ -322,6 +333,7 @@ export interface FileRouteTypes {
     | '/usage'
     | '/admin/feature-flags'
     | '/admin/health'
+    | '/admin/mcp-servers'
     | '/admin/monitoring'
     | '/admin/sms-numbers'
     | '/admin/tenant-requests'
@@ -438,6 +450,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminHealthRouteImport
       parentRoute: typeof AdminRouteRoute
     }
+    '/admin/mcp-servers': {
+      id: '/admin/mcp-servers'
+      path: '/mcp-servers'
+      fullPath: '/admin/mcp-servers'
+      preLoaderRoute: typeof AdminMcpServersRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/admin/monitoring': {
       id: '/admin/monitoring'
       path: '/monitoring'
@@ -549,6 +568,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteRouteChildren {
   AdminFeatureFlagsRoute: typeof AdminFeatureFlagsRoute
   AdminHealthRoute: typeof AdminHealthRoute
+  AdminMcpServersRoute: typeof AdminMcpServersRoute
   AdminMonitoringRoute: typeof AdminMonitoringRoute
   AdminSmsNumbersRoute: typeof AdminSmsNumbersRoute
   AdminTenantRequestsRoute: typeof AdminTenantRequestsRoute
@@ -562,6 +582,7 @@ interface AdminRouteRouteChildren {
 const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminFeatureFlagsRoute: AdminFeatureFlagsRoute,
   AdminHealthRoute: AdminHealthRoute,
+  AdminMcpServersRoute: AdminMcpServersRoute,
   AdminMonitoringRoute: AdminMonitoringRoute,
   AdminSmsNumbersRoute: AdminSmsNumbersRoute,
   AdminTenantRequestsRoute: AdminTenantRequestsRoute,

@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Mock } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { configureStore } from '@reduxjs/toolkit'
+import { Provider } from 'react-redux'
+import tenantReducer from '@/redux/slices/tenant.slice'
 import EventsEmailTab from './EventsEmailTab'
 import type { EmailSettingsValues } from '../utils/emailSettings'
 import { NotificationChannel, TemplateEngine } from '@/api/templates.api'
@@ -9,6 +12,7 @@ import type * as TemplatesApi from '@/api/templates.api'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import type { ApprovedEmailLogo } from '@/interfaces/tenant-settings.interface'
 import type { CstarGroup } from '@/api/cstar.api'
+import type { CstarGroupsStatus } from '@/hooks/useCstarGroups'
 
 const getTemplatesMock = vi.fn()
 
@@ -105,6 +109,7 @@ type RenderOptions = {
   approvedLogos?: ApprovedEmailLogo[]
   tenantEmailLogoId?: string | null
   tenantName?: string | null
+  cstarGroupsStatus?: CstarGroupsStatus
   cstarGroups?: CstarGroup[]
   onSave?: Mock<(values: EmailSettingsValues) => Promise<void>>
   onDeactivate?: Mock<() => Promise<void>>
@@ -118,6 +123,24 @@ function renderTab({
   onDeactivate = vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
   ...rest
 }: RenderOptions = {}) {
+  const store = configureStore({
+    reducer: { tenant: tenantReducer },
+    preloadedState: {
+      tenant: {
+        selectedTenant: {
+          id: 'tenant-1',
+          name: 'Test tenant',
+          ministryName: 'Test ministry',
+          createdDateTime: '2026-08-01T00:00:00.000Z',
+          updatedDateTime: '2026-08-01T00:00:00.000Z',
+          createdBy: 'test-user',
+          updatedBy: 'test-user',
+          users: [],
+        },
+        showTenantModal: false,
+      },
+    },
+  })
   const view = render(
     <EventsEmailTab
       values={values}
@@ -127,6 +150,7 @@ function renderTab({
       isDisabled={isDisabled}
       {...rest}
     />,
+    { wrapper: ({ children }) => <Provider store={store}>{children}</Provider> },
   )
   return { ...view, onSave, onDeactivate }
 }
@@ -387,6 +411,47 @@ describe('EventsEmailTab', () => {
   })
 
   describe('CSTAR groups', () => {
+    it('hides disabled CSTAR tools while keeping manual recipients available', async () => {
+      renderTab({ values: { ...unconfigured, active: true }, cstarGroupsStatus: 'disabled' })
+      expect(screen.queryByRole('checkbox', { name: 'CSTAR Group(s)' })).not.toBeInTheDocument()
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Additional recipient(s)' }))
+      expect(screen.getByRole('group', { name: 'Additional recipients' })).toBeInTheDocument()
+    })
+
+    it('explains lookup failures without blocking manual recipients', () => {
+      renderTab({ values: { ...unconfigured, active: true }, cstarGroupsStatus: 'error' })
+      expect(
+        screen.getByText(
+          'Unable to retrieve the recipients using CSTAR. You can still enter recipients manually.',
+        ),
+      ).toBeInTheDocument()
+      expect(screen.getByRole('checkbox', { name: 'Additional recipient(s)' })).toBeEnabled()
+    })
+
+    it('preserves saved groups when CSTAR is disabled and another field is edited', async () => {
+      const { onSave } = renderTab({
+        values: { ...savedAndActive, cstarGroupIdsTo: ['group-1'] },
+        isConfigured: true,
+        cstarGroupsStatus: 'disabled',
+      })
+      expect(screen.queryByRole('checkbox', { name: 'CSTAR Group(s)' })).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: 'Remove saved CSTAR groups' }),
+      ).not.toBeInTheDocument()
+      await userEvent.clear(senderField())
+      await userEvent.type(senderField(), 'updated@gov.bc.ca')
+      await userEvent.click(saveButton())
+      await waitFor(() =>
+        expect(onSave).toHaveBeenCalledWith(
+          expect.objectContaining({
+            senderEmail: 'updated@gov.bc.ca',
+            to: ['alice@gov.bc.ca'],
+            cstarGroupIdsTo: ['group-1'],
+          }),
+        ),
+      )
+    })
+
     it('opens the group fields when CSTAR groups are chosen', async () => {
       renderTab({ values: { ...unconfigured, active: true }, cstarGroups: groups })
 
