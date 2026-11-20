@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { EntityManager, LessThan, Repository } from 'typeorm'
 import { Template } from './entities/template.entity'
 import { TemplateVersion } from './entities/template-version.entity'
+import { TemplatePreviewData } from './entities/template-preview-data.entity'
 import { EventChannelSetting } from '../events/entities/event-channel-setting.entity'
 import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
 import type { ParsedListQuery, QueryableFieldsConfig } from '../../common/query/list-query.types'
@@ -21,6 +22,30 @@ export class TemplatesRepository {
     @InjectRepository(EventChannelSetting)
     private readonly eventChannelSettingRepository: Repository<EventChannelSetting>,
   ) {}
+
+  async findPreviewData(templateId: string): Promise<TemplatePreviewData | null> {
+    return this.templateRepository.manager.getRepository(TemplatePreviewData).findOne({
+      where: { templateId },
+    })
+  }
+
+  async savePreviewData(
+    templateId: string,
+    params: Record<string, string>,
+    userId: string,
+  ): Promise<Record<string, string>> {
+    // Update only mutable fields so concurrent first saves preserve the original creator.
+    const result = await this.templateRepository.manager
+      .getRepository(TemplatePreviewData)
+      .createQueryBuilder()
+      .insert()
+      .values({ templateId, params, createdBy: userId, updatedBy: userId })
+      .orUpdate(['params', 'updated_by'], ['template_id'])
+      .returning(['params'])
+      .execute()
+
+    return result.raw[0].params
+  }
 
   /**
    * The tenant's event channel settings associated with this template
@@ -192,6 +217,36 @@ export class TemplatesRepository {
   async create(template: Partial<Template>): Promise<Template> {
     const newTemplate = this.templateRepository.create(template)
     return this.templateRepository.save(newTemplate)
+  }
+
+  async createWithInitialVersion(
+    data: Partial<Template>,
+    previewParams?: Record<string, string>,
+  ): Promise<Template> {
+    return this.templateRepository.manager.transaction(async (manager) => {
+      const template = await manager.save(Template, manager.create(Template, data))
+      await manager.save(TemplateVersion, {
+        templateId: template.id,
+        version: 1,
+        name: template.name,
+        description: template.description,
+        channelCode: template.channelCode,
+        subject: template.subject,
+        body: template.body,
+        engineCode: template.engineCode,
+        bodyType: template.bodyType,
+        createdBy: template.createdBy,
+      })
+      if (previewParams !== undefined) {
+        await manager.save(TemplatePreviewData, {
+          templateId: template.id,
+          params: previewParams,
+          createdBy: template.createdBy,
+          updatedBy: template.updatedBy,
+        })
+      }
+      return template
+    })
   }
 
   /**

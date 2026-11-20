@@ -6,6 +6,7 @@ import { TenantSendingHistory } from './api/admin/tenants/entities/tenant-sendin
 import { NotifyUser } from './api/admin/users/entities/notify-user.entity'
 import { Template } from './api/templates/entities/template.entity'
 import { TemplateVersion } from './api/templates/entities/template-version.entity'
+import { TemplatePreviewData } from './api/templates/entities/template-preview-data.entity'
 import { TemplateEngineCode } from './api/templates/entities/template-engine-code.entity'
 import { NotificationRequest } from './api/notification/entities/notification-request.entity'
 import { NotificationRequestDetail } from './api/notification/entities/notification-request-detail.entity'
@@ -70,6 +71,7 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         NotifyConfiguration,
         Template,
         TemplateVersion,
+        TemplatePreviewData,
         TemplateEngineCode,
         FeatureFlag,
         FeatureFlagCode,
