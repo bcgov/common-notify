@@ -16,6 +16,9 @@ global:
   autoscaling: true
 
 backend:
+  awsSms:
+    credentialsSync:
+      keysParameter: /iam_users/notify-sms-prod_keys
   #-- requested memory per pod: room for a pod's working set under bulk-send load, below the
   #-- 512MB heap cap (backend.heapMb) so the scheduler places pods where they actually fit
   memoryRequest: 384Mi

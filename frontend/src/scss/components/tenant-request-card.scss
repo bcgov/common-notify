@@ -1,0 +1,55 @@
+@import '../variables';
+
+.tenant-request-card {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  max-width: 572px;
+  padding: $spacing-md;
+  border: 1px solid $border-default;
+  border-radius: 4px;
+  background-color: $white;
+}
+
+.tenant-request-card__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-xs;
+}
+
+.tenant-request-card__type {
+  color: $text-secondary;
+}
+
+// A wrapper, since className on a DS Button replaces its own classes.
+.tenant-request-card__dismiss {
+  margin-left: auto;
+}
+
+.tenant-request-card__meta,
+.tenant-request-card__details {
+  margin: 0;
+  font-size: $font-size-sm;
+  color: $text-secondary;
+}
+
+.tenant-request-card__details {
+  color: $dark-text;
+}
+
+// The admin's own words, set apart from the card's text.
+.tenant-request-card__reason {
+  margin: $spacing-xs 0;
+  padding-left: $spacing-sm;
+  border-left: 3px solid $border-medium;
+  color: $dark-text;
+}
+
+.tenant-request-card__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-sm;
+  margin-top: $spacing-sm;
+}

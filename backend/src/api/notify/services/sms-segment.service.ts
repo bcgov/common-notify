@@ -1,8 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, Optional } from '@nestjs/common'
 import { TemplatesRepository } from '../../templates/templates.repository'
 import { TemplatesService } from '../../templates/templates.service'
 import { InlineRenderingService } from '../../../services/rendering/inline-rendering.service'
 import { countSmsSegments } from '../../../common/utils/sms-segments'
+import { withSmsSenderName } from '../../../common/utils/sms-sender-name'
+import { TenantSettingsService } from '../../tenant-settings/tenant-settings.service'
 import { describeError } from '../../../common/utils/describe-error'
 import { applyGcNotifyMergeRendering } from '../../../queue/merge-batch-builder'
 import type { NotifySimpleRequest } from '../schemas/notify-simple-request'
@@ -24,6 +26,7 @@ export class SmsSegmentService {
     private readonly templatesRepository: TemplatesRepository,
     private readonly templatesService: TemplatesService,
     private readonly inlineRenderingService: InlineRenderingService,
+    @Optional() private readonly tenantSettingsService?: TenantSettingsService,
   ) {}
 
   /**
@@ -40,8 +43,11 @@ export class SmsSegmentService {
   ): Promise<number> {
     if (!request?.sms) return 0
 
-    const render = await this.bodyRenderer(tenantId, request)
-    return countSmsSegments(await render({}))
+    const [render, senderName] = await Promise.all([
+      this.bodyRenderer(tenantId, request),
+      this.senderName(tenantId),
+    ])
+    return countSmsSegments(withSmsSenderName(await render({}), senderName))
   }
 
   /**
@@ -58,9 +64,30 @@ export class SmsSegmentService {
 
     // The template is looked up once for the whole merge; rendering is CPU-only, so the rows can
     // run together without touching the connection pool.
-    const render = await this.bodyRenderer(tenantId, request)
+    const [render, senderName] = await Promise.all([
+      this.bodyRenderer(tenantId, request),
+      this.senderName(tenantId),
+    ])
     const bodies = await Promise.all(rowParams.map((params) => render(params)))
-    return bodies.reduce((total, body) => total + countSmsSegments(body), 0)
+    return bodies.reduce(
+      (total, body) => total + countSmsSegments(withSmsSenderName(body, senderName)),
+      0,
+    )
+  }
+
+  /**
+   * The tenant name its SMS starts with, which is billed like the rest of the body. Fails open to
+   * no name, like the body itself: accounting must not fail a send.
+   */
+  private async senderName(tenantId: string): Promise<string | null> {
+    try {
+      return (await this.tenantSettingsService?.getSmsSenderName(tenantId)) ?? null
+    } catch (error) {
+      this.logger.warn(
+        `Failed to read the SMS sender name for segment counting (tenant=${tenantId}): ${describeError(error)}`,
+      )
+      return null
+    }
   }
 
   /**

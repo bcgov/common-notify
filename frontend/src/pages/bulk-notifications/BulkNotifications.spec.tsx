@@ -588,7 +588,13 @@ describe('BulkNotifications', () => {
         'email',
       ),
     )
-    expect(await screen.findByText('2 notifications queued')).toBeInTheDocument()
+    await waitFor(() => expect(showSuccessToast).toHaveBeenCalled())
+    const [title, detail, options] = vi.mocked(showSuccessToast).mock.calls[0]
+    expect(title).toBe('2 notifications queued')
+    // It holds a link, so it stays until dismissed.
+    expect(options).toEqual({ autoClose: false })
+    render(<>{detail}</>)
+    expect(screen.getByRole('link', { name: 'notification status page' })).toBeInTheDocument()
   })
 
   it('reports recipients the safelist dropped alongside the queued count', async () => {
@@ -613,8 +619,11 @@ describe('BulkNotifications', () => {
     await screen.findByText('All required data passed validation.')
     await userEvent.click(screen.getByRole('button', { name: 'Send notifications' }))
 
-    expect(await screen.findByText('1 notification queued')).toBeInTheDocument()
-    expect(screen.getByText(/not on this tenant safelist/)).toBeInTheDocument()
+    await waitFor(() => expect(showSuccessToast).toHaveBeenCalled())
+    const [title, detail] = vi.mocked(showSuccessToast).mock.calls[0]
+    expect(title).toBe('1 notification queued')
+    render(<>{detail}</>)
+    expect(screen.getByText(/not on this tenant safelist\. Track delivery/)).toBeInTheDocument()
   })
 
   it('says a repeat of a recent batch was already sent, rather than queued again', async () => {
@@ -636,11 +645,16 @@ describe('BulkNotifications', () => {
     await screen.findByText('All required data passed validation.')
     await userEvent.click(screen.getByRole('button', { name: 'Send notifications' }))
 
-    expect(await screen.findByRole('heading', { name: 'Already sent' })).toBeInTheDocument()
-    expect(screen.getByText(/nothing new was sent/)).toBeInTheDocument()
-    expect(screen.queryByText(/queued/)).not.toBeInTheDocument()
-    expect(showInfoToast).toHaveBeenCalledWith('Already sent. Nothing new was sent.')
+    await waitFor(() => expect(showInfoToast).toHaveBeenCalled())
+    const [title, detail] = vi.mocked(showInfoToast).mock.calls[0]
+    expect(title).toBe('Already sent')
     expect(showSuccessToast).not.toHaveBeenCalled()
+    render(<>{detail}</>)
+    expect(screen.getByText(/nothing new was sent/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'original send' })).toHaveAttribute(
+      'href',
+      '/request-status/$notificationRequestId',
+    )
   })
 
   it('previews a recipient with that row values substituted', async () => {

@@ -266,7 +266,7 @@ describe('validateCsv row-level problems', () => {
     ).toMatchObject({
       title: 'Invalid phone number format',
       detail:
-        'Check and update the phone number using the expected format (e.g., +1-778-123-1234).',
+        'Check and update the phone number using the expected format (e.g., +1-250-555-0100).',
     })
   })
 

@@ -184,6 +184,57 @@ describe('NotificationService', () => {
     })
   })
 
+  describe('create from a mail merge', () => {
+    beforeEach(() => {
+      mockRepository.create.mockImplementation((value) => value)
+      mockRepository.save.mockImplementation(async (value) => ({ id: 'notif-uuid', ...value }))
+      mockRepository.findOne.mockResolvedValue(null)
+    })
+
+    it("stores an SMS merge's numbers, normalised, as its recipients", async () => {
+      await service.create({
+        tenantId: 'tenant-uuid',
+        payload: {
+          sms: {
+            content: { templateId: 'tpl-1' },
+            recipients: {
+              mergeArray: [
+                ['to', 'name'],
+                ['250 555 0123', 'Pat'],
+              ],
+            },
+          },
+        } as any,
+      })
+
+      expect(mockRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channelCodes: ['SMS'],
+          recipients: { sms: ['+12505550123'] },
+        }),
+      )
+    })
+
+    it("stores an email merge's addresses as its recipients", async () => {
+      await service.create({
+        tenantId: 'tenant-uuid',
+        payload: {
+          email: {
+            content: { templateId: 'tpl-1' },
+            recipients: { mergeArray: [['to'], ['a@example.com']] },
+          },
+        } as any,
+      })
+
+      expect(mockRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channelCodes: ['EMAIL'],
+          recipients: { email: ['a@example.com'] },
+        }),
+      )
+    })
+  })
+
   describe('findAll', () => {
     const mockTenant = {
       id: 'tenant-uuid',

@@ -1,0 +1,29 @@
+import type { FC } from 'react'
+import { StatusBadge } from '@/components/StatusBadge'
+
+/** How each request status reads, as one of StatusBadge's colours and a label. */
+const BADGES: Record<string, { status: string; label: string }> = {
+  pending: { status: 'pending', label: 'Pending' },
+  approved: { status: 'completed', label: 'Approved' },
+  rejected: { status: 'failed', label: 'Rejected' },
+  released: { status: 'cancelled', label: 'Released' },
+  cancelled: { status: 'cancelled', label: 'Cancelled' },
+}
+
+/** How a request status reads, e.g. "Pending"; a status added later reads as its code. */
+export const tenantRequestStatusLabel = (status: string): string => BADGES[status]?.label ?? status
+
+/** The statuses this badge knows, in workflow order, for when the code table is not loaded. */
+export const TENANT_REQUEST_STATUSES = Object.keys(BADGES)
+
+/** The status of a tenant request. A status added later shows with a neutral colour. */
+const TenantRequestStatusBadge: FC<{ status: string }> = ({ status }) => {
+  const badge = BADGES[status]
+  return badge ? (
+    <StatusBadge status={badge.status} statusLabel={badge.label} />
+  ) : (
+    <StatusBadge status={status} />
+  )
+}
+
+export default TenantRequestStatusBadge
