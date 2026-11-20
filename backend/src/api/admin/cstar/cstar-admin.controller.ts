@@ -32,9 +32,13 @@ import {
   CstarGroupDto,
   CstarGroupSharedServiceDto,
   CstarGroupUserDto,
+  CstarHealthDto,
+  CstarSharedServiceDto,
   CstarSsoSearchUserDto,
+  CstarTenantDetailDto,
   CstarTenantRoleDto,
   CstarTenantUserDto,
+  CstarUserGroupDto,
 } from '../../../services/cstar/schemas/cstar.schema'
 import { AddCstarTenantUserDto } from './schemas/add-cstar-tenant-user.dto'
 import {
@@ -43,7 +47,7 @@ import {
   UpdateCstarGroupDto,
   UpdateCstarGroupRolesDto,
 } from './schemas/cstar-group.dto'
-import { CstarTenantUserQueryDto } from './schemas/cstar-tenant-user-query.dto'
+import { CstarTenantQueryDto, CstarTenantUserQueryDto } from './schemas/cstar-tenant-user-query.dto'
 import {
   CstarBceidSearchQueryDto,
   CstarIdirSearchQueryDto,
@@ -138,6 +142,72 @@ export class CstarAdminController {
     @Req() req: express.Request,
   ): Promise<CstarTenantRoleDto[]> {
     return this.cstarApiClient.getTenantUserRoles(tenantId, tenantUserId, req.headers.authorization)
+  }
+
+  @Version('1')
+  @Get('health')
+  @Roles(SsoRole.NOTIFY_ADMIN)
+  @ApiOperation({ summary: "CSTAR's health check (admin only)" })
+  @ApiOkResponse({ type: CstarHealthDto })
+  getHealth(): Promise<CstarHealthDto> {
+    return this.cstarApiClient.getHealth()
+  }
+
+  @Version('1')
+  @Get('tenants/:tenantId')
+  @Roles(SsoRole.NOTIFY_ADMIN)
+  @ApiOperation({ summary: 'A CSTAR tenant (admin only)' })
+  @ApiOkResponse({ type: CstarTenantDetailDto })
+  getTenant(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Query() query: CstarTenantQueryDto,
+    @Req() req: express.Request,
+  ): Promise<CstarTenantDetailDto> {
+    return this.cstarApiClient.getTenant(tenantId, query.expand, req.headers.authorization)
+  }
+
+  @Version('1')
+  @Get('tenants/:tenantId/shared-services')
+  @Roles(SsoRole.NOTIFY_ADMIN)
+  @ApiOperation({ summary: 'The shared services a CSTAR tenant uses (admin only)' })
+  @ApiOkResponse({ type: [CstarSharedServiceDto] })
+  getTenantSharedServices(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Req() req: express.Request,
+  ): Promise<CstarSharedServiceDto[]> {
+    return this.cstarApiClient.getTenantSharedServices(tenantId, req.headers.authorization)
+  }
+
+  @Version('1')
+  @Get('tenants/:tenantId/ssousers/:ssoUserId/roles')
+  @Roles(SsoRole.NOTIFY_ADMIN)
+  @ApiOperation({ summary: "An SSO user's tenant roles in a CSTAR tenant (admin only)" })
+  @ApiOkResponse({ type: [CstarTenantRoleDto] })
+  getSsoUserTenantRoles(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('ssoUserId') ssoUserId: string,
+    @Req() req: express.Request,
+  ): Promise<CstarTenantRoleDto[]> {
+    return this.cstarApiClient.getSsoUserTenantRoles(tenantId, ssoUserId, req.headers.authorization)
+  }
+
+  @Version('1')
+  @Get('tenants/:tenantId/ssousers/:ssoUserId/groups')
+  @Roles(SsoRole.NOTIFY_ADMIN)
+  @ApiOperation({
+    summary: "An SSO user's groups that grant Notify roles, with those roles (admin only)",
+  })
+  @ApiOkResponse({ type: [CstarUserGroupDto] })
+  getUserGroupsWithRoles(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('ssoUserId') ssoUserId: string,
+    @Req() req: express.Request,
+  ): Promise<CstarUserGroupDto[]> {
+    return this.cstarApiClient.getUserGroupsWithRoles(
+      tenantId,
+      ssoUserId,
+      req.headers.authorization,
+    )
   }
 
   @Version('1')

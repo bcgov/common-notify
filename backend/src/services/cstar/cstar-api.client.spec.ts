@@ -732,3 +732,95 @@ describe('CstarApiClient groups', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })
+
+/** The read-only tenant, shared service, SSO user and health lookups. */
+describe('CstarApiClient lookups', () => {
+  const TENANT = 'e936010f-bb93-4430-87d9-e6e70b63e75f'
+  const SSO_USER = 'fd33f1cef7ca4b19a71104d4ecf7066b'
+  const TENANT_PATH = `https://cstar.example/api/v1/tenants/${TENANT}`
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  const respond = (body: unknown) =>
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => body })
+
+  beforeEach(() => {
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('gets a tenant, sending expand only when given', async () => {
+    respond({ data: { tenant: { id: TENANT, name: 'Roads' } } })
+    const client = buildClient()
+
+    await expect(client.getTenant(TENANT, undefined, 'Bearer admin')).resolves.toEqual({
+      id: TENANT,
+      name: 'Roads',
+    })
+    expect(fetchMock.mock.calls[0][0]).toBe(TENANT_PATH)
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer admin')
+
+    await client.getTenant(TENANT, 'tenantUserRoles')
+    expect(fetchMock.mock.calls[1][0]).toBe(`${TENANT_PATH}?expand=tenantUserRoles`)
+  })
+
+  it("gets a tenant's shared services", async () => {
+    respond({ data: { sharedServices: [{ id: 'svc', name: 'NOTIFY' }] } })
+
+    await expect(buildClient().getTenantSharedServices(TENANT)).resolves.toEqual([
+      { id: 'svc', name: 'NOTIFY' },
+    ])
+    expect(fetchMock.mock.calls[0][0]).toBe(`${TENANT_PATH}/shared-services`)
+  })
+
+  it("gets an SSO user's tenant roles", async () => {
+    respond({ data: { roles: [{ id: 'r', name: 'SERVICE_USER' }] } })
+
+    await expect(buildClient().getSsoUserTenantRoles(TENANT, SSO_USER)).resolves.toEqual([
+      { id: 'r', name: 'SERVICE_USER' },
+    ])
+    expect(fetchMock.mock.calls[0][0]).toBe(`${TENANT_PATH}/ssousers/${SSO_USER}/roles`)
+  })
+
+  it("gets an SSO user's groups with their roles", async () => {
+    respond({ data: { groups: [{ id: 'g', sharedServiceRoles: [{ name: 'NOTIFY_VIEWER' }] }] } })
+
+    await expect(buildClient().getUserGroupsWithRoles(TENANT, SSO_USER)).resolves.toEqual([
+      { id: 'g', sharedServiceRoles: [{ name: 'NOTIFY_VIEWER' }] },
+    ])
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      `${TENANT_PATH}/users/${SSO_USER}/groups/shared-service-roles`,
+    )
+  })
+
+  it('returns empty lists when CSTAR omits them', async () => {
+    respond({ data: {} })
+    const client = buildClient()
+
+    await expect(client.getTenantSharedServices(TENANT)).resolves.toEqual([])
+    await expect(client.getSsoUserTenantRoles(TENANT, SSO_USER)).resolves.toEqual([])
+    await expect(client.getUserGroupsWithRoles(TENANT, SSO_USER)).resolves.toEqual([])
+  })
+
+  it('rejects an ssoUserId that could change the request path', async () => {
+    await expect(buildClient().getUserGroupsWithRoles(TENANT, '../..')).rejects.toThrow(
+      BadRequestException,
+    )
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('checks health without a token', async () => {
+    respond({ apiStatus: 'Healthy', time: '2026-11-20T10:00:00Z' })
+
+    await expect(buildClient().getHealth()).resolves.toEqual({
+      apiStatus: 'Healthy',
+      time: '2026-11-20T10:00:00Z',
+    })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://cstar.example/api/v1/health')
+    expect(init.headers.Authorization).toBeUndefined()
+  })
+})

@@ -1,5 +1,15 @@
-import { IsOptional, Matches } from 'class-validator'
+import { IsIn, IsOptional, Matches } from 'class-validator'
 import { ApiPropertyOptional } from '@nestjs/swagger'
+
+export class CstarTenantQueryDto {
+  @ApiPropertyOptional({
+    description: "tenantUserRoles to include the tenant's users and their tenant roles",
+    enum: ['tenantUserRoles'],
+  })
+  @IsOptional()
+  @IsIn(['tenantUserRoles'])
+  expand?: string
+}
 
 export class CstarTenantUserQueryDto {
   @ApiPropertyOptional({

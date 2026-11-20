@@ -262,6 +262,76 @@ export class CstarGroupSharedServiceDto {
   sharedServiceRoles: CstarGroupSharedServiceRoleDto[]
 }
 
+/** A CSTAR tenant, with its users and their tenant roles when expanded with tenantUserRoles */
+export class CstarTenantDetailDto extends CstarTenantDto {
+  @ApiProperty({ type: [CstarTenantUserDto], required: false })
+  users?: CstarTenantUserDto[]
+}
+
+/** One of a shared service's roles */
+export class CstarSharedServiceRoleDto {
+  @ApiProperty({ format: 'uuid' })
+  id: string
+
+  @ApiProperty({ description: 'Role name, e.g. NOTIFY_VIEWER' })
+  name: string
+
+  @ApiProperty({ required: false })
+  description?: string
+
+  @ApiProperty({
+    description: 'Identity providers allowed this role; null or empty allows all',
+    nullable: true,
+    required: false,
+  })
+  allowedIdentityProviders?: string[] | null
+}
+
+/** A shared service a tenant uses, with its roles */
+export class CstarSharedServiceDto {
+  @ApiProperty({ format: 'uuid' })
+  id: string
+
+  @ApiProperty()
+  name: string
+
+  @ApiProperty()
+  displayName: string
+
+  @ApiProperty({ description: "The service's SSO client ID" })
+  clientIdentifier: string
+
+  @ApiProperty({ required: false })
+  description?: string
+
+  @ApiProperty()
+  isActive: boolean
+
+  @ApiProperty()
+  allowHeadlessOps: boolean
+
+  @ApiProperty()
+  allowServiceAccounts: boolean
+
+  @ApiProperty({ type: [CstarSharedServiceRoleDto] })
+  roles: CstarSharedServiceRoleDto[]
+}
+
+/** A group a user belongs to, with the calling service's roles that it grants */
+export class CstarUserGroupDto extends CstarGroupDto {
+  @ApiProperty({ type: [CstarSharedServiceRoleDto] })
+  sharedServiceRoles: CstarSharedServiceRoleDto[]
+}
+
+/** CSTAR's health check response */
+export class CstarHealthDto {
+  @ApiProperty({ example: 'Healthy' })
+  apiStatus: string
+
+  @ApiProperty({ format: 'date-time' })
+  time: string
+}
+
 /** Request body for switching a group's shared service roles on or off */
 export interface CstarGroupRolesUpdate {
   sharedServices: Array<{

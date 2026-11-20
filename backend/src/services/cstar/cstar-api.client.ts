@@ -19,12 +19,16 @@ import type {
   CstarGroupSharedServiceDto,
   CstarGroupUserDto,
   CstarGroupsResponseDto,
+  CstarHealthDto,
   CstarRolesResponseDto,
+  CstarSharedServiceDto,
   CstarSsoSearchUserDto,
   CstarSsoUserDto,
+  CstarTenantDetailDto,
   CstarTenantRoleDto,
   CstarTenantsResponseDto,
   CstarTenantUserDto,
+  CstarUserGroupDto,
 } from './schemas/cstar.schema'
 
 interface CstarErrorResponse {
@@ -531,6 +535,80 @@ export class CstarApiClient {
       `roles of tenant user ${tenantUserId}`,
     )
     return body.data?.roles ?? []
+  }
+
+  /**
+   * One CSTAR tenant.
+   *
+   * @param expand `tenantUserRoles` to include the tenant's users and their tenant roles
+   */
+  async getTenant(
+    tenantId: string,
+    expand: string | undefined,
+    authHeader?: string,
+  ): Promise<CstarTenantDetailDto> {
+    const safeTenantId = this.safeSegment(tenantId, 'tenantId')
+    const body = await this.cstarGet<{ data: { tenant: CstarTenantDetailDto } }>(
+      `/api/v1/tenants/${safeTenantId}${this.queryString({ expand })}`,
+      authHeader,
+      `tenant ${tenantId}`,
+    )
+    return body.data.tenant
+  }
+
+  /** The shared services a CSTAR tenant uses, with their roles. */
+  async getTenantSharedServices(
+    tenantId: string,
+    authHeader?: string,
+  ): Promise<CstarSharedServiceDto[]> {
+    const safeTenantId = this.safeSegment(tenantId, 'tenantId')
+    const body = await this.cstarGet<{ data?: { sharedServices?: CstarSharedServiceDto[] } }>(
+      `/api/v1/tenants/${safeTenantId}/shared-services`,
+      authHeader,
+      `shared services of tenant ${tenantId}`,
+    )
+    return body.data?.sharedServices ?? []
+  }
+
+  /** The tenant roles held by an SSO user in a CSTAR tenant, looked up by SSO user ID. */
+  async getSsoUserTenantRoles(
+    tenantId: string,
+    ssoUserId: string,
+    authHeader?: string,
+  ): Promise<CstarTenantRoleDto[]> {
+    const safeTenantId = this.safeSegment(tenantId, 'tenantId')
+    const safeSsoUserId = this.safeSegment(ssoUserId, 'ssoUserId')
+    const body = await this.cstarGet<{ data?: { roles?: CstarTenantRoleDto[] } }>(
+      `/api/v1/tenants/${safeTenantId}/ssousers/${safeSsoUserId}/roles`,
+      authHeader,
+      `tenant roles of SSO user ${ssoUserId}`,
+    )
+    return body.data?.roles ?? []
+  }
+
+  /**
+   * The groups an SSO user belongs to in a CSTAR tenant, with the roles each grants. CSTAR
+   * returns only groups that grant at least one role of the calling service, so with
+   * Notify's token these are the groups behind the user's Notify roles.
+   */
+  async getUserGroupsWithRoles(
+    tenantId: string,
+    ssoUserId: string,
+    authHeader?: string,
+  ): Promise<CstarUserGroupDto[]> {
+    const safeTenantId = this.safeSegment(tenantId, 'tenantId')
+    const safeSsoUserId = this.safeSegment(ssoUserId, 'ssoUserId')
+    const body = await this.cstarGet<{ data?: { groups?: CstarUserGroupDto[] } }>(
+      `/api/v1/tenants/${safeTenantId}/users/${safeSsoUserId}/groups/shared-service-roles`,
+      authHeader,
+      `groups of SSO user ${ssoUserId}`,
+    )
+    return body.data?.groups ?? []
+  }
+
+  /** CSTAR's health check. Needs no token. */
+  async getHealth(): Promise<CstarHealthDto> {
+    return this.cstarGet<CstarHealthDto>('/api/v1/health', undefined, 'health')
   }
 
   /**

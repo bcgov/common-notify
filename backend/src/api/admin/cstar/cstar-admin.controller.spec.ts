@@ -33,6 +33,11 @@ describe('CstarAdminController', () => {
       removeGroupUser: vi.fn().mockResolvedValue(undefined),
       getGroupRoles: vi.fn().mockResolvedValue([]),
       updateGroupRoles: vi.fn().mockResolvedValue([]),
+      getHealth: vi.fn().mockResolvedValue({}),
+      getTenant: vi.fn().mockResolvedValue({}),
+      getTenantSharedServices: vi.fn().mockResolvedValue([]),
+      getSsoUserTenantRoles: vi.fn().mockResolvedValue([]),
+      getUserGroupsWithRoles: vi.fn().mockResolvedValue([]),
     }
     controller = new CstarAdminController(client as unknown as CstarApiClient)
   })
@@ -57,6 +62,11 @@ describe('CstarAdminController', () => {
     'removeGroupUser',
     'getGroupRoles',
     'updateGroupRoles',
+    'getHealth',
+    'getTenant',
+    'getTenantSharedServices',
+    'getSsoUserTenantRoles',
+    'getUserGroupsWithRoles',
   ] as const)('requires the NOTIFY_ADMIN SSO role for %s', (handler) => {
     const roles = Reflect.getMetadata(ROLES_KEY, CstarAdminController.prototype[handler])
     expect(roles).toEqual([SsoRole.NOTIFY_ADMIN])
@@ -156,6 +166,31 @@ describe('CstarAdminController', () => {
       ]
       await controller.updateGroupRoles(TENANT, GROUP, { sharedServices }, req)
       expect(client.updateGroupRoles).toHaveBeenCalledWith(TENANT, GROUP, { sharedServices }, AUTH)
+    })
+  })
+
+  describe('lookups', () => {
+    const SSO_USER = 'fd33f1cef7ca4b19a71104d4ecf7066b'
+
+    it("checks CSTAR's health without a token", async () => {
+      await controller.getHealth()
+      expect(client.getHealth).toHaveBeenCalledWith()
+    })
+
+    it('gets a tenant, passing expand through, and its shared services', async () => {
+      await controller.getTenant(TENANT, { expand: 'tenantUserRoles' }, req)
+      expect(client.getTenant).toHaveBeenCalledWith(TENANT, 'tenantUserRoles', AUTH)
+
+      await controller.getTenantSharedServices(TENANT, req)
+      expect(client.getTenantSharedServices).toHaveBeenCalledWith(TENANT, AUTH)
+    })
+
+    it("gets an SSO user's tenant roles and groups", async () => {
+      await controller.getSsoUserTenantRoles(TENANT, SSO_USER, req)
+      expect(client.getSsoUserTenantRoles).toHaveBeenCalledWith(TENANT, SSO_USER, AUTH)
+
+      await controller.getUserGroupsWithRoles(TENANT, SSO_USER, req)
+      expect(client.getUserGroupsWithRoles).toHaveBeenCalledWith(TENANT, SSO_USER, AUTH)
     })
   })
 })
