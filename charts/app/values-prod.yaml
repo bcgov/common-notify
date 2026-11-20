@@ -68,8 +68,8 @@ frontend:
 
 # Adapter image follows the release tag through the existing build/import/promotion pipeline.
 cstarMcp:
-  # Off for the first release: soak in DEV and TEST, then flip PROD in a follow-up.
-  enabled: false
+  # Existing event group listing and delivery require this adapter.
+  enabled: true
   image: "" # Optional override; defaults to <global.registry>/<global.repository>/notify-cstar-mcp:<global.tag>.
   secretName: cstar-mcp-secrets
   replicaCount: 2

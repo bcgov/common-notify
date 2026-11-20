@@ -96,7 +96,9 @@ export class McpClientService {
     const credential = process.env[server.credential_env]
     if (!credential) throw new BadGatewayException('MCP credentials are not configured')
     const client = new Client({ name: 'notify', version: '1.0.0' })
-    const deadline = AbortSignal.timeout(15000)
+    // Allow the adapter's 30-second operation budget plus protocol overhead.
+    const timeout = 35000
+    const deadline = AbortSignal.timeout(timeout)
     const transport = new StreamableHTTPClientTransport(destination, {
       requestInit: {
         headers: { Authorization: `Bearer ${credential}`, 'x-tenant-id': tenantId },
@@ -107,7 +109,7 @@ export class McpClientService {
     try {
       await client.connect(transport)
       const response = await client.callTool({ name: tool, arguments: parameters }, undefined, {
-        timeout: 15000,
+        timeout,
         signal: deadline,
       })
       if (response.isError) throw new Error('MCP tool failed')

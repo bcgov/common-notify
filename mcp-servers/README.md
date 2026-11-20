@@ -21,7 +21,8 @@ Unknown fields are rejected, including tenant IDs supplied as tool arguments. Th
 groups belong to the supplied tenant before expanding members. Emails are trimmed, lowercased,
 deduplicated and limited to the email field; no arbitrary CSTAR user fields leave the adapter.
 Failures stop the send, rather than silently sending to a subset. HTTP lookups and token requests
-have 10-second deadlines; the Notify MCP operation has a 15-second overall deadline.
+have 10-second deadlines within a shared 30-second adapter budget; Notify allows 35 seconds
+including protocol overhead.
 
 ## Service account configuration
 
@@ -177,8 +178,15 @@ selected by `app-api-secrets.CSTAR_API_URL`. The previous CSTAR client forwarded
 not establish a stored service-account credential mapping. Confirm the existing service-account
 Secret/key before copying or remapping credentials. Do not commit secret values.
 
-Event group workflows require the adapter; `cstarMcp.enabled` controls its deployment. The
-image defaults to the release registry/repository/tag supplied by the existing deployer;
+Event group workflows require the adapter; `cstarMcp.enabled` controls its deployment.
+DEV/PR, TEST and PROD charts enable it together with the application integration. Provision each
+environment's existing secret mappings before promotion.
+Each To/CC/BCC selection accepts up to 100 CSTAR groups. A lookup has a shared 30-second budget
+across authentication and group expansion, with a 10-second limit on each upstream request.
+Notify allows 35 seconds for the adapter call, including protocol overhead. Any failed or timed-out
+lookup fails the send rather than returning partial recipients.
+
+The image defaults to the release registry/repository/tag supplied by the existing deployer;
 `cstarMcp.image` is an optional full-image override. Secrets must exist in each target namespace
 before deployment. The service is internal (`<release>-cstar-mcp:3101`), with readiness and liveness
 probes, rolling updates, non-root containers and no API-server token. Test/prod value files set

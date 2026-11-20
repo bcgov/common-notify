@@ -63,7 +63,7 @@ test('HTTPS validates the service identity and trusted CA, including the healthc
     '-subj',
     '/CN=cstar-mcp.test',
     '-addext',
-    'subjectAltName=DNS:cstar-mcp.test',
+    'subjectAltName=DNS:cstar-mcp.test,IP:127.0.0.1',
   ])
   const config = {
     MCP_API_KEY: key,
@@ -72,8 +72,45 @@ test('HTTPS validates the service identity and trusted CA, including the healthc
     MCP_TLS_CA_FILE: certificate,
     MCP_TLS_SERVER_NAME: 'cstar-mcp.test',
   }
-  const port = await listen(createListener(config, {}), t)
+  const port = await listen(
+    createListener(config, {
+      listGroups: async (tenant) => {
+        assert.equal(tenant, 'tenant-a')
+        return { groups: [{ id: 'group-a', name: 'Operations' }] }
+      },
+    }),
+    t,
+  )
   await exec(process.execPath, [healthcheck], { env: { ...process.env, ...config, PORT: port } })
+  // Exercise the same SDK transport and CA trust used by Notify, beyond /health.
+  const call = await exec(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      `
+    import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+    import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+    const client = new Client({ name: 'notify', version: '1.0.0' })
+    try {
+      await client.connect(new StreamableHTTPClientTransport(new URL(process.env.TEST_MCP_URL), {
+        requestInit: { headers: { Authorization: 'Bearer ' + process.env.MCP_API_KEY, 'x-tenant-id': 'tenant-a' } },
+      }))
+      const result = await client.callTool({ name: 'list_groups', arguments: {} })
+      console.log(JSON.stringify(result.structuredContent))
+    } finally { await client.close() }
+  `,
+    ],
+    {
+      env: {
+        ...process.env,
+        ...config,
+        NODE_EXTRA_CA_CERTS: certificate,
+        TEST_MCP_URL: `https://127.0.0.1:${port}/mcp`,
+      },
+    },
+  )
+  assert.deepEqual(JSON.parse(call.stdout), { groups: [{ id: 'group-a', name: 'Operations' }] })
   await assert.rejects(
     exec(process.execPath, [healthcheck], {
       env: { ...process.env, ...config, PORT: port, MCP_TLS_SERVER_NAME: 'wrong-service.test' },

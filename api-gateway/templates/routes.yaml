@@ -695,20 +695,6 @@ routes:
     request_buffering: true
     response_buffering: true
 
-  # Read-only group expansion, guarded by the selected tenant's roles and events flag.
-  - name: ${ROUTE_PREFIX}events-group-recipients-frontend
-    tags: [${CONFIG_TAG}]
-    hosts:
-      - ${GATEWAY_HOSTNAME}
-    paths:
-      - ${PATH_PREFIX}/api/v1/frontend/events/cstar-group-recipients
-    methods: [POST]
-    strip_path: true
-    https_redirect_status_code: 426
-    path_handling: v0
-    request_buffering: true
-    response_buffering: true
-
   # /api/v1/frontend/admin/feature-flags (list all)
   - name: ${ROUTE_PREFIX}admin-feature-flags-list-frontend
     tags: [${CONFIG_TAG}]
@@ -1834,17 +1820,11 @@ plugins:
   # ============================================================================
   # FEATURE FLAG ADMIN ROUTES PLUGINS
   # ============================================================================
-  # MCP registry and read-only recipient preview use the existing frontend JWT policy.
+  # MCP registry uses the existing frontend JWT policy.
   - name: jwt-keycloak
     tags: [${CONFIG_TAG}]
     enabled: true
     route: ${ROUTE_PREFIX}admin-mcp-servers-frontend
-    config: *jwtConfig
-
-  - name: jwt-keycloak
-    tags: [${CONFIG_TAG}]
-    enabled: true
-    route: ${ROUTE_PREFIX}events-group-recipients-frontend
     config: *jwtConfig
 
   # Admin Feature Flags List - Frontend Admin Token

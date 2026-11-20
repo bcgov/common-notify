@@ -14,7 +14,7 @@ export class CstarClient {
     this.token = null
   }
 
-  async accessToken() {
+  async accessToken(signal = AbortSignal.timeout(30000)) {
     if (this.token && this.token.expiresAt > Date.now() + 30000) return this.token.value
     const { CSTAR_TOKEN_URL, CSTAR_CLIENT_ID, CSTAR_CLIENT_SECRET, CSTAR_SCOPE } = this.config
     const missing = ['CSTAR_TOKEN_URL', 'CSTAR_CLIENT_ID', 'CSTAR_CLIENT_SECRET'].filter(
@@ -33,7 +33,7 @@ export class CstarClient {
       method: 'POST',
       body,
       redirect: 'error',
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]),
     })
     if (!response.ok) throw new Error(`CSTAR authentication failed (HTTP ${response.status})`)
     let result
@@ -51,13 +51,13 @@ export class CstarClient {
     return this.token.value
   }
 
-  async get(path) {
+  async get(path, signal = AbortSignal.timeout(30000)) {
     if (!this.config.CSTAR_API_URL) throw new Error('CSTAR API is not configured')
-    const token = await this.accessToken()
+    const token = await this.accessToken(signal)
     const response = await this.request(new URL(path, this.config.CSTAR_API_URL), {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
       redirect: 'error',
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]),
     })
     if (response.status === 401) this.token = null
     if (!response.ok) throw new Error(`CSTAR lookup failed (HTTP ${response.status})`)
@@ -68,8 +68,8 @@ export class CstarClient {
     }
   }
 
-  async listGroups(tenantId) {
-    const body = await this.get(`/api/v1/tenants/${validateIdentifier(tenantId)}/groups`)
+  async listGroups(tenantId, signal = AbortSignal.timeout(30000)) {
+    const body = await this.get(`/api/v1/tenants/${validateIdentifier(tenantId)}/groups`, signal)
     if (!Array.isArray(body.data?.groups)) throw new Error('Invalid CSTAR groups response')
     return {
       groups: body.data.groups.map(({ id, name, description }) => ({
@@ -80,12 +80,12 @@ export class CstarClient {
     }
   }
 
-  async getRecipients(tenantId, groupIds) {
+  async getRecipients(tenantId, groupIds, signal = AbortSignal.timeout(30000)) {
     validateIdentifier(tenantId)
     groupIds.forEach(validateIdentifier)
     if (!groupIds.length) return { emails: [] }
     // Validate tenant ownership before expanding groups with a privileged service account.
-    const { groups } = await this.listGroups(tenantId)
+    const { groups } = await this.listGroups(tenantId, signal)
     const allowed = new Set(groups.map((group) => group.id))
     if (groupIds.some((id) => !allowed.has(id))) throw new Error('Group does not belong to tenant')
     const uniqueGroupIds = [...new Set(groupIds)]
@@ -95,7 +95,7 @@ export class CstarClient {
     for (let offset = 0; offset < uniqueGroupIds.length; offset += 4) {
       const results = await Promise.all(
         uniqueGroupIds.slice(offset, offset + 4).map(async (groupId) => {
-          const body = await this.get(`/api/v1/tenants/${tenantId}/groups/${groupId}/users`)
+          const body = await this.get(`/api/v1/tenants/${tenantId}/groups/${groupId}/users`, signal)
           if (!Array.isArray(body.data?.users)) throw new Error('Invalid CSTAR users response')
           return body.data.users
             .map((user) => user?.email)

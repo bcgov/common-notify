@@ -5,6 +5,53 @@ import { createApp } from '../src/server.js'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 
+test('recipient expansion shares cancellation across batches and never returns partial recipients', async () => {
+  const controller = new AbortController()
+  let userRequests = 0
+  const client = new CstarClient(
+    { CSTAR_API_URL: 'https://cstar.example' },
+    async (url, options) => {
+      options.signal.throwIfAborted()
+      if (String(url).endsWith('/groups'))
+        return Response.json({
+          data: {
+            groups: Array.from({ length: 5 }, (_, i) => ({ id: `g${i}`, name: `Group ${i}` })),
+          },
+        })
+      userRequests++
+      if (userRequests === 4) controller.abort(new Error('Operation deadline reached'))
+      return Response.json({ data: { users: [{ email: 'member@example.com' }] } })
+    },
+  )
+  client.token = { value: 'token', expiresAt: Date.now() + 300000 }
+  await assert.rejects(
+    client.getRecipients('tenant-a', ['g0', 'g1', 'g2', 'g3', 'g4'], controller.signal),
+    /Operation deadline reached/,
+  )
+  assert.equal(userRequests, 4)
+})
+
+test('cancelled lookups also cancel service-account authentication', async () => {
+  const controller = new AbortController()
+  controller.abort(new Error('Operation deadline reached'))
+  const client = new CstarClient(
+    {
+      CSTAR_API_URL: 'https://cstar.example',
+      CSTAR_TOKEN_URL: 'https://sso.example/token',
+      CSTAR_CLIENT_ID: 'client',
+      CSTAR_CLIENT_SECRET: 'secret',
+    },
+    async (_url, options) => {
+      options.signal.throwIfAborted()
+      throw new Error('Should not reach upstream')
+    },
+  )
+  await assert.rejects(
+    client.listGroups('tenant-a', controller.signal),
+    /Operation deadline reached/,
+  )
+})
+
 test('service account resolves only tenant-owned groups and normalizes emails', async () => {
   const calls = []
   const client = new CstarClient(
