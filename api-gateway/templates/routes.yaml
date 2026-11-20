@@ -744,9 +744,9 @@ routes:
   # ============================================================================
   # CSTAR ADMIN ROUTES (admin only)
   # ============================================================================
-  # /api/v1/frontend/admin/cstar (tenant users, their roles, and IDIR/BCeID user search)
-  # Kong prefix-matches, so this covers tenants/:tenantId/users[/:tenantUserId[/roles]]
-  # and users/search/{idir,bceid}.
+  # /api/v1/frontend/admin/cstar (tenant users, groups, their roles, and IDIR/BCeID user search)
+  # Kong prefix-matches, so this covers tenants/:tenantId/users[/:tenantUserId[/roles]],
+  # tenants/:tenantId/groups[/:groupId[/roles]] and users/search/{idir,bceid}.
   - name: ${ROUTE_PREFIX}admin-cstar-read-frontend
     tags: [${CONFIG_TAG}]
     hosts:
@@ -762,6 +762,7 @@ routes:
     response_buffering: true
 
   # /api/v1/frontend/admin/cstar/tenants/:tenantId/users (add a tenant user)
+  # Also covers .../groups (create a group) and .../groups/:groupId/users (add a group user).
   - name: ${ROUTE_PREFIX}admin-cstar-tenant-users-create-frontend
     tags: [${CONFIG_TAG}]
     hosts:
@@ -776,7 +777,23 @@ routes:
     request_buffering: true
     response_buffering: true
 
+  # /api/v1/frontend/admin/cstar/tenants/:tenantId/groups/:groupId[/roles] (update a group or its roles)
+  - name: ${ROUTE_PREFIX}admin-cstar-groups-update-frontend
+    tags: [${CONFIG_TAG}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/admin/cstar/tenants/
+    methods:
+      - PUT
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
   # /api/v1/frontend/admin/cstar/tenants/:tenantId/users/:tenantUserId (remove a tenant user)
+  # Also covers .../groups/:groupId/users/:groupUserId (remove a group user).
   - name: ${ROUTE_PREFIX}admin-cstar-tenant-users-delete-frontend
     tags: [${CONFIG_TAG}]
     hosts:

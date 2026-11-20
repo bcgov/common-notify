@@ -12,8 +12,12 @@ import {
 import { ConfigService } from '@nestjs/config'
 import { CstarCacheStore } from './cstar-cache.store'
 import type {
+  CstarGroupDetailDto,
   CstarGroupDto,
   CstarGroupMemberDto,
+  CstarGroupRolesUpdate,
+  CstarGroupSharedServiceDto,
+  CstarGroupUserDto,
   CstarGroupsResponseDto,
   CstarRolesResponseDto,
   CstarSsoSearchUserDto,
@@ -21,7 +25,6 @@ import type {
   CstarTenantRoleDto,
   CstarTenantsResponseDto,
   CstarTenantUserDto,
-  CstarTenantUsersResponseDto,
 } from './schemas/cstar.schema'
 
 interface CstarErrorResponse {
@@ -403,46 +406,36 @@ export class CstarApiClient {
 
   /**
    * The email addresses of the members of one or more CSTAR groups, for sending a
-   * notification to those groups.
+   * notification to those groups. Authenticated as Notify's CSTAR service account, so it
+   * works with no user present.
    *
-   * Resolved through the tenant users endpoint filtered by `groupIds` rather than through
-   * GET groups/{groupId}?expand=groupUsers: that endpoint requires a CSTAR audience token,
-   * while this one accepts the shared service audience token we authenticate to CSTAR with.
-   * It also takes the whole group list at once, so a recipient field costs one call rather
-   * than one per group.
+   * One call per group: GET groups/{groupId}/users is the only member lookup CSTAR accepts
+   * a service account token on. The tenant users endpoint filtered by `groupIds` would take
+   * them all at once, but only with a user token.
    *
-   * Users without a usable address (no SSO user, or no email on it) are dropped rather than
-   * returned as blanks, and addresses are de-duplicated: one person in two of an event's
-   * groups should be mailed once.
+   * Members without an email are dropped rather than returned as blanks, and addresses are
+   * de-duplicated: one person in two of an event's groups should be mailed once.
    *
    * @param tenantId The CSTAR tenant ID (notify's tenant.externalId)
    * @param groupIds The CSTAR group IDs whose members to resolve
-   * @param authHeader JWT Authorization header to authenticate with CSTAR
    */
-  async getGroupMemberEmails(
+  async getGroupMemberEmailsAsServiceAccount(
     tenantId: string,
     groupIds: string[],
-    authHeader?: string,
   ): Promise<string[]> {
-    this.requireIdentifier(tenantId, 'tenantId')
-    const safeTenantId = encodeURIComponent(this.validatePathSegment(tenantId, 'tenantId'))
-
-    const safeGroupIds = groupIds.map((groupId, index) => {
-      this.requireIdentifier(groupId, `groupIds[${index}]`)
-      return this.validatePathSegment(groupId, `groupIds[${index}]`)
-    })
-    if (safeGroupIds.length === 0) {
+    if (groupIds.length === 0) {
       return []
     }
 
-    const body = await this.cstarGet<CstarTenantUsersResponseDto>(
-      `/api/v1/tenants/${safeTenantId}/users?groupIds=${encodeURIComponent(safeGroupIds.join(','))}`,
-      authHeader,
-      `members of group(s) ${safeGroupIds.join(', ')}`,
+    // Fetch the token before fanning out, or a cold cache would request one per group.
+    await this.getServiceAccountAuthHeader()
+    const groups = await Promise.all(
+      groupIds.map((groupId) => this.getGroupMembersAsServiceAccount(tenantId, groupId)),
     )
 
-    const emails = (body.data?.users ?? [])
-      .map((user) => user?.ssoUser?.email?.trim().toLowerCase())
+    const emails = groups
+      .flat()
+      .map((member) => member?.email?.trim().toLowerCase())
       .filter((email): email is string => !!email)
 
     return [...new Set(emails)]
@@ -598,6 +591,137 @@ export class CstarApiClient {
     return body.data?.users ?? []
   }
 
+  /**
+   * One CSTAR group with its members. Always expands groupUsers: each member's id is the
+   * groupUserId that removing them from the group needs.
+   */
+  async getGroup(
+    tenantId: string,
+    groupId: string,
+    authHeader?: string,
+  ): Promise<CstarGroupDetailDto> {
+    const body = await this.cstarGet<{ data: { group: CstarGroupDetailDto } }>(
+      `${this.groupPath(tenantId, groupId)}?expand=groupUsers`,
+      authHeader,
+      `group ${groupId}`,
+    )
+    return body.data.group
+  }
+
+  /** Create a group in a CSTAR tenant. CSTAR returns 409 for a name already in use. */
+  async createGroup(
+    tenantId: string,
+    group: { name: string; description?: string },
+    authHeader?: string,
+  ): Promise<CstarGroupDto> {
+    const safeTenantId = this.safeSegment(tenantId, 'tenantId')
+    const body = await this.cstarRequest<{ data: { group: CstarGroupDto } }>(
+      'POST',
+      `/api/v1/tenants/${safeTenantId}/groups`,
+      authHeader,
+      `group for tenant ${tenantId}`,
+      group,
+    )
+    return body.data.group
+  }
+
+  /** Rename a group or change its description. */
+  async updateGroup(
+    tenantId: string,
+    groupId: string,
+    group: { name?: string; description?: string },
+    authHeader?: string,
+  ): Promise<CstarGroupDto> {
+    const body = await this.cstarRequest<{ data: { group: CstarGroupDto } }>(
+      'PUT',
+      this.groupPath(tenantId, groupId),
+      authHeader,
+      `group ${groupId}`,
+      group,
+    )
+    return body.data.group
+  }
+
+  /**
+   * Add a user to a group. With Notify's shared service token, a group that also grants roles
+   * in other services needs those services listed in confirmOtherServices, or CSTAR returns 403
+   * OTHER_SERVICES_NOT_CONFIRMED.
+   */
+  async addGroupUser(
+    tenantId: string,
+    groupId: string,
+    user: CstarSsoUserDto,
+    confirmOtherServices: string[] | undefined,
+    authHeader?: string,
+  ): Promise<CstarGroupUserDto> {
+    const body = await this.cstarRequest<{ data: { groupUser: CstarGroupUserDto } }>(
+      'POST',
+      `${this.groupPath(tenantId, groupId)}/users`,
+      authHeader,
+      `user for group ${groupId}`,
+      { user, ...(confirmOtherServices ? { confirmOtherServices } : {}) },
+    )
+    return body.data.groupUser
+  }
+
+  /** Remove a user from a group, by the groupUserId from getGroup. */
+  async removeGroupUser(
+    tenantId: string,
+    groupId: string,
+    groupUserId: string,
+    authHeader?: string,
+  ): Promise<void> {
+    const safeGroupUserId = this.safeSegment(groupUserId, 'groupUserId')
+    await this.cstarRequest<void>(
+      'DELETE',
+      `${this.groupPath(tenantId, groupId)}/users/${safeGroupUserId}`,
+      authHeader,
+      `group user ${groupUserId}`,
+    )
+  }
+
+  /** The shared services a group's tenant uses, each with the roles the group grants. */
+  async getGroupRoles(
+    tenantId: string,
+    groupId: string,
+    authHeader?: string,
+  ): Promise<CstarGroupSharedServiceDto[]> {
+    const body = await this.cstarGet<{ data?: { sharedServices?: CstarGroupSharedServiceDto[] } }>(
+      `${this.groupPath(tenantId, groupId)}/shared-services/shared-service-roles`,
+      authHeader,
+      `roles of group ${groupId}`,
+    )
+    return body.data?.sharedServices ?? []
+  }
+
+  /**
+   * Switch a group's shared service roles on or off. With Notify's shared service token CSTAR
+   * only lets Notify's own roles be changed.
+   */
+  async updateGroupRoles(
+    tenantId: string,
+    groupId: string,
+    update: CstarGroupRolesUpdate,
+    authHeader?: string,
+  ): Promise<CstarGroupSharedServiceDto[]> {
+    const body = await this.cstarRequest<{
+      data?: { sharedServices?: CstarGroupSharedServiceDto[] }
+    }>(
+      'PUT',
+      `${this.groupPath(tenantId, groupId)}/shared-services/shared-service-roles`,
+      authHeader,
+      `roles of group ${groupId}`,
+      update,
+    )
+    return body.data?.sharedServices ?? []
+  }
+
+  private groupPath(tenantId: string, groupId: string): string {
+    const safeTenantId = this.safeSegment(tenantId, 'tenantId')
+    const safeGroupId = this.safeSegment(groupId, 'groupId')
+    return `/api/v1/tenants/${safeTenantId}/groups/${safeGroupId}`
+  }
+
   private safeSegment(value: string, field: string): string {
     this.requireIdentifier(value, field)
     return encodeURIComponent(this.validatePathSegment(value, field))
@@ -681,7 +805,7 @@ export class CstarApiClient {
    * @param body JSON request body, for writes
    */
   private async cstarRequest<T>(
-    method: 'GET' | 'POST' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     path: string,
     authHeader: string | undefined,
     description: string,

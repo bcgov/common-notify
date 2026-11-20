@@ -112,24 +112,6 @@ export class CstarGroupsResponseDto {
   }
 }
 
-/**
- * Response from CSTAR API for a tenant's users, optionally filtered to a set of groups.
- *
- * The email address lives on the nested SSO user. Both levels are optional here because a
- * tenant user can be present without a resolvable SSO user, and the SSO user's email is
- * itself nullable in CSTAR.
- */
-export class CstarTenantUsersResponseDto {
-  @ApiProperty({ description: 'The tenant users matching the request' })
-  data: {
-    users?: Array<{
-      ssoUser?: {
-        email?: string | null
-      } | null
-    }>
-  }
-}
-
 /** The SSO identity behind a CSTAR tenant user */
 export class CstarSsoUserDto {
   @ApiProperty({ description: 'SSO user ID (IDIR or BCeID GUID)' })
@@ -230,4 +212,60 @@ export class CstarGroupMemberDto {
 
   @ApiProperty({ enum: ['idir', 'bceidbusiness'] })
   idpType: 'idir' | 'bceidbusiness'
+}
+
+/** A user's membership of a CSTAR group. `id` is the groupUserId used to remove it. */
+export class CstarGroupUserDto {
+  @ApiProperty({ description: 'Group user ID', format: 'uuid' })
+  id: string
+
+  @ApiProperty({ type: CstarTenantUserDto, description: 'The tenant user in the group' })
+  user: CstarTenantUserDto
+}
+
+/** A CSTAR group with its members, from GET groups/{groupId}?expand=groupUsers */
+export class CstarGroupDetailDto extends CstarGroupDto {
+  @ApiProperty({ type: [CstarGroupUserDto] })
+  users: CstarGroupUserDto[]
+}
+
+/** One of a shared service's roles, and whether a group grants it */
+export class CstarGroupSharedServiceRoleDto {
+  @ApiProperty({ format: 'uuid' })
+  id: string
+
+  @ApiProperty({ description: 'Role name, e.g. NOTIFY_VIEWER' })
+  name: string
+
+  @ApiProperty({ required: false })
+  description?: string
+
+  @ApiProperty({ description: 'Whether the group grants this role' })
+  enabled: boolean
+}
+
+/** A shared service and which of its roles a group grants */
+export class CstarGroupSharedServiceDto {
+  @ApiProperty({ format: 'uuid' })
+  id: string
+
+  @ApiProperty()
+  name: string
+
+  @ApiProperty()
+  displayName: string
+
+  @ApiProperty({ description: "The service's SSO client ID" })
+  clientIdentifier: string
+
+  @ApiProperty({ type: [CstarGroupSharedServiceRoleDto] })
+  sharedServiceRoles: CstarGroupSharedServiceRoleDto[]
+}
+
+/** Request body for switching a group's shared service roles on or off */
+export interface CstarGroupRolesUpdate {
+  sharedServices: Array<{
+    id: string
+    sharedServiceRoles: Array<{ id: string; enabled: boolean }>
+  }>
 }

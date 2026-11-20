@@ -7,6 +7,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -27,11 +28,21 @@ import { Roles } from '../../../common/decorators/roles.decorator'
 import { SsoRole } from '../../../enum/sso-role.enum'
 import { CstarApiClient } from '../../../services/cstar/cstar-api.client'
 import {
+  CstarGroupDetailDto,
+  CstarGroupDto,
+  CstarGroupSharedServiceDto,
+  CstarGroupUserDto,
   CstarSsoSearchUserDto,
   CstarTenantRoleDto,
   CstarTenantUserDto,
 } from '../../../services/cstar/schemas/cstar.schema'
 import { AddCstarTenantUserDto } from './schemas/add-cstar-tenant-user.dto'
+import {
+  AddCstarGroupUserDto,
+  CreateCstarGroupDto,
+  UpdateCstarGroupDto,
+  UpdateCstarGroupRolesDto,
+} from './schemas/cstar-group.dto'
 import { CstarTenantUserQueryDto } from './schemas/cstar-tenant-user-query.dto'
 import {
   CstarBceidSearchQueryDto,
@@ -39,7 +50,7 @@ import {
 } from './schemas/cstar-user-search-query.dto'
 
 /**
- * Manage the users of any CSTAR tenant on CSTAR's behalf.
+ * Manage the users and groups of any CSTAR tenant on CSTAR's behalf.
  *
  * Route: /api/v1/frontend/admin/cstar
  * Guarded by NotifyAdminGuard + NOTIFY_ADMIN (SSO role); not tenant-scoped. The admin's own
@@ -151,5 +162,129 @@ export class CstarAdminController {
     @Req() req: express.Request,
   ): Promise<CstarSsoSearchUserDto[]> {
     return this.cstarApiClient.searchBceidUsers({ ...query }, req.headers.authorization)
+  }
+
+  @Version('1')
+  @Get('tenants/:tenantId/groups')
+  @Roles(SsoRole.NOTIFY_ADMIN)
+  @ApiOperation({ summary: "List a CSTAR tenant's groups (admin only)" })
+  @ApiOkResponse({ type: [CstarGroupDto] })
+  listGroups(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Req() req: express.Request,
+  ): Promise<CstarGroupDto[]> {
+    return this.cstarApiClient.getTenantGroups(tenantId, req.headers.authorization)
+  }
+
+  @Version('1')
+  @Get('tenants/:tenantId/groups/:groupId')
+  @Roles(SsoRole.NOTIFY_ADMIN)
+  @ApiOperation({ summary: 'A CSTAR group with its members (admin only)' })
+  @ApiOkResponse({ type: CstarGroupDetailDto })
+  getGroup(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Req() req: express.Request,
+  ): Promise<CstarGroupDetailDto> {
+    return this.cstarApiClient.getGroup(tenantId, groupId, req.headers.authorization)
+  }
+
+  @Version('1')
+  @Post('tenants/:tenantId/groups')
+  @Roles(SsoRole.NOTIFY_ADMIN)
+  @ApiOperation({ summary: 'Create a group in a CSTAR tenant (admin only)' })
+  @ApiCreatedResponse({ type: CstarGroupDto })
+  createGroup(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Body() dto: CreateCstarGroupDto,
+    @Req() req: express.Request,
+  ): Promise<CstarGroupDto> {
+    return this.cstarApiClient.createGroup(tenantId, { ...dto }, req.headers.authorization)
+  }
+
+  @Version('1')
+  @Put('tenants/:tenantId/groups/:groupId')
+  @Roles(SsoRole.NOTIFY_ADMIN)
+  @ApiOperation({ summary: "Change a CSTAR group's name or description (admin only)" })
+  @ApiOkResponse({ type: CstarGroupDto })
+  updateGroup(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Body() dto: UpdateCstarGroupDto,
+    @Req() req: express.Request,
+  ): Promise<CstarGroupDto> {
+    return this.cstarApiClient.updateGroup(tenantId, groupId, { ...dto }, req.headers.authorization)
+  }
+
+  @Version('1')
+  @Post('tenants/:tenantId/groups/:groupId/users')
+  @Roles(SsoRole.NOTIFY_ADMIN)
+  @ApiOperation({ summary: 'Add a user to a CSTAR group (admin only)' })
+  @ApiCreatedResponse({ type: CstarGroupUserDto })
+  addGroupUser(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Body() dto: AddCstarGroupUserDto,
+    @Req() req: express.Request,
+  ): Promise<CstarGroupUserDto> {
+    return this.cstarApiClient.addGroupUser(
+      tenantId,
+      groupId,
+      dto.user,
+      dto.confirmOtherServices,
+      req.headers.authorization,
+    )
+  }
+
+  @Version('1')
+  @Delete('tenants/:tenantId/groups/:groupId/users/:groupUserId')
+  @HttpCode(204)
+  @Roles(SsoRole.NOTIFY_ADMIN)
+  @ApiOperation({ summary: 'Remove a user from a CSTAR group (admin only)' })
+  @ApiNoContentResponse()
+  removeGroupUser(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Param('groupUserId', ParseUUIDPipe) groupUserId: string,
+    @Req() req: express.Request,
+  ): Promise<void> {
+    return this.cstarApiClient.removeGroupUser(
+      tenantId,
+      groupId,
+      groupUserId,
+      req.headers.authorization,
+    )
+  }
+
+  @Version('1')
+  @Get('tenants/:tenantId/groups/:groupId/roles')
+  @Roles(SsoRole.NOTIFY_ADMIN)
+  @ApiOperation({ summary: 'The shared service roles a CSTAR group grants (admin only)' })
+  @ApiOkResponse({ type: [CstarGroupSharedServiceDto] })
+  getGroupRoles(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Req() req: express.Request,
+  ): Promise<CstarGroupSharedServiceDto[]> {
+    return this.cstarApiClient.getGroupRoles(tenantId, groupId, req.headers.authorization)
+  }
+
+  @Version('1')
+  @Put('tenants/:tenantId/groups/:groupId/roles')
+  @Roles(SsoRole.NOTIFY_ADMIN)
+  @ApiOperation({ summary: "Switch a CSTAR group's Notify roles on or off (admin only)" })
+  @ApiOkResponse({ type: [CstarGroupSharedServiceDto] })
+  updateGroupRoles(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Body() dto: UpdateCstarGroupRolesDto,
+    @Req() req: express.Request,
+  ): Promise<CstarGroupSharedServiceDto[]> {
+    return this.cstarApiClient.updateGroupRoles(
+      tenantId,
+      groupId,
+      { sharedServices: dto.sharedServices },
+      req.headers.authorization,
+    )
   }
 }

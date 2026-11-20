@@ -232,10 +232,9 @@ export class EventNotificationResolver {
 
     // Deliberately not caught: sending to fewer people than the event was configured for is
     // worse than not sending, so a CSTAR failure fails the request.
-    const members = await this.cstarApiClient.getGroupMemberEmails(
+    const members = await this.cstarApiClient.getGroupMemberEmailsAsServiceAccount(
       cstar.tenantId,
       groupIds,
-      cstar.authHeader,
     )
 
     this.logger.debug(

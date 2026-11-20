@@ -294,72 +294,6 @@ describe('CstarApiClient group lookups', () => {
     expect(init.headers.Authorization).toBe('Bearer token')
   })
 
-  it('resolves group members to unique, lowercased email addresses', async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        data: {
-          users: [
-            { ssoUser: { email: 'Alice@gov.bc.ca' } },
-            { ssoUser: { email: 'alice@gov.bc.ca ' } },
-            { ssoUser: { email: 'bob@gov.bc.ca' } },
-            // A user with no address, and one with no SSO user at all: neither is a recipient,
-            // and neither may become a blank entry in the list.
-            { ssoUser: { email: null } },
-            { ssoUser: null },
-          ],
-        },
-      }),
-    })
-
-    const emails = await build().getGroupMemberEmails(TENANT, [GROUP], 'Bearer token')
-
-    expect(emails).toEqual(['alice@gov.bc.ca', 'bob@gov.bc.ca'])
-    const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe(`https://cstar.example/api/v1/tenants/${TENANT}/users?groupIds=${GROUP}`)
-    expect(init.headers.Authorization).toBe('Bearer token')
-  })
-
-  it('resolves every requested group in a single call', async () => {
-    const OTHER_GROUP = '8f01087b-edfe-4957-97c4-f0aece2bc514'
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({ data: { users: [{ ssoUser: { email: 'alice@gov.bc.ca' } }] } }),
-    })
-
-    await build().getGroupMemberEmails(TENANT, [GROUP, OTHER_GROUP])
-
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(fetchMock.mock.calls[0][0]).toBe(
-      `https://cstar.example/api/v1/tenants/${TENANT}/users?groupIds=${GROUP}%2C${OTHER_GROUP}`,
-    )
-  })
-
-  it('returns no addresses for a group with no members', async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({ data: { users: [] } }),
-    })
-
-    await expect(build().getGroupMemberEmails(TENANT, [GROUP])).resolves.toEqual([])
-  })
-
-  it('asks CSTAR nothing when no groups were selected', async () => {
-    await expect(build().getGroupMemberEmails(TENANT, [])).resolves.toEqual([])
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  it('treats a group the caller cannot see as forbidden rather than a server error', async () => {
-    fetchMock.mockResolvedValue({
-      ok: false,
-      status: 404,
-      statusText: 'Not Found',
-      text: async () => '{"message":"Tenant not found"}',
-    })
-
-    await expect(build().getGroupMemberEmails(TENANT, [GROUP])).rejects.toThrow(ForbiddenException)
-  })
-
   it('surfaces a CSTAR outage as a server error', async () => {
     fetchMock.mockRejectedValue(new Error('ECONNREFUSED'))
 
@@ -610,11 +544,191 @@ describe('CstarApiClient service account', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  describe('group member emails', () => {
+    const OTHER_GROUP = '8f01087b-edfe-4957-97c4-f0aece2bc514'
+
+    /** Answers each group's members route with that group's users. */
+    const routeGroups = (usersByGroup: Record<string, unknown[]>) =>
+      fetchMock.mockImplementation(async (url: string) => {
+        if (url === 'https://sso.example/token') {
+          return { ok: true, json: async () => ({ access_token: 'sa-token', expires_in: 300 }) }
+        }
+        const groupId = String(url).match(/groups\/([^/]+)\/users$/)?.[1] ?? ''
+        return { ok: true, json: async () => ({ data: { users: usersByGroup[groupId] ?? [] } }) }
+      })
+
+    it('fetches one token, then each group with it', async () => {
+      routeGroups({})
+
+      await buildClient().getGroupMemberEmailsAsServiceAccount(TENANT, [GROUP, OTHER_GROUP])
+
+      const tokenCalls = fetchMock.mock.calls.filter(([url]) => url === 'https://sso.example/token')
+      expect(tokenCalls).toHaveLength(1)
+      expect(cstarCalls().map(([url]) => url)).toEqual([
+        `https://cstar.example/api/v1/tenants/${TENANT}/groups/${GROUP}/users`,
+        `https://cstar.example/api/v1/tenants/${TENANT}/groups/${OTHER_GROUP}/users`,
+      ])
+      for (const [, init] of cstarCalls()) {
+        expect(init.headers.Authorization).toBe('Bearer sa-token')
+      }
+    })
+
+    it('returns unique, lowercased addresses across groups, dropping members without one', async () => {
+      routeGroups({
+        [GROUP]: [{ email: 'Alice@gov.bc.ca' }, { email: 'bob@gov.bc.ca' }, { email: null }],
+        [OTHER_GROUP]: [{ email: 'alice@gov.bc.ca ' }, { email: '' }],
+      })
+
+      await expect(
+        buildClient().getGroupMemberEmailsAsServiceAccount(TENANT, [GROUP, OTHER_GROUP]),
+      ).resolves.toEqual(['alice@gov.bc.ca', 'bob@gov.bc.ca'])
+    })
+
+    it('asks CSTAR nothing when no groups were selected', async () => {
+      await expect(buildClient().getGroupMemberEmailsAsServiceAccount(TENANT, [])).resolves.toEqual(
+        [],
+      )
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('fails the whole lookup when any group cannot be read', async () => {
+      fetchMock.mockImplementation(async (url: string) =>
+        url === 'https://sso.example/token'
+          ? { ok: true, json: async () => ({ access_token: 'sa-token', expires_in: 300 }) }
+          : String(url).includes(OTHER_GROUP)
+            ? cstarError(404, 'Group not found')
+            : { ok: true, json: async () => ({ data: { users: [] } }) },
+      )
+
+      await expect(
+        buildClient().getGroupMemberEmailsAsServiceAccount(TENANT, [GROUP, OTHER_GROUP]),
+      ).rejects.toThrow(ForbiddenException)
+    })
+  })
+
   it('is unavailable when the token endpoint refuses the credentials', async () => {
     fetchMock.mockResolvedValue({ ok: false, status: 401 })
 
     await expect(buildClient().getGroupMembersAsServiceAccount(TENANT, GROUP)).rejects.toThrow(
       ServiceUnavailableException,
     )
+  })
+})
+
+/** The group routes behind the NOTIFY_ADMIN CSTAR pages, which forward the admin's token. */
+describe('CstarApiClient groups', () => {
+  const TENANT = 'e936010f-bb93-4430-87d9-e6e70b63e75f'
+  const GROUP = '3a3fafee-d41b-4fbe-92df-62dbebf0f73a'
+  const GROUP_USER = '8f01087b-edfe-4957-97c4-f0aece2bc514'
+  const GROUP_PATH = `https://cstar.example/api/v1/tenants/${TENANT}/groups/${GROUP}`
+  const user = {
+    ssoUserId: 'fd33f1cef7ca4b19a71104d4ecf7066b',
+    firstName: 'John',
+    lastName: 'Smith',
+    displayName: 'Smith, John',
+    idpType: 'idir' as const,
+  }
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  const respond = (data: unknown, status = 200) =>
+    fetchMock.mockResolvedValue({ ok: true, status, json: async () => ({ data }) })
+
+  beforeEach(() => {
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('always expands group users when getting a group', async () => {
+    respond({ group: { id: GROUP, users: [{ id: GROUP_USER }] } })
+
+    await expect(buildClient().getGroup(TENANT, GROUP, 'Bearer admin')).resolves.toEqual({
+      id: GROUP,
+      users: [{ id: GROUP_USER }],
+    })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe(`${GROUP_PATH}?expand=groupUsers`)
+    expect(init.headers.Authorization).toBe('Bearer admin')
+  })
+
+  it('creates a group with a POST and updates one with a PUT', async () => {
+    respond({ group: { id: GROUP, name: 'Editors' } }, 201)
+    const client = buildClient()
+
+    await expect(client.createGroup(TENANT, { name: 'Editors' })).resolves.toEqual({
+      id: GROUP,
+      name: 'Editors',
+    })
+    expect(fetchMock.mock.calls[0][0]).toBe(`https://cstar.example/api/v1/tenants/${TENANT}/groups`)
+    expect(fetchMock.mock.calls[0][1].method).toBe('POST')
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ name: 'Editors' })
+
+    await client.updateGroup(TENANT, GROUP, { description: 'New' })
+    expect(fetchMock.mock.calls[1][0]).toBe(GROUP_PATH)
+    expect(fetchMock.mock.calls[1][1].method).toBe('PUT')
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ description: 'New' })
+  })
+
+  it('adds a group user, sending confirmOtherServices only when given', async () => {
+    respond({ groupUser: { id: GROUP_USER } }, 201)
+    const client = buildClient()
+
+    await expect(client.addGroupUser(TENANT, GROUP, user, undefined)).resolves.toEqual({
+      id: GROUP_USER,
+    })
+    expect(fetchMock.mock.calls[0][0]).toBe(`${GROUP_PATH}/users`)
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ user })
+
+    await client.addGroupUser(TENANT, GROUP, user, ['chefs'])
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+      user,
+      confirmOtherServices: ['chefs'],
+    })
+  })
+
+  it('removes a group user by its groupUserId', async () => {
+    fetchMock.mockResolvedValue({ ok: true, status: 204, json: async () => undefined })
+
+    await expect(buildClient().removeGroupUser(TENANT, GROUP, GROUP_USER)).resolves.toBeUndefined()
+    expect(fetchMock.mock.calls[0][0]).toBe(`${GROUP_PATH}/users/${GROUP_USER}`)
+    expect(fetchMock.mock.calls[0][1].method).toBe('DELETE')
+  })
+
+  it("gets and updates a group's shared service roles", async () => {
+    const sharedServices = [
+      { id: GROUP_USER, sharedServiceRoles: [{ id: GROUP, name: 'NOTIFY_VIEWER', enabled: true }] },
+    ]
+    respond({ sharedServices })
+    const client = buildClient()
+    const rolesPath = `${GROUP_PATH}/shared-services/shared-service-roles`
+
+    await expect(client.getGroupRoles(TENANT, GROUP)).resolves.toEqual(sharedServices)
+    expect(fetchMock.mock.calls[0][0]).toBe(rolesPath)
+
+    const update = {
+      sharedServices: [{ id: GROUP_USER, sharedServiceRoles: [{ id: GROUP, enabled: true }] }],
+    }
+    await expect(client.updateGroupRoles(TENANT, GROUP, update)).resolves.toEqual(sharedServices)
+    expect(fetchMock.mock.calls[1][0]).toBe(rolesPath)
+    expect(fetchMock.mock.calls[1][1].method).toBe('PUT')
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual(update)
+  })
+
+  it('passes a duplicate group name through as a conflict', async () => {
+    fetchMock.mockResolvedValue(cstarError(409, 'Group with same name already exists'))
+
+    await expect(buildClient().createGroup(TENANT, { name: 'Editors' })).rejects.toThrow(
+      ConflictException,
+    )
+  })
+
+  it('rejects a groupUserId that could change the request path', async () => {
+    await expect(buildClient().removeGroupUser(TENANT, GROUP, '../..')).rejects.toThrow(
+      BadRequestException,
+    )
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })
