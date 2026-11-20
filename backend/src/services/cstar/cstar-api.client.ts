@@ -5,14 +5,22 @@ import {
   ForbiddenException,
   InternalServerErrorException,
   BadRequestException,
+  ConflictException,
+  NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { CstarCacheStore } from './cstar-cache.store'
 import type {
   CstarGroupDto,
+  CstarGroupMemberDto,
   CstarGroupsResponseDto,
   CstarRolesResponseDto,
+  CstarSsoSearchUserDto,
+  CstarSsoUserDto,
+  CstarTenantRoleDto,
   CstarTenantsResponseDto,
+  CstarTenantUserDto,
   CstarTenantUsersResponseDto,
 } from './schemas/cstar.schema'
 
@@ -53,11 +61,22 @@ export class CstarApiClient {
   private readonly tenantsInFlight = new Map<string, Promise<any[]>>()
   private readonly rolesInFlight = new Map<string, Promise<string[]>>()
 
+  private readonly tokenUrl: string
+  private readonly clientId: string
+  private readonly clientSecret: string
+  private readonly scope?: string
+  private accessToken: string | null = null
+  private tokenExpiresAt = 0
+
   constructor(
     private readonly configService: ConfigService,
     private readonly cacheStore: CstarCacheStore,
   ) {
     this.baseUrl = this.configService.get<string>('cstar.baseUrl') || ''
+    this.tokenUrl = this.configService.get<string>('cstar.tokenUrl') || ''
+    this.clientId = this.configService.get<string>('cstar.clientId') || ''
+    this.clientSecret = this.configService.get<string>('cstar.clientSecret') || ''
+    this.scope = this.configService.get<string>('cstar.scope') || undefined
   }
 
   private validatePathSegment(value: string, fieldName: string): string {
@@ -430,15 +449,244 @@ export class CstarApiClient {
   }
 
   /**
-   * A GET against CSTAR, mapping its failures onto the same exceptions the role and tenant
+   * The users of a CSTAR tenant.
+   *
+   * @param tenantId The CSTAR tenant ID
+   * @param authHeader JWT Authorization header to pass through to CSTAR
+   */
+  async getTenantUsers(tenantId: string, authHeader?: string): Promise<CstarTenantUserDto[]> {
+    const safeTenantId = this.safeSegment(tenantId, 'tenantId')
+    const body = await this.cstarGet<{ data?: { users?: CstarTenantUserDto[] } }>(
+      `/api/v1/tenants/${safeTenantId}/users`,
+      authHeader,
+      `users of tenant ${tenantId}`,
+    )
+    return body.data?.users ?? []
+  }
+
+  /**
+   * One user of a CSTAR tenant.
+   *
+   * @param expand Comma-separated relations to include: groups, roles, sharedServices
+   */
+  async getTenantUser(
+    tenantId: string,
+    tenantUserId: string,
+    expand: string | undefined,
+    authHeader?: string,
+  ): Promise<CstarTenantUserDto> {
+    const safeTenantId = this.safeSegment(tenantId, 'tenantId')
+    const safeTenantUserId = this.safeSegment(tenantUserId, 'tenantUserId')
+    const body = await this.cstarGet<{ data: { tenantUser: CstarTenantUserDto } }>(
+      `/api/v1/tenants/${safeTenantId}/users/${safeTenantUserId}${this.queryString({ expand })}`,
+      authHeader,
+      `tenant user ${tenantUserId}`,
+    )
+    return body.data.tenantUser
+  }
+
+  /**
+   * Add a user to a CSTAR tenant. With Notify's shared service token CSTAR always gives the
+   * user the SERVICE_USER role, and rejects requests that also send roles or groups.
+   */
+  async addTenantUser(
+    tenantId: string,
+    user: CstarSsoUserDto,
+    authHeader?: string,
+  ): Promise<CstarTenantUserDto> {
+    const safeTenantId = this.safeSegment(tenantId, 'tenantId')
+    const body = await this.cstarRequest<{ data: { user: CstarTenantUserDto } }>(
+      'POST',
+      `/api/v1/tenants/${safeTenantId}/users`,
+      authHeader,
+      `user for tenant ${tenantId}`,
+      { user },
+    )
+    return body.data.user
+  }
+
+  /**
+   * Remove a user from a CSTAR tenant. With Notify's shared service token CSTAR only allows
+   * removing users whose only role is SERVICE_USER.
+   */
+  async removeTenantUser(
+    tenantId: string,
+    tenantUserId: string,
+    authHeader?: string,
+  ): Promise<void> {
+    const safeTenantId = this.safeSegment(tenantId, 'tenantId')
+    const safeTenantUserId = this.safeSegment(tenantUserId, 'tenantUserId')
+    await this.cstarRequest<void>(
+      'DELETE',
+      `/api/v1/tenants/${safeTenantId}/users/${safeTenantUserId}`,
+      authHeader,
+      `tenant user ${tenantUserId}`,
+    )
+  }
+
+  /** The tenant roles held by one user of a CSTAR tenant. */
+  async getTenantUserRoles(
+    tenantId: string,
+    tenantUserId: string,
+    authHeader?: string,
+  ): Promise<CstarTenantRoleDto[]> {
+    const safeTenantId = this.safeSegment(tenantId, 'tenantId')
+    const safeTenantUserId = this.safeSegment(tenantUserId, 'tenantUserId')
+    const body = await this.cstarGet<{ data?: { roles?: CstarTenantRoleDto[] } }>(
+      `/api/v1/tenants/${safeTenantId}/users/${safeTenantUserId}/roles`,
+      authHeader,
+      `roles of tenant user ${tenantUserId}`,
+    )
+    return body.data?.roles ?? []
+  }
+
+  /**
+   * Search BC Gov SSO for IDIR users. With Notify's shared service token CSTAR requires
+   * tenantId among the params.
+   */
+  async searchIdirUsers(
+    params: Record<string, string | undefined>,
+    authHeader?: string,
+  ): Promise<CstarSsoSearchUserDto[]> {
+    const body = await this.cstarGet<{ data?: CstarSsoSearchUserDto[] }>(
+      `/api/v1/users/bcgovssousers/idir/search${this.queryString(params)}`,
+      authHeader,
+      'IDIR user search',
+    )
+    return body.data ?? []
+  }
+
+  /**
+   * Search BC Gov SSO for Business BCeID users. With Notify's shared service token CSTAR
+   * requires tenantId among the params.
+   */
+  async searchBceidUsers(
+    params: Record<string, string | undefined>,
+    authHeader?: string,
+  ): Promise<CstarSsoSearchUserDto[]> {
+    const body = await this.cstarGet<{ data?: CstarSsoSearchUserDto[] }>(
+      `/api/v1/users/bcgovssousers/bceid/search${this.queryString(params)}`,
+      authHeader,
+      'BCeID user search',
+    )
+    return body.data ?? []
+  }
+
+  /**
+   * getTenantGroups, authenticated as Notify's CSTAR service account rather than a user, for
+   * work that runs with no user present.
+   */
+  async getTenantGroupsAsServiceAccount(tenantId: string): Promise<CstarGroupDto[]> {
+    return this.getTenantGroups(tenantId, await this.getServiceAccountAuthHeader())
+  }
+
+  /**
+   * The members of one CSTAR group, authenticated as Notify's CSTAR service account. CSTAR
+   * accepts only service account tokens on this route; user tokens get a 403.
+   */
+  async getGroupMembersAsServiceAccount(
+    tenantId: string,
+    groupId: string,
+  ): Promise<CstarGroupMemberDto[]> {
+    const safeTenantId = this.safeSegment(tenantId, 'tenantId')
+    const safeGroupId = this.safeSegment(groupId, 'groupId')
+    const body = await this.cstarGet<{ data?: { users?: CstarGroupMemberDto[] } }>(
+      `/api/v1/tenants/${safeTenantId}/groups/${safeGroupId}/users`,
+      await this.getServiceAccountAuthHeader(),
+      `members of group ${groupId}`,
+    )
+    return body.data?.users ?? []
+  }
+
+  private safeSegment(value: string, field: string): string {
+    this.requireIdentifier(value, field)
+    return encodeURIComponent(this.validatePathSegment(value, field))
+  }
+
+  /** `?a=1&b=2` from the params that have a value, or '' when none do. */
+  private queryString(params: Record<string, string | undefined>): string {
+    const query = new URLSearchParams()
+    for (const [key, value] of Object.entries(params)) {
+      if (value) query.set(key, value)
+    }
+    const encoded = query.toString()
+    return encoded ? `?${encoded}` : ''
+  }
+
+  /**
+   * A Bearer header for Notify's CSTAR service account, reusing the cached token until 80% of
+   * its TTL has elapsed so a token about to expire is not sent on a slow request.
+   */
+  private async getServiceAccountAuthHeader(): Promise<string> {
+    if (this.accessToken && Date.now() < this.tokenExpiresAt) {
+      return `Bearer ${this.accessToken}`
+    }
+
+    if (!this.tokenUrl || !this.clientId || !this.clientSecret) {
+      throw new ServiceUnavailableException(
+        'CSTAR service account is not configured. ' +
+          'Set CSTAR_TOKEN_URL, CSTAR_CLIENT_ID and CSTAR_CLIENT_SECRET.',
+      )
+    }
+
+    const form = new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: this.clientId,
+      client_secret: this.clientSecret,
+    })
+    if (this.scope) {
+      form.set('scope', this.scope)
+    }
+
+    try {
+      const response = await fetch(this.tokenUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: form.toString(),
+        signal: AbortSignal.timeout(10000),
+      })
+      if (!response.ok) {
+        throw new Error(`token endpoint returned ${response.status}`)
+      }
+      const data = (await response.json()) as { access_token: string; expires_in?: number }
+
+      this.accessToken = data.access_token
+      const expiresIn = Number(data.expires_in) || 300
+      this.tokenExpiresAt = Date.now() + expiresIn * 0.8 * 1000
+
+      this.logger.debug('Obtained CSTAR service account access token')
+      return `Bearer ${this.accessToken}`
+    } catch (error) {
+      this.logger.error(
+        `Failed to obtain CSTAR service account token: ${error instanceof Error ? error.message : String(error)}`,
+      )
+      throw new ServiceUnavailableException(
+        'Could not authenticate with CSTAR. Check the CSTAR service account credentials.',
+      )
+    }
+  }
+
+  private cstarGet<T>(path: string, authHeader: string | undefined, description: string) {
+    return this.cstarRequest<T>('GET', path, authHeader, description)
+  }
+
+  /**
+   * A request to CSTAR, mapping its failures onto the same exceptions the role and tenant
    * lookups above raise. Those two predate this helper and each inline their own copy; this
-   * exists so the group lookups do not add two more.
+   * exists so the other lookups do not add more.
    *
    * @param path Absolute request path, already encoded
    * @param authHeader JWT Authorization header to pass through to CSTAR
-   * @param description What is being fetched, for log and error messages
+   * @param description What is being fetched or changed, for log and error messages
+   * @param body JSON request body, for writes
    */
-  private async cstarGet<T>(path: string, authHeader: string | undefined, description: string) {
+  private async cstarRequest<T>(
+    method: 'GET' | 'POST' | 'DELETE',
+    path: string,
+    authHeader: string | undefined,
+    description: string,
+    body?: unknown,
+  ): Promise<T> {
     if (!this.baseUrl) {
       this.logger.error('CSTAR_API_URL is not configured')
       throw new InternalServerErrorException('CSTAR API is not configured')
@@ -448,19 +696,20 @@ export class CstarApiClient {
 
     let response: Response
     try {
-      this.logger.debug(`Fetching ${description} from CSTAR: ${url}`)
+      this.logger.debug(`${method} ${description} on CSTAR: ${url}`)
       response = await fetch(url, {
-        method: 'GET',
+        method,
         headers: {
           'Content-Type': 'application/json',
           ...(authHeader ? { Authorization: authHeader } : {}),
         },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       })
     } catch (error) {
       this.logger.error(
-        `Failed to fetch ${description}: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to ${method} ${description}: ${error instanceof Error ? error.message : String(error)}`,
       )
-      throw new InternalServerErrorException(`Failed to fetch ${description} from CSTAR`)
+      throw new InternalServerErrorException(`Failed to ${method} ${description} on CSTAR`)
     }
 
     if (!response.ok) {
@@ -479,24 +728,39 @@ export class CstarApiClient {
         errBody ??
         response.statusText
 
+      // Logged before mapping: the read branch below replaces CSTAR's reason with a generic one.
+      this.logger.debug(
+        `CSTAR returned ${response.status} for ${method} ${description}: ${message}`,
+      )
+
       if (response.status === 401) {
         throw new UnauthorizedException(`Not authenticated with CSTAR: ${message}`)
       }
-      // A 404 here is a tenant or group the caller cannot see, which is indistinguishable from
-      // one that does not exist - both mean "not yours to read".
-      if (response.status === 403 || response.status === 404) {
+      // A 404 on a read is a tenant or group the caller cannot see, which is indistinguishable
+      // from one that does not exist - both mean "not yours to read".
+      if (method === 'GET' && (response.status === 403 || response.status === 404)) {
         throw new ForbiddenException(`Not authorized to read ${description}`)
       }
+      // On the rest CSTAR's reason is passed through, so an admin can see why a change was
+      // refused - e.g. removing a user who holds more than the SERVICE_USER role.
+      if (response.status === 400) throw new BadRequestException(message)
+      if (response.status === 403) throw new ForbiddenException(message)
+      if (response.status === 404) throw new NotFoundException(message)
+      if (response.status === 409) throw new ConflictException(message)
 
-      this.logger.error(`CSTAR API error fetching ${description}: ${response.status} ${message}`)
+      this.logger.error(`CSTAR API error on ${description}: ${response.status} ${message}`)
       throw new InternalServerErrorException(`CSTAR API error: ${response.status} - ${message}`)
+    }
+
+    if (response.status === 204) {
+      return undefined as T
     }
 
     try {
       return (await response.json()) as T
     } catch {
       this.logger.error(`CSTAR returned an unparseable body for ${description}`)
-      throw new InternalServerErrorException(`Failed to fetch ${description} from CSTAR`)
+      throw new InternalServerErrorException(`Failed to ${method} ${description} on CSTAR`)
     }
   }
 }

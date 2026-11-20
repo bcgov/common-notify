@@ -129,3 +129,105 @@ export class CstarTenantUsersResponseDto {
     }>
   }
 }
+
+/** The SSO identity behind a CSTAR tenant user */
+export class CstarSsoUserDto {
+  @ApiProperty({ description: 'SSO user ID (IDIR or BCeID GUID)' })
+  ssoUserId: string
+
+  @ApiProperty({ description: 'First name' })
+  firstName: string
+
+  @ApiProperty({ description: 'Last name' })
+  lastName: string
+
+  @ApiProperty({ description: 'Display name' })
+  displayName: string
+
+  @ApiProperty({ description: 'Username', required: false })
+  userName?: string
+
+  @ApiProperty({ description: 'Email address', nullable: true, required: false })
+  email?: string | null
+
+  @ApiProperty({ description: 'Identity provider', enum: ['idir', 'bceidbusiness'] })
+  idpType: 'idir' | 'bceidbusiness'
+}
+
+/** A CSTAR tenant role (TENANT_OWNER, USER_ADMIN, SERVICE_USER, ...) */
+export class CstarTenantRoleDto {
+  @ApiProperty({ description: 'Unique identifier for the role', format: 'uuid' })
+  id: string
+
+  @ApiProperty({ description: 'Role name' })
+  name: string
+
+  @ApiProperty({ description: 'Role description' })
+  description: string
+}
+
+/**
+ * A user's membership of a CSTAR tenant. groups, roles and sharedServices are present only
+ * when requested through `expand` on GET tenants/{tenantId}/users/{tenantUserId}.
+ */
+export class CstarTenantUserDto {
+  @ApiProperty({ description: 'Tenant user ID', format: 'uuid' })
+  id: string
+
+  @ApiProperty({ type: CstarSsoUserDto })
+  ssoUser: CstarSsoUserDto
+
+  @ApiProperty({ description: 'Date the user was added to the tenant' })
+  createdDateTime: string
+
+  @ApiProperty({ description: 'Date the tenant user was last updated' })
+  updatedDateTime: string
+
+  @ApiProperty({ type: [CstarGroupDto], required: false })
+  groups?: CstarGroupDto[]
+
+  @ApiProperty({ type: [CstarTenantRoleDto], required: false })
+  roles?: CstarTenantRoleDto[]
+
+  @ApiProperty({ description: 'Shared services granted through groups', required: false })
+  sharedServices?: unknown[]
+}
+
+/**
+ * A user from a BC Gov SSO IDIR or BCeID search. CSTAR passes these through from the SSO
+ * API, so the identifying GUIDs live in `attributes` (idir_user_guid, bceid_user_guid, ...).
+ */
+export class CstarSsoSearchUserDto {
+  @ApiProperty({ required: false })
+  firstName?: string
+
+  @ApiProperty({ required: false })
+  lastName?: string
+
+  @ApiProperty({ required: false })
+  email?: string
+
+  @ApiProperty({ description: 'SSO username, e.g. <guid>@idir' })
+  username: string
+
+  @ApiProperty({ description: 'SSO attributes, each a list of values' })
+  attributes: Record<string, string[]>
+}
+
+/** A member of a CSTAR group, as returned to a service account */
+export class CstarGroupMemberDto {
+  @ApiProperty()
+  firstName: string
+
+  @ApiProperty()
+  lastName: string
+
+  @ApiProperty()
+  displayName: string
+
+  @ApiProperty({ nullable: true })
+  email: string | null
+
+  @ApiProperty({ enum: ['idir', 'bceidbusiness'] })
+  idpType: 'idir' | 'bceidbusiness'
+}

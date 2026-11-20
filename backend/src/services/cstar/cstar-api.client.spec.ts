@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ConfigService } from '@nestjs/config'
-import { ForbiddenException, InternalServerErrorException } from '@nestjs/common'
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  InternalServerErrorException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common'
 import { CstarApiClient } from './cstar-api.client'
 import type { CstarCacheStore } from './cstar-cache.store'
 
@@ -357,5 +364,257 @@ describe('CstarApiClient group lookups', () => {
     fetchMock.mockRejectedValue(new Error('ECONNREFUSED'))
 
     await expect(build().getTenantGroups(TENANT)).rejects.toThrow(InternalServerErrorException)
+  })
+})
+
+/** Shared setup for the tenant user and service account blocks below. */
+const buildClient = (overrides: Record<string, unknown> = {}) => {
+  const values: Record<string, unknown> = {
+    'cstar.baseUrl': 'https://cstar.example',
+    'cstar.tokenUrl': 'https://sso.example/token',
+    'cstar.clientId': 'sa-notify-cstar',
+    'cstar.clientSecret': 'secret',
+    ...overrides,
+  }
+  const config = { get: vi.fn((key: string) => values[key]) } as unknown as ConfigService
+  return new CstarApiClient(config, {} as unknown as CstarCacheStore)
+}
+
+const cstarError = (status: number, message: string) => ({
+  ok: false,
+  status,
+  statusText: 'error',
+  text: async () => JSON.stringify({ message }),
+})
+
+/** The tenant user routes behind the NOTIFY_ADMIN CSTAR pages, which forward the admin's token. */
+describe('CstarApiClient tenant users', () => {
+  const TENANT = 'e936010f-bb93-4430-87d9-e6e70b63e75f'
+  const TENANT_USER = '6c6e1b2a-3f4d-4e5f-8a9b-0c1d2e3f4a5b'
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it("lists a tenant's users with the caller's token", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { users: [{ id: TENANT_USER }] } }),
+    })
+
+    await expect(buildClient().getTenantUsers(TENANT, 'Bearer admin')).resolves.toEqual([
+      { id: TENANT_USER },
+    ])
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe(`https://cstar.example/api/v1/tenants/${TENANT}/users`)
+    expect(init.method).toBe('GET')
+    expect(init.headers.Authorization).toBe('Bearer admin')
+  })
+
+  it('gets one tenant user with expand, and without a query when expand is absent', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { tenantUser: { id: TENANT_USER } } }),
+    })
+    const client = buildClient()
+
+    await expect(client.getTenantUser(TENANT, TENANT_USER, 'groups,roles')).resolves.toEqual({
+      id: TENANT_USER,
+    })
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      `https://cstar.example/api/v1/tenants/${TENANT}/users/${TENANT_USER}?expand=groups%2Croles`,
+    )
+
+    await client.getTenantUser(TENANT, TENANT_USER, undefined)
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      `https://cstar.example/api/v1/tenants/${TENANT}/users/${TENANT_USER}`,
+    )
+  })
+
+  it('posts only the user when adding a tenant user', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({ data: { user: { id: TENANT_USER } } }),
+    })
+    const user = {
+      ssoUserId: 'fd33f1cef7ca4b19a71104d4ecf7066b',
+      firstName: 'John',
+      lastName: 'Smith',
+      displayName: 'Smith, John',
+      idpType: 'idir' as const,
+    }
+
+    await expect(buildClient().addTenantUser(TENANT, user, 'Bearer admin')).resolves.toEqual({
+      id: TENANT_USER,
+    })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe(`https://cstar.example/api/v1/tenants/${TENANT}/users`)
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body)).toEqual({ user })
+  })
+
+  it('removes a tenant user, accepting an empty 204', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 204,
+      json: async () => {
+        throw new Error('no body')
+      },
+    })
+
+    await expect(buildClient().removeTenantUser(TENANT, TENANT_USER)).resolves.toBeUndefined()
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe(`https://cstar.example/api/v1/tenants/${TENANT}/users/${TENANT_USER}`)
+    expect(init.method).toBe('DELETE')
+    expect(init.body).toBeUndefined()
+  })
+
+  it.each([
+    [400, BadRequestException],
+    [403, ForbiddenException],
+    [404, NotFoundException],
+    [409, ConflictException],
+  ])('maps a %s on a write to %o, keeping the CSTAR reason', async (status, exception) => {
+    fetchMock.mockResolvedValue(cstarError(status, 'Cannot remove the last tenant owner'))
+
+    const result = buildClient().removeTenantUser(TENANT, TENANT_USER)
+    await expect(result).rejects.toThrow(exception)
+    await expect(result).rejects.toThrow('Cannot remove the last tenant owner')
+  })
+
+  it('keeps mapping a 404 on a read to forbidden', async () => {
+    fetchMock.mockResolvedValue(cstarError(404, 'Tenant not found'))
+
+    await expect(buildClient().getTenantUserRoles(TENANT, TENANT_USER)).rejects.toThrow(
+      ForbiddenException,
+    )
+  })
+
+  it('rejects a path segment that could change the request path', async () => {
+    await expect(buildClient().getTenantUser(TENANT, '../roles', undefined)).rejects.toThrow(
+      BadRequestException,
+    )
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('sends only the search params that have a value', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ username: 'x@idir' }] }),
+    })
+
+    await expect(
+      buildClient().searchIdirUsers({ tenantId: TENANT, lastName: 'Smith & Co', email: undefined }),
+    ).resolves.toEqual([{ username: 'x@idir' }])
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      `https://cstar.example/api/v1/users/bcgovssousers/idir/search?tenantId=${TENANT}&lastName=Smith+%26+Co`,
+    )
+  })
+})
+
+/** The group reads that run with no user present, authenticated as Notify's CSTAR service account. */
+describe('CstarApiClient service account', () => {
+  const TENANT = 'e936010f-bb93-4430-87d9-e6e70b63e75f'
+  const GROUP = '3a3fafee-d41b-4fbe-92df-62dbebf0f73a'
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  /** Answers the token endpoint with successive tokens and CSTAR with the given body. */
+  const route = (cstarBody: unknown) => {
+    let issued = 0
+    fetchMock.mockImplementation(async (url: string) =>
+      url === 'https://sso.example/token'
+        ? {
+            ok: true,
+            json: async () => ({ access_token: `sa-token-${++issued}`, expires_in: 300 }),
+          }
+        : { ok: true, json: async () => cstarBody },
+    )
+  }
+
+  const cstarCalls = () =>
+    fetchMock.mock.calls.filter(([url]) => String(url).startsWith('https://cstar.example'))
+
+  beforeEach(() => {
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  })
+
+  it("lists a tenant's groups with a client-credentials token", async () => {
+    route({ data: { groups: [{ id: GROUP, name: 'Dev' }] } })
+
+    await expect(buildClient().getTenantGroupsAsServiceAccount(TENANT)).resolves.toEqual([
+      { id: GROUP, name: 'Dev' },
+    ])
+
+    const [tokenUrl, tokenInit] = fetchMock.mock.calls[0]
+    expect(tokenUrl).toBe('https://sso.example/token')
+    expect(tokenInit.method).toBe('POST')
+    expect(Object.fromEntries(new URLSearchParams(tokenInit.body))).toEqual({
+      grant_type: 'client_credentials',
+      client_id: 'sa-notify-cstar',
+      client_secret: 'secret',
+    })
+    expect(cstarCalls()[0][1].headers.Authorization).toBe('Bearer sa-token-1')
+  })
+
+  it("resolves a group's members with the service account", async () => {
+    route({ data: { users: [{ displayName: 'Lovelace, Ada', email: 'ada@gov.bc.ca' }] } })
+
+    await expect(buildClient().getGroupMembersAsServiceAccount(TENANT, GROUP)).resolves.toEqual([
+      { displayName: 'Lovelace, Ada', email: 'ada@gov.bc.ca' },
+    ])
+    expect(cstarCalls()[0][0]).toBe(
+      `https://cstar.example/api/v1/tenants/${TENANT}/groups/${GROUP}/users`,
+    )
+    expect(cstarCalls()[0][1].headers.Authorization).toBe('Bearer sa-token-1')
+  })
+
+  it('reuses the token until 80% of its lifetime has passed', async () => {
+    vi.useFakeTimers()
+    route({ data: { groups: [] } })
+    const client = buildClient()
+
+    await client.getTenantGroupsAsServiceAccount(TENANT)
+    vi.advanceTimersByTime(239_000) // just under 80% of 300s
+    await client.getTenantGroupsAsServiceAccount(TENANT)
+    expect(cstarCalls()[1][1].headers.Authorization).toBe('Bearer sa-token-1')
+
+    vi.advanceTimersByTime(2_000)
+    await client.getTenantGroupsAsServiceAccount(TENANT)
+    expect(cstarCalls()[2][1].headers.Authorization).toBe('Bearer sa-token-2')
+  })
+
+  it('sends the scope when one is configured', async () => {
+    route({ data: { groups: [] } })
+
+    await buildClient({ 'cstar.scope': 'cstar' }).getTenantGroupsAsServiceAccount(TENANT)
+    expect(new URLSearchParams(fetchMock.mock.calls[0][1].body).get('scope')).toBe('cstar')
+  })
+
+  it('is unavailable when the service account is not configured', async () => {
+    await expect(
+      buildClient({ 'cstar.clientSecret': undefined }).getTenantGroupsAsServiceAccount(TENANT),
+    ).rejects.toThrow(ServiceUnavailableException)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('is unavailable when the token endpoint refuses the credentials', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 401 })
+
+    await expect(buildClient().getGroupMembersAsServiceAccount(TENANT, GROUP)).rejects.toThrow(
+      ServiceUnavailableException,
+    )
   })
 })
