@@ -121,7 +121,7 @@ authentication, mapping it to the adapter's `MCP_API_KEY`. Leave that override u
 existing local shared key; if you change it, recreate the backend with the same setting as well. It
 is unrelated to the CSS client secret. Use separately provisioned secrets in OpenShift.
 
-Flyway V85 enables the built-in CSTAR destination automatically for both new and existing databases.
+Flyway V89 enables the built-in CSTAR destination automatically for both new and existing databases.
 No manual registry activation is needed.
 
 Notify calls `http://cstar-mcp:3101/mcp`; host-side MCP clients use `http://localhost:3101/mcp` and
@@ -137,10 +137,10 @@ docker build -t notify-cstar-mcp .
 
 ## Stored Notify client configuration
 
-V84 creates `notify.mcp_server` and `notify.mcp_tool`. Each call reloads the enabled URL, transport,
+V88 creates `notify.mcp_server` and `notify.mcp_tool`. Each call reloads the enabled URL, transport,
 credential reference, tool permission and parameter-name allowlist from these tables. There is no
 destination URL in event code. Secret values remain in environment variables/OpenShift Secrets. The
-seeded CSTAR entry is enabled automatically by V85. Existing event feature flags and tenant
+seeded CSTAR entry is enabled automatically by V89. Existing event feature flags and tenant
 authorization still apply; the `mcp_api` feature flag controls MCP administration.
 
 An administrator can manage servers/tools through **Admin > MCP Servers**, protected by the
@@ -177,7 +177,7 @@ selected by `app-api-secrets.CSTAR_API_URL`. The previous CSTAR client forwarded
 not establish a stored service-account credential mapping. Confirm the existing service-account
 Secret/key before copying or remapping credentials. Do not commit secret values.
 
-`cstarMcp.enabled` is true in DEV/PR and TEST; PROD remains off pending a follow-up rollout. The
+`cstarMcp.enabled` is true in DEV/PR, TEST and PROD because event group workflows require the adapter. The
 image defaults to the release registry/repository/tag supplied by the existing deployer;
 `cstarMcp.image` is an optional full-image override. Secrets must exist in each target namespace
 before deployment. The service is internal (`<release>-cstar-mcp:3101`), with readiness and liveness
@@ -185,7 +185,7 @@ probes, rolling updates, non-root containers and no API-server token. Test/prod 
 **two replicas**, preferred pod anti-affinity scoped to the release, and an enabled PDB keeps one
 available during voluntary disruption. These are deployment manifests, not evidence of live HA;
 coordinate quotas, placement, egress to CSTAR/SSO, secret rotation and image promotion with Nikhil.
-No deployment or team messages have been sent as part of this change. V85 enables the CSTAR registry
+No deployment or team messages have been sent as part of this change. V89 enables the CSTAR registry
 entry during deployment.
 
 Like Notify's ClamAV deployment, all adapter resources and selectors are scoped to the Helm release.
@@ -199,4 +199,8 @@ URLs remain authoritative. Local Compose continues to use cstar-mcp. No applied 
 editing. Existing deployments with the old fixed-name adapter should coordinate its retirement after
 the release-specific deployment is ready; this change does not modify a live cluster.
 
-Historical V83 is retained to avoid changing an already-applied Flyway checksum.
+MCP migrations use V87-V89 because main now owns V83-V86. Their SQL is unchanged.
+If an earlier PR deployment already applied the MCP scripts as V83-V85, its Flyway history
+must be reconciled before redeploying this branch; renaming files does not rewrite database
+history. Do not run the conflicting versions against that existing history without an agreed
+PR database reset or migration-history reconciliation. No live database was changed here.

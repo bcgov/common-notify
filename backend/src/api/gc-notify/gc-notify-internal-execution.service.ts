@@ -291,6 +291,7 @@ export class GcNotifyInternalExecutionService {
       sms: { recipients: { to: [body.phone_number] } },
       gcNotify: { ...body, phone_number: undefined, templateVersion: template.version },
     })
+    if (!duplicate) await this.assertSmsDestinationAllowed(tenantId, body.phone_number)
 
     const notifyRequest = {
       params: personalisation,
@@ -758,6 +759,19 @@ export class GcNotifyInternalExecutionService {
    * A single send in the /notifysimple order: limits checked before accepting, usage recorded
    * after. A send that turns out to be a duplicate at the claim is neither created nor counted.
    */
+  /**
+   * This route builds its request itself rather than going through validateBusinessRules, so it
+   * applies the international SMS rule here.
+   */
+  private async assertSmsDestinationAllowed(tenantId: string, phoneNumber: string): Promise<void> {
+    const message = await this.notificationService.findInternationalSmsError(tenantId, [
+      phoneNumber,
+    ])
+    if (message) {
+      throw new BadRequestException({ errors: [{ error: 'ValidationError', message }] })
+    }
+  }
+
   private async acceptSend(
     tenantId: string,
     notifyRequest: Record<string, unknown>,

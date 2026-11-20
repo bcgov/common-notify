@@ -7,6 +7,8 @@ import { ApiKeysModule } from './api-keys/api-keys.module'
 import { UsageModule } from './usage/usage.module'
 import { AttachmentModule } from './attachment/attachment.module'
 import { TenantSettingsModule } from './tenant-settings/tenant-settings.module'
+import { SmsNumbersModule } from './sms-numbers/sms-numbers.module'
+import { TenantRequestsModule } from './tenant-requests/tenant-requests.module'
 import { EventsModule } from './events/events.module'
 import { SafelistModule } from './safelist/safelist.module'
 import { EmailLogoModule } from './email-logo/email-logo.module'
@@ -35,6 +37,8 @@ import { EmailLogoModule } from './email-logo/email-logo.module'
     UsageModule,
     AttachmentModule,
     TenantSettingsModule,
+    TenantRequestsModule,
+    SmsNumbersModule,
     EventsModule,
     SafelistModule,
     EmailLogoModule,
@@ -48,6 +52,8 @@ import { EmailLogoModule } from './email-logo/email-logo.module'
     UsageModule,
     AttachmentModule,
     TenantSettingsModule,
+    TenantRequestsModule,
+    SmsNumbersModule,
     EventsModule,
     SafelistModule,
     EmailLogoModule,
