@@ -336,8 +336,8 @@
             <parent column="id" foreignKey="fk_event_channel_cstar_group_setting" implied="false" onDeleteCascade="true" schema="notify" table="event_channel_setting"/>
          </column>
          <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="channel_code" nullable="false" remarks="Channel of the parent setting, held identical to it by the composite foreign key to event_channel_setting. Stored here so (channel_code, kind) can reference notify.channel_recipient_kind. Always EMAIL for now." size="20" type="varchar" typeCode="12">
-            <parent column="channel_code" foreignKey="fk_event_channel_cstar_group_kind" implied="false" onDeleteCascade="false" schema="notify" table="channel_recipient_kind"/>
             <parent column="channel_code" foreignKey="fk_event_channel_cstar_group_setting" implied="false" onDeleteCascade="true" schema="notify" table="event_channel_setting"/>
+            <parent column="channel_code" foreignKey="fk_event_channel_cstar_group_kind" implied="false" onDeleteCascade="false" schema="notify" table="channel_recipient_kind"/>
          </column>
          <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="kind" nullable="false" remarks="Which recipient list the group is addressed through, from notify.event_recipient_kind_code. Paired with channel_code against notify.channel_recipient_kind." size="3" type="varchar" typeCode="12">
             <parent column="kind_code" foreignKey="fk_event_channel_cstar_group_kind" implied="false" onDeleteCascade="false" schema="notify" table="channel_recipient_kind"/>
@@ -390,8 +390,8 @@
             <parent column="id" foreignKey="fk_event_channel_recipient_setting" implied="false" onDeleteCascade="true" schema="notify" table="event_channel_setting"/>
          </column>
          <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="channel_code" nullable="false" remarks="Channel of the parent setting, held identical to it by the composite foreign key to event_channel_setting. Stored here so (channel_code, kind) can reference notify.channel_recipient_kind, which is what rejects a list the channel does not support." size="20" type="varchar" typeCode="12">
-            <parent column="channel_code" foreignKey="fk_event_channel_recipient_kind" implied="false" onDeleteCascade="false" schema="notify" table="channel_recipient_kind"/>
             <parent column="channel_code" foreignKey="fk_event_channel_recipient_setting" implied="false" onDeleteCascade="true" schema="notify" table="event_channel_setting"/>
+            <parent column="channel_code" foreignKey="fk_event_channel_recipient_kind" implied="false" onDeleteCascade="false" schema="notify" table="channel_recipient_kind"/>
          </column>
          <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="kind" nullable="false" remarks="Which recipient list the address belongs to, from notify.event_recipient_kind_code. Paired with channel_code against notify.channel_recipient_kind, so SMS rows can only be TO." size="3" type="varchar" typeCode="12">
             <parent column="kind_code" foreignKey="fk_event_channel_recipient_kind" implied="false" onDeleteCascade="false" schema="notify" table="channel_recipient_kind"/>
@@ -437,7 +437,7 @@
             <column ascending="false" name="operation_executed_at"/>
          </index>
       </table>
-      <table name="event_channel_setting" remarks="Per-channel configuration for an event, one row per (event, channel). Backs the Email settings and SMS settings tabs. Channel-specific columns are constrained so EMAIL rows carry sender_email and header values and SMS rows carry from_phone_number_id. Recipients live in notify.event_channel_recipient." schema="notify" type="TABLE">
+      <table name="event_channel_setting" remarks="Per-channel configuration for an event, one row per (event, channel). Backs the Email settings and SMS settings tabs. EMAIL rows carry sender_email and header values; SMS rows send from the tenant's SMS number (notify.tenant_sms_number), so carry no sender. Recipients live in notify.event_channel_recipient." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for the channel setting row." size="2147483647" type="uuid" typeCode="1111">
             <child column="channel_setting_id" foreignKey="fk_event_channel_cstar_group_setting" implied="false" onDeleteCascade="true" schema="notify" table="event_channel_cstar_group"/>
             <child column="channel_setting_id" foreignKey="fk_event_channel_recipient_setting" implied="false" onDeleteCascade="true" schema="notify" table="event_channel_recipient"/>
@@ -450,24 +450,21 @@
             <child column="channel_code" foreignKey="fk_event_channel_recipient_setting" implied="false" onDeleteCascade="true" schema="notify" table="event_channel_recipient"/>
             <parent column="channel_code" foreignKey="fk_event_channel_setting_channel" implied="false" onDeleteCascade="false" schema="notify" table="notification_channel_code"/>
          </column>
-         <column autoUpdated="false" defaultValue="false" digits="0" id="3" name="active" nullable="false" remarks="Active indicator for the channel. When false the event does not send on this channel. Cannot be set true until the template and the channel sender (sender_email for EMAIL, from_phone_number_id for SMS) are populated; the matching &quot;at least one recipient&quot; rule is enforced by the application, since recipients are rows in another table." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="false" digits="0" id="3" name="active" nullable="false" remarks="Active indicator for the channel. When false the event does not send on this channel. Cannot be set true until the template, and for EMAIL the sender_email, are populated; the matching &quot;at least one recipient&quot; rule is enforced by the application, since recipients are rows in another table." size="1" type="bool" typeCode="-7"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="template_id" nullable="true" remarks="Template used to render this channel. Must be an active template belonging to the same tenant as the event and matching channel_code; enforced by the application. Templates are authored separately by CSTAR template admins - the event only selects an existing one." size="2147483647" type="uuid" typeCode="1111">
             <parent column="id" foreignKey="fk_event_channel_setting_template" implied="false" onDeleteCascade="false" schema="notify" table="template"/>
          </column>
          <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="sender_email" nullable="true" remarks="From address for EMAIL sends. NULL on SMS rows. Format checked here; the permitted sending domain is enforced by the application." size="320" type="varchar" typeCode="12"/>
-         <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="from_phone_number_id" nullable="true" remarks="Provisioned number used as the from number for SMS sends. NULL on EMAIL rows. Set by claiming a number from the available pool the first time the tenant configures SMS; thereafter it is the tenant's single allocated number (V60), shared by all of that tenant's SMS events, so this is not unique." size="2147483647" type="uuid" typeCode="1111">
-            <parent column="id" foreignKey="fk_event_channel_setting_number" implied="false" onDeleteCascade="false" schema="notify" table="provisioned_phone_number"/>
-         </column>
-         <column autoUpdated="false" defaultValue="false" digits="0" id="7" name="use_custom_header" nullable="false" remarks="When false the email inherits the tenant's default header from notify.tenant_settings and the header columns here stay NULL; when true the event owns its header outright, inherits nothing, and uses header_logo_id and header_title as given. EMAIL only; always false on SMS rows. Stored explicitly so a custom header with no logo and no title stays distinct from the tenant default." size="1" type="bool" typeCode="-7"/>
-         <column autoUpdated="false" defaultValue="null" digits="0" id="8" name="header_logo_id" nullable="true" remarks="Approved email logo shown in the custom email header. NULL means the custom header has no logo, never &quot;inherit the tenant logo&quot;. Only set when use_custom_header = TRUE." size="2147483647" type="uuid" typeCode="1111">
+         <column autoUpdated="false" defaultValue="false" digits="0" id="6" name="use_custom_header" nullable="false" remarks="When false the email inherits the tenant's default header from notify.tenant_settings and the header columns here stay NULL; when true the event owns its header outright, inherits nothing, and uses header_logo_id and header_title as given. EMAIL only; always false on SMS rows. Stored explicitly so a custom header with no logo and no title stays distinct from the tenant default." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="7" name="header_logo_id" nullable="true" remarks="Approved email logo shown in the custom email header. NULL means the custom header has no logo, never &quot;inherit the tenant logo&quot;. Only set when use_custom_header = TRUE." size="2147483647" type="uuid" typeCode="1111">
             <parent column="id" foreignKey="fk_event_channel_setting_header_logo" implied="false" onDeleteCascade="false" schema="notify" table="email_logo"/>
          </column>
-         <column autoUpdated="false" defaultValue="null" digits="0" id="9" name="header_title" nullable="true" remarks="Title text shown beside the logo in the custom email header, defaulted in the UI to the tenant name. NULL means the custom header has no title, never &quot;inherit the tenant title&quot;. Only set when use_custom_header = TRUE, so a tenant-level default title added to notify.tenant_settings later applies to exactly the rows with use_custom_header = FALSE and needs no change here." size="200" type="varchar" typeCode="12"/>
-         <column autoUpdated="false" defaultValue="now()" digits="6" id="10" name="created_at" nullable="false" remarks="Timestamp with timezone when the channel setting was created." size="35" type="timestamptz" typeCode="93"/>
-         <column autoUpdated="false" defaultValue="null" digits="0" id="11" name="created_by" nullable="true" remarks="Identifier of the user or process that created this record." size="200" type="varchar" typeCode="12"/>
-         <column autoUpdated="false" defaultValue="now()" digits="6" id="12" name="updated_at" nullable="false" remarks="Timestamp with timezone when the channel setting was last updated. Maintained by trg_event_channel_setting_updated_at." size="35" type="timestamptz" typeCode="93"/>
-         <column autoUpdated="false" defaultValue="null" digits="0" id="13" name="updated_by" nullable="true" remarks="Identifier of the user or process that last updated this record." size="200" type="varchar" typeCode="12"/>
-         <column autoUpdated="false" defaultValue="false" digits="0" id="14" name="is_deleted" nullable="false" remarks="Soft delete flag. Deleted rows release their from number back to the picker." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="8" name="header_title" nullable="true" remarks="Title text shown beside the logo in the custom email header, defaulted in the UI to the tenant name. NULL means the custom header has no title, never &quot;inherit the tenant title&quot;. Only set when use_custom_header = TRUE, so a tenant-level default title added to notify.tenant_settings later applies to exactly the rows with use_custom_header = FALSE and needs no change here." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="9" name="created_at" nullable="false" remarks="Timestamp with timezone when the channel setting was created." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="10" name="created_by" nullable="true" remarks="Identifier of the user or process that created this record." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="11" name="updated_at" nullable="false" remarks="Timestamp with timezone when the channel setting was last updated. Maintained by trg_event_channel_setting_updated_at." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="12" name="updated_by" nullable="true" remarks="Identifier of the user or process that last updated this record." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="false" digits="0" id="13" name="is_deleted" nullable="false" remarks="Soft delete flag. Deleted rows release their from number back to the picker." size="1" type="bool" typeCode="-7"/>
          <primaryKey column="id" sequenceNumberInPK="1"/>
          <index name="pk_event_channel_setting" unique="true">
             <column ascending="true" name="id"/>
@@ -477,9 +474,6 @@
          </index>
          <index name="idx_event_channel_setting_header_logo" unique="false">
             <column ascending="true" name="header_logo_id"/>
-         </index>
-         <index name="idx_event_channel_setting_number" unique="false">
-            <column ascending="true" name="from_phone_number_id"/>
          </index>
          <index name="idx_event_channel_setting_template" unique="false">
             <column ascending="true" name="template_id"/>
@@ -492,11 +486,11 @@
             <column ascending="true" name="id"/>
             <column ascending="true" name="channel_code"/>
          </index>
-         <checkConstraint constraint="((active = false) OR ((template_id IS NOT NULL) AND ((((channel_code)::text = 'EMAIL'::text) AND (sender_email IS NOT NULL)) OR (((channel_code)::text = 'SMS'::text) AND (from_phone_number_id IS NOT NULL)))))" name="chk_event_channel_setting_active_complete"/>
+         <checkConstraint constraint="((active = false) OR ((template_id IS NOT NULL) AND (((channel_code)::text = 'SMS'::text) OR (((channel_code)::text = 'EMAIL'::text) AND (sender_email IS NOT NULL)))))" name="chk_event_channel_setting_active_complete"/>
          <checkConstraint constraint="((use_custom_header = true) OR ((header_logo_id IS NULL) AND (header_title IS NULL)))" name="chk_event_channel_setting_custom_header"/>
          <checkConstraint constraint="((header_title IS NULL) OR (btrim((header_title)::text) &lt;&gt; ''::text))" name="chk_event_channel_setting_header_title"/>
          <checkConstraint constraint="((sender_email IS NULL) OR ((sender_email)::text ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'::text))" name="chk_event_channel_setting_sender_email"/>
-         <checkConstraint constraint="((((channel_code)::text = 'EMAIL'::text) AND (from_phone_number_id IS NULL)) OR (((channel_code)::text = 'SMS'::text) AND (sender_email IS NULL) AND (use_custom_header = false) AND (header_logo_id IS NULL) AND (header_title IS NULL)))" name="chk_event_channel_setting_shape"/>
+         <checkConstraint constraint="(((channel_code)::text = 'EMAIL'::text) OR (((channel_code)::text = 'SMS'::text) AND (sender_email IS NULL) AND (use_custom_header = false) AND (header_logo_id IS NULL) AND (header_title IS NULL)))" name="chk_event_channel_setting_shape"/>
       </table>
       <table name="event_channel_setting_history" remarks="Immutable audit log of changes to event_channel_setting: activation, sender, template and header changes. Each row is a full snapshot after INSERT/UPDATE." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="h_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
@@ -662,6 +656,10 @@
             <child column="channel_code" foreignKey="fk_recipient_safelist_channel" implied="false" onDeleteCascade="false" schema="notify" table="recipient_safelist"/>
             <child column="channel_code" foreignKey="fk_template_channel" implied="false" onDeleteCascade="false" schema="notify" table="template"/>
             <child column="channel_code" foreignKey="fk_template_version_channel" implied="false" onDeleteCascade="false" schema="notify" table="template_version"/>
+            <child column="channel_code" foreignKey="fk_tenant_limit_channel" implied="false" onDeleteCascade="false" schema="notify" table="tenant_limit"/>
+            <child column="channel_code" foreignKey="fk_tenant_limit_alert_channel" implied="false" onDeleteCascade="false" schema="notify" table="tenant_limit_alert"/>
+            <child column="channel_code" foreignKey="fk_tenant_limit_alert_log_channel" implied="false" onDeleteCascade="false" schema="notify" table="tenant_limit_alert_log"/>
+            <child column="channel_code" foreignKey="fk_tenant_usage_channel" implied="false" onDeleteCascade="false" schema="notify" table="tenant_usage"/>
          </column>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="description" nullable="false" remarks="Human-readable description of the channel." size="255" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="now()" digits="6" id="2" name="created_at" nullable="false" remarks="Timestamp when the channel code was created." size="35" type="timestamptz" typeCode="93"/>
@@ -746,6 +744,7 @@
          <column autoUpdated="false" defaultValue="notify.uuid_generate_v4()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for the notification request" size="2147483647" type="uuid" typeCode="1111">
             <child column="notification_request_id" foreignKey="fk_api_key_limit_alert_log_notification_request" implied="false" onDeleteCascade="false" schema="notify" table="api_key_limit_alert_log"/>
             <child column="notification_request_id" foreignKey="fk_notification_request" implied="false" onDeleteCascade="true" schema="notify" table="notification_request_detail"/>
+            <child column="notification_request_id" foreignKey="fk_tenant_limit_alert_log_notification_request" implied="false" onDeleteCascade="false" schema="notify" table="tenant_limit_alert_log"/>
             <child column="notification_id" foreignKey="webhook_delivery_log_notification_id_fkey" implied="false" onDeleteCascade="false" schema="notify" table="webhook_delivery_log"/>
          </column>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="tenant_id" nullable="false" remarks="Tenant that submitted the request" size="2147483647" type="uuid" typeCode="1111">
@@ -922,59 +921,6 @@
             <column ascending="true" name="external_id"/>
          </index>
       </table>
-      <table name="provisioned_phone_number" remarks="Pool of SMS phone numbers provisioned from the SMS provider. A row with tenant_id NULL is available for allocation; a row with tenant_id set is allocated to that tenant. A tenant holds at most one live number and all of its SMS events send from it." schema="notify" type="TABLE">
-         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for the provisioned number." size="2147483647" type="uuid" typeCode="1111">
-            <child column="from_phone_number_id" foreignKey="fk_event_channel_setting_number" implied="false" onDeleteCascade="false" schema="notify" table="event_channel_setting"/>
-         </column>
-         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="phone_number" nullable="false" remarks="The number in E.164 format (e.g. +12505551234). Unique across all non-deleted rows." size="20" type="varchar" typeCode="12"/>
-         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="display_name" nullable="true" remarks="Optional human-friendly label for the number (e.g. &quot;Health Alerts - Victoria&quot;). Shown in the admin UI and the from-number picker." size="200" type="varchar" typeCode="12"/>
-         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="provider" nullable="true" remarks="Informational name of the provider the number was provisioned from (e.g. twilio, gc_notify). Free text until a provider code table exists." size="50" type="varchar" typeCode="12"/>
-         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="tenant_id" nullable="true" remarks="Tenant the number is allocated to. NULL means the number is unallocated and offered in the pool picker. At most one live number per tenant, and a number can only move NULL &lt;-&gt; tenant, never tenant -&gt; tenant. A tenant holding a number cannot be hard deleted; release the number back to the pool first." size="2147483647" type="uuid" typeCode="1111">
-            <parent column="id" foreignKey="fk_provisioned_phone_number_tenant" implied="false" onDeleteCascade="false" schema="notify" table="tenant"/>
-         </column>
-         <column autoUpdated="false" defaultValue="null" digits="6" id="5" name="allocated_at" nullable="true" remarks="Timestamp with timezone when the number was allocated to the current tenant. NULL while unallocated." size="35" type="timestamptz" typeCode="93"/>
-         <column autoUpdated="false" defaultValue="now()" digits="6" id="6" name="created_at" nullable="false" remarks="Timestamp with timezone when the number was added to the pool." size="35" type="timestamptz" typeCode="93"/>
-         <column autoUpdated="false" defaultValue="null" digits="0" id="7" name="created_by" nullable="true" remarks="Identifier of the user or process that added this number." size="200" type="varchar" typeCode="12"/>
-         <column autoUpdated="false" defaultValue="now()" digits="6" id="8" name="updated_at" nullable="false" remarks="Timestamp with timezone when the record was last updated. Maintained by the audit trigger." size="35" type="timestamptz" typeCode="93"/>
-         <column autoUpdated="false" defaultValue="null" digits="0" id="9" name="updated_by" nullable="true" remarks="Identifier of the user or process that last updated this record." size="200" type="varchar" typeCode="12"/>
-         <column autoUpdated="false" defaultValue="false" digits="0" id="10" name="is_deleted" nullable="false" remarks="Soft delete flag. When true the number is retired and excluded from the pool, the allocation list and the from-number picker." size="1" type="bool" typeCode="-7"/>
-         <primaryKey column="id" sequenceNumberInPK="1"/>
-         <index name="pk_provisioned_phone_number" unique="true">
-            <column ascending="true" name="id"/>
-         </index>
-         <index name="idx_provisioned_phone_number_available" unique="false">
-            <column ascending="true" name="phone_number"/>
-         </index>
-         <index name="uq_provisioned_phone_number_active" unique="true">
-            <column ascending="true" name="phone_number"/>
-         </index>
-         <index name="uq_provisioned_phone_number_tenant" unique="true">
-            <column ascending="true" name="tenant_id"/>
-         </index>
-         <checkConstraint constraint="(((tenant_id IS NULL) AND (allocated_at IS NULL)) OR ((tenant_id IS NOT NULL) AND (allocated_at IS NOT NULL)))" name="chk_provisioned_phone_number_allocation"/>
-         <checkConstraint constraint="((phone_number)::text ~ '^\+[1-9][0-9]{1,14}$'::text)" name="chk_provisioned_phone_number_e164"/>
-      </table>
-      <table name="provisioned_phone_number_history" remarks="Immutable audit log of changes to provisioned_phone_number. Each row is a full snapshot after INSERT/UPDATE, populated by the notify.audit_history() trigger. Allocation to a tenant and release back to the pool are both UPDATE rows." schema="notify" type="TABLE">
-         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="h_id" nullable="false" remarks="Unique identifier for this history record." size="2147483647" type="uuid" typeCode="1111"/>
-         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="target_row_id" nullable="false" remarks="provisioned_phone_number.id that was changed." size="2147483647" type="uuid" typeCode="1111"/>
-         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="operation_type" nullable="false" remarks="Type of operation: I=INSERT, U=UPDATE." size="1" type="bpchar" typeCode="1"/>
-         <column autoUpdated="false" defaultValue="CURRENT_USER" digits="0" id="3" name="operation_user" nullable="false" remarks="User who performed the operation (from app.current_user or the database user)." size="200" type="varchar" typeCode="12"/>
-         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="operation_executed_at" nullable="false" remarks="Server timestamp when the operation occurred." size="35" type="timestamptz" typeCode="93"/>
-         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="data_after_operation" nullable="false" remarks="Complete JSON snapshot of the row after the operation." size="2147483647" type="jsonb" typeCode="1111"/>
-         <primaryKey column="h_id" sequenceNumberInPK="1"/>
-         <index name="provisioned_phone_number_history_pkey" unique="true">
-            <column ascending="true" name="h_id"/>
-         </index>
-         <index name="idx_ppn_history_target_row" unique="false">
-            <column ascending="true" name="target_row_id"/>
-         </index>
-         <index name="idx_ppn_history_timestamp" unique="false">
-            <column ascending="false" name="operation_executed_at"/>
-         </index>
-         <index name="idx_ppn_history_user" unique="false">
-            <column ascending="true" name="operation_user"/>
-         </index>
-      </table>
       <table name="recipient_safelist" remarks="Per-tenant list of recipients that may be sent to in non-production environments, where the recipient_safelist feature flag is enabled. Equivalent to GC Notify service_safelist. Ignored in PROD, where the flag is off." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Unique identifier for the safelist entry." size="2147483647" type="uuid" typeCode="1111"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="tenant_id" nullable="false" remarks="Tenant this safelist entry belongs to. Cascade deleted with the tenant." size="2147483647" type="uuid" typeCode="1111">
@@ -1028,6 +974,71 @@
             <column ascending="true" name="operation_user"/>
          </index>
       </table>
+      <table name="sms_number" remarks="The SMS numbers Notify owns, each with the provider it is hosted by. Maintained by Notify admins." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <child column="sms_number_id" foreignKey="tenant_request_sms_number_sms_number_id_fkey" implied="false" onDeleteCascade="false" schema="notify" table="tenant_request_sms_number"/>
+            <child column="sms_number_id" foreignKey="fk_tenant_sms_number_number" implied="false" onDeleteCascade="false" schema="notify" table="tenant_sms_number"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="phone_number" nullable="false" remarks="E.164, or a 5-6 digit short code. Sent as the origination identity." size="16" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="provider_code" nullable="false" remarks="The provider hosting the number. Only a send through that provider uses it." size="20" type="varchar" typeCode="12">
+            <child column="provider_code" foreignKey="fk_tenant_sms_number_number" implied="false" onDeleteCascade="false" schema="notify" table="tenant_sms_number"/>
+            <parent column="code" foreignKey="sms_number_provider_code_fkey" implied="false" onDeleteCascade="false" schema="notify" table="sms_provider_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="number_type_code" nullable="false" remarks="" size="20" type="varchar" typeCode="12">
+            <parent column="code" foreignKey="sms_number_number_type_code_fkey" implied="false" onDeleteCascade="false" schema="notify" table="sms_number_type_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="description" nullable="true" remarks="Admin notes on the number." size="500" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="false" digits="0" id="5" name="is_default" nullable="false" remarks="The number a tenant with none of its own sends from, when SMS goes through this number's provider. At most one per provider. Each environment sets its own." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="false" digits="0" id="6" name="is_deleted" nullable="false" remarks="Soft delete. A number assigned to a tenant, or the default, cannot be deleted." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="7" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="8" name="created_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="9" name="updated_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="10" name="updated_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="sms_number_pkey" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="uq_sms_number_id_provider" unique="true">
+            <column ascending="true" name="id"/>
+            <column ascending="true" name="provider_code"/>
+         </index>
+         <index name="uq_sms_number_provider_default" unique="true">
+            <column ascending="true" name="provider_code"/>
+         </index>
+         <index name="uq_sms_number_provider_phone" unique="true">
+            <column ascending="true" name="provider_code"/>
+            <column ascending="true" name="phone_number"/>
+         </index>
+         <checkConstraint constraint="((phone_number)::text ~ '^(\+[1-9][0-9]{6,14}|[0-9]{5,6})$'::text)" name="chk_sms_number_phone_number"/>
+      </table>
+      <table name="sms_number_type_code" remarks="Code table of kinds of SMS number." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="code" nullable="false" remarks="" size="20" type="varchar" typeCode="12">
+            <child column="number_type_code" foreignKey="sms_number_number_type_code_fkey" implied="false" onDeleteCascade="false" schema="notify" table="sms_number"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="description" nullable="false" remarks="" size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="2" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="created_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="updated_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="updated_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="code" sequenceNumberInPK="1"/>
+         <index name="sms_number_type_code_pkey" unique="true">
+            <column ascending="true" name="code"/>
+         </index>
+      </table>
+      <table name="sms_provider_code" remarks="Code table of SMS providers. A code matches the name of the SMS transport that sends through it (DELIVERY_SMS_ADAPTER)." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="code" nullable="false" remarks="" size="20" type="varchar" typeCode="12">
+            <child column="provider_code" foreignKey="sms_number_provider_code_fkey" implied="false" onDeleteCascade="false" schema="notify" table="sms_number"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="description" nullable="false" remarks="" size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="2" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="created_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="updated_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="updated_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="code" sequenceNumberInPK="1"/>
+         <index name="sms_provider_code_pkey" unique="true">
+            <column ascending="true" name="code"/>
+         </index>
+      </table>
       <table name="template" remarks="Templates for notifications. Each template is scoped to a tenant and can be used to render notifications across different channels." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Template ID (UUID). Primary key." size="2147483647" type="uuid" typeCode="1111">
             <child column="template_id" foreignKey="fk_event_channel_setting_template" implied="false" onDeleteCascade="false" schema="notify" table="event_channel_setting"/>
@@ -1052,6 +1063,8 @@
          <column autoUpdated="false" defaultValue="now()" digits="6" id="13" name="updated_at" nullable="false" remarks="Timestamp when the template was last updated." size="35" type="timestamptz" typeCode="93"/>
          <column autoUpdated="false" defaultValue="'markdown'::character varying" digits="0" id="14" name="body_type" nullable="true" remarks="" size="20" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="null" digits="6" id="15" name="deleted_at" nullable="true" remarks="Timestamp when the template was soft-deleted." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="16" name="created_by_name" nullable="true" remarks="Display name of the user who created the template (JWT given_name and family_name, falling back to display_name), at the time they created it. NULL if the token carried none." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="17" name="updated_by_name" nullable="true" remarks="Display name of the user who last updated the template (JWT given_name and family_name, falling back to display_name), at the time they updated it. NULL if the token carried none." size="200" type="varchar" typeCode="12"/>
          <primaryKey column="id" sequenceNumberInPK="1"/>
          <index name="template_pkey" unique="true">
             <column ascending="true" name="id"/>
@@ -1100,7 +1113,7 @@
             <column ascending="true" name="engine_code"/>
          </index>
       </table>
-      <table name="template_version" remarks="Historical versions of templates. Allows tracking changes and rolling back to previous versions." schema="notify" type="TABLE">
+      <table name="template_version" remarks="The current and previous version of each template. Older versions are removed by the version trigger." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Version record ID (UUID). Primary key." size="2147483647" type="uuid" typeCode="1111"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="template_id" nullable="false" remarks="Foreign key to template. Links to the template this version belongs to." size="2147483647" type="uuid" typeCode="1111">
             <parent column="id" foreignKey="fk_template_version_template" implied="false" onDeleteCascade="true" schema="notify" table="template"/>
@@ -1119,6 +1132,7 @@
          <column autoUpdated="false" defaultValue="null" digits="0" id="9" name="created_by" nullable="false" remarks="User or process that created this version." size="200" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="now()" digits="6" id="10" name="created_at" nullable="false" remarks="Timestamp when this version was created." size="35" type="timestamptz" typeCode="93"/>
          <column autoUpdated="false" defaultValue="'markdown'::character varying" digits="0" id="11" name="body_type" nullable="true" remarks="" size="20" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="12" name="created_by_name" nullable="true" remarks="Display name of the user who made this version (JWT given_name and family_name, falling back to display_name), at the time they made it. Copied from template.updated_by_name by the version trigger. NULL if the token carried none." size="200" type="varchar" typeCode="12"/>
          <primaryKey column="id" sequenceNumberInPK="1"/>
          <index name="template_version_pkey" unique="true">
             <column ascending="true" name="id"/>
@@ -1149,9 +1163,14 @@
             <child column="tenant_id" foreignKey="fk_feature_flag_tenant_id" implied="false" onDeleteCascade="true" schema="notify" table="feature_flag"/>
             <child column="tenant_id" foreignKey="fk_notification_event_tenant" implied="false" onDeleteCascade="true" schema="notify" table="notification_event"/>
             <child column="tenant_id" foreignKey="fk_notification_request_tenant" implied="false" onDeleteCascade="false" schema="notify" table="notification_request"/>
-            <child column="tenant_id" foreignKey="fk_provisioned_phone_number_tenant" implied="false" onDeleteCascade="false" schema="notify" table="provisioned_phone_number"/>
             <child column="tenant_id" foreignKey="fk_recipient_safelist_tenant" implied="false" onDeleteCascade="true" schema="notify" table="recipient_safelist"/>
+            <child column="tenant_id" foreignKey="fk_tenant_limit_tenant" implied="false" onDeleteCascade="true" schema="notify" table="tenant_limit"/>
+            <child column="tenant_id" foreignKey="fk_tenant_limit_alert_tenant" implied="false" onDeleteCascade="true" schema="notify" table="tenant_limit_alert"/>
+            <child column="tenant_id" foreignKey="fk_tenant_limit_alert_log_tenant" implied="false" onDeleteCascade="true" schema="notify" table="tenant_limit_alert_log"/>
+            <child column="tenant_id" foreignKey="tenant_request_tenant_id_fkey" implied="false" onDeleteCascade="true" schema="notify" table="tenant_request"/>
             <child column="tenant_id" foreignKey="fk_tenant_settings_tenant" implied="false" onDeleteCascade="true" schema="notify" table="tenant_settings"/>
+            <child column="tenant_id" foreignKey="tenant_sms_number_tenant_id_fkey" implied="false" onDeleteCascade="true" schema="notify" table="tenant_sms_number"/>
+            <child column="tenant_id" foreignKey="fk_tenant_usage_tenant" implied="false" onDeleteCascade="true" schema="notify" table="tenant_usage"/>
             <child column="tenant_id" foreignKey="webhook_config_tenant_id_fkey" implied="false" onDeleteCascade="true" schema="notify" table="webhook_config"/>
             <child column="tenant_id" foreignKey="webhook_delivery_log_tenant_id_fkey" implied="false" onDeleteCascade="true" schema="notify" table="webhook_delivery_log"/>
          </column>
@@ -1185,6 +1204,209 @@
          </index>
          <index name="tenant_slug_key" unique="true">
             <column ascending="true" name="slug"/>
+         </index>
+      </table>
+      <table name="tenant_limit" remarks="Configured numeric notification limits per (tenant, channel). Seeded when a tenant is created." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="tenant_id" nullable="false" remarks="The tenant these limits apply to." size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_tenant_limit_tenant" implied="false" onDeleteCascade="true" schema="notify" table="tenant"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="channel_code" nullable="false" remarks="Channel the limits apply to (EMAIL, SMS). Limits differ per channel." size="20" type="varchar" typeCode="12">
+            <parent column="channel_code" foreignKey="fk_tenant_limit_channel" implied="false" onDeleteCascade="false" schema="notify" table="notification_channel_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="rate_limit_per_minute" nullable="false" remarks="Maximum notifications accepted per minute (API rate limit)." size="10" type="int4" typeCode="4"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="daily_limit" nullable="false" remarks="Maximum notifications per calendar day." size="19" type="int8" typeCode="-5"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="annual_limit" nullable="false" remarks="Maximum notifications per fiscal year. The year boundary is set globally via notify.configuration key 'fiscal_year_start'." size="19" type="int8" typeCode="-5"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="6" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="7" name="created_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="8" name="updated_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="9" name="updated_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="pk_tenant_limit" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="uq_tenant_limit" unique="true">
+            <column ascending="true" name="tenant_id"/>
+            <column ascending="true" name="channel_code"/>
+         </index>
+         <checkConstraint constraint="(annual_limit &gt; 0)" name="chk_tenant_limit_annual"/>
+         <checkConstraint constraint="(daily_limit &gt; 0)" name="chk_tenant_limit_daily"/>
+         <checkConstraint constraint="(rate_limit_per_minute &gt; 0)" name="chk_tenant_limit_rate"/>
+      </table>
+      <table name="tenant_limit_alert" remarks="Per-(tenant, channel) limit-alert configuration. Seeded when a tenant is created. Holds the warning threshold and an enabled flag; the 100% (limit reached) alert always fires." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="tenant_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_tenant_limit_alert_tenant" implied="false" onDeleteCascade="true" schema="notify" table="tenant"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="channel_code" nullable="false" remarks="" size="20" type="varchar" typeCode="12">
+            <parent column="channel_code" foreignKey="fk_tenant_limit_alert_channel" implied="false" onDeleteCascade="false" schema="notify" table="notification_channel_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="80" digits="0" id="3" name="warn_threshold_percent" nullable="false" remarks="Percent of a limit at which a warning alert is sent (default 80)." size="5" type="int2" typeCode="5"/>
+         <column autoUpdated="false" defaultValue="true" digits="0" id="4" name="alerts_enabled" nullable="false" remarks="Whether limit alerts are enabled for this tenant/channel." size="1" type="bool" typeCode="-7"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="5" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="created_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="7" name="updated_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="8" name="updated_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="pk_tenant_limit_alert" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="uq_tenant_limit_alert" unique="true">
+            <column ascending="true" name="tenant_id"/>
+            <column ascending="true" name="channel_code"/>
+         </index>
+         <checkConstraint constraint="((warn_threshold_percent &gt;= 1) AND (warn_threshold_percent &lt;= 100))" name="chk_tenant_limit_alert_threshold"/>
+      </table>
+      <table name="tenant_limit_alert_log" remarks="Atomically claims warning and limit-reached alerts for each tenant usage period, so each fires once." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="tenant_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_tenant_limit_alert_log_tenant" implied="false" onDeleteCascade="true" schema="notify" table="tenant"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="channel_code" nullable="false" remarks="" size="20" type="varchar" typeCode="12">
+            <parent column="channel_code" foreignKey="fk_tenant_limit_alert_log_channel" implied="false" onDeleteCascade="false" schema="notify" table="notification_channel_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="period_type_code" nullable="false" remarks="" size="20" type="varchar" typeCode="12">
+            <parent column="period_type_code" foreignKey="fk_tenant_limit_alert_log_period" implied="false" onDeleteCascade="false" schema="notify" table="usage_period_type_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="4" name="period_start" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="alert_level" nullable="false" remarks="" size="20" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="notification_request_id" nullable="true" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_tenant_limit_alert_log_notification_request" implied="false" onDeleteCascade="false" schema="notify" table="notification_request"/>
+         </column>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="7" name="claimed_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="8" name="enqueued_at" nullable="true" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="pk_tenant_limit_alert_log" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="uq_tenant_limit_alert_log" unique="true">
+            <column ascending="true" name="tenant_id"/>
+            <column ascending="true" name="channel_code"/>
+            <column ascending="true" name="period_type_code"/>
+            <column ascending="true" name="period_start"/>
+            <column ascending="true" name="alert_level"/>
+         </index>
+         <checkConstraint constraint="((alert_level)::text = ANY ((ARRAY['WARN'::character varying, 'LIMIT_REACHED'::character varying])::text[]))" name="chk_tenant_limit_alert_log_level"/>
+      </table>
+      <table name="tenant_request" remarks="A tenant's request for something a Notify admin must approve. Rows are kept after a decision as the record of it." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <child column="tenant_request_id" foreignKey="fk_tenant_request_sms_number_request" implied="false" onDeleteCascade="true" schema="notify" table="tenant_request_sms_number"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="tenant_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="tenant_request_tenant_id_fkey" implied="false" onDeleteCascade="true" schema="notify" table="tenant"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="request_type_code" nullable="false" remarks="What is being asked for. The type's own table holds its details." size="30" type="varchar" typeCode="12">
+            <child column="request_type_code" foreignKey="fk_tenant_request_sms_number_request" implied="false" onDeleteCascade="true" schema="notify" table="tenant_request_sms_number"/>
+            <parent column="code" foreignKey="tenant_request_request_type_code_fkey" implied="false" onDeleteCascade="false" schema="notify" table="tenant_request_type_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="'pending'::character varying" digits="0" id="3" name="status_code" nullable="false" remarks="" size="20" type="varchar" typeCode="12">
+            <parent column="code" foreignKey="tenant_request_status_code_fkey" implied="false" onDeleteCascade="false" schema="notify" table="tenant_request_status_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="decided_by" nullable="true" remarks="Stable identifier of the admin who approved or rejected the request. NULL while pending." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="decided_by_name" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="6" name="decided_at" nullable="true" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="7" name="decision_reason" nullable="true" remarks="Why the request was rejected. Shown to the tenant." size="500" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="8" name="released_by" nullable="true" remarks="Stable identifier of whoever took back what approval granted: a Notify admin or the tenant's operations admin, through the request or by changing what it granted directly. NULL unless released." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="9" name="released_by_name" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="10" name="released_at" nullable="true" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="11" name="cancelled_by" nullable="true" remarks="Stable identifier of the tenant user who cancelled the request while it was pending. NULL unless cancelled." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="12" name="cancelled_by_name" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="13" name="cancelled_at" nullable="true" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="14" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="15" name="created_by" nullable="true" remarks="Stable identifier of the tenant user who made the request (JWT preferred_username)." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="16" name="created_by_name" nullable="true" remarks="Display name of the tenant user who made the request, at the time. NULL if the token carried none." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="17" name="updated_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="18" name="updated_by" nullable="true" remarks="Stable identifier of whoever last changed the request's status. tenant_request_history has every change." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="19" name="dismissed_by" nullable="true" remarks="Stable identifier of the tenant user who cleared the finished request from the tenant's settings. NULL unless dismissed. Does not change the status." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="20" name="dismissed_by_name" nullable="true" remarks="Display name of that user at the time. NULL if the token carried none." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="21" name="dismissed_at" nullable="true" remarks="When the tenant cleared the request from its settings. The tenant's settings no longer show a dismissed request; admins still do." size="35" type="timestamptz" typeCode="93"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="tenant_request_pkey" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_tenant_request_status_created_at" unique="false">
+            <column ascending="true" name="status_code"/>
+            <column ascending="true" name="created_at"/>
+         </index>
+         <index name="idx_tenant_request_tenant_type_created_at" unique="false">
+            <column ascending="true" name="tenant_id"/>
+            <column ascending="true" name="request_type_code"/>
+            <column ascending="false" name="created_at"/>
+         </index>
+         <index name="uq_tenant_request_id_type" unique="true">
+            <column ascending="true" name="id"/>
+            <column ascending="true" name="request_type_code"/>
+         </index>
+         <index name="uq_tenant_request_tenant_type_pending" unique="true">
+            <column ascending="true" name="tenant_id"/>
+            <column ascending="true" name="request_type_code"/>
+         </index>
+      </table>
+      <table name="tenant_request_history" remarks="Audit trail of a tenant request: one row for each status it enters, including pending when it is made, written in the same transaction as the change. Append-only. No foreign keys, matching tenant_sending_history: an audit trail must outlive what it describes." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="tenant_request_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="status_code" nullable="false" remarks="The status the request entered." size="20" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="reason" nullable="true" remarks="The reason given, required when rejecting. NULL otherwise." size="500" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="created_by" nullable="false" remarks="Stable identifier of who made the change (JWT preferred_username): the tenant user for pending and cancelled, a Notify admin for approved and rejected, either for released." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="created_by_name" nullable="true" remarks="Display name of that user at the time. NULL if the token carried none." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="6" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="tenant_request_history_pkey" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_tenant_request_history_request_created_at" unique="false">
+            <column ascending="true" name="tenant_request_id"/>
+            <column ascending="true" name="created_at"/>
+         </index>
+      </table>
+      <table name="tenant_request_sms_number" remarks="What approving an SMS number request granted: written when it is approved, and kept after it is released as the record of which number it was." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="tenant_request_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_tenant_request_sms_number_request" implied="false" onDeleteCascade="true" schema="notify" table="tenant_request"/>
+         </column>
+         <column autoUpdated="false" defaultValue="'sms_number'::character varying" digits="0" id="1" name="request_type_code" nullable="false" remarks="" size="30" type="varchar" typeCode="12">
+            <parent column="request_type_code" foreignKey="fk_tenant_request_sms_number_request" implied="false" onDeleteCascade="true" schema="notify" table="tenant_request"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="sms_number_id" nullable="true" remarks="The number assigned to the tenant. NULL means it was approved on the provider's default number (non-prod only), so nothing was assigned." size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="tenant_request_sms_number_sms_number_id_fkey" implied="false" onDeleteCascade="false" schema="notify" table="sms_number"/>
+         </column>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="3" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="created_by" nullable="true" remarks="Stable identifier of the admin who approved the request (JWT preferred_username)." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="created_by_name" nullable="true" remarks="Display name of that admin at the time." size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="tenant_request_id" sequenceNumberInPK="1"/>
+         <index name="tenant_request_sms_number_pkey" unique="true">
+            <column ascending="true" name="tenant_request_id"/>
+         </index>
+         <index name="idx_tenant_request_sms_number_number" unique="false">
+            <column ascending="true" name="sms_number_id"/>
+         </index>
+         <checkConstraint constraint="((request_type_code)::text = 'sms_number'::text)" name="tenant_request_sms_number_request_type_code_check"/>
+      </table>
+      <table name="tenant_request_status_code" remarks="Code table of the statuses of a tenant request." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="code" nullable="false" remarks="" size="20" type="varchar" typeCode="12">
+            <child column="status_code" foreignKey="tenant_request_status_code_fkey" implied="false" onDeleteCascade="false" schema="notify" table="tenant_request"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="description" nullable="false" remarks="" size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="2" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="created_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="updated_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="updated_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="code" sequenceNumberInPK="1"/>
+         <index name="tenant_request_status_code_pkey" unique="true">
+            <column ascending="true" name="code"/>
+         </index>
+      </table>
+      <table name="tenant_request_type_code" remarks="Code table of the things a tenant can ask a Notify admin for. Each type's migration seeds its own code." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="code" nullable="false" remarks="" size="30" type="varchar" typeCode="12">
+            <child column="request_type_code" foreignKey="tenant_request_request_type_code_fkey" implied="false" onDeleteCascade="false" schema="notify" table="tenant_request"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="description" nullable="false" remarks="" size="255" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="2" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="created_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="updated_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="updated_by" nullable="true" remarks="" size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="code" sequenceNumberInPK="1"/>
+         <index name="tenant_request_type_code_pkey" unique="true">
+            <column ascending="true" name="code"/>
          </index>
       </table>
       <table name="tenant_sending_history" remarks="Audit trail of an admin enabling or disabling sending for a tenant. One row per change, written in the same transaction as the change. Append-only." schema="notify" type="TABLE">
@@ -1242,6 +1464,32 @@
          <checkConstraint constraint="((reply_to_email IS NULL) OR ((reply_to_email)::text ~ '^[A-Za-z0-9._-]{1,64}$'::text))" name="chk_tenant_settings_reply_to_email"/>
          <checkConstraint constraint="((safelist_max_entries IS NULL) OR (safelist_max_entries &gt; 0))" name="chk_tenant_settings_safelist_max"/>
       </table>
+      <table name="tenant_sms_number" remarks="Which number each tenant sends from, per provider. At most one per tenant per provider; a number may serve several tenants." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="tenant_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="tenant_sms_number_tenant_id_fkey" implied="false" onDeleteCascade="true" schema="notify" table="tenant"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="sms_number_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_tenant_sms_number_number" implied="false" onDeleteCascade="false" schema="notify" table="sms_number"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="provider_code" nullable="false" remarks="The number's provider, copied here so the unique key can allow one number per tenant per provider. The composite foreign key keeps it equal to the number's." size="20" type="varchar" typeCode="12">
+            <parent column="provider_code" foreignKey="fk_tenant_sms_number_number" implied="false" onDeleteCascade="false" schema="notify" table="sms_number"/>
+         </column>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="created_by" nullable="true" remarks="Stable identifier of the admin who assigned the number (JWT preferred_username)." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="created_by_name" nullable="true" remarks="Display name of that admin at the time." size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="tenant_sms_number_pkey" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_tenant_sms_number_number" unique="false">
+            <column ascending="true" name="sms_number_id"/>
+         </index>
+         <index name="uq_tenant_sms_number_tenant_provider" unique="true">
+            <column ascending="true" name="tenant_id"/>
+            <column ascending="true" name="provider_code"/>
+         </index>
+      </table>
       <table name="tenant_status_code" remarks="Code table for tenant status values. Defines all valid statuses for tenants." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="code" nullable="false" remarks="Status code (e.g., active, disabled). Primary key." size="20" type="varchar" typeCode="12">
             <child column="status" foreignKey="fk_tenant_status" implied="false" onDeleteCascade="false" schema="notify" table="tenant"/>
@@ -1257,10 +1505,45 @@
             <column ascending="true" name="code"/>
          </index>
       </table>
+      <table name="tenant_usage" remarks="Rolling notification counters per (tenant, channel, period), incremented on every accepted send whether made with an API key or from the Notify UI. YEAR (and DAY) rows are retained as usage history; MINUTE rows are prunable." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="tenant_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_tenant_usage_tenant" implied="false" onDeleteCascade="true" schema="notify" table="tenant"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="channel_code" nullable="false" remarks="" size="20" type="varchar" typeCode="12">
+            <parent column="channel_code" foreignKey="fk_tenant_usage_channel" implied="false" onDeleteCascade="false" schema="notify" table="notification_channel_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="period_type_code" nullable="false" remarks="Granularity of the bucket (FK to usage_period_type_code): MINUTE (rate limit), DAY (daily max), YEAR (annual max / fiscal-year history)." size="20" type="varchar" typeCode="12">
+            <parent column="period_type_code" foreignKey="fk_tenant_usage_period" implied="false" onDeleteCascade="false" schema="notify" table="usage_period_type_code"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="4" name="period_start" nullable="false" remarks="Inclusive start of the bucket. For YEAR this is the fiscal-year anchor (e.g. April 1); for DAY/MINUTE it is the truncated timestamp." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="0" digits="0" id="5" name="sent_count" nullable="false" remarks="Number of notifications sent in this bucket (SMS counted in billable segments)." size="19" type="int8" typeCode="-5"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="6" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="7" name="updated_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="pk_tenant_usage" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_tenant_usage_lookup" unique="false">
+            <column ascending="true" name="tenant_id"/>
+            <column ascending="true" name="channel_code"/>
+            <column ascending="true" name="period_type_code"/>
+            <column ascending="false" name="period_start"/>
+         </index>
+         <index name="uq_tenant_usage" unique="true">
+            <column ascending="true" name="tenant_id"/>
+            <column ascending="true" name="channel_code"/>
+            <column ascending="true" name="period_type_code"/>
+            <column ascending="true" name="period_start"/>
+         </index>
+         <checkConstraint constraint="(sent_count &gt;= 0)" name="chk_tenant_usage_count"/>
+      </table>
       <table name="usage_period_type_code" numRows="3" remarks="Code table for usage counter granularity. Defines the valid window types for api_key_usage buckets and limit checks." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="period_type_code" nullable="false" remarks="Period type code (MINUTE, DAY, YEAR). Primary key." size="20" type="varchar" typeCode="12">
             <child column="period_type_code" foreignKey="fk_api_key_limit_alert_log_period" implied="false" onDeleteCascade="false" schema="notify" table="api_key_limit_alert_log"/>
             <child column="period_type_code" foreignKey="fk_api_key_usage_period" implied="false" onDeleteCascade="false" schema="notify" table="api_key_usage"/>
+            <child column="period_type_code" foreignKey="fk_tenant_limit_alert_log_period" implied="false" onDeleteCascade="false" schema="notify" table="tenant_limit_alert_log"/>
+            <child column="period_type_code" foreignKey="fk_tenant_usage_period" implied="false" onDeleteCascade="false" schema="notify" table="tenant_usage"/>
          </column>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="description" nullable="false" remarks="Human-readable description of the period type." size="255" type="varchar" typeCode="12"/>
          <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="display_name" nullable="true" remarks="Display label for the period type." size="255" type="varchar" typeCode="12"/>
@@ -1475,66 +1758,6 @@ END;]]></definition>
             <parameter mode="IN"/>
          </parameters>
       </routine>
-      <routine dataAccess="MODIFIES" deterministic="false" name="check_phone_number_allocation()" returnType="trigger" securityType="INVOKER" type="FUNCTION">
-         <comment><![CDATA[Rejects moving a provisioned phone number directly from one tenant to another. A number must be released back to the pool (tenant_id NULL) before another tenant can claim it, so the release guard in V61 always gets a chance to run.]]></comment>
-         <definition language="plpgsql"><![CDATA[BEGIN
-  IF OLD.tenant_id IS NOT NULL
-     AND NEW.tenant_id IS NOT NULL
-     AND NEW.tenant_id IS DISTINCT FROM OLD.tenant_id THEN
-    RAISE EXCEPTION
-      'Phone number % cannot be transferred directly between tenants. Release it back to the pool first.',
-      OLD.phone_number
-      USING ERRCODE = 'foreign_key_violation';
-  END IF;
-
-  RETURN NEW;
-END;]]></definition>
-         <parameters>
-            <parameter mode="IN"/>
-         </parameters>
-      </routine>
-      <routine dataAccess="MODIFIES" deterministic="false" name="check_phone_number_release()" returnType="trigger" securityType="INVOKER" type="FUNCTION">
-         <comment><![CDATA[Blocks releasing, re-allocating or retiring a provisioned phone number while any non-deleted event_channel_setting referencing it still has active = TRUE. When every reference is inactive, clears those references so a released number leaves no cross-tenant pointer behind.]]></comment>
-         <definition language="plpgsql"><![CDATA[DECLARE
-  v_event_name TEXT;
-BEGIN
-  -- Only guard transitions that take the number away from its current holder: a change of
-  -- tenant (including release to NULL) or a retirement.
-  IF NEW.tenant_id IS NOT DISTINCT FROM OLD.tenant_id
-     AND NOT (NEW.is_deleted AND NOT OLD.is_deleted) THEN
-    RETURN NEW;
-  END IF;
-
-  SELECT e.name
-    INTO v_event_name
-    FROM notify.event_channel_setting ecs
-    JOIN notify.notification_event e ON e.id = ecs.event_id
-   WHERE ecs.from_phone_number_id = OLD.id
-     AND ecs.is_deleted = FALSE
-     AND ecs.active = TRUE
-   LIMIT 1;
-
-  IF v_event_name IS NOT NULL THEN
-    RAISE EXCEPTION
-      'Phone number % cannot be released or retired: event "%" still has SMS enabled. Disable SMS on that event first.',
-      OLD.phone_number, v_event_name
-      USING ERRCODE = 'foreign_key_violation';
-  END IF;
-
-  -- Everything still pointing at the number is a disabled SMS tab. Detach it rather than leave a
-  -- pointer to a number that may be re-allocated to a different tenant. Safe against
-  -- chk_event_channel_setting_active_complete precisely because these rows are inactive.
-  UPDATE notify.event_channel_setting
-     SET from_phone_number_id = NULL
-   WHERE from_phone_number_id = OLD.id
-     AND is_deleted = FALSE;
-
-  RETURN NEW;
-END;]]></definition>
-         <parameters>
-            <parameter mode="IN"/>
-         </parameters>
-      </routine>
       <routine dataAccess="MODIFIES" deterministic="false" name="create_template_version_on_update()" returnType="trigger" securityType="INVOKER" type="FUNCTION">
          <comment/>
          <definition language="plpgsql"><![CDATA[BEGIN
@@ -1565,6 +1788,7 @@ END;]]></definition>
       body,
       engine_code,
       created_by,
+      created_by_name,
       created_at
     ) VALUES (
       gen_random_uuid(),
@@ -1577,8 +1801,21 @@ END;]]></definition>
       NEW.body,
       NEW.engine_code,
       COALESCE(NEW.updated_by, 'system'),
+      NEW.updated_by_name,
       NOW()
     );
+
+    -- Remove anything older than the previous version
+    DELETE FROM notify.template_version
+    WHERE template_id = NEW.id
+      AND version < (
+        SELECT version
+        FROM notify.template_version
+        WHERE template_id = NEW.id
+        ORDER BY version DESC
+        OFFSET 1
+        LIMIT 1
+      );
   END IF;
 
   RETURN NEW;

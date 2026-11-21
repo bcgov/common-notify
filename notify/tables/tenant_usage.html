@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <title>provisioned_phone_number_history - default.notify</title>
+        <title>tenant_usage - default.notify</title>
         <!-- Tell the browser to be responsive to screen width -->
         <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
         <link rel="icon" type="image/png" sizes="16x16" href="../favicon.png">
@@ -73,7 +73,7 @@
             <div class="content-wrapper">
                 <!-- Content Header (Page header) -->
                 <section class="content-header">
-                    <h1>provisioned_phone_number_history</h1><p><span id="recordNumber">-1</span> rows</p><br />
+                    <h1>tenant_usage</h1><p><span id="recordNumber">-1</span> rows</p><br />
                     <div class="box box-primary">
                         <div class="box-header with-border">
                             <i class="fa fa-file-text-o"></i>
@@ -84,7 +84,7 @@
                             </div>
                         </div><!-- /.box-header -->
                         <div class="box-body clearfix">
-                            <p>Immutable audit log of changes to provisioned_phone_number. Each row is a full snapshot after INSERT/UPDATE, populated by the notify.audit_history() trigger. Allocation to a tenant and release back to the pool are both UPDATE rows.</p>
+                            <p>Rolling notification counters per (tenant, channel, period), incremented on every accepted send whether made with an API key or from the Notify UI. YEAR (and DAY) rows are retained as usage history; MINUTE rows are prunable.</p>
                         </div><!-- /.box-body -->
                     </div>
                 </section>
@@ -122,7 +122,7 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="h_id">h_id</span></td>
+                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="id">id</span></td>
                                     <td>uuid</td>
                                     <td>2147483647</td>
                                     <td title=''></td>
@@ -136,10 +136,10 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Unique identifier for this history record.</p></td>
+                                    <td></td>
                                 </tr>
                                 <tr>
-                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="target_row_id">target_row_id</span></td>
+                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="tenant_id">tenant_id</span></td>
                                     <td>uuid</td>
                                     <td>2147483647</td>
                                     <td title=''></td>
@@ -151,14 +151,63 @@
                                     </td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
+                                            <tr>
+                                                <td title="tenant_usage.tenant_id references tenant.id via fk_tenant_usage_tenant"><a href='tenant.html'>tenant</a><span class='relatedKey'>.id</span></td>
+                                                <td class="constraint detail">fk_tenant_usage_tenant</td>
+                                                <td class="constraint detail"><span title='Cascade on delete:&#10;Deletion of parent deletes child'>C</span></td>
+                                            </tr>
                                         </table>
                                     </td>
-                                    <td><p>provisioned_phone_number.id that was changed.</p></td>
+                                    <td></td>
                                 </tr>
                                 <tr>
-                                    <td><span id="operation_type">operation_type</span></td>
-                                    <td>bpchar</td>
-                                    <td>1</td>
+                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="channel_code">channel_code</span></td>
+                                    <td>varchar</td>
+                                    <td>20</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                            <tr>
+                                                <td title="tenant_usage.channel_code references notification_channel_code.channel_code via fk_tenant_usage_channel"><a href='notification_channel_code.html'>notification_channel_code</a><span class='relatedKey'>.channel_code</span></td>
+                                                <td class="constraint detail">fk_tenant_usage_channel</td>
+                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="period_type_code">period_type_code</span></td>
+                                    <td>varchar</td>
+                                    <td>20</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                            <tr>
+                                                <td title="tenant_usage.period_type_code references usage_period_type_code.period_type_code via fk_tenant_usage_period"><a href='usage_period_type_code.html'>usage_period_type_code</a><span class='relatedKey'>.period_type_code</span></td>
+                                                <td class="constraint detail">fk_tenant_usage_period</td>
+                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td><p>Granularity of the bucket (FK to usage_period_type_code): MINUTE (rate limit), DAY (daily max), YEAR (annual max / fiscal-year history).</p></td>
+                                </tr>
+                                <tr>
+                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="period_start">period_start</span></td>
+                                    <td>timestamptz</td>
+                                    <td>35,6</td>
                                     <td title=''></td>
                                     <td title=''></td>
                                     <td>null</td>
@@ -170,15 +219,15 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Type of operation: I=INSERT, U=UPDATE.</p></td>
+                                    <td><p>Inclusive start of the bucket. For YEAR this is the fiscal-year anchor (e.g. April 1); for DAY/MINUTE it is the truncated timestamp.</p></td>
                                 </tr>
                                 <tr>
-                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="operation_user">operation_user</span></td>
-                                    <td>varchar</td>
-                                    <td>200</td>
+                                    <td><span id="sent_count">sent_count</span></td>
+                                    <td>int8</td>
+                                    <td>19</td>
                                     <td title=''></td>
                                     <td title=''></td>
-                                    <td>CURRENT_USER</td>
+                                    <td>0</td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
@@ -187,10 +236,10 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>User who performed the operation (from app.current_user or the database user).</p></td>
+                                    <td><p>Number of notifications sent in this bucket (SMS counted in billable segments).</p></td>
                                 </tr>
                                 <tr>
-                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="operation_executed_at">operation_executed_at</span></td>
+                                    <td><span id="created_at">created_at</span></td>
                                     <td>timestamptz</td>
                                     <td>35,6</td>
                                     <td title=''></td>
@@ -204,15 +253,15 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Server timestamp when the operation occurred.</p></td>
+                                    <td></td>
                                 </tr>
                                 <tr>
-                                    <td><span id="data_after_operation">data_after_operation</span></td>
-                                    <td>jsonb</td>
-                                    <td>2147483647</td>
+                                    <td><span id="updated_at">updated_at</span></td>
+                                    <td>timestamptz</td>
+                                    <td>35,6</td>
                                     <td title=''></td>
                                     <td title=''></td>
-                                    <td>null</td>
+                                    <td>now()</td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
@@ -221,7 +270,7 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Complete JSON snapshot of the row after the operation.</p></td>
+                                    <td></td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -254,32 +303,58 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey'></i> provisioned_phone_number_history_pkey</td>
+                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey'></i> pk_tenant_usage</td>
                                     <td>Primary key</td>
                                     <td><span title='Ascending'>Asc</span></td>
-                                    <td>h_id</td>
+                                    <td>id</td>
                                 </tr>
                                 <tr>
-                                    <td title='Indexed'>idx_ppn_history_target_row</td>
+                                    <td title='Indexed'>idx_tenant_usage_lookup</td>
                                     <td>Performance</td>
-                                    <td><span title='Ascending'>Asc</span></td>
-                                    <td>target_row_id</td>
+                                    <td><span title='Ascending'>Asc</span>/<span title='Ascending'>Asc</span>/<span title='Ascending'>Asc</span>/<span title='Descending'>Desc</span></td>
+                                    <td>tenant_id + channel_code + period_type_code + period_start</td>
                                 </tr>
                                 <tr>
-                                    <td title='Indexed'>idx_ppn_history_timestamp</td>
-                                    <td>Performance</td>
-                                    <td><span title='Descending'>Desc</span></td>
-                                    <td>operation_executed_at</td>
-                                </tr>
-                                <tr>
-                                    <td title='Indexed'>idx_ppn_history_user</td>
-                                    <td>Performance</td>
-                                    <td><span title='Ascending'>Asc</span></td>
-                                    <td>operation_user</td>
+                                    <td class='uniqueKey' title='Unique Key'><i class='icon ion-key iconkey'></i> uq_tenant_usage</td>
+                                    <td>Must be unique</td>
+                                    <td><span title='Ascending'>Asc</span>/<span title='Ascending'>Asc</span>/<span title='Ascending'>Asc</span>/<span title='Ascending'>Asc</span></td>
+                                    <td>tenant_id + channel_code + period_type_code + period_start</td>
                                 </tr>
                                 </tbody>
                             </table>
                         </div><!-- /.box-body -->
+                    </div>
+                    <div class="box box-primary">
+                        <div class="box-header with-border">
+                            <i class="fa fa-sitemap"></i>
+                            <h3 class="box-title">Check Constraints</h3>
+                            <div class="box-tools pull-right">
+                                <button type="button" class="btn btn-box-tool" data-widget="collapse"><i class="fa fa-minus"></i></button>
+                                <button type="button" class="btn btn-box-tool" data-widget="remove"><i class="fa fa-times"></i></button>
+                            </div>
+                        </div>
+                        <div class="box-body">
+                            <table
+                                    id="check_table"
+                                    class="table table-bordered table-striped dataTable"
+                                    role="grid"
+                                    data-paging="true"
+                                    data-page-length="10"
+                                    data-length-change="false">
+                                <thead align='left'>
+                                <tr>
+                                    <th>Constraint Name</th>
+                                    <th>Constraint</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr>
+                                    <td>chk_tenant_usage_count</td>
+                                    <td>(sent_count &gt;&#61; 0)</td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                     <div class="box box-primary">
                         <div class="box-header with-border">
@@ -295,13 +370,51 @@
                                 <h5>Close relationships within degrees of separation</h5>
                                 <ul class="nav nav-tabs pull-left ui-sortable-handle">
                                     <li class="active"><a href="#oneDegreeImg-chart" data-toggle="tab" aria-expanded="true">One</a></li>
+                                    <li class=""><a href="#twodegreesDegreeImg-chart" data-toggle="tab" aria-expanded="true">Two degrees</a></li>
                                 </ul>
                                 <div class="tab-content no-padding">
                                     <div class="chart tab-pane active" id="oneDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="oneDegreeRelationshipsDiagram" name="oneDegreeRelationshipsDiagram">
-<area shape="rect" id="node1" href="provisioned_phone_number_history.html" target="_top" title="provisioned_phone_number_history" alt="" coords="5,5,481,251">
+<area shape="rect" id="node1" href="tenant_usage.html" target="_top" title="tenant_usage" alt="" coords="337,137,663,441">
+<area shape="rect" id="node2" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="5,199,293,345">
+<area shape="rect" id="node3" href="usage_period_type_code.html" target="_top" title="usage_period_type_code" alt="" coords="14,363,285,509">
+<area shape="rect" id="node4" href="tenant.html" target="_top" title="tenant" alt="" coords="53,5,246,181">
 </map>
-                                        <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/provisioned_phone_number_history.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
+                                        <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/tenant_usage.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
+                                    </div>
+                                    <div class="chart tab-pane " id="twodegreesDegreeImg-chart" style="position: relative; overflow-x:auto;">
+                                        <map id="twoDegreesRelationshipsDiagram" name="twoDegreesRelationshipsDiagram">
+<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="858,424,1083,512">
+<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="284,1396,477,1572">
+<area shape="rect" id="node20" href="tenant_status_code.html" target="_top" title="tenant_status_code" alt="" coords="5,1458,240,1546">
+<area shape="rect" id="node3" href="api_key_limit.html" target="_top" title="api_key_limit" alt="" coords="1230,72,1413,160">
+<area shape="rect" id="node4" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="827,631,1115,778">
+<area shape="rect" id="node5" href="api_key_limit_alert.html" target="_top" title="api_key_limit_alert" alt="" coords="1207,178,1435,266">
+<area shape="rect" id="node6" href="api_key_limit_alert_log.html" target="_top" title="api_key_limit_alert_log" alt="" coords="1192,671,1451,759">
+<area shape="rect" id="node7" href="notification_request.html" target="_top" title="notification_request" alt="" coords="850,1132,1091,1220">
+<area shape="rect" id="node8" href="usage_period_type_code.html" target="_top" title="usage_period_type_code" alt="" coords="835,882,1106,1028">
+<area shape="rect" id="node14" href="notification_event.html" target="_top" title="notification_event" alt="" coords="539,1096,765,1184">
+<area shape="rect" id="node9" href="api_key_usage.html" target="_top" title="api_key_usage" alt="" coords="1225,424,1417,512">
+<area shape="rect" id="node10" href="attachment.html" target="_top" title="attachment" alt="" coords="565,1526,739,1614">
+<area shape="rect" id="node11" href="channel_recipient_kind.html" target="_top" title="channel_recipient_kind" alt="" coords="1189,283,1453,371">
+<area shape="rect" id="node12" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="521,1631,783,1719">
+<area shape="rect" id="node13" href="event_channel_setting.html" target="_top" title="event_channel_setting" alt="" coords="1528,351,1785,439">
+<area shape="rect" id="node15" href="template.html" target="_top" title="template" alt="" coords="1245,530,1397,618">
+<area shape="rect" id="node16" href="feature_flag.html" target="_top" title="feature_flag" alt="" coords="565,1736,739,1824">
+<area shape="rect" id="node17" href="notification_request_detail.html" target="_top" title="notification_request_detail" alt="" coords="1175,776,1468,864">
+<area shape="rect" id="node18" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="1213,1308,1429,1396">
+<area shape="rect" id="node19" href="template_version.html" target="_top" title="template_version" alt="" coords="1547,563,1766,651">
+<area shape="rect" id="node21" href="tenant_limit.html" target="_top" title="tenant_limit" alt="" coords="1233,1414,1410,1502">
+<area shape="rect" id="node22" href="tenant_limit_alert.html" target="_top" title="tenant_limit_alert" alt="" coords="1210,1519,1433,1607">
+<area shape="rect" id="node23" href="tenant_limit_alert_log.html" target="_top" title="tenant_limit_alert_log" alt="" coords="1195,1203,1447,1291">
+<area shape="rect" id="node24" href="tenant_request.html" target="_top" title="tenant_request" alt="" coords="551,1842,753,1930">
+<area shape="rect" id="node25" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="550,1947,754,2035">
+<area shape="rect" id="node26" href="tenant_sms_number.html" target="_top" title="tenant_sms_number" alt="" coords="531,2052,773,2140">
+<area shape="rect" id="node27" href="tenant_usage.html" target="_top" title="tenant_usage" alt="" coords="1159,882,1484,1186">
+<area shape="rect" id="node28" href="webhook_config.html" target="_top" title="webhook_config" alt="" coords="867,1556,1075,1644">
+<area shape="rect" id="node29" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="1194,1624,1449,1712">
+</map>
+                                        <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/tenant_usage.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                 </div>
                             </div>

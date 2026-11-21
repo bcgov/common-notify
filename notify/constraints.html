@@ -80,7 +80,7 @@
                     <div class="box box-primary">
                         <div class="box-header with-border">
                             <i class="ion ion-key"></i>
-                            <h3 class="box-title">54 Foreign Key Constraints</h3>
+                            <h3 class="box-title">72 Foreign Key Constraints</h3>
                             <div class="box-tools pull-right">
                                 <button type="button" class="btn btn-box-tool" data-widget="collapse"><i class="fa fa-minus"></i></button>
                                 <button type="button" class="btn btn-box-tool" data-widget="remove"><i class="fa fa-times"></i></button>
@@ -230,24 +230,6 @@
                                         <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
                                     </tr>
                                     <tr>
-                                        <td>fk_event_channel_setting_number</td>
-                                        <td>
-                                            <table border='0' cellspacing='0' cellpadding='0'>
-                                                <tr>
-                                                    <td><a href='tables/event_channel_setting.html'>event_channel_setting</a><span>.from_phone_number_id</span></td>
-                                                </tr>
-                                            </table>
-                                        </td>
-                                        <td>
-                                            <table border='0' cellspacing='0' cellpadding='0'>
-                                                <tr>
-                                                    <td><a href='tables/provisioned_phone_number.html'>provisioned_phone_number</a><span>.id</span></td>
-                                                </tr>
-                                            </table>
-                                        </td>
-                                        <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
-                                    </tr>
-                                    <tr>
                                         <td>fk_event_channel_setting_header_logo</td>
                                         <td>
                                             <table border='0' cellspacing='0' cellpadding='0'>
@@ -368,6 +350,42 @@
                                             <table border='0' cellspacing='0' cellpadding='0'>
                                                 <tr>
                                                     <td><a href='tables/usage_period_type_code.html'>usage_period_type_code</a><span>.period_type_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>fk_tenant_limit_tenant</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_limit.html'>tenant_limit</a><span>.tenant_id</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant.html'>tenant</a><span>.id</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Cascade on delete:&#10;Deletion of parent deletes child'>Cascade on delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>fk_tenant_limit_channel</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_limit.html'>tenant_limit</a><span>.channel_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/notification_channel_code.html'>notification_channel_code</a><span>.channel_code</span></td>
                                                 </tr>
                                             </table>
                                         </td>
@@ -510,6 +528,60 @@
                                             </table>
                                         </td>
                                         <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>tenant_request_status_code_fkey</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_request.html'>tenant_request</a><span>.status_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_request_status_code.html'>tenant_request_status_code</a><span>.code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>tenant_request_request_type_code_fkey</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_request.html'>tenant_request</a><span>.request_type_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_request_type_code.html'>tenant_request_type_code</a><span>.code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>tenant_request_tenant_id_fkey</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_request.html'>tenant_request</a><span>.tenant_id</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant.html'>tenant</a><span>.id</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Cascade on delete:&#10;Deletion of parent deletes child'>Cascade on delete</span></td>
                                     </tr>
                                     <tr>
                                         <td>fk_template_version_engine</td>
@@ -764,6 +836,48 @@
                                         <td><span title='Cascade on delete:&#10;Deletion of parent deletes child'>Cascade on delete</span></td>
                                     </tr>
                                     <tr>
+                                        <td>fk_tenant_sms_number_number</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_sms_number.html'>tenant_sms_number</a><span>.sms_number_id</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td><a href='tables/tenant_sms_number.html'>tenant_sms_number</a><span>.provider_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/sms_number.html'>sms_number</a><span>.id</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td><a href='tables/sms_number.html'>sms_number</a><span>.provider_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>tenant_sms_number_tenant_id_fkey</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_sms_number.html'>tenant_sms_number</a><span>.tenant_id</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant.html'>tenant</a><span>.id</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Cascade on delete:&#10;Deletion of parent deletes child'>Cascade on delete</span></td>
+                                    </tr>
+                                    <tr>
                                         <td>fk_email_logo_source</td>
                                         <td>
                                             <table border='0' cellspacing='0' cellpadding='0'>
@@ -800,11 +914,65 @@
                                         <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
                                     </tr>
                                     <tr>
-                                        <td>fk_provisioned_phone_number_tenant</td>
+                                        <td>sms_number_number_type_code_fkey</td>
                                         <td>
                                             <table border='0' cellspacing='0' cellpadding='0'>
                                                 <tr>
-                                                    <td><a href='tables/provisioned_phone_number.html'>provisioned_phone_number</a><span>.tenant_id</span></td>
+                                                    <td><a href='tables/sms_number.html'>sms_number</a><span>.number_type_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/sms_number_type_code.html'>sms_number_type_code</a><span>.code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>sms_number_provider_code_fkey</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/sms_number.html'>sms_number</a><span>.provider_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/sms_provider_code.html'>sms_provider_code</a><span>.code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>fk_tenant_limit_alert_channel</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_limit_alert.html'>tenant_limit_alert</a><span>.channel_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/notification_channel_code.html'>notification_channel_code</a><span>.channel_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>fk_tenant_limit_alert_tenant</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_limit_alert.html'>tenant_limit_alert</a><span>.tenant_id</span></td>
                                                 </tr>
                                             </table>
                                         </td>
@@ -815,7 +983,7 @@
                                                 </tr>
                                             </table>
                                         </td>
-                                        <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                        <td><span title='Cascade on delete:&#10;Deletion of parent deletes child'>Cascade on delete</span></td>
                                     </tr>
                                     <tr>
                                         <td>fk_event_channel_cstar_group_kind</td>
@@ -864,6 +1032,78 @@
                                             </table>
                                         </td>
                                         <td><span title='Cascade on delete:&#10;Deletion of parent deletes child'>Cascade on delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>fk_tenant_limit_alert_log_channel</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_limit_alert_log.html'>tenant_limit_alert_log</a><span>.channel_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/notification_channel_code.html'>notification_channel_code</a><span>.channel_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>fk_tenant_limit_alert_log_tenant</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_limit_alert_log.html'>tenant_limit_alert_log</a><span>.tenant_id</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant.html'>tenant</a><span>.id</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Cascade on delete:&#10;Deletion of parent deletes child'>Cascade on delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>fk_tenant_limit_alert_log_notification_request</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_limit_alert_log.html'>tenant_limit_alert_log</a><span>.notification_request_id</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/notification_request.html'>notification_request</a><span>.id</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>fk_tenant_limit_alert_log_period</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_limit_alert_log.html'>tenant_limit_alert_log</a><span>.period_type_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/usage_period_type_code.html'>usage_period_type_code</a><span>.period_type_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
                                     </tr>
                                     <tr>
                                         <td>fk_feature_flag_tenant_id</td>
@@ -938,6 +1178,48 @@
                                         <td><span title='Cascade on delete:&#10;Deletion of parent deletes child'>Cascade on delete</span></td>
                                     </tr>
                                     <tr>
+                                        <td>fk_tenant_request_sms_number_request</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_request_sms_number.html'>tenant_request_sms_number</a><span>.tenant_request_id</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td><a href='tables/tenant_request_sms_number.html'>tenant_request_sms_number</a><span>.request_type_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_request.html'>tenant_request</a><span>.id</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td><a href='tables/tenant_request.html'>tenant_request</a><span>.request_type_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Cascade on delete:&#10;Deletion of parent deletes child'>Cascade on delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>tenant_request_sms_number_sms_number_id_fkey</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_request_sms_number.html'>tenant_request_sms_number</a><span>.sms_number_id</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/sms_number.html'>sms_number</a><span>.id</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
                                         <td>fk_recipient_safelist_tenant</td>
                                         <td>
                                             <table border='0' cellspacing='0' cellpadding='0'>
@@ -990,6 +1272,60 @@
                                             </table>
                                         </td>
                                         <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>fk_tenant_usage_period</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_usage.html'>tenant_usage</a><span>.period_type_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/usage_period_type_code.html'>usage_period_type_code</a><span>.period_type_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>fk_tenant_usage_channel</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_usage.html'>tenant_usage</a><span>.channel_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/notification_channel_code.html'>notification_channel_code</a><span>.channel_code</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>Restrict delete</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>fk_tenant_usage_tenant</td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant_usage.html'>tenant_usage</a><span>.tenant_id</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td>
+                                            <table border='0' cellspacing='0' cellpadding='0'>
+                                                <tr>
+                                                    <td><a href='tables/tenant.html'>tenant</a><span>.id</span></td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td><span title='Cascade on delete:&#10;Deletion of parent deletes child'>Cascade on delete</span></td>
                                     </tr>
                                     <tr>
                                         <td>fk_tenant_status</td>
@@ -1136,7 +1472,7 @@
                                     <tr>
                                         <td><a href='tables/event_channel_setting.html'>event_channel_setting</a></td>
                                         <td>chk_event_channel_setting_active_complete</td>
-                                        <td>((active &#61; false) OR ((template_id IS NOT NULL) AND ((((channel_code)::text &#61; &#39;EMAIL&#39;::text) AND (sender_email IS NOT NULL)) OR (((channel_code)::text &#61; &#39;SMS&#39;::text) AND (from_phone_number_id IS NOT NULL)))))</td>
+                                        <td>((active &#61; false) OR ((template_id IS NOT NULL) AND (((channel_code)::text &#61; &#39;SMS&#39;::text) OR (((channel_code)::text &#61; &#39;EMAIL&#39;::text) AND (sender_email IS NOT NULL)))))</td>
                                     </tr>
                                     <tr>
                                         <td><a href='tables/event_channel_setting.html'>event_channel_setting</a></td>
@@ -1156,7 +1492,7 @@
                                     <tr>
                                         <td><a href='tables/event_channel_setting.html'>event_channel_setting</a></td>
                                         <td>chk_event_channel_setting_shape</td>
-                                        <td>((((channel_code)::text &#61; &#39;EMAIL&#39;::text) AND (from_phone_number_id IS NULL)) OR (((channel_code)::text &#61; &#39;SMS&#39;::text) AND (sender_email IS NULL) AND (use_custom_header &#61; false) AND (header_logo_id IS NULL) AND (header_title IS NULL)))</td>
+                                        <td>(((channel_code)::text &#61; &#39;EMAIL&#39;::text) OR (((channel_code)::text &#61; &#39;SMS&#39;::text) AND (sender_email IS NULL) AND (use_custom_header &#61; false) AND (header_logo_id IS NULL) AND (header_title IS NULL)))</td>
                                     </tr>
                                     <tr>
                                         <td><a href='tables/notification_request_detail.html'>notification_request_detail</a></td>
@@ -1167,6 +1503,21 @@
                                         <td><a href='tables/api_key_usage.html'>api_key_usage</a></td>
                                         <td>chk_api_key_usage_count</td>
                                         <td>(sent_count &gt;&#61; 0)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><a href='tables/tenant_limit.html'>tenant_limit</a></td>
+                                        <td>chk_tenant_limit_annual</td>
+                                        <td>(annual_limit &gt; 0)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><a href='tables/tenant_limit.html'>tenant_limit</a></td>
+                                        <td>chk_tenant_limit_daily</td>
+                                        <td>(daily_limit &gt; 0)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><a href='tables/tenant_limit.html'>tenant_limit</a></td>
+                                        <td>chk_tenant_limit_rate</td>
+                                        <td>(rate_limit_per_minute &gt; 0)</td>
                                     </tr>
                                     <tr>
                                         <td><a href='tables/notification_event.html'>notification_event</a></td>
@@ -1204,14 +1555,14 @@
                                         <td>((NOT is_default) OR (((status_code)::text &#61; &#39;APPROVED&#39;::text) AND (NOT is_deleted) AND ((source_code)::text &#61; &#39;SYSTEM&#39;::text)))</td>
                                     </tr>
                                     <tr>
-                                        <td><a href='tables/provisioned_phone_number.html'>provisioned_phone_number</a></td>
-                                        <td>chk_provisioned_phone_number_allocation</td>
-                                        <td>(((tenant_id IS NULL) AND (allocated_at IS NULL)) OR ((tenant_id IS NOT NULL) AND (allocated_at IS NOT NULL)))</td>
+                                        <td><a href='tables/sms_number.html'>sms_number</a></td>
+                                        <td>chk_sms_number_phone_number</td>
+                                        <td>((phone_number)::text ~ &#39;^(\+[1-9][0-9]{6,14}|[0-9]{5,6})$&#39;::text)</td>
                                     </tr>
                                     <tr>
-                                        <td><a href='tables/provisioned_phone_number.html'>provisioned_phone_number</a></td>
-                                        <td>chk_provisioned_phone_number_e164</td>
-                                        <td>((phone_number)::text ~ &#39;^\+[1-9][0-9]{1,14}$&#39;::text)</td>
+                                        <td><a href='tables/tenant_limit_alert.html'>tenant_limit_alert</a></td>
+                                        <td>chk_tenant_limit_alert_threshold</td>
+                                        <td>((warn_threshold_percent &gt;&#61; 1) AND (warn_threshold_percent &lt;&#61; 100))</td>
                                     </tr>
                                     <tr>
                                         <td><a href='tables/event_channel_cstar_group.html'>event_channel_cstar_group</a></td>
@@ -1222,6 +1573,11 @@
                                         <td><a href='tables/event_channel_cstar_group.html'>event_channel_cstar_group</a></td>
                                         <td>chk_event_channel_cstar_group_id</td>
                                         <td>((cstar_group_id)::text ~ &#39;^[A-Za-z0-9_-]{1,128}$&#39;::text)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><a href='tables/tenant_limit_alert_log.html'>tenant_limit_alert_log</a></td>
+                                        <td>chk_tenant_limit_alert_log_level</td>
+                                        <td>((alert_level)::text &#61; ANY ((ARRAY[&#39;WARN&#39;::character varying, &#39;LIMIT_REACHED&#39;::character varying])::text[]))</td>
                                     </tr>
                                     <tr>
                                         <td><a href='tables/api_key_limit.html'>api_key_limit</a></td>
@@ -1239,6 +1595,11 @@
                                         <td>(rate_limit_per_minute &gt; 0)</td>
                                     </tr>
                                     <tr>
+                                        <td><a href='tables/tenant_request_sms_number.html'>tenant_request_sms_number</a></td>
+                                        <td>tenant_request_sms_number_request_type_code_check</td>
+                                        <td>((request_type_code)::text &#61; &#39;sms_number&#39;::text)</td>
+                                    </tr>
+                                    <tr>
                                         <td><a href='tables/recipient_safelist.html'>recipient_safelist</a></td>
                                         <td>chk_recipient_safelist_channel</td>
                                         <td>((channel_code)::text &#61; ANY ((ARRAY[&#39;EMAIL&#39;::character varying, &#39;SMS&#39;::character varying])::text[]))</td>
@@ -1252,6 +1613,11 @@
                                         <td><a href='tables/recipient_safelist.html'>recipient_safelist</a></td>
                                         <td>chk_recipient_safelist_recipient</td>
                                         <td>(length(btrim((recipient)::text)) &gt; 0)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><a href='tables/tenant_usage.html'>tenant_usage</a></td>
+                                        <td>chk_tenant_usage_count</td>
+                                        <td>(sent_count &gt;&#61; 0)</td>
                                     </tr>
                                     <tr>
                                         <td><a href='tables/api_key_consumer.html'>api_key_consumer</a></td>

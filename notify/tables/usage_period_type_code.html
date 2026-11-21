@@ -140,6 +140,16 @@
                                                 <td class="constraint detail">fk_api_key_usage_period</td>
                                                 <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
                                             </tr>
+                                            <tr>
+                                                <td title="tenant_limit_alert_log.period_type_code references usage_period_type_code.period_type_code via fk_tenant_limit_alert_log_period"><a href='tenant_limit_alert_log.html'>tenant_limit_alert_log</a><span class='relatedKey'>.period_type_code</span></td>
+                                                <td class="constraint detail">fk_tenant_limit_alert_log_period</td>
+                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td title="tenant_usage.period_type_code references usage_period_type_code.period_type_code via fk_tenant_usage_period"><a href='tenant_usage.html'>tenant_usage</a><span class='relatedKey'>.period_type_code</span></td>
+                                                <td class="constraint detail">fk_tenant_usage_period</td>
+                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
+                                            </tr>
                                         </table>
                                     </td>
                                     <td>
@@ -333,19 +343,24 @@
                                     <div class="chart tab-pane active" id="oneDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="oneDegreeRelationshipsDiagram" name="oneDegreeRelationshipsDiagram">
 <area shape="rect" id="node1" href="api_key_limit_alert_log.html" target="_top" title="api_key_limit_alert_log" alt="" coords="428,5,687,299">
-<area shape="rect" id="node2" href="usage_period_type_code.html" target="_top" title="usage_period_type_code" alt="" coords="5,247,384,551">
+<area shape="rect" id="node2" href="usage_period_type_code.html" target="_top" title="usage_period_type_code" alt="" coords="5,528,384,832">
 <area shape="rect" id="node3" href="api_key_usage.html" target="_top" title="api_key_usage" alt="" coords="449,316,665,551">
+<area shape="rect" id="node4" href="tenant_limit_alert_log.html" target="_top" title="tenant_limit_alert_log" alt="" coords="431,568,683,861">
+<area shape="rect" id="node5" href="tenant_usage.html" target="_top" title="tenant_usage" alt="" coords="464,879,651,1113">
 </map>
                                         <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/usage_period_type_code.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                     <div class="chart tab-pane " id="twodegreesDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="twoDegreesRelationshipsDiagram" name="twoDegreesRelationshipsDiagram">
-<area shape="rect" id="node1" href="api_key_limit_alert_log.html" target="_top" title="api_key_limit_alert_log" alt="" coords="428,257,687,551">
-<area shape="rect" id="node2" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="82,37,307,125">
-<area shape="rect" id="node3" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="51,143,339,231">
-<area shape="rect" id="node4" href="notification_request.html" target="_top" title="notification_request" alt="" coords="74,569,315,657">
-<area shape="rect" id="node5" href="usage_period_type_code.html" target="_top" title="usage_period_type_code" alt="" coords="5,248,384,552">
-<area shape="rect" id="node6" href="api_key_usage.html" target="_top" title="api_key_usage" alt="" coords="449,5,665,240">
+<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="259,324,485,412">
+<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="5,572,139,660">
+<area shape="rect" id="node3" href="api_key_limit_alert_log.html" target="_top" title="api_key_limit_alert_log" alt="" coords="605,509,864,803">
+<area shape="rect" id="node4" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="228,429,516,517">
+<area shape="rect" id="node5" href="notification_request.html" target="_top" title="notification_request" alt="" coords="251,892,493,980">
+<area shape="rect" id="node6" href="usage_period_type_code.html" target="_top" title="usage_period_type_code" alt="" coords="183,535,561,839">
+<area shape="rect" id="node7" href="api_key_usage.html" target="_top" title="api_key_usage" alt="" coords="627,257,843,492">
+<area shape="rect" id="node8" href="tenant_limit_alert_log.html" target="_top" title="tenant_limit_alert_log" alt="" coords="609,820,861,1113">
+<area shape="rect" id="node9" href="tenant_usage.html" target="_top" title="tenant_usage" alt="" coords="641,5,828,240">
 </map>
                                         <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/usage_period_type_code.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>

@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <title>provisioned_phone_number - default.notify</title>
+        <title>tenant_limit_alert_log - default.notify</title>
         <!-- Tell the browser to be responsive to screen width -->
         <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
         <link rel="icon" type="image/png" sizes="16x16" href="../favicon.png">
@@ -73,7 +73,7 @@
             <div class="content-wrapper">
                 <!-- Content Header (Page header) -->
                 <section class="content-header">
-                    <h1>provisioned_phone_number</h1><p><span id="recordNumber">-1</span> rows</p><br />
+                    <h1>tenant_limit_alert_log</h1><p><span id="recordNumber">-1</span> rows</p><br />
                     <div class="box box-primary">
                         <div class="box-header with-border">
                             <i class="fa fa-file-text-o"></i>
@@ -84,7 +84,7 @@
                             </div>
                         </div><!-- /.box-header -->
                         <div class="box-body clearfix">
-                            <p>Pool of SMS phone numbers provisioned from the SMS provider. A row with tenant_id NULL is available for allocation; a row with tenant_id set is allocated to that tenant. A tenant holds at most one live number and all of its SMS events send from it.</p>
+                            <p>Atomically claims warning and limit-reached alerts for each tenant usage period, so each fires once.</p>
                         </div><!-- /.box-body -->
                     </div>
                 </section>
@@ -130,21 +130,99 @@
                                     <td>gen_random_uuid()</td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
-                                            <tr>
-                                                <td title="event_channel_setting.from_phone_number_id references provisioned_phone_number.id via fk_event_channel_setting_number"><a href='event_channel_setting.html'>event_channel_setting</a><span class='relatedKey'>.from_phone_number_id</span></td>
-                                                <td class="constraint detail">fk_event_channel_setting_number</td>
-                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
-                                            </tr>
                                         </table>
                                     </td>
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Unique identifier for the provisioned number.</p></td>
+                                    <td></td>
                                 </tr>
                                 <tr>
-                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="phone_number">phone_number</span></td>
+                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="tenant_id">tenant_id</span></td>
+                                    <td>uuid</td>
+                                    <td>2147483647</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                            <tr>
+                                                <td title="tenant_limit_alert_log.tenant_id references tenant.id via fk_tenant_limit_alert_log_tenant"><a href='tenant.html'>tenant</a><span class='relatedKey'>.id</span></td>
+                                                <td class="constraint detail">fk_tenant_limit_alert_log_tenant</td>
+                                                <td class="constraint detail"><span title='Cascade on delete:&#10;Deletion of parent deletes child'>C</span></td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="channel_code">channel_code</span></td>
+                                    <td>varchar</td>
+                                    <td>20</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                            <tr>
+                                                <td title="tenant_limit_alert_log.channel_code references notification_channel_code.channel_code via fk_tenant_limit_alert_log_channel"><a href='notification_channel_code.html'>notification_channel_code</a><span class='relatedKey'>.channel_code</span></td>
+                                                <td class="constraint detail">fk_tenant_limit_alert_log_channel</td>
+                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="period_type_code">period_type_code</span></td>
+                                    <td>varchar</td>
+                                    <td>20</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                            <tr>
+                                                <td title="tenant_limit_alert_log.period_type_code references usage_period_type_code.period_type_code via fk_tenant_limit_alert_log_period"><a href='usage_period_type_code.html'>usage_period_type_code</a><span class='relatedKey'>.period_type_code</span></td>
+                                                <td class="constraint detail">fk_tenant_limit_alert_log_period</td>
+                                                <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="period_start">period_start</span></td>
+                                    <td>timestamptz</td>
+                                    <td>35,6</td>
+                                    <td title=''></td>
+                                    <td title=''></td>
+                                    <td>null</td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td>
+                                        <table border='0' cellspacing='0' cellpadding='0'>
+                                        </table>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td class='indexedColumn' title='Indexed'><i class='fa fa-sitemap fa-rotate-120' style='padding-right: 5px;'></i><span id="alert_level">alert_level</span></td>
                                     <td>varchar</td>
                                     <td>20</td>
                                     <td title=''></td>
@@ -158,44 +236,10 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>The number in E.164 format (e.g. +12505551234). Unique across all non-deleted rows.</p></td>
+                                    <td></td>
                                 </tr>
                                 <tr>
-                                    <td><span id="display_name">display_name</span></td>
-                                    <td>varchar</td>
-                                    <td>200</td>
-                                    <td title='nullable'>√</td>
-                                    <td title=''></td>
-                                    <td>null</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Optional human-friendly label for the number (e.g. &ldquo;Health Alerts - Victoria&rdquo;). Shown in the admin UI and the from-number picker.</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="provider">provider</span></td>
-                                    <td>varchar</td>
-                                    <td>50</td>
-                                    <td title='nullable'>√</td>
-                                    <td title=''></td>
-                                    <td>null</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Informational name of the provider the number was provisioned from (e.g. twilio, gc_notify). Free text until a provider code table exists.</p></td>
-                                </tr>
-                                <tr>
-                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="tenant_id">tenant_id</span></td>
+                                    <td class='foreignKey' title='Foreign Key'><i class='icon ion-key iconkey' style='padding-left: 5px;'></i><span id="notification_request_id">notification_request_id</span></td>
                                     <td>uuid</td>
                                     <td>2147483647</td>
                                     <td title='nullable'>√</td>
@@ -208,33 +252,16 @@
                                     <td>
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                             <tr>
-                                                <td title="provisioned_phone_number.tenant_id references tenant.id via fk_provisioned_phone_number_tenant"><a href='tenant.html'>tenant</a><span class='relatedKey'>.id</span></td>
-                                                <td class="constraint detail">fk_provisioned_phone_number_tenant</td>
+                                                <td title="tenant_limit_alert_log.notification_request_id references notification_request.id via fk_tenant_limit_alert_log_notification_request"><a href='notification_request.html'>notification_request</a><span class='relatedKey'>.id</span></td>
+                                                <td class="constraint detail">fk_tenant_limit_alert_log_notification_request</td>
                                                 <td class="constraint detail"><span title='Restrict delete:&#10;Parent cannot be deleted if children exist'>R</span></td>
                                             </tr>
                                         </table>
                                     </td>
-                                    <td><p>Tenant the number is allocated to. NULL means the number is unallocated and offered in the pool picker. At most one live number per tenant, and a number can only move NULL &lt;-&gt; tenant, never tenant -&gt; tenant. A tenant holding a number cannot be hard deleted; release the number back to the pool first.</p></td>
+                                    <td></td>
                                 </tr>
                                 <tr>
-                                    <td><span id="allocated_at">allocated_at</span></td>
-                                    <td>timestamptz</td>
-                                    <td>35,6</td>
-                                    <td title='nullable'>√</td>
-                                    <td title=''></td>
-                                    <td>null</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Timestamp with timezone when the number was allocated to the current tenant. NULL while unallocated.</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="created_at">created_at</span></td>
+                                    <td><span id="claimed_at">claimed_at</span></td>
                                     <td>timestamptz</td>
                                     <td>35,6</td>
                                     <td title=''></td>
@@ -248,46 +275,12 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Timestamp with timezone when the number was added to the pool.</p></td>
+                                    <td></td>
                                 </tr>
                                 <tr>
-                                    <td><span id="created_by">created_by</span></td>
-                                    <td>varchar</td>
-                                    <td>200</td>
-                                    <td title='nullable'>√</td>
-                                    <td title=''></td>
-                                    <td>null</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Identifier of the user or process that added this number.</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="updated_at">updated_at</span></td>
+                                    <td><span id="enqueued_at">enqueued_at</span></td>
                                     <td>timestamptz</td>
                                     <td>35,6</td>
-                                    <td title=''></td>
-                                    <td title=''></td>
-                                    <td>now()</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Timestamp with timezone when the record was last updated. Maintained by the audit trigger.</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="updated_by">updated_by</span></td>
-                                    <td>varchar</td>
-                                    <td>200</td>
                                     <td title='nullable'>√</td>
                                     <td title=''></td>
                                     <td>null</td>
@@ -299,24 +292,7 @@
                                         <table border='0' cellspacing='0' cellpadding='0'>
                                         </table>
                                     </td>
-                                    <td><p>Identifier of the user or process that last updated this record.</p></td>
-                                </tr>
-                                <tr>
-                                    <td><span id="is_deleted">is_deleted</span></td>
-                                    <td>bool</td>
-                                    <td>1</td>
-                                    <td title=''></td>
-                                    <td title=''></td>
-                                    <td>false</td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td>
-                                        <table border='0' cellspacing='0' cellpadding='0'>
-                                        </table>
-                                    </td>
-                                    <td><p>Soft delete flag. When true the number is retired and excluded from the pool, the allocation list and the from-number picker.</p></td>
+                                    <td></td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -349,28 +325,16 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey'></i> pk_provisioned_phone_number</td>
+                                    <td class='primaryKey' title='Primary Key'><i class='icon ion-key iconkey'></i> pk_tenant_limit_alert_log</td>
                                     <td>Primary key</td>
                                     <td><span title='Ascending'>Asc</span></td>
                                     <td>id</td>
                                 </tr>
                                 <tr>
-                                    <td title='Indexed'>idx_provisioned_phone_number_available</td>
-                                    <td>Performance</td>
-                                    <td><span title='Ascending'>Asc</span></td>
-                                    <td>phone_number</td>
-                                </tr>
-                                <tr>
-                                    <td class='uniqueKey' title='Unique Key'><i class='icon ion-key iconkey'></i> uq_provisioned_phone_number_active</td>
+                                    <td class='uniqueKey' title='Unique Key'><i class='icon ion-key iconkey'></i> uq_tenant_limit_alert_log</td>
                                     <td>Must be unique</td>
-                                    <td><span title='Ascending'>Asc</span></td>
-                                    <td>phone_number</td>
-                                </tr>
-                                <tr>
-                                    <td class='uniqueKey' title='Unique Key'><i class='icon ion-key iconkey'></i> uq_provisioned_phone_number_tenant</td>
-                                    <td>Must be unique</td>
-                                    <td><span title='Ascending'>Asc</span></td>
-                                    <td>tenant_id</td>
+                                    <td><span title='Ascending'>Asc</span>/<span title='Ascending'>Asc</span>/<span title='Ascending'>Asc</span>/<span title='Ascending'>Asc</span>/<span title='Ascending'>Asc</span></td>
+                                    <td>tenant_id + channel_code + period_type_code + period_start + alert_level</td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -401,12 +365,8 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td>chk_provisioned_phone_number_allocation</td>
-                                    <td>(((tenant_id IS NULL) AND (allocated_at IS NULL)) OR ((tenant_id IS NOT NULL) AND (allocated_at IS NOT NULL)))</td>
-                                </tr>
-                                <tr>
-                                    <td>chk_provisioned_phone_number_e164</td>
-                                    <td>((phone_number)::text ~ &#39;^\+[1-9][0-9]{1,14}$&#39;::text)</td>
+                                    <td>chk_tenant_limit_alert_log_level</td>
+                                    <td>((alert_level)::text &#61; ANY ((ARRAY[&#39;WARN&#39;::character varying, &#39;LIMIT_REACHED&#39;::character varying])::text[]))</td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -431,35 +391,48 @@
                                 <div class="tab-content no-padding">
                                     <div class="chart tab-pane active" id="oneDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="oneDegreeRelationshipsDiagram" name="oneDegreeRelationshipsDiagram">
-<area shape="rect" id="node1" href="event_channel_setting.html" target="_top" title="event_channel_setting" alt="" coords="696,5,953,269">
-<area shape="rect" id="node2" href="provisioned_phone_number.html" target="_top" title="provisioned_phone_number" alt="" coords="243,120,652,512">
-<area shape="rect" id="node3" href="tenant.html" target="_top" title="tenant" alt="" coords="5,240,199,416">
+<area shape="rect" id="node1" href="notification_request.html" target="_top" title="notification_request" alt="" coords="266,396,507,719">
+<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="5,210,199,386">
+<area shape="rect" id="node3" href="tenant_limit_alert_log.html" target="_top" title="tenant_limit_alert_log" alt="" coords="575,75,945,408">
+<area shape="rect" id="node4" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="243,68,531,215">
+<area shape="rect" id="node5" href="usage_period_type_code.html" target="_top" title="usage_period_type_code" alt="" coords="251,232,522,379">
 </map>
-                                        <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/provisioned_phone_number.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
+                                        <a name='diagram'><img id="oneDegreeImg" src="../diagrams/tables/tenant_limit_alert_log.1degree.png" usemap="#oneDegreeRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                     <div class="chart tab-pane " id="twodegreesDegreeImg-chart" style="position: relative; overflow-x:auto;">
                                         <map id="twoDegreesRelationshipsDiagram" name="twoDegreesRelationshipsDiagram">
-<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="708,846,933,934">
-<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="331,949,525,1125">
-<area shape="rect" id="node16" href="tenant_status_code.html" target="_top" title="tenant_status_code" alt="" coords="5,1010,240,1098">
-<area shape="rect" id="node3" href="attachment.html" target="_top" title="attachment" alt="" coords="734,951,907,1039">
-<area shape="rect" id="node4" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="690,1162,951,1250">
-<area shape="rect" id="node5" href="event_channel_cstar_group.html" target="_top" title="event_channel_cstar_group" alt="" coords="1371,266,1665,354">
-<area shape="rect" id="node6" href="event_channel_setting.html" target="_top" title="event_channel_setting" alt="" coords="1069,181,1327,445">
-<area shape="rect" id="node8" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="284,85,572,173">
-<area shape="rect" id="node9" href="notification_event.html" target="_top" title="notification_event" alt="" coords="708,705,933,793">
-<area shape="rect" id="node10" href="provisioned_phone_number.html" target="_top" title="provisioned_phone_number" alt="" coords="616,295,1025,687">
-<area shape="rect" id="node11" href="email_logo.html" target="_top" title="email_logo" alt="" coords="739,1057,903,1145">
-<area shape="rect" id="node12" href="template.html" target="_top" title="template" alt="" coords="745,85,897,173">
-<area shape="rect" id="node7" href="event_channel_recipient.html" target="_top" title="event_channel_recipient" alt="" coords="1381,161,1655,249">
-<area shape="rect" id="node13" href="feature_flag.html" target="_top" title="feature_flag" alt="" coords="733,1267,908,1355">
-<area shape="rect" id="node14" href="notification_request.html" target="_top" title="notification_request" alt="" coords="1077,773,1319,861">
-<area shape="rect" id="node15" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="713,190,929,278">
-<area shape="rect" id="node17" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="1096,1145,1300,1233">
-<area shape="rect" id="node18" href="webhook_config.html" target="_top" title="webhook_config" alt="" coords="1094,1339,1302,1427">
-<area shape="rect" id="node19" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="1391,1339,1645,1427">
+<area shape="rect" id="node1" href="api_key_consumer.html" target="_top" title="api_key_consumer" alt="" coords="810,216,1035,304">
+<area shape="rect" id="node2" href="tenant.html" target="_top" title="tenant" alt="" coords="284,935,417,1023">
+<area shape="rect" id="node21" href="tenant_status_code.html" target="_top" title="tenant_status_code" alt="" coords="5,932,240,1020">
+<area shape="rect" id="node3" href="api_key_limit.html" target="_top" title="api_key_limit" alt="" coords="1205,111,1387,199">
+<area shape="rect" id="node4" href="notification_channel_code.html" target="_top" title="notification_channel_code" alt="" coords="779,924,1067,1071">
+<area shape="rect" id="node5" href="api_key_limit_alert.html" target="_top" title="api_key_limit_alert" alt="" coords="1182,216,1410,304">
+<area shape="rect" id="node6" href="api_key_limit_alert_log.html" target="_top" title="api_key_limit_alert_log" alt="" coords="1167,427,1425,515">
+<area shape="rect" id="node7" href="notification_request.html" target="_top" title="notification_request" alt="" coords="802,1091,1043,1179">
+<area shape="rect" id="node8" href="usage_period_type_code.html" target="_top" title="usage_period_type_code" alt="" coords="787,623,1058,769">
+<area shape="rect" id="node14" href="notification_event.html" target="_top" title="notification_event" alt="" coords="485,1193,711,1281">
+<area shape="rect" id="node17" href="notification_status_code.html" target="_top" title="notification_status_code" alt="" coords="461,1088,735,1176">
+<area shape="rect" id="node9" href="api_key_usage.html" target="_top" title="api_key_usage" alt="" coords="1200,5,1392,93">
+<area shape="rect" id="node10" href="attachment.html" target="_top" title="attachment" alt="" coords="511,1592,685,1680">
+<area shape="rect" id="node11" href="channel_recipient_kind.html" target="_top" title="channel_recipient_kind" alt="" coords="1164,919,1428,1007">
+<area shape="rect" id="node12" href="client_tenant_mapping.html" target="_top" title="client_tenant_mapping" alt="" coords="467,289,729,377">
+<area shape="rect" id="node13" href="event_channel_setting.html" target="_top" title="event_channel_setting" alt="" coords="1525,987,1783,1075">
+<area shape="rect" id="node15" href="template.html" target="_top" title="template" alt="" coords="1220,1024,1372,1112">
+<area shape="rect" id="node16" href="feature_flag.html" target="_top" title="feature_flag" alt="" coords="511,395,685,483">
+<area shape="rect" id="node18" href="notification_request_detail.html" target="_top" title="notification_request_detail" alt="" coords="1149,1165,1443,1253">
+<area shape="rect" id="node19" href="recipient_safelist.html" target="_top" title="recipient_safelist" alt="" coords="1188,1271,1404,1359">
+<area shape="rect" id="node20" href="template_version.html" target="_top" title="template_version" alt="" coords="1545,1092,1763,1180">
+<area shape="rect" id="node22" href="tenant_limit.html" target="_top" title="tenant_limit" alt="" coords="1207,1376,1385,1464">
+<area shape="rect" id="node23" href="tenant_limit_alert.html" target="_top" title="tenant_limit_alert" alt="" coords="1185,1481,1407,1569">
+<area shape="rect" id="node24" href="tenant_limit_alert_log.html" target="_top" title="tenant_limit_alert_log" alt="" coords="1111,532,1481,865">
+<area shape="rect" id="node25" href="tenant_request.html" target="_top" title="tenant_request" alt="" coords="497,500,699,588">
+<area shape="rect" id="node26" href="tenant_settings.html" target="_top" title="tenant_settings" alt="" coords="496,605,700,693">
+<area shape="rect" id="node27" href="tenant_sms_number.html" target="_top" title="tenant_sms_number" alt="" coords="477,711,719,799">
+<area shape="rect" id="node28" href="tenant_usage.html" target="_top" title="tenant_usage" alt="" coords="1203,321,1389,409">
+<area shape="rect" id="node29" href="webhook_config.html" target="_top" title="webhook_config" alt="" coords="819,1451,1027,1539">
+<area shape="rect" id="node30" href="webhook_delivery_log.html" target="_top" title="webhook_delivery_log" alt="" coords="1169,1623,1423,1711">
 </map>
-                                        <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/provisioned_phone_number.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
+                                        <a name='diagram'><img id="twodegreesDegreeImg" src="../diagrams/tables/tenant_limit_alert_log.2degrees.png" usemap="#twoDegreesRelationshipsDiagram" class="diagram" border="0" align="left"></a>
                                     </div>
                                 </div>
                             </div>
