@@ -30,6 +30,16 @@ spec:
       ports:
         - protocol: TCP
           port: 3000
+    {{- with .Values.backend.networkPolicy.metricsScrapeNamespaceSelector }}
+    # Our own Prometheus, which scrapes /api/metrics from the tools namespace.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml . | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 3000
+    {{- end }}
     # Kong's Data Plane only. The API-key routes work the tenant out from Kong's
     # x-credential-identifier / x-consumer-* headers, so anything else on the
     # cluster could set those itself and bypass the gateway entirely.
