@@ -744,9 +744,15 @@ routes:
   # ============================================================================
   # CSTAR ADMIN ROUTES (admin only)
   # ============================================================================
-  # /api/v1/frontend/admin/cstar (tenant users, groups, their roles, and IDIR/BCeID user search)
-  # Kong prefix-matches, so this covers tenants/:tenantId/users[/:tenantUserId[/roles]],
-  # tenants/:tenantId/groups[/:groupId[/roles]] and users/search/{idir,bceid}.
+  # /api/v1/frontend/admin/cstar (every CSTAR admin read)
+  # Kong prefix-matches, so this covers:
+  #   health
+  #   tenants/:tenantId
+  #   tenants/:tenantId/shared-services
+  #   tenants/:tenantId/ssousers/:ssoUserId/{roles,groups}
+  #   tenants/:tenantId/users[/:tenantUserId[/roles]]
+  #   tenants/:tenantId/groups[/:groupId[/roles]]
+  #   users/search/{idir,bceid}
   - name: ${ROUTE_PREFIX}admin-cstar-read-frontend
     tags: [${CONFIG_TAG}]
     hosts:
