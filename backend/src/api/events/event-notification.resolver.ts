@@ -230,12 +230,23 @@ export class EventNotificationResolver {
 
     if (groupIds.length === 0) return addresses
 
-    // Deliberately not caught: sending to fewer people than the event was configured for is
-    // worse than not sending, so a CSTAR failure fails the request.
-    const members = await this.cstarApiClient.getGroupMemberEmailsAsServiceAccount(
-      cstar.tenantId,
-      groupIds,
-    )
+    // A CSTAR failure fails the request: sending to fewer people than the event was configured
+    // for is worse than not sending. A refused read is reworded so the sender knows to check
+    // the event's groups; every other failure passes through as it is.
+    let members: string[]
+    try {
+      members = await this.cstarApiClient.getGroupMemberEmailsAsServiceAccount(
+        cstar.tenantId,
+        groupIds,
+      )
+    } catch (error) {
+      if (!(error instanceof ForbiddenException)) throw error
+      throw new UnprocessableEntityException(
+        `This event's CSTAR groups could not be read: ${error.message}. A group may have been ` +
+          "deleted in CSTAR, or Notify's service account may not have access to it. Check the " +
+          "event's recipients.",
+      )
+    }
 
     this.logger.debug(
       `Resolved ${groupIds.length} CSTAR group(s) for ${kind} to ${members.length} address(es)`,

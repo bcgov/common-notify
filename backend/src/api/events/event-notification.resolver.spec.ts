@@ -159,6 +159,19 @@ describe('EventNotificationResolver', () => {
       ).rejects.toBeInstanceOf(UnprocessableEntityException)
     })
 
+    it('explains a CSTAR group that can no longer be read', async () => {
+      vi.mocked(eventRepository.findOne).mockResolvedValue(
+        eventWith({ cstarGroups: [group(EventRecipientKind.TO, 'group-a')] as any }),
+      )
+      vi.mocked(cstarApiClient.getGroupMemberEmailsAsServiceAccount).mockRejectedValue(
+        new ForbiddenException('Not authorized to read members of group group-a'),
+      )
+
+      const result = resolver.resolveSend('tenant-id', 'event-id', undefined, cstar)
+      await expect(result).rejects.toBeInstanceOf(UnprocessableEntityException)
+      await expect(result).rejects.toThrow('members of group group-a')
+    })
+
     it('lets a CSTAR failure fail the request', async () => {
       vi.mocked(eventRepository.findOne).mockResolvedValue(
         eventWith({ cstarGroups: [group(EventRecipientKind.TO, 'group-a')] as any }),
