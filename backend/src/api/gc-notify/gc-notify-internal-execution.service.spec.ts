@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
-import { BadRequestException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException } from '@nestjs/common'
 import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest'
 import { GcNotifyInternalExecutionService } from './gc-notify-internal-execution.service'
 import { TemplatesRepository } from '../templates/templates.repository'
@@ -19,6 +19,8 @@ import { NotifySubmissionService } from '../notify/services/notify-submission.se
 import { TenantsService } from '../admin/tenants/tenants.service'
 import { EventNotificationResolver } from '../events/event-notification.resolver'
 import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
+import { FeatureFlagService } from '../feature-flag/feature-flag.service'
+import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { QueueName } from '../../enum/queue-name.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
@@ -53,6 +55,8 @@ describe('GcNotifyInternalExecutionService', () => {
   const mockTenantUsageService = { assertWithinLimits: vi.fn(), recordUsage: vi.fn() }
   const mockSmsSegmentService = { countSegments: vi.fn() }
   let mockTenantSettingsService: { resolveSenderAddress: ReturnType<typeof vi.fn> }
+  let mockTenantsService: { assertCanSend: ReturnType<typeof vi.fn> }
+  let mockFeatureFlagService: { isEnabled: ReturnType<typeof vi.fn> }
   // Disabled unless a test opts in, so the rest of the suite runs the undeduplicated path.
   let mockNotificationDedupService: {
     enabled: boolean
@@ -105,6 +109,8 @@ describe('GcNotifyInternalExecutionService', () => {
     mockTenantSettingsService = {
       resolveSenderAddress: vi.fn().mockResolvedValue('permits@gov.bc.ca'),
     }
+    mockTenantsService = { assertCanSend: vi.fn().mockResolvedValue(undefined) }
+    mockFeatureFlagService = { isEnabled: vi.fn().mockResolvedValue(true) }
     mockNotificationDedupService = {
       enabled: false,
       fingerprint: vi.fn().mockReturnValue('fingerprint-1'),
@@ -133,7 +139,8 @@ describe('GcNotifyInternalExecutionService', () => {
         { provide: AttachmentProcessingService, useValue: mockAttachmentProcessingService },
         { provide: NotificationDedupService, useValue: mockNotificationDedupService },
         { provide: EventNotificationResolver, useValue: {} },
-        { provide: TenantsService, useValue: { assertCanSend: vi.fn() } },
+        { provide: TenantsService, useValue: mockTenantsService },
+        { provide: FeatureFlagService, useValue: mockFeatureFlagService },
         NotifySubmissionService,
       ],
     }).compile()
@@ -1231,6 +1238,97 @@ describe('GcNotifyInternalExecutionService', () => {
       expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(expect.anything(), {
         items: ['apples', 'pears'],
       })
+    })
+  })
+
+  describe('sending permission', () => {
+    const emailBody = { email_address: 'user@example.com', template_id: 'tpl-1' }
+    const smsBody = { phone_number: '+15555550100', template_id: 'tpl-2' }
+    const smsBulkBody = {
+      template_id: 'tpl-bulk',
+      name: 'Reminders',
+      rows: [['phone number'], ['+15555550100']],
+    } as any
+    const disabled = new ForbiddenException('Sending is disabled for this tenant')
+
+    function expectNothingAccepted() {
+      expect(mockTemplatesRepository.findById).not.toHaveBeenCalled()
+      expect(mockNotificationService.create).not.toHaveBeenCalled()
+      expect(mockIngestionQueue.add).not.toHaveBeenCalled()
+      expect(enforceLimits).not.toHaveBeenCalled()
+    }
+
+    it('rejects an email from a tenant an admin has disabled, before accepting it', async () => {
+      mockTenantsService.assertCanSend.mockRejectedValue(disabled)
+
+      await expect(service.sendEmail(emailBody, TENANT_ID)).rejects.toBe(disabled)
+      expect(mockTenantsService.assertCanSend).toHaveBeenCalledWith(TENANT_ID)
+      expectNothingAccepted()
+    })
+
+    it('rejects an SMS from a tenant an admin has disabled, before accepting it', async () => {
+      mockTenantsService.assertCanSend.mockRejectedValue(disabled)
+
+      await expect(service.sendSms(smsBody, TENANT_ID)).rejects.toBe(disabled)
+      expect(mockTenantsService.assertCanSend).toHaveBeenCalledWith(TENANT_ID)
+      expectNothingAccepted()
+    })
+
+    it('rejects an SMS from a tenant without the SMS feature, before accepting it', async () => {
+      mockFeatureFlagService.isEnabled.mockResolvedValue(false)
+
+      await expect(service.sendSms(smsBody, TENANT_ID)).rejects.toThrow(
+        new ForbiddenException('SMS notifications are not enabled for this tenant'),
+      )
+      expect(mockFeatureFlagService.isEnabled).toHaveBeenCalledWith(
+        FeatureFlagCode.SMS_NOTIFICATIONS,
+        TENANT_ID,
+      )
+      expectNothingAccepted()
+    })
+
+    it('does not consult the SMS feature for an email', async () => {
+      mockFeatureFlagService.isEnabled.mockResolvedValue(false)
+      mockTemplatesRepository.findById.mockResolvedValue(null)
+
+      // Past both checks to the template lookup, which is as far as this test needs to go.
+      await expect(service.sendEmail(emailBody, TENANT_ID)).rejects.toBeInstanceOf(
+        BadRequestException,
+      )
+      expect(mockFeatureFlagService.isEnabled).not.toHaveBeenCalled()
+    })
+
+    it('rejects an SMS bulk send from a tenant without the SMS feature', async () => {
+      mockFeatureFlagService.isEnabled.mockResolvedValue(false)
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'tpl-bulk',
+        version: 1,
+        channelCode: NotificationChannel.SMS,
+        engineCode: TemplateEngine.LEGACY_GC_NOTIFY,
+      })
+
+      await expect(service.sendBulk(smsBulkBody, TENANT_ID)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      )
+      expect(acceptMerge).not.toHaveBeenCalled()
+    })
+
+    it('does not consult the SMS feature for an email bulk send', async () => {
+      mockFeatureFlagService.isEnabled.mockResolvedValue(false)
+      mockTemplatesRepository.findById.mockResolvedValue({
+        id: 'tpl-bulk',
+        version: 1,
+        channelCode: NotificationChannel.EMAIL,
+        engineCode: TemplateEngine.LEGACY_GC_NOTIFY,
+      })
+      acceptMerge.mockResolvedValue({ notifyId: 'n-1', recipientCount: 1 } as never)
+
+      await service.sendBulk(
+        { template_id: 'tpl-bulk', name: 'R', rows: [['email address'], ['a@example.com']] } as any,
+        TENANT_ID,
+      )
+      expect(mockFeatureFlagService.isEnabled).not.toHaveBeenCalled()
+      expect(acceptMerge).toHaveBeenCalled()
     })
   })
 

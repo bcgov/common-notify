@@ -3,6 +3,7 @@ import {
   Inject,
   Logger,
   BadRequestException,
+  ForbiddenException,
   UnprocessableEntityException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
@@ -54,6 +55,9 @@ import {
 import { AttachmentValidationService } from '../notify/services/attachment-validation.service'
 import { AttachmentProcessingService } from '../notify/services/attachment-processing.service'
 import { NotifySubmissionService } from '../notify/services/notify-submission.service'
+import { TenantsService } from '../admin/tenants/tenants.service'
+import { FeatureFlagService } from '../feature-flag/feature-flag.service'
+import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { MAIL_MERGE_MAX_REPORTED_ERRORS } from '../notify/schemas/mail-merge.constants'
 import type { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
 import type { NotifyEmailChannel } from '../notify/schemas/notify-email-channel'
@@ -190,6 +194,8 @@ export class GcNotifyInternalExecutionService {
     private readonly attachmentProcessingService: AttachmentProcessingService,
     private readonly bulkValidationService: GcNotifyBulkValidationService,
     private readonly submissionService: NotifySubmissionService,
+    private readonly tenantsService: TenantsService,
+    private readonly featureFlagService: FeatureFlagService,
   ) {}
 
   async sendEmail(
@@ -197,6 +203,8 @@ export class GcNotifyInternalExecutionService {
     tenantId: string,
     requestRoute?: string,
   ): Promise<NotificationResponse> {
+    // First, as acceptSimple does, so a disabled tenant's retry of an earlier send is refused too.
+    await this.tenantsService.assertCanSend(tenantId)
     const template = await this.requireTemplate(
       tenantId,
       body.template_id,
@@ -281,6 +289,8 @@ export class GcNotifyInternalExecutionService {
     tenantId: string,
     requestRoute?: string,
   ): Promise<NotificationResponse> {
+    await this.tenantsService.assertCanSend(tenantId)
+    await this.assertSmsEnabled(tenantId)
     const template = await this.requireTemplate(tenantId, body.template_id, NotificationChannel.SMS)
     const personalisation = this.toTemplateParams(body.personalisation)
     const rendered = await this.renderWithLegacyGcNotifyEngine(template, personalisation)
@@ -372,6 +382,9 @@ export class GcNotifyInternalExecutionService {
       })
     }
     const channel = template.channelCode as NotificationChannel
+    // acceptMerge checks the tenant can send, but not the channel: the /notifysimple routes leave
+    // that to a guard, and a guard cannot see the channel here because the template decides it.
+    if (channel === NotificationChannel.SMS) await this.assertSmsEnabled(tenantId)
     const rows = this.resolveBulkRows(body)
 
     // Unconditional, as the controller did before: the validator self-selects on the header row,
@@ -769,6 +782,17 @@ export class GcNotifyInternalExecutionService {
     ])
     if (message) {
       throw new BadRequestException({ errors: [{ error: 'ValidationError', message }] })
+    }
+  }
+
+  /**
+   * The SMS_NOTIFICATIONS check SmsChannelFeatureFlagGuard makes on /notifysimple. These routes
+   * cannot use that guard: it looks for an `sms` key in the body, which a GC Notify request has
+   * not got.
+   */
+  private async assertSmsEnabled(tenantId: string): Promise<void> {
+    if (!(await this.featureFlagService.isEnabled(FeatureFlagCode.SMS_NOTIFICATIONS, tenantId))) {
+      throw new ForbiddenException('SMS notifications are not enabled for this tenant')
     }
   }
 
