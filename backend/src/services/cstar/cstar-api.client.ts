@@ -617,8 +617,8 @@ export class CstarApiClient {
    * getTenantGroups, authenticated as Notify's CSTAR service account rather than a user, for
    * work that runs with no user present.
    */
-  async getTenantGroupsAsServiceAccount(tenantId: string): Promise<CstarGroupDto[]> {
-    return this.getTenantGroups(tenantId, await this.getServiceAccountAuthHeader())
+  getTenantGroupsAsServiceAccount(tenantId: string): Promise<CstarGroupDto[]> {
+    return this.withServiceAccount((authHeader) => this.getTenantGroups(tenantId, authHeader))
   }
 
   /**
@@ -631,10 +631,12 @@ export class CstarApiClient {
   ): Promise<CstarGroupMemberDto[]> {
     const safeTenantId = this.safeSegment(tenantId, 'tenantId')
     const safeGroupId = this.safeSegment(groupId, 'groupId')
-    const body = await this.cstarGet<{ data?: { users?: CstarGroupMemberDto[] } }>(
-      `/api/v1/tenants/${safeTenantId}/groups/${safeGroupId}/users`,
-      await this.getServiceAccountAuthHeader(),
-      `members of group ${groupId}`,
+    const body = await this.withServiceAccount((authHeader) =>
+      this.cstarGet<{ data?: { users?: CstarGroupMemberDto[] } }>(
+        `/api/v1/tenants/${safeTenantId}/groups/${safeGroupId}/users`,
+        authHeader,
+        `members of group ${groupId}`,
+      ),
     )
     return body.data?.users ?? []
   }
@@ -832,6 +834,22 @@ export class CstarApiClient {
       throw new ServiceUnavailableException(
         'Could not authenticate with CSTAR. Check the CSTAR service account credentials.',
       )
+    }
+  }
+
+  /**
+   * Runs a CSTAR call as the service account. A 401 means the cached token was revoked or
+   * expired early, so it is dropped and the call is retried once with a fresh one.
+   */
+  private async withServiceAccount<T>(call: (authHeader: string) => Promise<T>): Promise<T> {
+    try {
+      return await call(await this.getServiceAccountAuthHeader())
+    } catch (error) {
+      if (!(error instanceof UnauthorizedException)) throw error
+      this.logger.warn('CSTAR rejected the service account token; retrying with a new one')
+      this.accessToken = null
+      this.tokenExpiresAt = 0
+      return call(await this.getServiceAccountAuthHeader())
     }
   }
 

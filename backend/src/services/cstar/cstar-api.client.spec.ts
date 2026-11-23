@@ -8,6 +8,7 @@ import {
   Logger,
   NotFoundException,
   ServiceUnavailableException,
+  UnauthorizedException,
 } from '@nestjs/common'
 import { CstarApiClient } from './cstar-api.client'
 import type { CstarCacheStore } from './cstar-cache.store'
@@ -650,6 +651,49 @@ describe('CstarApiClient service account', () => {
       await expect(
         buildClient().getGroupMemberEmailsAsServiceAccount(TENANT, [GROUP, OTHER_GROUP]),
       ).rejects.toThrow(ForbiddenException)
+    })
+  })
+
+  describe('a rejected token', () => {
+    /** Issues successive tokens; CSTAR answers 401 for the first `rejections` calls. */
+    const routeRejecting = (rejections: number) => {
+      let issued = 0
+      let cstarCallCount = 0
+      fetchMock.mockImplementation(async (url: string) => {
+        if (url === 'https://sso.example/token') {
+          return {
+            ok: true,
+            json: async () => ({ access_token: `sa-token-${++issued}`, expires_in: 300 }),
+          }
+        }
+        return ++cstarCallCount <= rejections
+          ? cstarError(401, 'Token revoked')
+          : { ok: true, json: async () => ({ data: { users: [{ email: 'a@gov.bc.ca' }] } }) }
+      })
+    }
+    const tokenCalls = () =>
+      fetchMock.mock.calls.filter(([url]) => url === 'https://sso.example/token')
+
+    it('gets a new token and retries once', async () => {
+      routeRejecting(1)
+
+      await expect(buildClient().getGroupMembersAsServiceAccount(TENANT, GROUP)).resolves.toEqual([
+        { email: 'a@gov.bc.ca' },
+      ])
+      expect(tokenCalls()).toHaveLength(2)
+      expect(cstarCalls().map(([, init]) => init.headers.Authorization)).toEqual([
+        'Bearer sa-token-1',
+        'Bearer sa-token-2',
+      ])
+    })
+
+    it('gives up when the new token is rejected too', async () => {
+      routeRejecting(2)
+
+      await expect(buildClient().getGroupMembersAsServiceAccount(TENANT, GROUP)).rejects.toThrow(
+        UnauthorizedException,
+      )
+      expect(cstarCalls()).toHaveLength(2)
     })
   })
 
