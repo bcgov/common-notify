@@ -340,7 +340,7 @@ export class SmsDeliveryWorker extends DeliveryWorker {
 
     // Tagged with our id so a provider delivery report can be matched back to this notification.
     // No `from` leaves the transport to send from its default number.
-    // Every SMS passes through here, so the environment prefix is added here and nowhere else.
+    // Add an environment prefix here if we are sending through DEV or TEST - no prefix in PROD
     const body = payload?.content?.body
     const content =
       this.messagePrefix && typeof body === 'string'
