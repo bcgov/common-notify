@@ -923,16 +923,16 @@ export class CstarApiClient {
     message: string,
     description: string,
   ): HttpException {
-    // Logged before mapping: the read branch below replaces CSTAR's reason with a generic one.
+    // On a read, a 404 means the same as a 403: the caller can't see it.
+    if (method === 'GET' && (status === 403 || status === 404)) {
+      this.logger.warn(`CSTAR refused ${method} ${description} (${status}): ${message}`)
+      return new ForbiddenException(`Not authorized to read ${description}: ${message}`)
+    }
+
     this.logger.debug(`CSTAR returned ${status} for ${method} ${description}: ${message}`)
 
     if (status === 401) {
       return new UnauthorizedException(`Not authenticated with CSTAR: ${message}`)
-    }
-    // A 404 on a read is a tenant or group the caller cannot see, which is indistinguishable
-    // from one that does not exist - both mean "not yours to read".
-    if (method === 'GET' && (status === 403 || status === 404)) {
-      return new ForbiddenException(`Not authorized to read ${description}`)
     }
     // On the rest CSTAR's reason is passed through, so an admin can see why a change was
     // refused - e.g. removing a user who holds more than the SERVICE_USER role.

@@ -5,6 +5,7 @@ import {
   ConflictException,
   ForbiddenException,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common'
@@ -471,6 +472,17 @@ describe('CstarApiClient tenant users', () => {
     await expect(buildClient().getTenantUserRoles(TENANT, TENANT_USER)).rejects.toThrow(
       ForbiddenException,
     )
+  })
+
+  it("keeps CSTAR's reason on a refused read and logs it as a warning", async () => {
+    const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined)
+    fetchMock.mockResolvedValue(cstarError(403, 'Headless token required'))
+
+    const result = buildClient().getTenantUserRoles(TENANT, TENANT_USER)
+    await expect(result).rejects.toThrow(ForbiddenException)
+    await expect(result).rejects.toThrow(/^Not authorized to read .+: Headless token required$/)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('Headless token required'))
+    warn.mockRestore()
   })
 
   it('rejects a path segment that could change the request path', async () => {
