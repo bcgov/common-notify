@@ -25,7 +25,7 @@ vi.mock('@nestjs/passport', () => ({
 }))
 
 const PATH_TENANT = 'e936010f-bb93-4430-87d9-e6e70b63e75f'
-const HEADER_TENANT = '11111111-2222-3333-4444-555555555555'
+const QUERY_TENANT = '11111111-2222-3333-4444-555555555555'
 const AUTH = 'Bearer user-token'
 const BOTH_ROLES = [SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN]
 
@@ -34,11 +34,15 @@ const tenantUser = { sub: 'user', idir_user_guid: 'USERGUID', client_roles: [] }
 
 function context(
   user: Record<string, unknown> | undefined,
-  { params = {}, headers = {} }: { params?: object; headers?: Record<string, string> } = {},
+  {
+    params = {},
+    query = {},
+    headers = {},
+  }: { params?: object; query?: object; headers?: Record<string, string> } = {},
 ): ExecutionContext {
   return {
     switchToHttp: () => ({
-      getRequest: () => ({ user, params, headers: { authorization: AUTH, ...headers } }),
+      getRequest: () => ({ user, params, query, headers: { authorization: AUTH, ...headers } }),
     }),
     getHandler: () => ({}),
     getClass: () => ({}),
@@ -73,22 +77,24 @@ describe('CstarTenantAdminGuard', () => {
     expect(getUserRoles).toHaveBeenCalledWith(PATH_TENANT, 'USERGUID', AUTH)
   })
 
-  it('checks the path tenant, not x-tenant-id, when both are given', async () => {
-    const ctx = context(tenantUser, {
-      params: { tenantId: PATH_TENANT },
-      headers: { 'x-tenant-id': HEADER_TENANT },
-    })
-    await guard.canActivate(ctx)
-    expect(getUserRoles).toHaveBeenCalledWith(PATH_TENANT, 'USERGUID', AUTH)
+  it('ignores x-tenant-id', async () => {
+    const ctx = context(tenantUser, { headers: { 'x-tenant-id': QUERY_TENANT } })
+    await expect(guard.canActivate(ctx)).rejects.toThrow(BadRequestException)
+    expect(getUserRoles).not.toHaveBeenCalled()
   })
 
-  it('checks x-tenant-id on a route with no tenant in the path', async () => {
-    const ctx = context(tenantUser, { headers: { 'x-tenant-id': HEADER_TENANT } })
+  it('checks the tenantId query on a route with no tenant in the path', async () => {
+    const ctx = context(tenantUser, { query: { tenantId: QUERY_TENANT } })
     await expect(guard.canActivate(ctx)).resolves.toBe(true)
-    expect(getUserRoles).toHaveBeenCalledWith(HEADER_TENANT, 'USERGUID', AUTH)
+    expect(getUserRoles).toHaveBeenCalledWith(QUERY_TENANT, 'USERGUID', AUTH)
   })
 
-  it('needs x-tenant-id from a tenant admin when the path has no tenant', async () => {
+  it('refuses a repeated tenantId query', async () => {
+    const ctx = context(tenantUser, { query: { tenantId: [QUERY_TENANT, PATH_TENANT] } })
+    await expect(guard.canActivate(ctx)).rejects.toThrow(BadRequestException)
+  })
+
+  it('needs a tenant from a tenant admin', async () => {
     await expect(guard.canActivate(context(tenantUser))).rejects.toThrow(BadRequestException)
   })
 

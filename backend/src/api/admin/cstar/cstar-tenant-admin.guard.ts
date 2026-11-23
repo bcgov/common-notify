@@ -18,8 +18,8 @@ import { CstarApiClient } from '../../../services/cstar/cstar-api.client'
  *
  * A caller with one of the route's SSO roles may act on any tenant. Anyone else needs one of the
  * route's CSTAR roles in the tenant they are acting on: the :tenantId in the path, or the
- * x-tenant-id header on routes without one (user search). The path wins when it is present, so
- * a header can't stand in for a tenant the caller doesn't administer.
+ * tenantId query parameter on routes without one (user search), which is the tenant the search
+ * is made for in CSTAR.
  *
  * A route with no @Roles() is refused.
  */
@@ -61,11 +61,11 @@ export class CstarTenantAdminGuard extends AuthGuard('jwt') {
       throw new ForbiddenException('User does not have required admin role')
     }
 
-    const header = request.headers['x-tenant-id']
+    const queryTenantId = request.query?.tenantId
     const tenantId: string | undefined =
-      request.params?.tenantId ?? (typeof header === 'string' ? header : undefined)
+      request.params?.tenantId ?? (typeof queryTenantId === 'string' ? queryTenantId : undefined)
     if (!tenantId) {
-      throw new BadRequestException('x-tenant-id header is required')
+      throw new BadRequestException('tenantId is required')
     }
 
     const idirUserGuid = payload.idir_user_guid as string | undefined

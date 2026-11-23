@@ -60,9 +60,9 @@ import {
  * Route: /api/v1/frontend/admin/cstar
  * Guarded by CstarTenantAdminGuard: a NOTIFY_ADMIN (SSO role) may manage any tenant, and a
  * NOTIFY_OPERATIONS_ADMIN may manage the tenant they hold it in (the :tenantId in the path, or
- * x-tenant-id for user search). Health is NOTIFY_ADMIN only. The caller's own token is passed
- * through, which CSTAR accepts as a headless shared service token when the caller is IDIR and
- * the tenant uses Notify. CSTAR enforces the rest, and its refusals are passed back.
+ * the tenantId query for user search). Health is NOTIFY_ADMIN only. The caller's own token is
+ * passed through, which CSTAR accepts as a headless shared service token when the caller is IDIR
+ * and the tenant uses Notify. CSTAR enforces the rest, and its refusals are passed back.
  */
 @ApiTags('admin-cstar')
 // Not part of the service API; kept out of the published spec.
