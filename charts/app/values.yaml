@@ -108,6 +108,12 @@ backend:
     #-- `name: <plate>` and carries the environment in a separate label, so this one
     #-- value matches the dev, test and prod data planes.
     apiGatewayLicensePlate: 264e6f
+    #-- namespace labels of the Prometheus that scrapes /api/metrics. It runs in this license
+    #-- plate's tools namespace, which the `monitoring` policy-group does NOT cover — that group
+    #-- is OpenShift's own cluster monitoring. Empty disables the rule.
+    metricsScrapeNamespaceSelector:
+      name: f6bc3f
+      environment: tools
   #-- which transport each channel sends through. The credentials for the selected adapter must
   #-- exist (app-api-secrets, or backend.awsSms.credentialsSecret for aws), or it does not send.
   delivery:
