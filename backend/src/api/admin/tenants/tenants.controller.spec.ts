@@ -3,6 +3,7 @@ import { HttpException } from '@nestjs/common'
 import { vi } from 'vitest'
 import { TenantsController } from './tenants.controller'
 import { TenantsService } from './tenants.service'
+import { NotifyAdminGuard } from '../../../common/guards/notify-admin.guard'
 
 describe('TenantsController', () => {
   let controller: TenantsController
@@ -37,7 +38,10 @@ describe('TenantsController', () => {
           useValue: mockService,
         },
       ],
-    }).compile()
+    })
+      .overrideGuard(NotifyAdminGuard)
+      .useValue({ canActivate: () => true })
+      .compile()
 
     controller = module.get<TenantsController>(TenantsController)
     vi.clearAllMocks()

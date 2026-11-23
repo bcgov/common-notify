@@ -1,11 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { ExecutionContext, ForbiddenException } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { Reflector } from '@nestjs/core'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { NotifyAdminGuard } from './notify-admin.guard'
+import { CstarRole } from '../../enum/cstar-role.enum'
 import { SsoRole } from '../../enum/sso-role.enum'
 
-// Mock the parent AuthGuard class
+// Mock the Passport AuthGuard, so only the JWKS/signature layer is stubbed
 vi.mock('@nestjs/passport', () => {
   return {
     AuthGuard: vi.fn((_strategy: string) => {
@@ -20,18 +22,24 @@ vi.mock('@nestjs/passport', () => {
   }
 })
 
-// Helper to create mock ExecutionContext with getResponse
-function createMockContext(userPayload: any, headers: Record<string, string> = {}) {
+const CLIENT_ID = 'notify-app'
+const ISSUER = 'https://keycloak.example/realms/standard'
+
+const adminToken = {
+  sub: 'admin-user',
+  azp: CLIENT_ID,
+  iss: ISSUER,
+  client_roles: [SsoRole.NOTIFY_ADMIN] as unknown,
+}
+
+function createMockContext(user: unknown) {
   return {
     switchToHttp: () => ({
-      getRequest: () => ({
-        user: userPayload,
-        headers,
-      }),
+      getRequest: () => ({ user, headers: {} }),
       getResponse: () => ({}),
     }),
-    getHandler: () => ({}),
-    getClass: () => ({}),
+    getHandler: () => function handler() {},
+    getClass: () => class TestController {},
   } as unknown as ExecutionContext
 }
 
@@ -41,217 +49,87 @@ describe('NotifyAdminGuard', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [NotifyAdminGuard, Reflector],
+      providers: [
+        NotifyAdminGuard,
+        Reflector,
+        {
+          provide: ConfigService,
+          useValue: {
+            getOrThrow: (key: string) => (key === 'auth.notifyClientId' ? CLIENT_ID : ISSUER),
+          },
+        },
+      ],
     }).compile()
 
     guard = module.get<NotifyAdminGuard>(NotifyAdminGuard)
     reflector = module.get<Reflector>(Reflector)
+    requireRoles([SsoRole.NOTIFY_ADMIN])
   })
 
-  describe('JWT Validation (positive)', () => {
-    it('should allow request with valid JWT and no role requirement', async () => {
-      const mockContext = createMockContext({
-        sub: 'user-123',
-        client_roles: ['some-role'],
-      })
+  function requireRoles(roles: string[] | undefined) {
+    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(roles)
+  }
 
-      vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([])
+  describe('token', () => {
+    it.each([null, undefined])(
+      'rejects a request the JWT strategy did not accept (%s)',
+      async (user) => {
+        await expect(guard.canActivate(createMockContext(user))).resolves.toBe(false)
+      },
+    )
 
-      const result = await guard.canActivate(mockContext)
+    it.each(['another-client', undefined])(
+      'rejects NOTIFY_ADMIN on a token issued to another client (azp %s)',
+      async (azp) => {
+        const context = createMockContext({ ...adminToken, azp })
+        await expect(guard.canActivate(context)).rejects.toThrow('Invalid client ID')
+      },
+    )
 
-      expect(result).toBe(true)
-    })
-
-    it('should allow admin user with required NOTIFY_ADMIN role', async () => {
-      const mockContext = createMockContext({
-        sub: 'admin-user-123',
-        client_roles: [SsoRole.NOTIFY_ADMIN],
-      })
-
-      vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
-
-      const result = await guard.canActivate(mockContext)
-
-      expect(result).toBe(true)
-    })
-
-    it('should allow user with multiple roles including NOTIFY_ADMIN', async () => {
-      const mockContext = createMockContext({
-        sub: 'multi-role-user',
-        client_roles: ['role1', SsoRole.NOTIFY_ADMIN, 'role3'],
-      })
-
-      vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
-
-      const result = await guard.canActivate(mockContext)
-
-      expect(result).toBe(true)
-    })
+    it.each(['https://keycloak.example/realms/apigw', undefined])(
+      'rejects NOTIFY_ADMIN on a token from another realm (iss %s)',
+      async (iss) => {
+        const context = createMockContext({ ...adminToken, iss })
+        await expect(guard.canActivate(context)).rejects.toThrow('Invalid token issuer')
+      },
+    )
   })
 
-  describe('JWT Validation (negative)', () => {
-    it('should reject request with invalid JWT', async () => {
-      const mockContext = createMockContext(null)
-
-      vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
-
-      const result = await guard.canActivate(mockContext)
-
-      expect(result).toBe(false)
+  describe('role', () => {
+    it.each([
+      ['only the role', [SsoRole.NOTIFY_ADMIN]],
+      ['the role among others', ['role1', SsoRole.NOTIFY_ADMIN, 'role3']],
+    ])('allows a user with %s, without an x-tenant-id header', async (_name, client_roles) => {
+      const context = createMockContext({ ...adminToken, client_roles })
+      await expect(guard.canActivate(context)).resolves.toBe(true)
     })
 
-    it('should reject request with missing user payload', async () => {
-      const mockContext = createMockContext(undefined)
+    it.each([
+      ['a different role', ['wrong-role']],
+      ['no roles', []],
+      ['null client_roles', null],
+      ['no client_roles claim', undefined],
+      ['client_roles that is a string containing the role', `NOT_${SsoRole.NOTIFY_ADMIN}`],
+    ])('rejects a user with %s', async (_name, client_roles) => {
+      const context = createMockContext({ ...adminToken, client_roles })
+      await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException)
+    })
 
-      vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
-
-      const result = await guard.canActivate(mockContext)
-
-      expect(result).toBe(false)
+    it('accepts only SSO roles, not a matching non-SSO role', async () => {
+      requireRoles([SsoRole.NOTIFY_ADMIN, 'role1'])
+      const context = createMockContext({ ...adminToken, client_roles: ['role1'] })
+      await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException)
     })
   })
 
-  describe('Role Validation (positive)', () => {
-    it('should allow user with exact required role', async () => {
-      const mockContext = createMockContext({
-        sub: 'user-123',
-        client_roles: [SsoRole.NOTIFY_ADMIN],
-      })
-
-      vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
-
-      const result = await guard.canActivate(mockContext)
-
-      expect(result).toBe(true)
-    })
-
-    it('should allow user with one of multiple required roles', async () => {
-      const mockContext = createMockContext({
-        sub: 'user-456',
-        client_roles: ['role1', SsoRole.NOTIFY_ADMIN],
-      })
-
-      vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN, 'role1'])
-
-      const result = await guard.canActivate(mockContext)
-
-      expect(result).toBe(true)
-    })
-  })
-
-  describe('Role Validation (negative)', () => {
-    it('should reject user without required role', async () => {
-      const mockContext = createMockContext({
-        sub: 'user-789',
-        client_roles: ['wrong-role'],
-      })
-
-      vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
-
-      await expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
-    })
-
-    it('should reject user with empty client_roles array', async () => {
-      const mockContext = createMockContext({
-        sub: 'user-empty',
-        client_roles: [],
-      })
-
-      vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
-
-      await expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
-    })
-
-    it('should reject user with null client_roles', async () => {
-      const mockContext = createMockContext({
-        sub: 'user-null',
-        client_roles: null,
-      })
-
-      vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
-
-      await expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
-    })
-
-    it('should reject user with undefined client_roles', async () => {
-      const mockContext = createMockContext({
-        sub: 'user-undefined',
-        client_roles: undefined,
-      })
-
-      vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
-
-      await expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
-    })
-
-    it('should reject user with completely different role', async () => {
-      const mockContext = createMockContext({
-        sub: 'user-different',
-        client_roles: ['role-x', 'role-y', 'role-z'],
-      })
-
-      vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
-
-      await expect(guard.canActivate(mockContext)).rejects.toThrow(ForbiddenException)
-    })
-  })
-
-  describe('Decorator Handling', () => {
-    it('should skip role validation when no @Roles() decorator is present', async () => {
-      const mockContext = createMockContext({
-        sub: 'user-any',
-        client_roles: ['any-role'],
-      })
-
-      vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(null)
-
-      const result = await guard.canActivate(mockContext)
-
-      expect(result).toBe(true)
-    })
-
-    it('should skip role validation when @Roles() decorator is empty array', async () => {
-      const mockContext = createMockContext({
-        sub: 'user-empty-decorator',
-        client_roles: [],
-      })
-
-      vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([])
-
-      const result = await guard.canActivate(mockContext)
-
-      expect(result).toBe(true)
-    })
-  })
-
-  describe('Guard Scope', () => {
-    it('should only validate SSO roles, not CSTAR roles', async () => {
-      const mockContext = createMockContext({
-        sub: 'sso-user',
-        client_roles: [SsoRole.NOTIFY_ADMIN],
-      })
-
-      vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
-
-      const result = await guard.canActivate(mockContext)
-
-      expect(result).toBe(true)
-    })
-
-    it('should not require x-tenant-id header', async () => {
-      const mockContext = createMockContext(
-        {
-          sub: 'user-no-tenant',
-          client_roles: [SsoRole.NOTIFY_ADMIN],
-        },
-        {},
-      )
-
-      vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([SsoRole.NOTIFY_ADMIN])
-
-      const result = await guard.canActivate(mockContext)
-
-      expect(result).toBe(true)
-    })
+  it.each([
+    ['no @Roles()', undefined],
+    ['an empty @Roles()', []],
+    ['only CSTAR roles', [CstarRole.NOTIFY_OPERATIONS_ADMIN]],
+  ])('denies even an admin on a route with %s', async (_name, roles) => {
+    requireRoles(roles)
+    await expect(guard.canActivate(createMockContext(adminToken))).rejects.toThrow(
+      ForbiddenException,
+    )
   })
 })
