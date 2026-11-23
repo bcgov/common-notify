@@ -742,7 +742,7 @@ routes:
     response_buffering: true
 
   # ============================================================================
-  # CSTAR ADMIN ROUTES (admin only)
+  # CSTAR ADMIN ROUTES (NOTIFY_ADMIN, or NOTIFY_OPERATIONS_ADMIN for their own tenant)
   # ============================================================================
   # /api/v1/frontend/admin/cstar (every CSTAR admin read)
   # Kong prefix-matches, so this covers:

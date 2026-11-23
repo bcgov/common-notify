@@ -23,8 +23,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger'
 import * as express from 'express'
-import { NotifyAdminGuard } from '../../../common/guards/notify-admin.guard'
+import { CstarTenantAdminGuard } from './cstar-tenant-admin.guard'
 import { Roles } from '../../../common/decorators/roles.decorator'
+import { CstarRole } from '../../../enum/cstar-role.enum'
 import { SsoRole } from '../../../enum/sso-role.enum'
 import { CstarApiClient } from '../../../services/cstar/cstar-api.client'
 import {
@@ -54,26 +55,27 @@ import {
 } from './schemas/cstar-user-search-query.dto'
 
 /**
- * Manage the users and groups of any CSTAR tenant on CSTAR's behalf.
+ * Manage the users and groups of a CSTAR tenant on CSTAR's behalf.
  *
  * Route: /api/v1/frontend/admin/cstar
- * Guarded by NotifyAdminGuard + NOTIFY_ADMIN (SSO role); not tenant-scoped. The admin's own
- * token is passed through, which CSTAR accepts as a headless shared service token when the
- * admin is IDIR and the tenant uses Notify. CSTAR enforces the rest, and its refusals are
- * passed back.
+ * Guarded by CstarTenantAdminGuard: a NOTIFY_ADMIN (SSO role) may manage any tenant, and a
+ * NOTIFY_OPERATIONS_ADMIN may manage the tenant they hold it in (the :tenantId in the path, or
+ * x-tenant-id for user search). Health is NOTIFY_ADMIN only. The caller's own token is passed
+ * through, which CSTAR accepts as a headless shared service token when the caller is IDIR and
+ * the tenant uses Notify. CSTAR enforces the rest, and its refusals are passed back.
  */
 @ApiTags('admin-cstar')
 // Not part of the service API; kept out of the published spec.
 @ApiExcludeController()
 @Controller('frontend/admin/cstar')
-@UseGuards(NotifyAdminGuard)
+@UseGuards(CstarTenantAdminGuard)
 @ApiBearerAuth()
-export class CstarAdminController {
+export class CstarTenantAdminController {
   constructor(private readonly cstarApiClient: CstarApiClient) {}
 
   @Version('1')
   @Get('tenants/:tenantId/users')
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: "List a CSTAR tenant's users (admin only)" })
   @ApiOkResponse({ type: [CstarTenantUserDto] })
   listTenantUsers(
@@ -85,7 +87,7 @@ export class CstarAdminController {
 
   @Version('1')
   @Get('tenants/:tenantId/users/:tenantUserId')
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: 'A user of a CSTAR tenant (admin only)' })
   @ApiOkResponse({ type: CstarTenantUserDto })
   getTenantUser(
@@ -104,7 +106,7 @@ export class CstarAdminController {
 
   @Version('1')
   @Post('tenants/:tenantId/users')
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: 'Add a user to a CSTAR tenant as a SERVICE_USER (admin only)' })
   @ApiCreatedResponse({ type: CstarTenantUserDto })
   addTenantUser(
@@ -118,7 +120,7 @@ export class CstarAdminController {
   @Version('1')
   @Delete('tenants/:tenantId/users/:tenantUserId')
   @HttpCode(204)
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({
     summary: 'Remove a SERVICE_USER-only user from a CSTAR tenant (admin only)',
   })
@@ -133,7 +135,7 @@ export class CstarAdminController {
 
   @Version('1')
   @Get('tenants/:tenantId/users/:tenantUserId/roles')
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: "A CSTAR tenant user's tenant roles (admin only)" })
   @ApiOkResponse({ type: [CstarTenantRoleDto] })
   getTenantUserRoles(
@@ -155,7 +157,7 @@ export class CstarAdminController {
 
   @Version('1')
   @Get('tenants/:tenantId')
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: 'A CSTAR tenant (admin only)' })
   @ApiOkResponse({ type: CstarTenantDetailDto })
   getTenant(
@@ -168,7 +170,7 @@ export class CstarAdminController {
 
   @Version('1')
   @Get('tenants/:tenantId/shared-services')
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: 'The shared services a CSTAR tenant uses (admin only)' })
   @ApiOkResponse({ type: [CstarSharedServiceDto] })
   getTenantSharedServices(
@@ -180,7 +182,7 @@ export class CstarAdminController {
 
   @Version('1')
   @Get('tenants/:tenantId/ssousers/:ssoUserId/roles')
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: "An SSO user's tenant roles in a CSTAR tenant (admin only)" })
   @ApiOkResponse({ type: [CstarTenantRoleDto] })
   getSsoUserTenantRoles(
@@ -193,7 +195,7 @@ export class CstarAdminController {
 
   @Version('1')
   @Get('tenants/:tenantId/ssousers/:ssoUserId/groups')
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({
     summary: "An SSO user's groups that grant Notify roles, with those roles (admin only)",
   })
@@ -212,7 +214,7 @@ export class CstarAdminController {
 
   @Version('1')
   @Get('users/search/idir')
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: 'Search BC Gov SSO for IDIR users (admin only)' })
   @ApiOkResponse({ type: [CstarSsoSearchUserDto] })
   searchIdirUsers(
@@ -224,7 +226,7 @@ export class CstarAdminController {
 
   @Version('1')
   @Get('users/search/bceid')
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: 'Search BC Gov SSO for Business BCeID users (admin only)' })
   @ApiOkResponse({ type: [CstarSsoSearchUserDto] })
   searchBceidUsers(
@@ -236,7 +238,7 @@ export class CstarAdminController {
 
   @Version('1')
   @Get('tenants/:tenantId/groups')
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: "List a CSTAR tenant's groups (admin only)" })
   @ApiOkResponse({ type: [CstarGroupDto] })
   listGroups(
@@ -248,7 +250,7 @@ export class CstarAdminController {
 
   @Version('1')
   @Get('tenants/:tenantId/groups/:groupId')
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: 'A CSTAR group with its members (admin only)' })
   @ApiOkResponse({ type: CstarGroupDetailDto })
   getGroup(
@@ -261,7 +263,7 @@ export class CstarAdminController {
 
   @Version('1')
   @Post('tenants/:tenantId/groups')
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: 'Create a group in a CSTAR tenant (admin only)' })
   @ApiCreatedResponse({ type: CstarGroupDto })
   createGroup(
@@ -274,7 +276,7 @@ export class CstarAdminController {
 
   @Version('1')
   @Put('tenants/:tenantId/groups/:groupId')
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: "Change a CSTAR group's name or description (admin only)" })
   @ApiOkResponse({ type: CstarGroupDto })
   updateGroup(
@@ -288,7 +290,7 @@ export class CstarAdminController {
 
   @Version('1')
   @Post('tenants/:tenantId/groups/:groupId/users')
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: 'Add a user to a CSTAR group (admin only)' })
   @ApiCreatedResponse({ type: CstarGroupUserDto })
   addGroupUser(
@@ -309,7 +311,7 @@ export class CstarAdminController {
   @Version('1')
   @Delete('tenants/:tenantId/groups/:groupId/users/:groupUserId')
   @HttpCode(204)
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: 'Remove a user from a CSTAR group (admin only)' })
   @ApiNoContentResponse()
   removeGroupUser(
@@ -328,7 +330,7 @@ export class CstarAdminController {
 
   @Version('1')
   @Get('tenants/:tenantId/groups/:groupId/roles')
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: 'The shared service roles a CSTAR group grants (admin only)' })
   @ApiOkResponse({ type: [CstarGroupSharedServiceDto] })
   getGroupRoles(
@@ -341,7 +343,7 @@ export class CstarAdminController {
 
   @Version('1')
   @Put('tenants/:tenantId/groups/:groupId/roles')
-  @Roles(SsoRole.NOTIFY_ADMIN)
+  @Roles(SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN)
   @ApiOperation({ summary: "Switch a CSTAR group's Notify roles on or off (admin only)" })
   @ApiOkResponse({ type: [CstarGroupSharedServiceDto] })
   updateGroupRoles(

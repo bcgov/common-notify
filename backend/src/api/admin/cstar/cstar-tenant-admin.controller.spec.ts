@@ -1,20 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { GUARDS_METADATA } from '@nestjs/common/constants'
 import type * as express from 'express'
-import { CstarAdminController } from './cstar-admin.controller'
-import { NotifyAdminGuard } from '../../../common/guards/notify-admin.guard'
+import { CstarTenantAdminController } from './cstar-tenant-admin.controller'
+import { CstarTenantAdminGuard } from './cstar-tenant-admin.guard'
 import { ROLES_KEY } from '../../../common/decorators/roles.decorator'
+import { CstarRole } from '../../../enum/cstar-role.enum'
 import { SsoRole } from '../../../enum/sso-role.enum'
 import type { CstarApiClient } from '../../../services/cstar/cstar-api.client'
 
-describe('CstarAdminController', () => {
+describe('CstarTenantAdminController', () => {
   const TENANT = 'e936010f-bb93-4430-87d9-e6e70b63e75f'
   const TENANT_USER = '6c6e1b2a-3f4d-4e5f-8a9b-0c1d2e3f4a5b'
   const AUTH = 'Bearer admin-token'
   const req = { headers: { authorization: AUTH } } as express.Request
 
   let client: Record<string, ReturnType<typeof vi.fn>>
-  let controller: CstarAdminController
+  let controller: CstarTenantAdminController
 
   beforeEach(() => {
     client = {
@@ -39,11 +40,13 @@ describe('CstarAdminController', () => {
       getSsoUserTenantRoles: vi.fn().mockResolvedValue([]),
       getUserGroupsWithRoles: vi.fn().mockResolvedValue([]),
     }
-    controller = new CstarAdminController(client as unknown as CstarApiClient)
+    controller = new CstarTenantAdminController(client as unknown as CstarApiClient)
   })
 
-  it('is guarded by NotifyAdminGuard', () => {
-    expect(Reflect.getMetadata(GUARDS_METADATA, CstarAdminController)).toContain(NotifyAdminGuard)
+  it('is guarded by CstarTenantAdminGuard', () => {
+    expect(Reflect.getMetadata(GUARDS_METADATA, CstarTenantAdminController)).toContain(
+      CstarTenantAdminGuard,
+    )
   })
 
   it.each([
@@ -62,13 +65,17 @@ describe('CstarAdminController', () => {
     'removeGroupUser',
     'getGroupRoles',
     'updateGroupRoles',
-    'getHealth',
     'getTenant',
     'getTenantSharedServices',
     'getSsoUserTenantRoles',
     'getUserGroupsWithRoles',
-  ] as const)('requires the NOTIFY_ADMIN SSO role for %s', (handler) => {
-    const roles = Reflect.getMetadata(ROLES_KEY, CstarAdminController.prototype[handler])
+  ] as const)('allows NOTIFY_ADMIN or a tenant admin for %s', (handler) => {
+    const roles = Reflect.getMetadata(ROLES_KEY, CstarTenantAdminController.prototype[handler])
+    expect(roles).toEqual([SsoRole.NOTIFY_ADMIN, CstarRole.NOTIFY_OPERATIONS_ADMIN])
+  })
+
+  it('allows only NOTIFY_ADMIN for getHealth', () => {
+    const roles = Reflect.getMetadata(ROLES_KEY, CstarTenantAdminController.prototype.getHealth)
     expect(roles).toEqual([SsoRole.NOTIFY_ADMIN])
   })
 
