@@ -6,6 +6,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import type { Job } from 'bullmq'
 import { DeliveryJobPayload } from '../queue.types'
 import { SMS_CHANNEL } from './delivery-channel'
@@ -57,6 +58,8 @@ export class SmsDeliveryWorker extends DeliveryWorker {
   readonly concurrency = { configKey: 'smsDeliveryWorkerConcurrency', default: 2 }
   protected readonly channel = SMS_CHANNEL
   protected readonly logger = new Logger(SmsDeliveryWorker.name)
+  /** Environment prefix added just before sending (not stored), empty for Prod */
+  private readonly messagePrefix: string
 
   constructor(
     private readonly notificationService: NotificationService,
@@ -71,8 +74,10 @@ export class SmsDeliveryWorker extends DeliveryWorker {
     @Optional() structuredLogger?: StructuredLoggerService,
     @Optional() private readonly smsNumbersService?: SmsNumbersService,
     @Optional() private readonly tenantSettingsService?: TenantSettingsService,
+    @Optional() configService?: ConfigService,
   ) {
     super(mergeBatches, failures, structuredLogger)
+    this.messagePrefix = (configService?.get<string>('delivery.smsMessagePrefix') ?? '').trim()
   }
 
   /**
@@ -335,8 +340,15 @@ export class SmsDeliveryWorker extends DeliveryWorker {
 
     // Tagged with our id so a provider delivery report can be matched back to this notification.
     // No `from` leaves the transport to send from its default number.
+    // Every SMS passes through here, so the environment prefix is added here and nowhere else.
+    const body = payload?.content?.body
+    const content =
+      this.messagePrefix && typeof body === 'string'
+        ? { ...payload.content, body: `${this.messagePrefix} ${body}` }
+        : payload?.content
     const result = await this.smsAdapter.send({
       ...(payload as object),
+      ...(content && { content }),
       ...(from && { from }),
       tag: notifyId,
     } as any)
