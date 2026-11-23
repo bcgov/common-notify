@@ -528,7 +528,7 @@ describe('CstarApiClient service account', () => {
   }
 
   const cstarCalls = () =>
-    fetchMock.mock.calls.filter(([url]) => String(url).startsWith('https://cstar.example'))
+    fetchMock.mock.calls.filter(([url]) => new URL(String(url)).origin === 'https://cstar.example')
 
   beforeEach(() => {
     fetchMock = vi.fn()
