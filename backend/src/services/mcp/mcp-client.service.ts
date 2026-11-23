@@ -78,7 +78,7 @@ export class McpClientService {
     // The seeded local destination follows the release's service name in OpenShift.
     // Explicit operator-managed registry destinations remain authoritative.
     const url =
-      serverName === 'cstar' && server.url === 'http://cstar-mcp:3101/mcp'
+      serverName === 'cstar' && server.url === 'http://cstar-mcp:3101/mcp' // NOSONAR: matches seeded in-cluster value, not a request
         ? process.env.CSTAR_MCP_URL || server.url
         : server.url
     const destination = validateMcpRegistryPolicy({ ...server, url })
