@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest'
+import { Subject } from 'rxjs'
 import { GUARDS_METADATA } from '@nestjs/common/constants'
 import { MonitoringController } from './monitoring.controller'
 import { NotifyAdminGuard } from '../../../common/guards/notify-admin.guard'
 import { ROLES_KEY } from '../../../common/decorators/roles.decorator'
 import { SsoRole } from '../../../enum/sso-role.enum'
+import type { MonitoringService } from './monitoring.service'
+import type { MonitoringEventsService } from './monitoring-events.service'
 
 describe('MonitoringController', () => {
   it('is guarded by NotifyAdminGuard', () => {
@@ -18,5 +21,16 @@ describe('MonitoringController', () => {
   it('requires the NOTIFY_ADMIN SSO role for the event stream', () => {
     const roles = Reflect.getMetadata(ROLES_KEY, MonitoringController.prototype.streamQueueEvents)
     expect(roles).toEqual([SsoRole.NOTIFY_ADMIN])
+  })
+
+  it('ends open event streams on shutdown so the HTTP server can close', () => {
+    const events = { changes$: new Subject<void>() } as unknown as MonitoringEventsService
+    const controller = new MonitoringController({} as MonitoringService, events)
+    let complete = false
+    controller.streamQueueEvents().subscribe({ complete: () => (complete = true) })
+
+    controller.onModuleDestroy()
+
+    expect(complete).toBe(true)
   })
 })
