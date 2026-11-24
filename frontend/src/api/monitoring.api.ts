@@ -3,6 +3,7 @@ import { get, generateApiParameters } from '@/common/api'
 import { toReadableError } from '@/utils/apiErrorMessage'
 import type { QueueMonitoring } from '@/interfaces/queueMonitoring.interface'
 import UserService from '@/service/user-service'
+import { reconnectOnClose } from './sseStream'
 
 /**
  * Queue, worker and Redis health for the admin monitoring page. Requires NOTIFY_ADMIN.
@@ -58,6 +59,7 @@ export function connectQueueMonitoringStream(handlers: QueueMonitoringStreamHand
     onmessage(event: EventSourceMessage) {
       if (event.event === 'changed') handlers.onChange()
     },
+    onclose: reconnectOnClose,
     onerror(error: unknown) {
       const fatal = error instanceof StreamRefusedError
       handlers.onError(fatal)

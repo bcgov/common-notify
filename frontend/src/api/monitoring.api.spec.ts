@@ -2,6 +2,7 @@ import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { get } from '@/common/api'
 import { connectQueueMonitoringStream, getQueueMonitoring } from './monitoring.api'
+import { StreamClosedError } from './sseStream'
 vi.mock('@microsoft/fetch-event-source', () => ({
   fetchEventSource: vi.fn().mockResolvedValue(undefined),
 }))
@@ -79,4 +80,18 @@ describe('monitoring API', () => {
       expect(handlers.onError).toHaveBeenCalledWith(status !== 500)
     },
   )
+  it('reconnects when the server ends the stream, as a pod does on shutdown', () => {
+    const handlers = { onOpen: vi.fn(), onChange: vi.fn(), onError: vi.fn() }
+    connectQueueMonitoringStream(handlers)
+    const options = vi.mocked(fetchEventSource).mock.calls[0][1]
+    let closed: unknown
+    try {
+      options.onclose!()
+    } catch (error) {
+      closed = error
+    }
+    expect(closed).toBeInstanceOf(StreamClosedError)
+    expect(() => options.onerror!(closed)).not.toThrow()
+    expect(handlers.onError).toHaveBeenCalledWith(false)
+  })
 })

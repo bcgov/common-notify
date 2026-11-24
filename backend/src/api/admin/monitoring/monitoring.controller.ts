@@ -1,5 +1,14 @@
-import { Controller, Get, MessageEvent, Sse, UseGuards, Version } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  MessageEvent,
+  OnModuleDestroy,
+  Sse,
+  UseGuards,
+  Version,
+} from '@nestjs/common'
 import { Observable, interval, map, merge } from 'rxjs'
+import { SseShutdown } from '../../../common/sse/sse-shutdown'
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { NotifyAdminGuard } from '../../../common/guards/notify-admin.guard'
 import { Roles } from '../../../common/decorators/roles.decorator'
@@ -22,7 +31,9 @@ const KEEPALIVE_MS = 25_000
 @Controller('frontend/admin/monitoring')
 @UseGuards(NotifyAdminGuard)
 @ApiBearerAuth()
-export class MonitoringController {
+export class MonitoringController implements OnModuleDestroy {
+  private readonly sse = new SseShutdown()
+
   constructor(
     private readonly monitoringService: MonitoringService,
     private readonly monitoringEvents: MonitoringEventsService,
@@ -51,6 +62,10 @@ export class MonitoringController {
     const keepalive$ = interval(KEEPALIVE_MS).pipe(
       map(() => ({ type: 'keepalive', data: '' }) as MessageEvent),
     )
-    return merge(changes$, keepalive$)
+    return merge(changes$, keepalive$).pipe(this.sse.untilShutdown())
+  }
+
+  onModuleDestroy(): void {
+    this.sse.end()
   }
 }

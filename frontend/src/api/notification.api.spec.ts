@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { notificationApi } from './notification.api'
+import { StreamClosedError } from './sseStream'
 import { get, STATUS_CODES } from '@/common/api'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 
@@ -181,4 +182,12 @@ describe('delivery details and notification streams', () => {
       expect(() => vi.mocked(fetchEventSource).mock.calls[1][1].onerror!(error)).not.toThrow()
     },
   )
+  it('reconnects quietly when the server ends the stream, as a pod does on shutdown', () => {
+    const onError = vi.fn()
+    notificationApi.connectNotificationStream(vi.fn(), onError)
+    const options = vi.mocked(fetchEventSource).mock.calls[0][1]
+    expect(() => options.onclose!()).toThrow(StreamClosedError)
+    expect(() => options.onerror!(new StreamClosedError())).not.toThrow()
+    expect(onError).not.toHaveBeenCalled()
+  })
 })
