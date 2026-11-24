@@ -3,6 +3,9 @@ import { Test } from '@nestjs/testing'
 import type { INestApplication, CanActivate, ExecutionContext } from '@nestjs/common'
 import { VersioningType } from '@nestjs/common'
 import request from 'supertest'
+import http from 'node:http'
+import type { AddressInfo } from 'node:net'
+import { NEVER } from 'rxjs'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { NotificationFrontendController } from './notification-frontend.controller'
 import { NotificationService } from './notification.service'
@@ -83,6 +86,34 @@ describe('NotificationFrontendController', () => {
   it('should be defined', () => {
     const controller = app.get(NotificationFrontendController)
     expect(controller).toBeDefined()
+  })
+
+  describe('GET /api/v1/frontend/notification_request/events', () => {
+    it('ends open streams on shutdown so the HTTP server can close', async () => {
+      mockNotificationPubSubService.getObservable.mockReturnValue(NEVER)
+      await app.listen(0)
+      const { port } = app.getHttpServer().address() as AddressInfo
+      const res = await new Promise<http.IncomingMessage>((resolve, reject) => {
+        // No pooled agent: a kept-alive socket would leave close() waiting on Node's keep-alive
+        // timeout (5s) after the stream ends, which is not what this test is about.
+        http
+          .get(
+            `http://127.0.0.1:${port}/api/v1/frontend/notification_request/events`,
+            { agent: false },
+            resolve,
+          )
+          .on('error', reject)
+      })
+      expect(res.headers['content-type']).toContain('text/event-stream')
+      const closed = new Promise<void>((resolve) => res.on('close', resolve))
+      res.resume()
+
+      // Without the stream ending, close() waits on the open response and the test times out.
+      await app.close()
+      await closed
+      // Ended by the server, not cut off: the client sees a clean close and reconnects.
+      expect(res.complete).toBe(true)
+    })
   })
 
   describe('GET /api/v1/frontend/notification_request', () => {
