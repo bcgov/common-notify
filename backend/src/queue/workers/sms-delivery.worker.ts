@@ -77,7 +77,7 @@ export class SmsDeliveryWorker extends DeliveryWorker {
     @Optional() configService?: ConfigService,
   ) {
     super(mergeBatches, failures, structuredLogger)
-    this.messagePrefix = (configService?.get<string>('delivery.smsMessagePrefix') ?? '').trim()
+    this.messagePrefix = (configService?.get<string>('delivery.environmentPrefix') ?? '').trim()
   }
 
   /**

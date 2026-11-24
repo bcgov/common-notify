@@ -101,7 +101,7 @@ describe('configuration smsNumbers.defaultNumberAssignable', () => {
   })
 })
 
-describe('configuration delivery.smsMessagePrefix', () => {
+describe('configuration delivery.environmentPrefix', () => {
   const original = process.env.ENVIRONMENT
 
   afterEach(() => {
@@ -117,11 +117,11 @@ describe('configuration delivery.smsMessagePrefix', () => {
     ['local', ''],
   ])('with ENVIRONMENT=%s is "%s"', (environment, expected) => {
     process.env.ENVIRONMENT = environment
-    expect(configuration().delivery.smsMessagePrefix).toBe(expected)
+    expect(configuration().delivery.environmentPrefix).toBe(expected)
   })
 
   it('is empty when ENVIRONMENT is unset', () => {
     delete process.env.ENVIRONMENT
-    expect(configuration().delivery.smsMessagePrefix).toBe('')
+    expect(configuration().delivery.environmentPrefix).toBe('')
   })
 })
