@@ -133,6 +133,8 @@ describe('NotificationFrontendController', () => {
       totalPages: 1,
     })
     expect(raw.errorMessage).toBe('{"private":"details"}')
+  })
+
   describe('GET /api/v1/frontend/notification_request/events', () => {
     it('ends open streams on shutdown so the HTTP server can close', async () => {
       mockNotificationPubSubService.getObservable.mockReturnValue(NEVER)
