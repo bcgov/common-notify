@@ -1,6 +1,9 @@
 /** Grafana in f6bc3f-tools reads the Loki that every environment's backend ships to. */
 export const GRAFANA_URL = 'https://grafana-f6bc3f-tools.apps.silver.devops.gov.bc.ca'
 
+/** Provisioned in monitoring/grafana-stack/grafana/values-tools-sso.yaml. */
+const LOKI_DATASOURCE_UID = 'loki'
+
 const BEFORE_MS = 5 * 60_000
 const AFTER_MS = 15 * 60_000
 
@@ -18,18 +21,24 @@ export function lokiLogsUrl(
   namespace: string | undefined = process.env.NAMESPACE,
 ): string | null {
   if (!namespace) return null
-  const left = {
-    datasource: 'loki',
-    queries: [
-      {
-        refId: 'A',
-        expr: `{job="common-notify-backend",namespace="${namespace}"} |= "${requestId}"`,
+  // Grafana 10+ reads Explore state from `panes`, keyed by an arbitrary pane id; the older
+  // `left` param is no longer honoured and lands on the home page instead.
+  const datasource = { type: 'loki', uid: LOKI_DATASOURCE_UID }
+  const panes = {
+    logs: {
+      datasource: LOKI_DATASOURCE_UID,
+      queries: [
+        {
+          refId: 'A',
+          datasource,
+          expr: `{job="common-notify-backend",namespace="${namespace}"} |= "${requestId}"`,
+        },
+      ],
+      range: {
+        from: String(from.getTime() - BEFORE_MS),
+        to: String(to.getTime() + AFTER_MS),
       },
-    ],
-    range: {
-      from: String(from.getTime() - BEFORE_MS),
-      to: String(to.getTime() + AFTER_MS),
     },
   }
-  return `${GRAFANA_URL}/explore?orgId=1&left=${encodeURIComponent(JSON.stringify(left))}`
+  return `${GRAFANA_URL}/explore?schemaVersion=1&orgId=1&panes=${encodeURIComponent(JSON.stringify(panes))}`
 }
