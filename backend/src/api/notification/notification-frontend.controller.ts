@@ -3,6 +3,7 @@ import {
   Get,
   Version,
   Logger,
+  OnModuleDestroy,
   Query,
   Req,
   Request,
@@ -33,6 +34,7 @@ import { CstarRole as CstarRoleEnum } from '../../enum/cstar-role.enum'
 import { FeatureFlag } from '../../common/decorators/feature-flag.decorator'
 import { interval, map, merge, Observable } from 'rxjs'
 import { NotificationPubSubService } from './notification-pubsub.service'
+import { SseShutdown } from '../../common/sse/sse-shutdown'
 import type { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-role.guard'
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
@@ -60,8 +62,9 @@ import { ListQueryDto } from '../../common/query/list-query.dto'
 @Controller('frontend/notification_request')
 @UseGuards(NotifyFrontendRoleGuard)
 @ApiBearerAuth()
-export class NotificationFrontendController {
+export class NotificationFrontendController implements OnModuleDestroy {
   private readonly logger = new Logger(NotificationFrontendController.name)
+  private readonly sse = new SseShutdown()
 
   constructor(
     private readonly notificationService: NotificationService,
@@ -139,7 +142,7 @@ export class NotificationFrontendController {
       map(() => ({ type: 'keepalive', data: '' }) as MessageEvent),
     )
 
-    return merge(updates$, keepalive$)
+    return merge(updates$, keepalive$).pipe(this.sse.untilShutdown())
   }
 
   @Version('1')
@@ -214,5 +217,9 @@ export class NotificationFrontendController {
   findOne(@Req() req: Request, @Param('id') id: string) {
     const tenant = (req as any).tenant as Tenant
     return this.notificationService.findOneFrontend(id, tenant.externalId)
+  }
+
+  onModuleDestroy(): void {
+    this.sse.end()
   }
 }
