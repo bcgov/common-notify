@@ -1,4 +1,4 @@
-import { fetchApiKeyUsage } from './apiKeyUsage.thunks'
+import { fetchTenantUsage } from './usage.thunks'
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import {
   getApiKeys,
@@ -35,7 +35,7 @@ export const issueApiKey = createAsyncThunk<
     const issuedKey = await issueApiKeyApi(notes)
     // Refresh usage without delaying the one-time key reveal or resetting form values.
     if (tenantId && getState().tenant.selectedTenant?.id === tenantId) {
-      void dispatch(fetchApiKeyUsage())
+      void dispatch(fetchTenantUsage())
     }
     return issuedKey
   } catch (error) {

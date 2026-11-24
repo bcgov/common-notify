@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { TemplatesRepository } from '../../templates/templates.repository'
 import { TemplatesService } from '../../templates/templates.service'
 import { InlineRenderingService } from '../../../services/rendering/inline-rendering.service'
@@ -6,6 +6,8 @@ import { NotifySimpleRequest } from '../schemas/notify-simple-request'
 import { NotifyContent } from '../schemas/notify-content'
 import { PhoneNumberService } from './phone-number.service'
 import { countSmsSegments } from '../../../common/utils/sms-segments'
+import { withSmsSenderName } from '../../../common/utils/sms-sender-name'
+import { TenantSettingsService } from '../../tenant-settings/tenant-settings.service'
 
 type ChannelName = 'email' | 'sms' | 'msgApp'
 const CHANNELS: ChannelName[] = ['email', 'sms', 'msgApp']
@@ -29,6 +31,7 @@ export class NotifyPreviewService {
     private readonly templatesService: TemplatesService,
     private readonly inlineRenderingService: InlineRenderingService,
     private readonly phoneNumberService: PhoneNumberService,
+    @Optional() private readonly tenantSettingsService?: TenantSettingsService,
   ) {}
 
   /** Everything a preview cannot do, checked before any template read or render. */
@@ -91,8 +94,16 @@ export class NotifyPreviewService {
     return this.inlineRenderingService.renderMsgApp(content, params)
   }
 
-  /** The SMS entry, with recipients normalised and segments counted on the rendered body. */
-  private smsPreview(request: NotifySimpleRequest, rendered: Partial<NotifyContent>) {
+  /**
+   * The SMS entry, with recipients normalised, and the body as it will be sent: starting with the
+   * tenant's name when it includes it, and its segments counted on that.
+   */
+  private smsPreview(
+    request: NotifySimpleRequest,
+    rendered: Partial<NotifyContent>,
+    senderName: string | null,
+  ) {
+    const body = withSmsSenderName(rendered.body, senderName)
     return {
       recipients: {
         to: request.sms!.recipients.to!.map((number) => {
@@ -101,9 +112,9 @@ export class NotifyPreviewService {
           return normalized
         }),
       },
-      content: { body: rendered.body },
-      // Same calculation as SmsSegmentService billing, on the already-rendered body.
-      segmentsPerRecipient: countSmsSegments(rendered.body),
+      content: { body },
+      // Same calculation as SmsSegmentService billing, on the body as sent.
+      segmentsPerRecipient: countSmsSegments(body),
     }
   }
 
@@ -141,13 +152,17 @@ export class NotifyPreviewService {
     this.assertPreviewable(request, original)
 
     const names = CHANNELS.filter((name) => request[name])
-    const renders = await Promise.all(
-      names.map((name) => {
-        const channel = request[name]!
-        const params = { ...request.params, ...channel.params }
-        return this.renderContent(tenantId, name, channel.content!, params)
-      }),
-    )
+    const [renders, senderName] = await Promise.all([
+      Promise.all(
+        names.map((name) => {
+          const channel = request[name]!
+          const params = { ...request.params, ...channel.params }
+          return this.renderContent(tenantId, name, channel.content!, params)
+        }),
+      ),
+      // Only an SMS body starts with the tenant's name.
+      request.sms ? this.tenantSettingsService?.getSmsSenderName(tenantId) : undefined,
+    ])
 
     const result: NotifyPreviewResponse = {}
     for (const [i, name] of names.entries()) {
@@ -155,7 +170,7 @@ export class NotifyPreviewService {
       const rendered = renders[i]
 
       if (name === 'sms') {
-        result.sms = this.smsPreview(request, rendered)
+        result.sms = this.smsPreview(request, rendered, senderName ?? null)
       } else {
         result[name] = {
           recipients: original[name]!.recipients,

@@ -21,10 +21,10 @@ import { WebhookConfig } from './api/webhook/entities/webhook-config.entity'
 import { WebhookDeliveryLog } from './api/webhook/entities/webhook-delivery-log.entity'
 import { WebhookTypeCode } from './api/webhook/entities/webhook-type.entity'
 import { ApiKeyConsumer } from './api/api-keys/entities/api-key-consumer.entity'
-import { ApiKeyLimit } from './api/api-keys/entities/api-key-limit.entity'
-import { ApiKeyUsage } from './api/api-keys/entities/api-key-usage.entity'
-import { ApiKeyLimitAlert } from './api/api-keys/entities/api-key-limit-alert.entity'
-import { ApiKeyLimitAlertLog } from './api/api-keys/entities/api-key-limit-alert-log.entity'
+import { TenantLimit } from './api/usage/entities/tenant-limit.entity'
+import { TenantUsage } from './api/usage/entities/tenant-usage.entity'
+import { TenantLimitAlert } from './api/usage/entities/tenant-limit-alert.entity'
+import { TenantLimitAlertLog } from './api/usage/entities/tenant-limit-alert-log.entity'
 import { AttachmentEntity } from './api/attachment/entities/attachment.entity'
 import { TenantSettings } from './api/tenant-settings/entities/tenant-settings.entity'
 import { NotifyEvent } from './api/events/entities/event.entity'
@@ -32,9 +32,12 @@ import { EventChannelSetting } from './api/events/entities/event-channel-setting
 import { EventChannelRecipient } from './api/events/entities/event-channel-recipient.entity'
 import { EventChannelCstarGroup } from './api/events/entities/event-channel-cstar-group.entity'
 import { EventRecipientKindCode } from './api/events/entities/event-recipient-kind-code.entity'
-import { ProvisionedPhoneNumber } from './api/events/entities/provisioned-phone-number.entity'
 import { EmailLogo } from './api/tenant-settings/entities/email-logo.entity'
 import { RecipientSafelist } from './api/safelist/entities/recipient-safelist.entity'
+import { SmsNumber } from './api/sms-numbers/entities/sms-number.entity'
+import { TenantSmsNumber } from './api/sms-numbers/entities/tenant-sms-number.entity'
+import { TenantRequest } from './api/tenant-requests/entities/tenant-request.entity'
+import { TenantRequestHistory } from './api/tenant-requests/entities/tenant-request-history.entity'
 
 const dbHost = process.env.POSTGRES_HOST || 'localhost'
 const dbUser = process.env.POSTGRES_USER || 'postgres'
@@ -75,10 +78,10 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         WebhookDeliveryLog,
         WebhookTypeCode,
         ApiKeyConsumer,
-        ApiKeyLimit,
-        ApiKeyUsage,
-        ApiKeyLimitAlert,
-        ApiKeyLimitAlertLog,
+        TenantLimit,
+        TenantUsage,
+        TenantLimitAlert,
+        TenantLimitAlertLog,
         AttachmentEntity,
         TenantSettings,
         NotifyEvent,
@@ -86,9 +89,12 @@ const dbSchema = process.env.POSTGRES_SCHEMA || 'notify'
         EventChannelRecipient,
         EventChannelCstarGroup,
         EventRecipientKindCode,
-        ProvisionedPhoneNumber,
         EmailLogo,
         RecipientSafelist,
+        SmsNumber,
+        TenantSmsNumber,
+        TenantRequest,
+        TenantRequestHistory,
       ],
       synchronize: false, // Use Flyway for migrations
       logging: process.env.NODE_ENV !== 'production' ? ['query', 'error'] : ['error'],

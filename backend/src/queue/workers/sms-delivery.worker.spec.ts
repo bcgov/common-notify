@@ -17,6 +17,8 @@ import type { TemplatesRepository } from '../../api/templates/templates.reposito
 import type { TemplatesService } from '../../api/templates/templates.service'
 import type { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
 import type { StructuredLoggerService } from '../../common/logger'
+import type { SmsNumbersService } from '../../api/sms-numbers/sms-numbers.service'
+import type { TenantSettingsService } from '../../api/tenant-settings/tenant-settings.service'
 
 describe('SmsDeliveryWorker', () => {
   let mockNotificationService: any
@@ -38,6 +40,8 @@ describe('SmsDeliveryWorker', () => {
     requestDetailService: NotificationRequestDetailService
     concurrency?: number
     structuredLogger?: StructuredLoggerService
+    smsNumbersService?: SmsNumbersService
+    tenantSettingsService?: TenantSettingsService
   }) {
     const mergeBatches = new MergeBatchRunner(
       deps.notificationService,
@@ -61,6 +65,8 @@ describe('SmsDeliveryWorker', () => {
         deps.structuredLogger,
       ),
       deps.structuredLogger,
+      deps.smsNumbersService,
+      deps.tenantSettingsService,
     )
     processHandler = (job) => worker.process(job)
     failedCallback = (job, err) => worker.onFailed(job, err)
@@ -127,6 +133,46 @@ describe('SmsDeliveryWorker', () => {
   afterEach(() => {
     vi.clearAllMocks()
   })
+
+  const mergeJob = (attemptsMade = 0) =>
+    ({
+      data: {
+        notifyId: 'notify-merge',
+        tenantId: 'tenant-123',
+        channel: NotificationChannel.SMS,
+        mailMerge: true,
+        batchId: 'notify-merge-SMS-0',
+        mailMergeData: {
+          content: { body: 'Hi {{name}}' },
+          params: {},
+          recipients: ['+16135550001', '+16135550002', '+16135550003'].map((address) => ({
+            address,
+            params: { name: 'A' },
+          })),
+        },
+        request: {},
+        payload: {} as never,
+        attempt: 0,
+      },
+      opts: { attempts: 3 },
+      attemptsMade,
+    }) as unknown as Job<DeliveryJobPayload>
+  const plainJob = (attemptsMade = 0) =>
+    ({
+      data: {
+        notifyId: 'notify-plain',
+        tenantId: 'tenant-123',
+        channel: NotificationChannel.SMS,
+        request: {},
+        payload: {
+          recipients: { to: ['+16135551234', '+16135559999'] },
+          content: { body: 'Test SMS' },
+        },
+        attempt: 0,
+      },
+      opts: { attempts: 3 },
+      attemptsMade,
+    }) as unknown as Job<DeliveryJobPayload>
 
   describe('process handler', () => {
     it('records each recipient separately when the transport reports a partial failure', async () => {
@@ -1023,46 +1069,6 @@ describe('SmsDeliveryWorker', () => {
         requestDetailService: mockRequestDetailService,
       })
     const outage = () => new TransientDeliveryError('ACS SMS: upstream 503 - unavailable', 502)
-    const mergeJob = (attemptsMade = 0) =>
-      ({
-        data: {
-          notifyId: 'notify-merge',
-          tenantId: 'tenant-123',
-          channel: NotificationChannel.SMS,
-          mailMerge: true,
-          batchId: 'notify-merge-SMS-0',
-          mailMergeData: {
-            content: { body: 'Hi {{name}}' },
-            params: {},
-            recipients: ['+16135550001', '+16135550002', '+16135550003'].map((address) => ({
-              address,
-              params: { name: 'A' },
-            })),
-          },
-          request: {},
-          payload: {} as never,
-          attempt: 0,
-        },
-        opts: { attempts: 3 },
-        attemptsMade,
-      }) as unknown as Job<DeliveryJobPayload>
-    const plainJob = (attemptsMade = 0) =>
-      ({
-        data: {
-          notifyId: 'notify-plain',
-          tenantId: 'tenant-123',
-          channel: NotificationChannel.SMS,
-          request: {},
-          payload: {
-            recipients: { to: ['+16135551234', '+16135559999'] },
-            content: { body: 'Test SMS' },
-          },
-          attempt: 0,
-        },
-        opts: { attempts: 3 },
-        attemptsMade,
-      }) as unknown as Job<DeliveryJobPayload>
-
     beforeEach(() => {
       mockInlineRenderingService.renderSms = vi.fn().mockResolvedValue({ body: 'Hi A' })
     })
@@ -1160,6 +1166,93 @@ describe('SmsDeliveryWorker', () => {
         expect.stringContaining('not found'),
       )
       expect(mockRequestDetailService.markFailed).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('sending number', () => {
+    const init = (fromNumber: string | null, senderName: string | null = null) => {
+      const smsNumbersService = { getFromNumber: vi.fn().mockResolvedValue(fromNumber) }
+      const tenantSettingsService = { getSmsSenderName: vi.fn().mockResolvedValue(senderName) }
+      mockInlineRenderingService.renderSms = vi.fn().mockResolvedValue({ body: 'Hi A' })
+      mockSmsAdapter.send = vi.fn().mockResolvedValue({ messageId: 'SM1' })
+      initialize({
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+        smsNumbersService: smsNumbersService as unknown as SmsNumbersService,
+        tenantSettingsService: tenantSettingsService as unknown as TenantSettingsService,
+      })
+      return Object.assign(smsNumbersService, tenantSettingsService)
+    }
+
+    it("sends from the tenant's number for the provider the transport sends through", async () => {
+      const smsNumbersService = init('+15814360804')
+
+      await processHandler(plainJob())
+
+      expect(smsNumbersService.getFromNumber).toHaveBeenCalledWith('tenant-123', 'twilio')
+      expect(mockSmsAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({ from: '+15814360804', tag: 'notify-plain' }),
+      )
+    })
+
+    it('sends every merge recipient from that number, looked up once per batch', async () => {
+      const smsNumbersService = init('+15814360804')
+
+      await processHandler(mergeJob())
+
+      expect(mockSmsAdapter.send).toHaveBeenCalledTimes(3)
+      for (const [options] of vi.mocked(mockSmsAdapter.send).mock.calls) {
+        expect(options).toMatchObject({ from: '+15814360804' })
+      }
+      expect(smsNumbersService.getFromNumber).toHaveBeenCalledTimes(1)
+    })
+
+    it('starts a plain send with the tenant name when the tenant includes it', async () => {
+      const services = init(null, 'Parks Booking')
+
+      await processHandler(plainJob())
+
+      expect(services.getSmsSenderName).toHaveBeenCalledWith('tenant-123')
+      expect(mockSmsAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.objectContaining({ body: 'Parks Booking: Test SMS' }),
+        }),
+      )
+    })
+
+    it('starts every merge recipient with the tenant name, looked up once per batch', async () => {
+      const services = init(null, 'Parks Booking')
+
+      await processHandler(mergeJob())
+
+      for (const [options] of vi.mocked(mockSmsAdapter.send).mock.calls) {
+        expect(options).toMatchObject({ content: { body: 'Parks Booking: Hi A' } })
+      }
+      expect(services.getSmsSenderName).toHaveBeenCalledTimes(1)
+    })
+
+    it('sends the body unchanged when the tenant leaves its name out', async () => {
+      init(null, null)
+
+      await processHandler(plainJob())
+
+      expect(mockSmsAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({ content: expect.objectContaining({ body: 'Test SMS' }) }),
+      )
+    })
+
+    it('leaves the transport its default number when the tenant has none for this provider', async () => {
+      init(null)
+
+      await processHandler(plainJob())
+
+      expect(mockSmsAdapter.send).toHaveBeenCalledWith(
+        expect.not.objectContaining({ from: expect.anything() }),
+      )
     })
   })
 })

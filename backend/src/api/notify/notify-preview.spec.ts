@@ -16,8 +16,9 @@ import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { ApiKeyConsumer } from '../api-keys/entities/api-key-consumer.entity'
 import { NotificationService } from '../notification/notification.service'
 import { NotificationRequestDetailService } from '../notification/notification-request-detail.service'
-import { ApiKeyUsageService } from '../api-keys/api-key-usage.service'
+import { TenantUsageService } from '../usage/tenant-usage.service'
 import { SafelistService } from '../safelist/safelist.service'
+import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import { QueueName } from '../../enum/queue-name.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
@@ -26,6 +27,8 @@ describe('Notify preview HTTP pipeline', () => {
   let app: INestApplication
   let templates: TemplatesService
   const templateId = '3f1a7c2e-9b45-4d10-8e21-6c0f5a9b7d33'
+  // No name prefix unless a test sets one.
+  const tenantSettings = { getSmsSenderName: vi.fn() }
   const template = {
     id: templateId,
     tenantId: 'tenant-1',
@@ -84,8 +87,9 @@ describe('Notify preview HTTP pipeline', () => {
         { provide: NotificationService, useValue: notification },
         { provide: NotificationRequestDetailService, useValue: details },
         { provide: QueueName.INGESTION, useValue: queue },
-        { provide: ApiKeyUsageService, useValue: usage },
+        { provide: TenantUsageService, useValue: usage },
         { provide: SafelistService, useValue: safelist },
+        { provide: TenantSettingsService, useValue: tenantSettings },
       ],
     })
       .useMocker(() => ({}))
@@ -103,6 +107,7 @@ describe('Notify preview HTTP pipeline', () => {
   })
   beforeEach(() => {
     vi.clearAllMocks()
+    tenantSettings.getSmsSenderName.mockResolvedValue(null)
     binding.findOne.mockResolvedValue({
       id: 'key-1',
       tenantId: 'tenant-1',
@@ -271,6 +276,24 @@ describe('Notify preview HTTP pipeline', () => {
       content: { body },
       segmentsPerRecipient: segments,
     })
+  })
+
+  it('previews the body as sent, starting with the tenant name, and counts that', async () => {
+    tenantSettings.getSmsSenderName.mockResolvedValue('Parks Booking')
+    // 150 characters fits one segment on its own; the 15-character prefix makes it two.
+    const body = 'a'.repeat(150)
+
+    const response = await post('/sms?preview=true', {
+      sms: {
+        recipients: { to: ['250 555 0123'] },
+        content: { body: '{{message}}', renderer: 'handlebars' },
+        params: { message: body },
+      },
+    }).expect(200)
+
+    expect(response.body.sms.content.body).toBe(`Parks Booking: ${body}`)
+    expect(response.body.sms.segmentsPerRecipient).toBe(2)
+    expect(tenantSettings.getSmsSenderName).toHaveBeenCalledWith('tenant-1')
   })
 
   it('counts segments after rendering an SMS template', async () => {

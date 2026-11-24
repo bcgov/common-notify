@@ -13,17 +13,18 @@ import { SsoRole } from '@/enum/sso-role.enum'
 
 // Icons
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
+import SpaceDashboardOutlinedIcon from '@mui/icons-material/SpaceDashboardOutlined'
+import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined'
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined'
-import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
-// import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
+import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
+import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
 import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined'
-import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
-import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined'
+import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
+// import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
-import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
-import WorkspacesOutlinedIcon from '@mui/icons-material/WorkspacesOutlined'
 import { CSTAR_ROLE_DISPLAY } from '@/enum/cstar-role.enum'
 import { Button, Tooltip, SvgInfoIcon } from '@bcgov/design-system-react-components'
 import TooltipTrigger from '@/components/TooltipTrigger'
@@ -39,22 +40,22 @@ const navItems = [
   {
     label: 'Dashboard',
     to: '/dashboard',
-    icon: <WorkspacesOutlinedIcon />,
+    icon: <SpaceDashboardOutlinedIcon />,
+  },
+  {
+    label: 'Notification Templates',
+    to: '/templates',
+    icon: <InsertDriveFileOutlinedIcon />,
   },
   {
     label: 'Notification Events',
     to: '/events',
-    icon: <WorkspacesOutlinedIcon />,
+    icon: <FolderOutlinedIcon />,
   },
   {
-    label: 'Send Batch Notification',
+    label: 'Send Batch Notifications',
     to: '/bulk-notifications',
     icon: <SendOutlinedIcon />,
-  },
-  {
-    label: 'Templates',
-    to: '/templates',
-    icon: <FolderOutlinedIcon />,
   },
   {
     label: 'Usage & Limits',
@@ -86,6 +87,8 @@ const adminItems = {
       label: 'Manage',
       links: [
         { label: 'Tenants', to: '/admin/tenants' },
+        { label: 'Tenant Requests', to: '/admin/tenant-requests' },
+        { label: 'SMS Numbers', to: '/admin/sms-numbers' },
         { label: 'Feature Flags', to: '/admin/feature-flags' },
       ],
     },
@@ -193,7 +196,7 @@ const Sidebar: FC = () => {
                 beside it. Passing className replaces the design system's own classes, so
                 there is deliberately no variant here — it would have no effect. */}
             <Button
-              className="sidebar__item"
+              className={`sidebar__item${onAdminPage ? ' active' : ''}`}
               aria-label={collapsed ? adminItems.label : undefined}
               aria-expanded={!collapsed && adminExpanded}
               aria-controls={adminExpanded && !collapsed ? adminMenuId : undefined}

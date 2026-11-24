@@ -20,3 +20,10 @@ KSV104
 # the volume. Same approach as the chart's own pgbackrest log cleanup. The Role is
 # namespaced, read-only on pods, and exec-only on pods/exec.
 KSV-0053
+
+# KSV-0113: Role manages secrets
+# charts/app/templates/aws-sms-credentials-sync.yaml has to: the BC Gov IAM User Service
+# rotates the SMS access key every two days, and the CronJob copies the current one into
+# the Secret the backend mounts. The Role is limited by resourceNames to that one Secret,
+# get and patch only - Trivy flags it regardless of resourceNames.
+KSV-0113

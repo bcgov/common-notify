@@ -48,8 +48,13 @@ backend:
   #-- hosts every PR environment under one quota; TEST and PROD raise it in merge.yml.
   memoryRequest: 200Mi
   #-- seconds a stopping pod gets to finish in-flight queue jobs before it is killed. With
-  #-- Recreate, a deploy waits this long only while a pod is mid-batch; idle pods exit at once.
+  #-- Recreate, a deploy waits this long only while a pod is mid-batch; idle pods exit once
+  #-- preStopSleepSeconds is up.
   terminationGracePeriodSeconds: 120
+  #-- seconds a stopping pod keeps serving before it is sent SIGTERM, so the gateway drops it
+  #-- from its endpoints before the process starts closing connections. Comes out of
+  #-- terminationGracePeriodSeconds, so QUEUE_SHUTDOWN_DRAIN_MS subtracts it. 0 omits the hook.
+  preStopSleepSeconds: 10
   #-- the number of replicas when autoscaling is disabled
   replicaCount: 1
   #-- autoscaling for the component. it is optional and is an object.
@@ -101,21 +106,43 @@ backend:
     minAvailable: 1
   networkPolicy:
     enabled: true # enable NetworkPolicy to restrict traffic to backend
-    # Allows traffic from:
-    # 1. OpenShift Router (ingress policy-group)
-    # 2. Frontend pods in same release
-    # 3. Monitoring namespace (monitoring policy-group)
-    # 4. Any namespace on port 3000 (for Kong API Gateway)
-    # NOTE: More restrictive namespace selector needed from platform team
+    # Allows traffic from the OpenShift Router, the monitoring namespace, and
+    # Kong's Data Plane. The frontend is deliberately absent: Caddy proxies
+    # /api* and /gcnotify/* to the public gateway, never to the backend service.
+    #-- APS license plate for Kong's Data Plane. The platform labels every namespace
+    #-- `name: <plate>` and carries the environment in a separate label, so this one
+    #-- value matches the dev, test and prod data planes.
+    apiGatewayLicensePlate: 264e6f
+    #-- namespace labels of the Prometheus that scrapes /api/metrics. It runs in this license
+    #-- plate's tools namespace, which the `monitoring` policy-group does NOT cover — that group
+    #-- is OpenShift's own cluster monitoring. Empty disables the rule.
+    metricsScrapeNamespaceSelector:
+      name: f6bc3f
+      environment: tools
   #-- which transport each channel sends through. The credentials for the selected adapter must
-  #-- exist in app-api-secrets, or the adapter logs instead of sending.
+  #-- exist (app-api-secrets, or backend.awsSms.credentialsSecret for aws), or it does not send.
   delivery:
     #-- email transport: ches | nodemailer | log ("log" is a non-delivering sink, load tests only)
     emailAdapter: ches
-    #-- sms transport: acs | twilio
-    #-- Both report per-recipient outcomes, so a partial failure marks only the recipients that
-    #-- actually failed and the queue retry does not re-send to the rest.
-    smsAdapter: acs
+    #-- sms transport: aws | acs | twilio
+    #-- All three report per-recipient outcomes, so a partial failure marks only the recipients
+    #-- that actually failed and the queue retry does not re-send to the rest.
+    smsAdapter: aws
+  #-- AWS End User Messaging SMS (smsAdapter: aws).
+  awsSms:
+    region: ca-central-1
+    #-- Secret holding AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY for the SMS IAM user, mounted
+    #-- into the backend as files. Not created by this chart: seed it once per namespace from the
+    #-- user's Parameter Store entry, and the sync CronJob below keeps it current.
+    credentialsSecret: aws-sms-credentials
+    #-- The BC Gov IAM User Service rotates the key every two days and deletes the old one two
+    #-- days later, so this copies the current key into the Secret. One per namespace: PR
+    #-- releases turn it off, since they share DEV's Secret.
+    credentialsSync:
+      enabled: true
+      schedule: "17 */6 * * *"
+      #-- Parameter Store entry the IAM User Service writes the rotated keys to
+      keysParameter: /iam_users/notify-sms-dev_keys
   #-- Seconds within which an identical send (same tenant, recipients and content) is answered
   #-- with the original notifyId instead of being sent again. 0 disables deduplication.
   dedupWindowSeconds: 300

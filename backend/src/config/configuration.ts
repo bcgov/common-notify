@@ -157,10 +157,18 @@ export default function configuration() {
       fromNumber: process.env.ACS_FROM_NUMBER || defaultSmsFrom,
     },
 
+    // AWS End User Messaging SMS
+    awsSms: {
+      region: process.env.AWS_REGION || 'ca-central-1',
+      // Where the access key Secret is mounted; unset (local dev) logs SMS instead of sending.
+      credentialsDir: process.env.AWS_SMS_CREDENTIALS_DIR,
+      fromNumber: defaultSmsFrom,
+    },
+
     // Delivery Adapter Selection
     delivery: {
       email: process.env.DELIVERY_EMAIL_ADAPTER || 'ches',
-      sms: process.env.DELIVERY_SMS_ADAPTER || 'acs',
+      sms: process.env.DELIVERY_SMS_ADAPTER || 'aws',
     },
 
     // Load-test-only switches. MUST stay false outside DEV / ephemeral PR dev envs.
@@ -171,6 +179,13 @@ export default function configuration() {
     // Hard-gated to non-test/prod namespaces: all environments run NODE_ENV=production,
     // so the namespace (…-dev / …-test / …-prod) is the reliable discriminator. Even if
     // LOADTEST_AUTOBIND_ENABLED were somehow set in test/prod, this stays false there.
+    smsNumbers: {
+      // Dev, test and PR environments all send from DEFAULT_SMS_FROM_NUMBER, so approving a
+      // tenant's number request there can assign it. Gated on the namespace like loadtest below:
+      // NODE_ENV is 'production' everywhere.
+      defaultNumberAssignable: !(process.env.NAMESPACE || '').includes('-prod'),
+    },
+
     loadtest: {
       autobindEnabled:
         process.env.LOADTEST_AUTOBIND_ENABLED === 'true' &&

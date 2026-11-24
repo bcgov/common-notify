@@ -1,23 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, userEvent, waitFor, fireEvent, within } from '@/test-utils'
-import reducer, {
-  setAdminFilter,
-  setAdminSearch,
-  setAdminSort,
-} from '@/redux/slices/apiKeyUsage.slice'
+import reducer, { setAdminFilter, setAdminSearch, setAdminSort } from '@/redux/slices/usage.slice'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
 import AdminUsage from './AdminUsage'
-import { updateTenantLimits } from '@/redux/thunks/apiKeyUsage.thunks'
-import type * as UsageThunks from '@/redux/thunks/apiKeyUsage.thunks'
-import { getAdminUsageSummary, setTenantSending } from '@/api/apiKeyUsage.api'
-import type * as UsageApi from '@/api/apiKeyUsage.api'
+import { updateTenantLimits } from '@/redux/thunks/usage.thunks'
+import type * as UsageThunks from '@/redux/thunks/usage.thunks'
+import { getAdminUsageSummary, setTenantSending } from '@/api/usage.api'
+import type * as UsageApi from '@/api/usage.api'
 
-vi.mock('@/api/apiKeyUsage.api', async (importOriginal) => ({
+vi.mock('@/api/usage.api', async (importOriginal) => ({
   ...(await importOriginal<typeof UsageApi>()),
   getAdminUsageSummary: vi.fn(),
   setTenantSending: vi.fn(),
 }))
-vi.mock('@/redux/thunks/apiKeyUsage.thunks', async (importOriginal) => {
+vi.mock('@/redux/thunks/usage.thunks', async (importOriginal) => {
   const actual = await importOriginal<typeof UsageThunks>()
   return { ...actual, updateTenantLimits: vi.fn(actual.updateTenantLimits) }
 })
@@ -43,6 +39,8 @@ const row = {
   disabledReason: null,
   disabledAt: null,
   disabledBy: null,
+  smsEnabled: true,
+  smsFromNumber: null,
   channel: 'SMS',
   dailyLimit: 100,
   annualLimit: 1000,
@@ -61,7 +59,7 @@ let tenantOptions: Array<{ id: string; name: string }> = []
 function setup(overrides = {}, roles = ['NOTIFY_OPERATIONS_ADMIN']) {
   usageState = { ...reducer(undefined, { type: 'init' }), ...overrides }
   mocks.state = {
-    apiKeyUsage: usageState,
+    usage: usageState,
     adminTenants: { notifyOptions: tenantOptions, notifyOptionsRequested: true },
     tenant: { selectedTenant: { id: 'tenant' } },
     user: { current: { cstarRoles: roles } },
@@ -132,13 +130,13 @@ describe('AdminUsage', () => {
     expect(cells).toEqual([
       'Test Tenant',
       'Enabled',
+      'EnabledDefault number',
       'SMS',
       'SMS: Never',
       'SMS: —No full month of sending yet',
       'SMS: 0',
       'SMS: 0 / Not set',
       'SMS: 0 / Not set',
-      'SMS: Not set',
       '',
     ])
     await userEvent.click(screen.getByRole('button', { name: 'Actions for Test Tenant' }))
@@ -149,12 +147,32 @@ describe('AdminUsage', () => {
     setup({ adminRows: [{ ...row, channel: 'EMAIL', usedToday: 7 }, row], adminCount: 1 })
     expect(screen.getAllByRole('row', { name: /Test Tenant/ })).toHaveLength(1)
     const tenantRow = screen.getByRole('row', { name: /Test Tenant/ })
-    const daily = within(tenantRow).getAllByRole('cell')[6]
+    const daily = within(tenantRow).getAllByRole('cell')[7]
     expect(
       within(daily)
         .getAllByRole('listitem')
         .map((item) => item.textContent),
     ).toEqual(['Email: 7 / 100 (7%)', 'SMS: 20 / 100 (20%)'])
+  })
+  it('shows whether each tenant may send SMS and the number it sends from', () => {
+    setup({
+      adminRows: [
+        row,
+        {
+          ...row,
+          tenantId: 'other',
+          tenantName: 'Other Tenant',
+          smsEnabled: false,
+          smsFromNumber: '+15814360804',
+        },
+      ],
+      adminCount: 2,
+    })
+    const smsCell = (tenant: RegExp) =>
+      within(screen.getByRole('row', { name: tenant })).getAllByRole('cell')[2].textContent
+    expect(screen.getByRole('columnheader', { name: /SMS/ })).toBeInTheDocument()
+    expect(smsCell(/Test Tenant/)).toBe('EnabledDefault number')
+    expect(smsCell(/Other Tenant/)).toBe('Disabled+15814360804')
   })
   it('shows when each channel last sent and its monthly average', () => {
     setup({ adminRows: [row], adminCount: 1 })

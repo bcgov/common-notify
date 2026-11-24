@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FC } from 'react'
-import { getAdminUsageSummary } from '@/api/apiKeyUsage.api'
+import { getAdminUsageSummary } from '@/api/usage.api'
 import { useNotifyTenantNames } from '@/hooks/useNotifyTenantNames'
-import type { AdminTenantUsageRow, AdminUsageSummary } from '@/api/apiKeyUsage.api'
+import type { AdminTenantUsageRow, AdminUsageSummary } from '@/api/usage.api'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
-import { fetchAllTenantsUsage, updateTenantLimits } from '@/redux/thunks/apiKeyUsage.thunks'
+import { fetchAllTenantsUsage, updateTenantLimits } from '@/redux/thunks/usage.thunks'
 import {
   setAdminPage,
   setAdminLimit,
   setAdminSearch,
   setAdminFilter,
   setAdminSort,
-} from '@/redux/slices/apiKeyUsage.slice'
+} from '@/redux/slices/usage.slice'
 import UserService from '@/service/user-service'
 import PageHeading from '@/components/PageHeading'
 import { channelFilterOptions, formatChannel } from '@/utils/channels'
@@ -26,6 +26,7 @@ import EditModal from '@/components/EditModal'
 import NumberInputField from '@/components/NumberInputField'
 import { showSuccessToast, showErrorToast } from '@/redux/utils/toastUtils'
 import TenantSendingCell from './TenantSendingCell'
+import TenantSmsCell from './TenantSmsCell'
 import TenantSendingDialog from './TenantSendingDialog'
 import {
   adoptionSummaryText,
@@ -45,7 +46,7 @@ function tenantActionGroups(tenant: AdminTenantUsage) {
   return [
     {
       id: 'limits',
-      // Limits are created when an API key is bound, so a channel without them has nothing to edit.
+      // Limits are created with the tenant, so a channel without them has nothing to edit.
       actions: tenant.channels
         .filter((row) => row.dailyLimit !== null && row.annualLimit !== null)
         .map((row) => ({
@@ -79,7 +80,7 @@ const AdminUsage: FC = () => {
     adminSortOrder,
     adminUpdatingKey,
     adminError,
-  } = useAppSelector((state) => state.apiKeyUsage)
+  } = useAppSelector((state) => state.usage)
   const isAdmin = UserService.hasRole('NOTIFY_ADMIN')
   const [searchInput, setSearchInput] = useState(adminSearch)
   const [editingRow, setEditingRow] = useState<AdminTenantUsageRow | null>(null)
@@ -214,6 +215,11 @@ const AdminUsage: FC = () => {
       render: (_, tenant) => <TenantSendingCell {...tenant} />,
     },
     {
+      key: 'smsFromNumber',
+      label: 'SMS',
+      render: (_, tenant) => <TenantSmsCell {...tenant} />,
+    },
+    {
       key: 'channels',
       label: 'Channel',
       filterKey: 'channel',
@@ -316,23 +322,6 @@ const AdminUsage: FC = () => {
               thresholdPercent={row.warnThresholdPercent}
             />
           )}
-        />
-      ),
-    },
-    {
-      key: 'channels',
-      id: 'threshold',
-      label: 'Alert threshold',
-      render: (_, tenant) => (
-        <ChannelValues
-          rows={tenant.channels}
-          render={(row) =>
-            row.warnThresholdPercent === null ? (
-              <span className="text-muted">Not set</span>
-            ) : (
-              `${row.warnThresholdPercent}%`
-            )
-          }
         />
       ),
     },

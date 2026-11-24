@@ -22,15 +22,6 @@ spec:
       ports:
         - protocol: TCP
           port: 3000
-    # Allow traffic from frontend pods in the same release (internal communication)
-    - from:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/instance: {{ .Release.Name }}
-              app.kubernetes.io/name: frontend
-      ports:
-        - protocol: TCP
-          port: 3000
     # Allow traffic from monitoring/metrics scrapers
     - from:
         - namespaceSelector:
@@ -39,10 +30,23 @@ spec:
       ports:
         - protocol: TCP
           port: 3000
-    # Allow traffic from any namespace on port 3000 (allows Kong API Gateway)
-    # NOTE: Platform team support needed to identify proper namespace selector for API Gateway
+    {{- with .Values.backend.networkPolicy.metricsScrapeNamespaceSelector }}
+    # Our own Prometheus, which scrapes /api/metrics from the tools namespace.
     - from:
-        - namespaceSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml . | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 3000
+    {{- end }}
+    # Kong's Data Plane only. The API-key routes work the tenant out from Kong's
+    # x-credential-identifier / x-consumer-* headers, so anything else on the
+    # cluster could set those itself and bypass the gateway entirely.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: {{ required "backend.networkPolicy.apiGatewayLicensePlate is required: the APS Kong Data Plane license plate" .Values.backend.networkPolicy.apiGatewayLicensePlate }}
       ports:
         - protocol: TCP
           port: 3000

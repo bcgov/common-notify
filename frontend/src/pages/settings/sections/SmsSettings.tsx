@@ -11,6 +11,7 @@ import { useCstarRoles } from '@/hooks/useCstarRoles'
 import { useFeatureFlag } from '@/config/featureFlags/useFeatureFlag'
 import { CstarRole } from '@/enum/cstar-role.enum'
 import type { SmsSettingsValues } from '@/interfaces/tenant-settings.interface'
+import SmsNumberRequestField from './SmsNumberRequestField'
 
 const formatLimit = (limit: number | undefined, unit: 'day' | 'year'): string =>
   limit === undefined ? 'Not set' : `${limit.toLocaleString()} SMS/${unit}`
@@ -18,7 +19,7 @@ const formatLimit = (limit: number | undefined, unit: 'day' | 'year'): string =>
 const SmsSettings: FC = () => {
   const dispatch = useAppDispatch()
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
-  const { usage, isLoading } = useAppSelector((state) => state.apiKeyUsage)
+  const { usage, isLoading } = useAppSelector((state) => state.usage)
   const {
     smsNotificationsEnabled,
     includeTenantNameInSms,
@@ -139,6 +140,8 @@ const SmsSettings: FC = () => {
           Start all SMS notifications with &apos;{selectedTenant?.name}&apos;
         </p>
       </div>
+
+      <SmsNumberRequestField canEdit={canEdit} smsEnabled={smsNotificationsEnabled} />
 
       {internationalSmsAvailable && (
         <div className="settings__field">

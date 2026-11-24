@@ -195,7 +195,6 @@ export class GcNotifyInternalExecutionService {
   async sendEmail(
     body: CreateEmailNotificationRequest,
     tenantId: string,
-    apiKeyConsumerId?: string,
     requestRoute?: string,
   ): Promise<NotificationResponse> {
     const template = await this.requireTemplate(
@@ -256,7 +255,6 @@ export class GcNotifyInternalExecutionService {
           body.scheduled_for,
           requestRoute,
           fingerprint,
-          apiKeyConsumerId,
           usage,
         )
 
@@ -281,7 +279,6 @@ export class GcNotifyInternalExecutionService {
   async sendSms(
     body: CreateSmsNotificationRequest,
     tenantId: string,
-    apiKeyConsumerId?: string,
     requestRoute?: string,
   ): Promise<NotificationResponse> {
     const template = await this.requireTemplate(tenantId, body.template_id, NotificationChannel.SMS)
@@ -294,6 +291,7 @@ export class GcNotifyInternalExecutionService {
       sms: { recipients: { to: [body.phone_number] } },
       gcNotify: { ...body, phone_number: undefined, templateVersion: template.version },
     })
+    if (!duplicate) await this.assertSmsDestinationAllowed(tenantId, body.phone_number)
 
     const notifyRequest = {
       params: personalisation,
@@ -318,7 +316,6 @@ export class GcNotifyInternalExecutionService {
           body.scheduled_for,
           requestRoute,
           fingerprint,
-          apiKeyConsumerId,
           [
             {
               channel: NotificationChannel.SMS,
@@ -358,7 +355,6 @@ export class GcNotifyInternalExecutionService {
   async sendBulk(
     body: PostBulkRequest,
     tenantId: string,
-    apiKeyConsumerId?: string,
     requestRoute?: string,
   ): Promise<PostBulkResponse> {
     const template = await this.requireTemplate(tenantId, body.template_id)
@@ -407,7 +403,6 @@ export class GcNotifyInternalExecutionService {
       tenantId,
       dto: notifyRequest,
       channel,
-      apiKeyConsumerId,
       requestRoute,
     })
 
@@ -764,16 +759,28 @@ export class GcNotifyInternalExecutionService {
    * A single send in the /notifysimple order: limits checked before accepting, usage recorded
    * after. A send that turns out to be a duplicate at the claim is neither created nor counted.
    */
+  /**
+   * This route builds its request itself rather than going through validateBusinessRules, so it
+   * applies the international SMS rule here.
+   */
+  private async assertSmsDestinationAllowed(tenantId: string, phoneNumber: string): Promise<void> {
+    const message = await this.notificationService.findInternationalSmsError(tenantId, [
+      phoneNumber,
+    ])
+    if (message) {
+      throw new BadRequestException({ errors: [{ error: 'ValidationError', message }] })
+    }
+  }
+
   private async acceptSend(
     tenantId: string,
     notifyRequest: Record<string, unknown>,
     scheduledFor: string | undefined,
     requestRoute: string | undefined,
     fingerprint: string | undefined,
-    apiKeyConsumerId: string | undefined,
     usage: Array<{ channel: string; count: number }>,
   ): Promise<{ id: string }> {
-    await this.submissionService.enforceLimits(apiKeyConsumerId, usage)
+    await this.submissionService.enforceLimits(tenantId, usage)
 
     const accepted = await this.createAndEnqueue(
       tenantId,
@@ -784,7 +791,7 @@ export class GcNotifyInternalExecutionService {
     )
 
     if (!accepted.duplicate) {
-      await this.submissionService.recordAcceptedUsage(apiKeyConsumerId, usage)
+      await this.submissionService.recordAcceptedUsage(tenantId, usage)
     }
     return accepted
   }

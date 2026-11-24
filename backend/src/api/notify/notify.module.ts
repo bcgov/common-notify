@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { Tenant } from '../admin/tenants/entities/tenant.entity'
 import { TenantsModule } from '../admin/tenants/tenants.module'
 import { ApiKeysModule } from '../api-keys/api-keys.module'
+import { UsageModule } from '../usage/usage.module'
 import { TemplatesModule } from '../templates/templates.module'
 import { FeatureFlagModule } from '../feature-flag/feature-flag.module'
 import { CstarModule } from '../../services/cstar/cstar.module'
@@ -29,6 +30,7 @@ import { AttachmentProcessingService } from './services/attachment-processing.se
 import { AttachmentResolverService } from './services/attachment-resolver.service'
 import { LimitAlertNotificationService } from './services/limit-alert-notification.service'
 import { SmsSegmentService } from './services/sms-segment.service'
+import { TenantSettingsModule } from '../tenant-settings/tenant-settings.module'
 import { NotificationDedupService } from './services/notification-dedup.service'
 import { NotifySubmissionService } from './services/notify-submission.service'
 import { PhoneNumberService } from './services/phone-number.service'
@@ -46,8 +48,10 @@ import { EventsModule } from '../events/events.module'
     CstarModule,
     WebhookModule,
     ApiKeysModule,
+    UsageModule,
     AttachmentModule,
     SafelistModule,
+    TenantSettingsModule,
     forwardRef(() => TemplatesModule),
     forwardRef(() => QueueModule),
     forwardRef(() => EventsModule),

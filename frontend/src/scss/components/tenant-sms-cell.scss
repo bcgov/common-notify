@@ -1,0 +1,17 @@
+@import '../variables';
+
+.tenant-sms-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: $spacing-xs;
+}
+
+.tenant-sms-cell__number {
+  white-space: nowrap;
+}
+
+.tenant-sms-cell__default {
+  color: $text-secondary;
+  font-size: $font-size-sm;
+}

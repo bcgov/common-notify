@@ -145,22 +145,31 @@ export class NotificationService {
    * Extract channel code, recipients, and delayed send time from notification payload
    */
   /**
-   * Extract channel code, recipients, and delayed send time from a mail merge email payload. Mail merge
-   * sends are always a single EMAIL-channel request, with recipient addresses parsed from `mergeArray`
-   * (mirroring how simple sends store their recipients on the parent request).
+   * Extract channel code, recipients, and delayed send time from a mail merge payload. A merge send
+   * is a single EMAIL- or SMS-channel request, with addresses parsed from that channel's
+   * `mergeArray` (mirroring how simple sends store their recipients on the parent request).
    */
-  private extractMailMergeChannelAndRecipients(payload: NotifySimpleRequest): {
+  private extractMailMergeChannelAndRecipients(
+    payload: NotifySimpleRequest,
+    channel: NotificationChannel,
+  ): {
     channelCodes: string[] | null
     recipients: { email?: string[]; sms?: string[]; msgApp?: string[] } | null
     delayedSendTime: Date | null
   } {
-    const email = payload.email
-    const delayedSendTime = email?.delayedSend ? new Date(email.delayedSend) : null
-    const parsed = this.parseMailMergeRecipients(email?.recipients?.mergeArray ?? [])
+    const isSms = channel === NotificationChannel.SMS
+    const channelPayload = isSms ? payload.sms : payload.email
+    const delayedSendTime = channelPayload?.delayedSend
+      ? new Date(channelPayload.delayedSend)
+      : null
+    const parsed = this.parseMailMergeRecipients(
+      channelPayload?.recipients?.mergeArray ?? [],
+      channel,
+    )
     const addresses = parsed.map((r) => r.address)
     return {
-      channelCodes: ['EMAIL'],
-      recipients: addresses.length > 0 ? { email: addresses } : null,
+      channelCodes: [isSms ? 'SMS' : 'EMAIL'],
+      recipients: addresses.length > 0 ? { [isSms ? 'sms' : 'email']: addresses } : null,
       delayedSendTime:
         delayedSendTime && !Number.isNaN(delayedSendTime.getTime()) ? delayedSendTime : null,
     }
@@ -221,13 +230,12 @@ export class NotificationService {
   }
 
   async create(dto: CreateNotificationRequestDto): Promise<NotificationRequest> {
-    // Extract channel, recipients, and delayed send time from payload. Mail-merge sends (email
-    // recipients given as `mergeArray`) take a dedicated extractor since the addressees live in the
-    // merge rows rather than to/cc/bcc.
-    const { channelCodes, recipients, delayedSendTime } = Array.isArray(
-      dto.payload?.email?.recipients?.mergeArray,
-    )
-      ? this.extractMailMergeChannelAndRecipients(dto.payload as NotifySimpleRequest)
+    // Extract channel, recipients, and delayed send time from payload. Mail-merge sends (email or
+    // SMS recipients given as `mergeArray`) take a dedicated extractor since the addressees live in
+    // the merge rows rather than to/cc/bcc.
+    const mergeChannel = mailMergeChannelOf(dto.payload)
+    const { channelCodes, recipients, delayedSendTime } = mergeChannel
+      ? this.extractMailMergeChannelAndRecipients(dto.payload as NotifySimpleRequest, mergeChannel)
       : this.extractChannelAndRecipients(dto.payload)
 
     const notification = this.notificationRepository.create({
@@ -411,6 +419,19 @@ export class NotificationService {
    * then the tenant's own International SMS setting decides. Only runs when a request has an
    * international number.
    */
+  /**
+   * The error for any international numbers this tenant may not send to, or null when there are
+   * none. Shared by every single-send path, so they all reject with the same message.
+   */
+  async findInternationalSmsError(tenantId: string, numbers: string[]): Promise<string | null> {
+    const international = numbers.filter((number) =>
+      this.phoneNumberService.isInternational(number),
+    )
+    if (international.length === 0 || (await this.isInternationalSmsAllowed(tenantId))) return null
+
+    return `SMS cannot be sent to international number(s): ${international.join(', ')}. ${INTERNATIONAL_SMS_HINT}`
+  }
+
   private async isInternationalSmsAllowed(tenantId: string): Promise<boolean> {
     if (!(await this.featureFlagService.isEnabled(FeatureFlagCode.INTERNATIONAL_SMS, tenantId))) {
       return false
@@ -716,14 +737,11 @@ export class NotificationService {
         )
       }
 
-      const international = request.sms.recipients.to.filter((number) =>
-        this.phoneNumberService.isInternational(number),
+      const internationalError = await this.findInternationalSmsError(
+        tenantId,
+        request.sms.recipients.to,
       )
-      if (international.length > 0 && !(await this.isInternationalSmsAllowed(tenantId))) {
-        errors.push(
-          `SMS cannot be sent to international number(s): ${international.join(', ')}. ${INTERNATIONAL_SMS_HINT}`,
-        )
-      }
+      if (internationalError) errors.push(internationalError)
 
       // Only validate content if not using a template (template provides body)
       if (!smsTemplateId) {
@@ -921,4 +939,13 @@ function setMergeParam(params: Record<string, unknown>, key: string, value: stri
   if (!(leaf in target)) {
     target[leaf] = value
   }
+}
+
+/** The channel a mail merge payload sends on, or null if it is not a merge send. */
+function mailMergeChannelOf(
+  payload: NotifySimpleRequest | ProcessedNotifySimpleRequest | undefined,
+): NotificationChannel | null {
+  if (Array.isArray(payload?.email?.recipients?.mergeArray)) return NotificationChannel.EMAIL
+  if (Array.isArray(payload?.sms?.recipients?.mergeArray)) return NotificationChannel.SMS
+  return null
 }

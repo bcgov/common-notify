@@ -1,4 +1,4 @@
-import type { AdminTenantUsageRow, AdminUsageSummary } from '@/api/apiKeyUsage.api'
+import type { AdminTenantUsageRow, AdminUsageSummary } from '@/api/usage.api'
 import { formatDate } from './dates'
 
 /** Shared helpers for the notification usage & limits screens. */
@@ -6,7 +6,14 @@ import { formatDate } from './dates'
 /** One tenant of the admin usage table, with its per-channel rows. */
 export type AdminTenantUsage = Pick<
   AdminTenantUsageRow,
-  'tenantId' | 'tenantName' | 'sendingEnabled' | 'disabledReason' | 'disabledAt' | 'disabledBy'
+  | 'tenantId'
+  | 'tenantName'
+  | 'sendingEnabled'
+  | 'disabledReason'
+  | 'disabledAt'
+  | 'disabledBy'
+  | 'smsEnabled'
+  | 'smsFromNumber'
 > & { channels: AdminTenantUsageRow[] }
 
 /** Tenant-by-channel rows as one entry per tenant, in the order the tenants first appear. */
@@ -18,7 +25,16 @@ export function groupUsageByTenant(rows: readonly AdminTenantUsageRow[]): AdminT
       tenant.channels.push(row)
       continue
     }
-    const { tenantId, tenantName, sendingEnabled, disabledReason, disabledAt, disabledBy } = row
+    const {
+      tenantId,
+      tenantName,
+      sendingEnabled,
+      disabledReason,
+      disabledAt,
+      disabledBy,
+      smsEnabled,
+      smsFromNumber,
+    } = row
     tenants.set(tenantId, {
       tenantId,
       tenantName,
@@ -26,6 +42,8 @@ export function groupUsageByTenant(rows: readonly AdminTenantUsageRow[]): AdminT
       disabledReason,
       disabledAt,
       disabledBy,
+      smsEnabled,
+      smsFromNumber,
       channels: [row],
     })
   }
