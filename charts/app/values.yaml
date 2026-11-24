@@ -48,7 +48,8 @@ backend:
   #-- hosts every PR environment under one quota; TEST and PROD raise it in merge.yml.
   memoryRequest: 200Mi
   #-- seconds a stopping pod gets to finish in-flight queue jobs before it is killed. With
-  #-- Recreate, a deploy waits this long only while a pod is mid-batch; idle pods exit at once.
+  #-- Recreate, a deploy waits this long only while a pod is mid-batch; idle pods exit once
+  #-- preStopSleepSeconds is up.
   terminationGracePeriodSeconds: 120
   #-- seconds a stopping pod keeps serving before it is sent SIGTERM, so the gateway drops it
   #-- from its endpoints before the process starts closing connections. Comes out of

@@ -1,5 +1,6 @@
 import type { AxiosError } from 'axios'
 import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-event-source'
+import { reconnectOnClose, StreamClosedError } from './sseStream'
 import { get, generateApiParameters, STATUS_CODES } from '@/common/api'
 import type { NotificationRequest } from '@/interfaces/NotificationRequest'
 import type {
@@ -130,7 +131,10 @@ export const notificationApi = {
         if (event.event === 'keepalive') return
         onMessage()
       },
+      onclose: reconnectOnClose,
       onerror(err: Error) {
+        // A pod shutting down ends the stream on purpose; reconnecting is all it needs.
+        if (err instanceof StreamClosedError) return
         onError?.(err)
       },
     })
