@@ -223,9 +223,11 @@ grafana.ini:
     login_attribute_path: preferred_username
     name_attribute_path: name
 
-    # Role mapping - default all users to Viewer
-    # To grant admin access, manually promote users in Grafana after first login
-    role_attribute_path: contains(groups[*], 'grafana-admin') && 'Admin' || 'Viewer'
+    # Role mapping from the Grafana client's CSS roles, which CSS sends in `client_roles`.
+    # Re-applied on every login, so a role changed by hand in Grafana does not stick: assign
+    # grafana-admin or grafana-editor in CSS instead. Explore (the admin "View logs in Loki"
+    # link) needs Editor; Viewers are sent back to the home page.
+    role_attribute_path: contains(client_roles[*], 'grafana-admin') && 'Admin' || contains(client_roles[*], 'grafana-editor') && 'Editor' || 'Viewer'
     role_attribute_strict: false
 
     # Allow users to see Grafana org users list
