@@ -19,6 +19,7 @@ import type { TenantSettingsService } from '../../api/tenant-settings/tenant-set
 import type { InlineRenderingService } from '../../services/rendering/inline-rendering.service'
 import type { EventNotificationResolver } from '../../api/events/event-notification.resolver'
 import type { StructuredLoggerService } from '../../common/logger'
+import type { ConfigService } from '@nestjs/config'
 
 describe('EmailDeliveryWorker', () => {
   let mockNotificationService: any
@@ -52,6 +53,7 @@ describe('EmailDeliveryWorker', () => {
     structuredLogger?: StructuredLoggerService
     tenantSettingsService?: TenantSettingsService
     eventNotificationResolver?: EventNotificationResolver
+    environmentPrefix?: string
   }) {
     const mergeBatches = new MergeBatchRunner(
       deps.notificationService,
@@ -77,6 +79,9 @@ describe('EmailDeliveryWorker', () => {
       deps.structuredLogger,
       deps.tenantSettingsService,
       deps.eventNotificationResolver,
+      deps.environmentPrefix === undefined
+        ? undefined
+        : ({ get: () => deps.environmentPrefix } as unknown as ConfigService),
     )
     processHandler = (job) => worker.process(job)
     completedCallback = (job) => worker.onCompleted(job)
@@ -2027,6 +2032,61 @@ describe('EmailDeliveryWorker', () => {
         { preserveCompleted: true },
       )
       expect(result).toEqual(expect.objectContaining({ success: true, provider: 'ches' }))
+    })
+  })
+
+  describe('environment prefix', () => {
+    const init = (environmentPrefix: string) =>
+      initialize({
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+        environmentPrefix,
+      })
+
+    const plainJob = () =>
+      ({
+        data: {
+          notifyId: 'notify-123',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          request: {},
+          payload: {
+            recipients: { to: ['test@example.com'] },
+            content: { subject: 'Test Email', body: 'Test body', bodyType: 'html' },
+          },
+          attempt: 0,
+        } as DeliveryJobPayload,
+        opts: { attempts: 3 },
+        attemptsMade: 0,
+      }) as unknown as Job<DeliveryJobPayload>
+
+    it('starts the subject with the prefix and leaves the body alone', async () => {
+      init('[TEST]')
+
+      await processHandler(plainJob())
+
+      expect(mockEmailAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.objectContaining({ subject: '[TEST] Test Email', body: 'Test body' }),
+        }),
+      )
+    })
+
+    it('sends the subject unchanged when the prefix is empty, as in prod', async () => {
+      init('')
+
+      await processHandler(plainJob())
+
+      expect(mockEmailAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.objectContaining({ subject: 'Test Email' }),
+        }),
+      )
     })
   })
 })
