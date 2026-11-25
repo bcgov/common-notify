@@ -2,13 +2,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import EventsEmailPreviewModal from './EventsEmailPreviewModal'
-import { previewTemplate, TemplateEngine, NotificationChannel } from '@/api/templates.api'
+import {
+  getTemplatePreviewData,
+  saveTemplatePreviewData,
+  previewTemplate,
+  TemplateEngine,
+  NotificationChannel,
+} from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
 import type * as TemplatesApi from '@/api/templates.api'
 
 vi.mock('@/api/templates.api', async (importOriginal) => ({
   ...(await importOriginal<typeof TemplatesApi>()),
   previewTemplate: vi.fn(),
+  getTemplatePreviewData: vi.fn(),
+  saveTemplatePreviewData: vi.fn(),
+}))
+const permissions = vi.hoisted(() => ({ canEdit: true }))
+vi.mock('@/hooks/useCstarRoles', () => ({ useCstarRoles: () => permissions }))
+vi.mock('@/redux/hooks', () => ({
+  useAppSelector: (selector: (state: { tenant: { selectedTenant: { id: string } } }) => unknown) =>
+    selector({ tenant: { selectedTenant: { id: 'tenant-a' } } }),
 }))
 // The header reads the store; it has its own spec.
 vi.mock('@/components/EmailHeader', () => ({ default: () => <div>Email header</div> }))
@@ -45,6 +59,9 @@ function renderModal(props: Partial<Parameters<typeof EventsEmailPreviewModal>[0
 
 beforeEach(() => {
   vi.clearAllMocks()
+  permissions.canEdit = true
+  vi.mocked(getTemplatePreviewData).mockResolvedValue({ params: {} })
+  vi.mocked(saveTemplatePreviewData).mockResolvedValue({ params: {} })
   vi.mocked(previewTemplate).mockImplementation(async (_id, params) => ({
     subject: `Permit for ${params?.name}`,
     body: params?.approved ? 'Approved' : 'Declined',
@@ -55,6 +72,82 @@ beforeEach(() => {
 })
 
 describe('EventsEmailPreviewModal', () => {
+  it('loads shared values before rendering and ignores removed placeholders', async () => {
+    vi.mocked(getTemplatePreviewData).mockResolvedValue({
+      params: { name: 'Jane', approved: 'false', removed: 'Old' },
+    })
+    renderModal()
+    expect(await screen.findByText('Declined')).toBeVisible()
+    expect(screen.getByRole('textbox', { name: /^name/i })).toHaveValue('Jane')
+    expect(previewTemplate).toHaveBeenCalledWith('template', { name: 'Jane', approved: '' })
+    expect(saveTemplatePreviewData).not.toHaveBeenCalled()
+  })
+
+  it('saves the form strings on Apply and restores them on another visit', async () => {
+    let params: Record<string, string> = { name: 'Jane', approved: 'true' }
+    vi.mocked(getTemplatePreviewData).mockImplementation(async () => ({ params }))
+    vi.mocked(saveTemplatePreviewData).mockImplementation(async (_id, values) => {
+      params = values
+      return { params }
+    })
+    const view = renderModal()
+    await screen.findByText('Approved')
+    await userEvent.clear(screen.getByRole('textbox', { name: /^name/i }))
+    await userEvent.type(screen.getByRole('textbox', { name: /^name/i }), 'Ada')
+    await userEvent.click(screen.getByRole('radio', { name: 'False' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Apply to Preview' }))
+    await screen.findByText('Declined')
+    expect(saveTemplatePreviewData).toHaveBeenCalledWith('template', {
+      name: 'Ada',
+      approved: 'false',
+    })
+    view.unmount()
+    renderModal()
+    await screen.findByText('Declined')
+    expect(screen.getByRole('textbox', { name: /^name/i })).toHaveValue('Ada')
+  })
+
+  it('lets viewers apply local changes without saving', async () => {
+    permissions.canEdit = false
+    renderModal()
+    await screen.findByText('Approved')
+    await userEvent.type(screen.getByRole('textbox', { name: /^name/i }), 'Viewer')
+    await userEvent.click(screen.getByRole('button', { name: 'Apply to Preview' }))
+    expect(await screen.findByText('Permit for Viewer')).toBeVisible()
+    expect(saveTemplatePreviewData).not.toHaveBeenCalled()
+  })
+
+  it('announces loading and load errors and retries', async () => {
+    let rejectLoad!: (error: Error) => void
+    vi.mocked(getTemplatePreviewData).mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectLoad = reject
+        }),
+    )
+    renderModal()
+    expect(screen.getByRole('status')).toHaveTextContent('Loading preview values')
+    expect(screen.getByRole('button', { name: 'Apply to Preview' })).toBeDisabled()
+    rejectLoad(new Error('Cannot load values'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Cannot load values')
+    await userEvent.click(screen.getByRole('button', { name: /Retry loading/ }))
+    expect(await screen.findByText('Approved')).toBeVisible()
+  })
+
+  it('retains edited values after save failure for retry', async () => {
+    vi.mocked(saveTemplatePreviewData)
+      .mockRejectedValueOnce(new Error('Cannot save values'))
+      .mockResolvedValueOnce({ params: {} })
+    renderModal()
+    await screen.findByText('Approved')
+    await userEvent.type(screen.getByRole('textbox', { name: /^name/i }), 'Ada')
+    await userEvent.click(screen.getByRole('button', { name: 'Apply to Preview' }))
+    expect(await screen.findByText('Cannot save values')).toBeVisible()
+    expect(screen.getByRole('textbox', { name: /^name/i })).toHaveValue('Ada')
+    await userEvent.click(screen.getByRole('button', { name: 'Apply to Preview' }))
+    expect(await screen.findByText('Permit for Ada')).toBeVisible()
+  })
+
   it('renders on open with a variable from the subject and booleans defaulting to true', async () => {
     renderModal()
 
@@ -117,7 +210,7 @@ describe('EventsEmailPreviewModal', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Close this alert' }))
 
     expect(
-      screen.queryByText(/Preview values are generated from your API payload/),
+      screen.queryByText(/Sample values are shared with the template editor/),
     ).not.toBeInTheDocument()
   })
 
