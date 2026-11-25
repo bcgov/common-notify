@@ -14,8 +14,9 @@ import { AttachmentService } from '../../api/attachment/attachment.service'
 import { PhoneNumberService } from '../../api/notify/services/phone-number.service'
 import { mergeJobDataFromRequest } from '../merge-batch-builder'
 import { DELIVERY_JOB_OPTIONS } from '../job-options'
-import { jobPriority, requestPriority } from '../job-priority'
+import { jobPriority, priorityLanesEnabled, requestPriority } from '../job-priority'
 import { TenantsService } from '../../api/admin/tenants/tenants.service'
+import { FeatureFlagService } from '../../api/feature-flag/feature-flag.service'
 import { describeError } from '../../common/utils/describe-error'
 
 type IngestionRequest = IngestionJobPayload['request']
@@ -75,6 +76,7 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
     private readonly tenantsService: TenantsService,
     @Optional() private readonly clamavService?: ClamavService,
     @Optional() private readonly attachmentService?: AttachmentService,
+    @Optional() private readonly featureFlagService?: FeatureFlagService,
   ) {}
 
   /**
@@ -121,9 +123,7 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
 
       // Delivery jobs inherit the ingestion job's priority. A job queued before priorities has
       // none, and gets the default for its kind of send.
-      const priority =
-        job.opts.priority ||
-        jobPriority(requestPriority(job.data.request, !!job.data.mailMerge), this.configService)
+      const priority = job.opts.priority || (await this.defaultPriority(job.data))
 
       if (job.data.mailMerge && job.data.mailMergeData) {
         return await this.fanOutMerge(job.data, priority)
@@ -205,6 +205,12 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
         this.notificationService.parseMailMergeRecipients(mergeArray, mergeChannel),
       (address) => !blocked.has(address),
     ).recipients!
+  }
+
+  /** The priority for a job queued without one, as acceptance would give it today. */
+  private async defaultPriority(data: IngestionJobPayload): Promise<number> {
+    const lanes = await priorityLanesEnabled(this.featureFlagService, data.tenantId)
+    return jobPriority(requestPriority(data.request, !!data.mailMerge, lanes), this.configService)
   }
 
   /**

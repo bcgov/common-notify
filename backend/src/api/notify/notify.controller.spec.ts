@@ -392,6 +392,22 @@ describe('Notify Controllers', () => {
         expect(options.delay).toBeLessThanOrEqual(120 * 60_000)
       })
 
+      it('gives a rescheduled job queued before priorities the default for its send', async () => {
+        const job = { ...queuedJob('delayed'), opts: {} }
+        job.data = { ...job.data, mailMerge: true } as typeof job.data
+        mockIngestionQueue.getJob.mockResolvedValue(job)
+
+        await cancelOrReschedule({ scheduledTime: new Date(Date.now() + 60_000).toISOString() })
+
+        // Priority lanes are on in this suite, so a merge is low priority.
+        const [, , options] = mockIngestionQueue.add.mock.calls[0]
+        expect(options).toMatchObject({ priority: 10 })
+        expect(mockFeatureFlagService.isEnabled).toHaveBeenCalledWith(
+          'notification_priority',
+          'tenant-1',
+        )
+      })
+
       it.each(['active', 'completed'])('leaves a job that is already %s alone', async (state) => {
         const job = queuedJob(state)
         mockIngestionQueue.getJob.mockResolvedValue(job)
@@ -1169,7 +1185,7 @@ describe('Notify Controllers', () => {
             await expectQueuedAt(5)
           })
 
-          it('queues a merge asking for high at low priority', async () => {
+          it('queues a merge at normal priority, not behind single sends', async () => {
             await request(app.getHttpServer())
               .post('/api/v1/frontend/notifysimple')
               .send({
@@ -1179,7 +1195,7 @@ describe('Notify Controllers', () => {
               })
               .expect(202)
 
-            await expectQueuedAt(10)
+            await expectQueuedAt(5)
           })
 
           it('still rejects an unknown priority', async () => {

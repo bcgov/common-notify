@@ -13,6 +13,7 @@ import { PhoneNumberService } from '../../api/notify/services/phone-number.servi
 import type { ConfigService } from '@nestjs/config'
 import type { ClamavService } from '../../services/clamav.service'
 import type { TenantsService } from '../../api/admin/tenants/tenants.service'
+import type { FeatureFlagService } from '../../api/feature-flag/feature-flag.service'
 import type { NotificationService } from '../../api/notification/notification.service'
 import type { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 
@@ -39,6 +40,7 @@ describe('IngestionWorker', () => {
     attachmentService?: AttachmentService
     phoneNumberService?: PhoneNumberService
     tenantsService?: Pick<TenantsService, 'isSendingDisabled'>
+    featureFlagService?: Pick<FeatureFlagService, 'isEnabled'>
   }) {
     const worker = new IngestionWorker(
       deps.emailQueue,
@@ -52,6 +54,7 @@ describe('IngestionWorker', () => {
       }) as TenantsService,
       deps.clamavService,
       deps.attachmentService,
+      deps.featureFlagService as FeatureFlagService | undefined,
     )
     processHandler = (job) => worker.process(job)
     failedCallback = (job, err) => worker.onFailed(job, err)
@@ -989,8 +992,8 @@ describe('IngestionWorker', () => {
           }),
           expect.objectContaining({
             jobId: 'notify-bulk-EMAIL-0',
-            // A job queued without a priority gets a merge's default.
-            priority: 10,
+            // A job queued without a priority gets the default; priority lanes are off.
+            priority: 5,
             removeOnComplete: true,
             removeOnFail: FAILED_JOB_RETENTION,
             attempts: 3,
@@ -1004,6 +1007,41 @@ describe('IngestionWorker', () => {
           status: 'processing',
           updatedBy: 'ingestion-worker',
         })
+      })
+
+      it('gives a merge queued without a priority low priority when priority lanes are on', async () => {
+        const isEnabled = vi.fn().mockResolvedValue(true)
+        initialize({
+          emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+          smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
+          notificationService: mockNotificationService,
+          requestDetailService: mockRequestDetailService,
+          configService: mockConfigService,
+          featureFlagService: { isEnabled },
+        })
+
+        await processHandler({
+          opts: {},
+          data: {
+            notifyId: 'notify-bulk',
+            tenantId: 'tenant-bulk',
+            request: {} as any,
+            requestedAt: new Date().toISOString(),
+            mailMerge: true,
+            mailMergeData: {
+              templateId: 'template-uuid',
+              params: {},
+              recipients: [{ address: 'alice@example.com', params: {} }],
+            },
+          },
+        } as Partial<Job<IngestionJobPayload>> as Job<IngestionJobPayload>)
+
+        expect(isEnabled).toHaveBeenCalledWith('notification_priority', 'tenant-bulk')
+        expect(mockEmailQueue.add).toHaveBeenCalledWith(
+          QueueName.EMAIL_DELIVERY,
+          expect.anything(),
+          expect.objectContaining({ priority: 10 }),
+        )
       })
 
       it('should split recipients into multiple batches when addresses exceed batchSize', async () => {

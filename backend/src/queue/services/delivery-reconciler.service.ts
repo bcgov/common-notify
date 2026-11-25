@@ -22,7 +22,7 @@ import { ProviderToken } from '../../enum/provider-token.enum'
 import { QueueName } from '../../enum/queue-name.enum'
 import { redisKey } from '../../common/redis/redis-namespace'
 import { DELIVERY_JOB_OPTIONS, INGESTION_JOB_OPTIONS } from '../job-options'
-import { jobPriority, requestPriority } from '../job-priority'
+import { jobPriority, priorityLanesEnabled, requestPriority } from '../job-priority'
 import { StructuredLoggerService } from '../../common/logger'
 import {
   delayUntilScheduled,
@@ -31,6 +31,7 @@ import {
 } from '../merge-batch-builder'
 import type { DeliveryJobPayload } from '../queue.types'
 import type { NotifySimpleRequest } from '../../api/notify/schemas/notify-simple-request'
+import { FeatureFlagService } from '../../api/feature-flag/feature-flag.service'
 import { recordReconcilePass } from '../reconcile-activity'
 import type { ReconcileActionRecord, ReconcileKind } from '../reconcile-activity'
 
@@ -130,6 +131,7 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
     @Optional() @Inject(QueueName.INGESTION) private readonly ingestionQueue?: Queue | null,
     @Optional() private readonly structuredLogger?: StructuredLoggerService,
     @Optional() private readonly configService?: ConfigService,
+    @Optional() private readonly featureFlagService?: FeatureFlagService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -395,10 +397,7 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
     await this.ingestionQueue.add(this.ingestionQueue.name, job, {
       jobId: item.notifyId,
       ...INGESTION_JOB_OPTIONS,
-      priority: jobPriority(
-        requestPriority(request.payload as NotifySimpleRequest, !!job.mailMerge),
-        this.configService,
-      ),
+      priority: await this.priorityFor(request.tenantId, request.payload, !!job.mailMerge),
       ...(delay > 0 && { delay }),
     })
 
@@ -436,11 +435,21 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
       batchId: item.batchId,
       mailMergeData,
     }
-    const priority = jobPriority(
-      requestPriority(request.payload as NotifySimpleRequest, true),
+    const priority = await this.priorityFor(item.tenantId, request.payload, true)
+    return { data, priority }
+  }
+
+  /** The priority acceptance gives this stored request. */
+  private async priorityFor(
+    tenantId: string,
+    payload: unknown,
+    mailMerge: boolean,
+  ): Promise<number> {
+    const lanes = await priorityLanesEnabled(this.featureFlagService, tenantId)
+    return jobPriority(
+      requestPriority(payload as NotifySimpleRequest, mailMerge, lanes),
       this.configService,
     )
-    return { data, priority }
   }
 
   /**

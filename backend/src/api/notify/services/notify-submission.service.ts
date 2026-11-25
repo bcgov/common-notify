@@ -31,10 +31,9 @@ import { extractRequestRoute } from '../../../common/utils/extract-request-route
 import { describeError } from '../../../common/utils/describe-error'
 import { mergeRequestChannel } from '../../../queue/merge-batch-builder'
 import { INGESTION_JOB_OPTIONS } from '../../../queue/job-options'
-import { jobPriority, requestPriority } from '../../../queue/job-priority'
+import { jobPriority, priorityLanesEnabled, requestPriority } from '../../../queue/job-priority'
 import { TenantsService } from '../../admin/tenants/tenants.service'
 import { FeatureFlagService } from '../../feature-flag/feature-flag.service'
-import { FeatureFlagCode } from '../../../enum/feature-flag-code.enum'
 
 interface AcceptedUsageResult extends RecordedUsageResult {
   channelCode: string
@@ -73,6 +72,8 @@ export interface MergeSubmission {
   requestRoute?: string
   eventId?: string
   skipDedup?: boolean
+  /** The tenant's notification_priority flag, when the caller already has it. */
+  priorityLanes?: boolean
 }
 
 /**
@@ -134,11 +135,8 @@ export class NotifySubmissionService {
       }
 
       // Strip out the priority value and fall back to default priority if the feature flag is disabled.
-      const priorityAllowed = await this.featureFlagService.isEnabled(
-        FeatureFlagCode.NOTIFICATION_PRIORITY,
-        caller.tenantId,
-      )
-      if (!priorityAllowed) payload = withoutPriority(payload)
+      const priorityLanes = await priorityLanesEnabled(this.featureFlagService, caller.tenantId)
+      if (!priorityLanes) payload = withoutPriority(payload)
 
       const mergeChannel = mergeRequestChannel(payload)
       if (mergeChannel) {
@@ -149,10 +147,17 @@ export class NotifySubmissionService {
           requestRoute: caller.requestRoute,
           eventId,
           skipDedup,
+          priorityLanes,
         })
       }
 
-      return await this.acceptSimple(caller, payload as NotifySimpleRequest, eventId, skipDedup)
+      return await this.acceptSimple(
+        caller,
+        payload as NotifySimpleRequest,
+        eventId,
+        skipDedup,
+        priorityLanes,
+      )
     } catch (error) {
       this.logger.error(`Failed to queue notification`, {
         error: (error as Error).message,
@@ -250,7 +255,9 @@ export class NotifySubmissionService {
       }),
     }
 
-    const priority = jobPriority(requestPriority(dto, true), this.configService)
+    const priorityLanes =
+      submission.priorityLanes ?? (await priorityLanesEnabled(this.featureFlagService, tenantId))
+    const priority = jobPriority(requestPriority(dto, true, priorityLanes), this.configService)
     this.enqueueInBackground(
       notificationRecord.id,
       tenantId,
@@ -284,6 +291,16 @@ export class NotifySubmissionService {
     if (skip || !dedup.enabled) return { duplicate: null }
     const fingerprint = dedup.fingerprint(fingerprintSource)
     return { fingerprint, duplicate: await dedup.findDuplicate(tenantId, fingerprint) }
+  }
+
+  /** The priority acceptance gives an ingestion job, for one re-added without its own. */
+  async ingestionPriority(
+    tenantId: string,
+    request: NotifySimpleRequest | undefined,
+    mailMerge: boolean,
+  ): Promise<number> {
+    const lanes = await priorityLanesEnabled(this.featureFlagService, tenantId)
+    return jobPriority(requestPriority(request, mailMerge, lanes), this.configService)
   }
 
   /**
@@ -435,6 +452,7 @@ export class NotifySubmissionService {
     payload: NotifySimpleRequest,
     eventId: string | undefined,
     skipDedup: boolean,
+    priorityLanes: boolean,
   ): Promise<NotificationAcceptanceResponse> {
     const { tenantId } = caller
     await this.tenantsService.assertCanSend(tenantId)
@@ -503,7 +521,10 @@ export class NotifySubmissionService {
         : 'Notification accepted, queuing in progress',
     }
 
-    const priority = jobPriority(requestPriority(processed, false), this.configService)
+    const priority = jobPriority(
+      requestPriority(processed, false, priorityLanes),
+      this.configService,
+    )
     this.enqueueInBackground(notificationRecord.id, tenantId, delayedSend, 'job', priority, {
       request: processed,
     })

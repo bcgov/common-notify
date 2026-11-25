@@ -568,7 +568,14 @@ export class NotifySimpleController {
               {
                 jobId: notificationId,
                 ...INGESTION_JOB_OPTIONS,
-                priority: jobToUpdate.opts.priority,
+                // A job queued before priorities has none, and would otherwise jump the queue.
+                priority:
+                  jobToUpdate.opts.priority ||
+                  (await this.submissionService.ingestionPriority(
+                    tenantId,
+                    jobToUpdate.data.request,
+                    !!jobToUpdate.data.mailMerge,
+                  )),
                 delay: Math.max(0, newDelay),
               },
             )
