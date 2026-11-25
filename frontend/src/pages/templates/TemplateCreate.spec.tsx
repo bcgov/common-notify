@@ -26,7 +26,27 @@ vi.mock('@/redux/utils/toastUtils', () => ({
 }))
 
 vi.mock('./TemplatePreviewModal', () => ({
-  default: () => null,
+  default: ({
+    isOpen,
+    onClose,
+    draftValues,
+    onDraftValuesChange,
+  }: {
+    isOpen: boolean
+    onClose: () => void
+    draftValues: Record<string, string>
+    onDraftValuesChange: (values: Record<string, string>) => void
+  }) =>
+    isOpen ? (
+      <div>
+        <input
+          aria-label="Sample name"
+          value={draftValues.name ?? ''}
+          onChange={(event) => onDraftValuesChange({ name: event.target.value })}
+        />
+        <button onClick={onClose}>Close preview</button>
+      </div>
+    ) : null,
 }))
 
 vi.mock('@bcgov/design-system-react-components', async () => {
@@ -291,6 +311,40 @@ describe('TemplateCreate', () => {
     expect(screen.getByRole('button', { name: 'About MJML syntax' })).toBeTruthy()
   })
 
+  it('retains preview draft values on reopen and retries creation with the same values', async () => {
+    createTemplateMock
+      .mockRejectedValueOnce(new Error('Save failed'))
+      .mockResolvedValueOnce({ id: 'created-template' })
+    render(<TemplateCreate />)
+    fireEvent.click(screen.getByLabelText('Email'))
+    fireEvent.click(screen.getByLabelText('Handlebars'))
+    const [titleInput, subjectInput, bodyTextarea] = screen.getAllByRole('textbox')
+    fireEvent.change(titleInput, { target: { value: 'Draft template' } })
+    fireEvent.change(subjectInput, { target: { value: 'Hello {{name}}' } })
+    fireEvent.change(bodyTextarea, { target: { value: 'Hello {{name}}' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Sample name' }), {
+      target: { value: 'Jane' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Close preview' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(screen.getByRole('textbox', { name: 'Sample name' })).toHaveValue('Jane')
+    fireEvent.click(screen.getByRole('button', { name: 'Close preview' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled())
+    expect(navigateMock).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(navigateMock).toHaveBeenCalled())
+    expect(createTemplateMock).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ previewParams: { name: 'Jane' } }),
+    )
+    expect(createTemplateMock).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ previewParams: { name: 'Jane' } }),
+    )
+  })
+
   it('does not require or send bodyType when saving an MJML template', async () => {
     render(<TemplateCreate />)
 
@@ -319,6 +373,7 @@ describe('TemplateCreate', () => {
     })
 
     expect(createTemplateMock).toHaveBeenCalledWith({
+      previewParams: {},
       name: 'local mjml final test',
       channelCode: 'EMAIL',
       engineCode: 'mjml',
@@ -352,6 +407,7 @@ describe('TemplateCreate', () => {
     })
 
     expect(createTemplateMock).toHaveBeenCalledWith({
+      previewParams: {},
       name: 'welcome template',
       channelCode: 'EMAIL',
       engineCode: 'handlebars',

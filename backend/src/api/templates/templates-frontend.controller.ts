@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Delete,
   Param,
   Query,
@@ -35,6 +36,7 @@ import { PreviewTemplateDto } from './schemas/preview-template.dto'
 import { PreviewTemplateBodyDto } from './schemas/preview-template-body.dto'
 import { TemplateResponseDto } from './schemas/template-response.dto'
 import { TemplateUsageResponseDto } from './schemas/template-usage-response.dto'
+import { TemplatePreviewDataDto } from './schemas/template-preview-data.dto'
 import { TemplateVersionResponseDto } from './schemas/template-version-response.dto'
 import { UpdateTemplateDto } from './schemas/update-template.dto'
 import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
@@ -217,6 +219,38 @@ export class TemplatesFrontendController {
     return this.templatesService.getTemplate(tenant.id, templateId)
   }
 
+  @Version('1')
+  @Get(':templateId/preview-data')
+  @HttpCode(200)
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
+  @ApiOkResponse({ type: TemplatePreviewDataDto })
+  async getPreviewData(
+    @Req() req: express.Request,
+    @Param('templateId', new ParseUUIDPipe()) templateId: string,
+  ): Promise<TemplatePreviewDataDto> {
+    const tenant = await this.requireTenantContext(req)
+    return this.templatesService.getPreviewData(tenant.id, templateId)
+  }
+
+  @Version('1')
+  @Put(':templateId/preview-data')
+  @HttpCode(200)
+  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
+  @ApiOkResponse({ type: TemplatePreviewDataDto })
+  async savePreviewData(
+    @Req() req: express.Request,
+    @Param('templateId', new ParseUUIDPipe()) templateId: string,
+    @Body() dto: TemplatePreviewDataDto,
+  ): Promise<TemplatePreviewDataDto> {
+    const tenant = await this.requireTenantContext(req)
+    const user = JwtUserExtractor.extractUser(req)
+    return this.templatesService.savePreviewData(tenant.id, templateId, dto, user)
+  }
+
   /**
    * List the events that still use a template
    * Asked before deleting, since a template an event renders with cannot be deleted
@@ -370,7 +404,11 @@ export class TemplatesFrontendController {
   @Version('1')
   @Post(':templateId/preview')
   @HttpCode(200)
-  @Roles(CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR, CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN)
+  @Roles(
+    CstarRoleEnum.NOTIFY_VIEWER,
+    CstarRoleEnum.NOTIFY_TEMPLATE_EDITOR,
+    CstarRoleEnum.NOTIFY_OPERATIONS_ADMIN,
+  )
   async previewTemplate(
     @Req() req: Request,
     @Param('templateId', new ParseUUIDPipe()) templateId: string,

@@ -16,6 +16,12 @@ import type { CstarGroupsStatus } from '@/hooks/useCstarGroups'
 
 const getTemplatesMock = vi.fn()
 
+vi.mock('@/hooks/useCstarRoles', () => ({ useCstarRoles: () => ({ canEdit: true }) }))
+vi.mock('@/redux/hooks', () => ({
+  useAppSelector: (selector: (state: { tenant: { selectedTenant: { id: string } } }) => unknown) =>
+    selector({ tenant: { selectedTenant: { id: 'tenant-a' } } }),
+}))
+
 // The tab registers a route blocker for unsaved changes. The mock keeps hold of the options it
 // was given, so the tests can ask the same question the router would, and drives the resolver
 // the dialog is rendered from.
