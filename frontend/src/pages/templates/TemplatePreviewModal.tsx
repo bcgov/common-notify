@@ -177,6 +177,15 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
     )
   }
 
+  let statusMessage = ''
+  if (loadingValues) {
+    statusMessage = 'Loading preview values...'
+  } else if (savingValues) {
+    statusMessage = 'Saving preview values...'
+  } else if (loading) {
+    statusMessage = 'Rendering preview...'
+  }
+
   return (
     <NotificationPreviewModal
       isOpen={isOpen}
@@ -249,15 +258,7 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
         </>
       }
       isLoading={loading && activeTab === 'rendered'}
-      statusMessage={
-        loadingValues
-          ? 'Loading preview values...'
-          : savingValues
-            ? 'Saving preview values...'
-            : loading
-              ? 'Rendering preview...'
-              : ''
-      }
+      statusMessage={statusMessage}
       error={activeTab === 'rendered' ? error : null}
     />
   )

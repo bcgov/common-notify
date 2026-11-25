@@ -153,6 +153,20 @@ describe('TemplatePreviewModal apply flow', () => {
     canSave: true,
   }
 
+  beforeEach(() => {
+    vi.clearAllMocks()
+    getPreviewDataMock.mockResolvedValue({ params: {} })
+    savePreviewDataMock.mockResolvedValue({ params: {} })
+    previewTemplateBodyMock.mockImplementation(
+      async ({ params }: PreviewTemplateBodyData): Promise<PreviewTemplateBodyResponse> => ({
+        channelCode: NotificationChannel.EMAIL,
+        subject: 'Subject',
+        body: `rendered:${params?.firstName ?? ''}:${params?.lastName ?? ''}`,
+        bodyType: 'markdown',
+      }),
+    )
+  })
+
   it('saves on Apply and restores values after remounting', async () => {
     let saved = { firstName: 'Jane', lastName: 'Doe' }
     getPreviewDataMock.mockImplementation(async () => ({ params: saved }))
@@ -245,20 +259,6 @@ describe('TemplatePreviewModal apply flow', () => {
       expect(screen.getByRole('textbox', { name: /firstName/ })).toHaveValue('Second'),
     )
     expect(savePreviewDataMock).not.toHaveBeenCalled()
-  })
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    getPreviewDataMock.mockResolvedValue({ params: {} })
-    savePreviewDataMock.mockResolvedValue({ params: {} })
-    previewTemplateBodyMock.mockImplementation(
-      async ({ params }: PreviewTemplateBodyData): Promise<PreviewTemplateBodyResponse> => ({
-        channelCode: NotificationChannel.EMAIL,
-        subject: 'Subject',
-        body: `rendered:${params?.firstName ?? ''}:${params?.lastName ?? ''}`,
-        bodyType: 'markdown',
-      }),
-    )
   })
 
   it('renders with empty fields, flagging them only once the preview is applied', async () => {

@@ -7,9 +7,7 @@ export function initializePreviewValues(
   return Object.fromEntries(
     variables.map((variable) => {
       const fallback = variable.type === 'boolean' ? 'true' : ''
-      const value = Object.prototype.hasOwnProperty.call(saved, variable.name)
-        ? saved[variable.name]
-        : fallback
+      const value = Object.hasOwn(saved, variable.name) ? saved[variable.name] : fallback
       return [variable.name, value]
     }),
   )

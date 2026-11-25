@@ -142,6 +142,15 @@ const EventsEmailPreviewModal: FC<EventsEmailPreviewModalProps> = ({
     }
   }, [isOpen, template.id, template.version, variables, runPreview, tenantId, loadAttempt])
 
+  let statusMessage = ''
+  if (loadingValues) {
+    statusMessage = 'Loading preview values...'
+  } else if (savingValues) {
+    statusMessage = 'Saving preview values...'
+  } else if (loading) {
+    statusMessage = 'Rendering preview...'
+  }
+
   return (
     <NotificationPreviewModal
       isOpen={isOpen}
@@ -205,15 +214,7 @@ const EventsEmailPreviewModal: FC<EventsEmailPreviewModalProps> = ({
       bodyHtml={bodyHtml}
       bodyText={bodyText}
       isLoading={loading || loadingValues}
-      statusMessage={
-        loadingValues
-          ? 'Loading preview values...'
-          : savingValues
-            ? 'Saving preview values...'
-            : loading
-              ? 'Rendering preview...'
-              : ''
-      }
+      statusMessage={statusMessage}
       error={error}
     />
   )

@@ -23,7 +23,7 @@ export class TemplatesRepository {
     private readonly eventChannelSettingRepository: Repository<EventChannelSetting>,
   ) {}
 
-  async findPreviewData(templateId: string): Promise<TemplatePreviewData | null> {
+  findPreviewData(templateId: string): Promise<TemplatePreviewData | null> {
     return this.templateRepository.manager.getRepository(TemplatePreviewData).findOne({
       where: { templateId },
     })
@@ -219,7 +219,7 @@ export class TemplatesRepository {
     return this.templateRepository.save(newTemplate)
   }
 
-  async createWithInitialVersion(
+  createWithInitialVersion(
     data: Partial<Template>,
     previewParams?: Record<string, string>,
   ): Promise<Template> {

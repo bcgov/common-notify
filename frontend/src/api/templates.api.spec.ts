@@ -44,6 +44,10 @@ const httpError = (status: number, data?: unknown) =>
   })
 
 describe('templates.api', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   it('reads the selected template preview data', async () => {
     const data = { params: { name: 'Jane' } }
     vi.mocked(get).mockResolvedValue(data)
@@ -71,10 +75,6 @@ describe('templates.api', () => {
     await expect(saveTemplatePreviewData('template-a', {})).rejects.toThrow(
       'Failed to save preview values',
     )
-  })
-
-  beforeEach(() => {
-    vi.clearAllMocks()
   })
 
   describe('getTemplates', () => {
