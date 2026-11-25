@@ -1,4 +1,5 @@
-import { Inject, Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import type { Queue } from 'bullmq'
 import {
   ClaimedLimitAlert,
@@ -12,6 +13,7 @@ import { IngestionJobPayload } from '../../../queue/queue.types'
 import { NotifySimpleRequest } from '../schemas/notify-simple-request'
 import { TenantsService } from '../../admin/tenants/tenants.service'
 import { INGESTION_JOB_OPTIONS } from '../../../queue/job-options'
+import { jobPriority } from '../../../queue/job-priority'
 
 export type ProcessLimitAlertNotificationsInput = ProcessLimitAlertUsageInput
 
@@ -66,6 +68,7 @@ export class LimitAlertNotificationService {
     private readonly tenantsService: TenantsService,
     @Inject(QueueName.INGESTION)
     private readonly ingestionQueue: Queue<IngestionJobPayload>,
+    @Optional() private readonly configService?: ConfigService,
   ) {}
 
   async processAcceptedUsage(input: ProcessLimitAlertNotificationsInput): Promise<void> {
@@ -132,6 +135,7 @@ export class LimitAlertNotificationService {
     await this.ingestionQueue.add(this.ingestionQueue.name, jobPayload, {
       jobId: notificationRecord.id,
       ...INGESTION_JOB_OPTIONS,
+      priority: jobPriority('normal', this.configService),
     })
 
     await this.notificationService.update(notificationRecord.id, claim.tenantId, {

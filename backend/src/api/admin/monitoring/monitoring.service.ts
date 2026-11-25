@@ -686,6 +686,8 @@ export class MonitoringService {
     const outPerMinute = Math.round((completedPerMinute + failedPerMinute) * 10) / 10
     const failureRatePercent =
       outPerMinute > 0 ? Math.round((failedPerMinute / outPerMinute) * 1000) / 10 : 0
+    // Every job is queued with a priority, and BullMQ holds those in `prioritized`, not `waiting`.
+    const ready = (counts.waiting ?? 0) + (counts.prioritized ?? 0)
 
     return evaluateQueue(
       {
@@ -694,11 +696,11 @@ export class MonitoringService {
         // A paused BullMQ queue keeps its jobs in waiting; they are reported as paused, as they
         // were when a paused queue moved them to a list of their own.
         counts: {
-          waiting: isPaused ? 0 : (counts.waiting ?? 0),
+          waiting: isPaused ? 0 : ready,
           active: counts.active ?? 0,
           delayed: counts.delayed ?? 0,
           failed: counts.failed ?? 0,
-          paused: isPaused ? (counts.waiting ?? 0) : 0,
+          paused: isPaused ? ready : 0,
         },
         oldestWaitingAgeMs,
         throughput: {
@@ -718,13 +720,15 @@ export class MonitoringService {
   }
 
   /**
-   * The oldest waiting job is the next one out. A delayed job (scheduled send or retry backoff)
-   * only became ready at timestamp + delay, which is what its wait is measured from.
+   * The longest wait among the next jobs out: the head of `waiting` and of `prioritized` (the
+   * highest-priority job, so a lower-priority job held back behind it is not measured). A delayed
+   * job (scheduled send or retry backoff) only became ready at timestamp + delay, which is what
+   * its wait is measured from.
    */
   private async getOldestWaitingAge(queue: Queue, now: number): Promise<number | null> {
-    const [job] = await queue.getJobs(['waiting'], 0, 0, true)
-    if (!job) return null
-    const readyAt = job.timestamp + (job.opts?.delay ?? 0)
+    const jobs = await queue.getJobs(['waiting', 'prioritized'], 0, 0, true)
+    if (jobs.length === 0) return null
+    const readyAt = Math.min(...jobs.map((job) => job.timestamp + (job.opts?.delay ?? 0)))
     return Math.max(0, now - readyAt)
   }
 

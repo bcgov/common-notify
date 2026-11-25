@@ -13,6 +13,7 @@ import { PhoneNumberService } from '../../api/notify/services/phone-number.servi
 import type { ConfigService } from '@nestjs/config'
 import type { ClamavService } from '../../services/clamav.service'
 import type { TenantsService } from '../../api/admin/tenants/tenants.service'
+import type { FeatureFlagService } from '../../api/feature-flag/feature-flag.service'
 import type { NotificationService } from '../../api/notification/notification.service'
 import type { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 
@@ -39,6 +40,7 @@ describe('IngestionWorker', () => {
     attachmentService?: AttachmentService
     phoneNumberService?: PhoneNumberService
     tenantsService?: Pick<TenantsService, 'isSendingDisabled'>
+    featureFlagService?: Pick<FeatureFlagService, 'isEnabled'>
   }) {
     const worker = new IngestionWorker(
       deps.emailQueue,
@@ -52,6 +54,7 @@ describe('IngestionWorker', () => {
       }) as TenantsService,
       deps.clamavService,
       deps.attachmentService,
+      deps.featureFlagService as FeatureFlagService | undefined,
     )
     processHandler = (job) => worker.process(job)
     failedCallback = (job, err) => worker.onFailed(job, err)
@@ -127,6 +130,7 @@ describe('IngestionWorker', () => {
       })
 
       const result = await processHandler({
+        opts: {},
         data: {
           notifyId: 'notify-123',
           tenantId: 'tenant-123',
@@ -165,6 +169,7 @@ describe('IngestionWorker', () => {
       })
 
       const job: Partial<Job<IngestionJobPayload>> = {
+        opts: {},
         data: {
           notifyId: 'notify-456',
           tenantId: 'tenant-456',
@@ -201,6 +206,7 @@ describe('IngestionWorker', () => {
       })
 
       const job: Partial<Job<IngestionJobPayload>> = {
+        opts: {},
         data: {
           notifyId: 'notify-normalized-sms',
           tenantId: 'tenant-456',
@@ -248,6 +254,7 @@ describe('IngestionWorker', () => {
       })
 
       const job: Partial<Job<IngestionJobPayload>> = {
+        opts: {},
         data: {
           notifyId: 'notify-789',
           tenantId: 'tenant-789',
@@ -283,6 +290,7 @@ describe('IngestionWorker', () => {
       const scheduledFor = new Date(Date.now() + 60000).toISOString()
 
       const job: Partial<Job<IngestionJobPayload>> = {
+        opts: {},
         data: {
           notifyId: 'notify-scheduled',
           tenantId: 'tenant-scheduled',
@@ -316,6 +324,7 @@ describe('IngestionWorker', () => {
     describe('when an admin has disabled sending for the tenant', () => {
       const job = (scheduledFor?: string) =>
         ({
+          opts: {},
           data: {
             notifyId: 'notify-1',
             tenantId: 'tenant-1',
@@ -394,6 +403,7 @@ describe('IngestionWorker', () => {
       const futureDate = new Date(Date.now() + 60000).toISOString()
 
       const job: Partial<Job<IngestionJobPayload>> = {
+        opts: {},
         data: {
           notifyId: 'notify-scheduled',
           tenantId: 'tenant-scheduled',
@@ -431,6 +441,7 @@ describe('IngestionWorker', () => {
       })
 
       const job: Partial<Job<IngestionJobPayload>> = {
+        opts: {},
         data: {
           notifyId: 'notify-no-channel',
           tenantId: 'tenant-no-channel',
@@ -455,6 +466,7 @@ describe('IngestionWorker', () => {
       })
 
       const job: Partial<Job<IngestionJobPayload>> = {
+        opts: {},
         data: {
           notifyId: 'notify-no-request',
           tenantId: 'tenant-no-request',
@@ -479,6 +491,7 @@ describe('IngestionWorker', () => {
       })
 
       const job: Partial<Job<IngestionJobPayload>> = {
+        opts: {},
         data: {
           notifyId: undefined as any,
           tenantId: 'tenant-123',
@@ -508,6 +521,7 @@ describe('IngestionWorker', () => {
       })
 
       const job: Partial<Job<IngestionJobPayload>> = {
+        opts: {},
         data: {
           notifyId: 'notify-123',
           tenantId: null as any,
@@ -537,6 +551,7 @@ describe('IngestionWorker', () => {
       })
 
       const job: Partial<Job<IngestionJobPayload>> = {
+        opts: {},
         data: {
           notifyId: 'notify-123',
           tenantId: 'tenant-123',
@@ -609,6 +624,7 @@ describe('IngestionWorker', () => {
         content: { subject: 'Test Subject', body: 'Test body' },
       }
       const job: Partial<Job<IngestionJobPayload>> = {
+        opts: {},
         data: {
           notifyId: 'notify-data',
           tenantId: 'tenant-data',
@@ -645,6 +661,7 @@ describe('IngestionWorker', () => {
       })
 
       const job: Partial<Job<IngestionJobPayload>> = {
+        opts: {},
         data: {
           notifyId: 'notify-retry',
           tenantId: 'tenant-retry',
@@ -675,6 +692,43 @@ describe('IngestionWorker', () => {
       )
     })
 
+    it('queues delivery jobs at the ingestion job’s priority', async () => {
+      initialize({
+        emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+        smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
+        notificationService: mockNotificationService,
+        requestDetailService: mockRequestDetailService,
+        configService: mockConfigService,
+        clamavService: mockClamavService,
+      })
+
+      const job: Partial<Job<IngestionJobPayload>> = {
+        opts: { priority: 1 },
+        data: {
+          notifyId: 'notify-priority',
+          tenantId: 'tenant-priority',
+          request: {
+            email: {
+              recipients: { to: ['test@example.com'] },
+              content: { subject: 'Test', body: 'Test body' },
+            },
+            sms: { recipients: { to: ['+1234567890'] }, content: { body: 'SMS test' } },
+          },
+          requestedAt: new Date().toISOString(),
+        },
+      }
+
+      await processHandler(job as Job<IngestionJobPayload>)
+
+      for (const queue of [mockEmailQueue, mockSmsQueue]) {
+        expect(queue.add).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.any(Object),
+          expect.objectContaining({ priority: 1 }),
+        )
+      }
+    })
+
     it('should retry the ingestion job when fail-closed scanning blocks unavailable ClamAV', async () => {
       mockClamavService.scanBuffer.mockRejectedValueOnce(
         new Error('ClamAV is unavailable while fail-closed mode is enabled'),
@@ -692,6 +746,7 @@ describe('IngestionWorker', () => {
       })
 
       const job: Partial<Job<IngestionJobPayload>> = {
+        opts: {},
         data: {
           notifyId: 'notify-attachment-retry',
           tenantId: 'tenant-attachment-retry',
@@ -738,6 +793,7 @@ describe('IngestionWorker', () => {
       })
 
       const result = await processHandler({
+        opts: {},
         data: {
           notifyId: 'notify-stored-attachment',
           tenantId: 'tenant-stored-attachment',
@@ -781,6 +837,7 @@ describe('IngestionWorker', () => {
 
       await expect(
         processHandler({
+          opts: {},
           data: {
             notifyId: 'notify-stored-attachment-fail',
             tenantId: 'tenant-stored-attachment-fail',
@@ -819,6 +876,7 @@ describe('IngestionWorker', () => {
 
       await expect(
         processHandler({
+          opts: {},
           data: {
             notifyId: 'notify-invalid-attachments',
             tenantId: 'tenant-invalid-attachments',
@@ -855,6 +913,7 @@ describe('IngestionWorker', () => {
         })
 
         await processHandler({
+          opts: {},
           data: {
             notifyId: 'notify-rerun',
             tenantId: 'tenant-1',
@@ -893,6 +952,7 @@ describe('IngestionWorker', () => {
           { address: 'bob@example.com', params: {} },
         ]
         const job: Partial<Job<IngestionJobPayload>> = {
+          opts: {},
           data: {
             notifyId: 'notify-bulk',
             tenantId: 'tenant-bulk',
@@ -932,6 +992,8 @@ describe('IngestionWorker', () => {
           }),
           expect.objectContaining({
             jobId: 'notify-bulk-EMAIL-0',
+            // A job queued without a priority gets the default; priority lanes are off.
+            priority: 10,
             removeOnComplete: true,
             removeOnFail: FAILED_JOB_RETENTION,
             attempts: 3,
@@ -945,6 +1007,41 @@ describe('IngestionWorker', () => {
           status: 'processing',
           updatedBy: 'ingestion-worker',
         })
+      })
+
+      it('gives a merge queued without a priority low priority when priority lanes are on', async () => {
+        const isEnabled = vi.fn().mockResolvedValue(true)
+        initialize({
+          emailQueue: mockEmailQueue as Queue<DeliveryJobPayload>,
+          smsQueue: mockSmsQueue as Queue<DeliveryJobPayload>,
+          notificationService: mockNotificationService,
+          requestDetailService: mockRequestDetailService,
+          configService: mockConfigService,
+          featureFlagService: { isEnabled },
+        })
+
+        await processHandler({
+          opts: {},
+          data: {
+            notifyId: 'notify-bulk',
+            tenantId: 'tenant-bulk',
+            request: {} as any,
+            requestedAt: new Date().toISOString(),
+            mailMerge: true,
+            mailMergeData: {
+              templateId: 'template-uuid',
+              params: {},
+              recipients: [{ address: 'alice@example.com', params: {} }],
+            },
+          },
+        } as Partial<Job<IngestionJobPayload>> as Job<IngestionJobPayload>)
+
+        expect(isEnabled).toHaveBeenCalledWith('notification_priority', 'tenant-bulk')
+        expect(mockEmailQueue.add).toHaveBeenCalledWith(
+          QueueName.EMAIL_DELIVERY,
+          expect.anything(),
+          expect.objectContaining({ priority: 15 }),
+        )
       })
 
       it('should split recipients into multiple batches when addresses exceed batchSize', async () => {
@@ -963,6 +1060,7 @@ describe('IngestionWorker', () => {
         })
 
         const job: Partial<Job<IngestionJobPayload>> = {
+          opts: {},
           data: {
             notifyId: 'notify-bulk-multi',
             tenantId: 'tenant-bulk',
@@ -1027,6 +1125,7 @@ describe('IngestionWorker', () => {
         })
 
         const job: Partial<Job<IngestionJobPayload>> = {
+          opts: {},
           data: {
             notifyId: 'notify-bulk-default',
             tenantId: 'tenant-bulk',
@@ -1080,6 +1179,7 @@ describe('IngestionWorker', () => {
         })
 
         const result = await processHandler({
+          opts: {},
           data: {
             notifyId: 'notify-db',
             tenantId: 'tenant-bulk',
@@ -1122,6 +1222,7 @@ describe('IngestionWorker', () => {
         })
 
         await processHandler({
+          opts: {},
           data: {
             notifyId: 'notify-retry',
             tenantId: 'tenant-bulk',

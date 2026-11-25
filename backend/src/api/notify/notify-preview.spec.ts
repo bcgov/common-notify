@@ -182,6 +182,15 @@ describe('Notify preview HTTP pipeline', () => {
     expect(response.body.email).toEqual(channel)
   })
 
+  it('accepts a priority on the email route and leaves it out of the preview', async () => {
+    const channel = {
+      recipients: email().recipients,
+      content: { subject: 'Literal', body: 'Plain body', bodyType: 'text' },
+    }
+    const response = await post('/email?preview=true', { ...channel, priority: 'low' }).expect(200)
+    expect(response.body.email).toEqual(channel)
+  })
+
   it.each(['', '/email'])(
     'renders a stored template through TemplatesService on %s',
     async (path) => {

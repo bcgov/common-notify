@@ -7,6 +7,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common'
 import type { Queue } from 'bullmq'
+import { ConfigService } from '@nestjs/config'
 import { NotificationStatus } from '../../../enum/notification-status.enum'
 import { QueueName } from '../../../enum/queue-name.enum'
 import { NotificationChannel } from '../../../enum/notification-channel.enum'
@@ -30,7 +31,9 @@ import { extractRequestRoute } from '../../../common/utils/extract-request-route
 import { describeError } from '../../../common/utils/describe-error'
 import { mergeRequestChannel } from '../../../queue/merge-batch-builder'
 import { INGESTION_JOB_OPTIONS } from '../../../queue/job-options'
+import { jobPriority, priorityLanesEnabled, requestPriority } from '../../../queue/job-priority'
 import { TenantsService } from '../../admin/tenants/tenants.service'
+import { FeatureFlagService } from '../../feature-flag/feature-flag.service'
 
 interface AcceptedUsageResult extends RecordedUsageResult {
   channelCode: string
@@ -68,6 +71,8 @@ export interface MergeSubmission {
   requestRoute?: string
   eventId?: string
   skipDedup?: boolean
+  /** The tenant's notification_priority flag, when the caller already has it. */
+  priorityLanes?: boolean
 }
 
 /**
@@ -94,8 +99,10 @@ export class NotifySubmissionService {
     private readonly notificationDedupService: NotificationDedupService,
     private readonly eventNotificationResolver: EventNotificationResolver,
     private readonly tenantsService: TenantsService,
+    private readonly featureFlagService: FeatureFlagService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Queue,
     @Optional() private readonly limitAlertNotificationService?: LimitAlertNotificationService,
+    @Optional() private readonly configService?: ConfigService,
   ) {}
 
   /** Entry point for the /notifysimple send routes. */
@@ -118,8 +125,17 @@ export class NotifySubmissionService {
       let eventId: string | undefined
       if (options.eventSend) {
         eventId = (payload as { eventId?: string })?.eventId
-        payload = await this.resolveEventSend(options.eventSend, payload, caller)
+        // The resolver builds a new request from the event; the caller's priority goes on it.
+        const priority = (payload as NotifyEventTestSendRequest).priority
+        payload = {
+          ...(await this.resolveEventSend(options.eventSend, payload, caller)),
+          ...(priority && { priority }),
+        }
       }
+
+      // Strip out the priority value and fall back to default priority if the feature flag is disabled.
+      const priorityLanes = await priorityLanesEnabled(this.featureFlagService, caller.tenantId)
+      if (!priorityLanes) payload = withoutPriority(payload)
 
       const mergeChannel = mergeRequestChannel(payload)
       if (mergeChannel) {
@@ -130,10 +146,17 @@ export class NotifySubmissionService {
           requestRoute: caller.requestRoute,
           eventId,
           skipDedup,
+          priorityLanes,
         })
       }
 
-      return await this.acceptSimple(caller, payload as NotifySimpleRequest, eventId, skipDedup)
+      return await this.acceptSimple(
+        caller,
+        payload as NotifySimpleRequest,
+        eventId,
+        skipDedup,
+        priorityLanes,
+      )
     } catch (error) {
       this.logger.error(`Failed to queue notification`, {
         error: (error as Error).message,
@@ -231,14 +254,24 @@ export class NotifySubmissionService {
       }),
     }
 
-    this.enqueueInBackground(notificationRecord.id, tenantId, delayedSend, 'mail merge job', {
-      request: { templateId: channelPayload.content?.templateId },
-      mailMerge: true,
-      mailMergeChannel: channel,
-      // Recipients are not carried: ingestion reads them from the request stored above, so a
-      // large merge is not held in Redis.
-      mailMergeData: { content: channelPayload.content, params: globalParams },
-    })
+    const priorityLanes =
+      submission.priorityLanes ?? (await priorityLanesEnabled(this.featureFlagService, tenantId))
+    const priority = jobPriority(requestPriority(dto, true, priorityLanes), this.configService)
+    this.enqueueInBackground(
+      notificationRecord.id,
+      tenantId,
+      delayedSend,
+      'mail merge job',
+      priority,
+      {
+        request: { templateId: channelPayload.content?.templateId },
+        mailMerge: true,
+        mailMergeChannel: channel,
+        // Recipients are not carried: ingestion reads them from the request stored above, so a
+        // large merge is not held in Redis.
+        mailMergeData: { content: channelPayload.content, params: globalParams },
+      },
+    )
 
     return response
   }
@@ -257,6 +290,16 @@ export class NotifySubmissionService {
     if (skip || !dedup.enabled) return { duplicate: null }
     const fingerprint = dedup.fingerprint(fingerprintSource)
     return { fingerprint, duplicate: await dedup.findDuplicate(tenantId, fingerprint) }
+  }
+
+  /** The priority acceptance gives an ingestion job, for one re-added without its own. */
+  async ingestionPriority(
+    tenantId: string,
+    request: NotifySimpleRequest | undefined,
+    mailMerge: boolean,
+  ): Promise<number> {
+    const lanes = await priorityLanesEnabled(this.featureFlagService, tenantId)
+    return jobPriority(requestPriority(request, mailMerge, lanes), this.configService)
   }
 
   /**
@@ -406,6 +449,7 @@ export class NotifySubmissionService {
     payload: NotifySimpleRequest,
     eventId: string | undefined,
     skipDedup: boolean,
+    priorityLanes: boolean,
   ): Promise<NotificationAcceptanceResponse> {
     const { tenantId } = caller
     await this.tenantsService.assertCanSend(tenantId)
@@ -474,7 +518,11 @@ export class NotifySubmissionService {
         : 'Notification accepted, queuing in progress',
     }
 
-    this.enqueueInBackground(notificationRecord.id, tenantId, delayedSend, 'job', {
+    const priority = jobPriority(
+      requestPriority(processed, false, priorityLanes),
+      this.configService,
+    )
+    this.enqueueInBackground(notificationRecord.id, tenantId, delayedSend, 'job', priority, {
       request: processed,
     })
 
@@ -679,6 +727,7 @@ export class NotifySubmissionService {
     tenantId: string,
     delayedSend: string | undefined,
     label: string,
+    priority: number,
     job: Record<string, unknown>,
   ): void {
     const delayMs = delayedSend ? Math.max(0, new Date(delayedSend).getTime() - Date.now()) : 0
@@ -698,6 +747,7 @@ export class NotifySubmissionService {
           {
             jobId: notifyId,
             ...INGESTION_JOB_OPTIONS,
+            priority,
             ...(delayMs > 0 && { delay: delayMs }),
           },
         )
@@ -747,6 +797,22 @@ function duplicateResponse(
       'An identical notification was already accepted; returning the original request instead ' +
       'of sending again',
   }
+}
+
+/**
+ * A copy of the request without a priority, in either place `requestPriority` reads one: the
+ * top level, or `email` on the email-only routes.
+ */
+function withoutPriority(payload: unknown): unknown {
+  if (!payload || typeof payload !== 'object') return payload
+  const request = { ...payload } as { priority?: unknown; email?: unknown }
+  delete request.priority
+  if (request.email && typeof request.email === 'object') {
+    const email = { ...request.email } as { priority?: unknown }
+    delete email.priority
+    request.email = email
+  }
+  return request
 }
 
 /**
