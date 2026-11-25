@@ -15,7 +15,6 @@ interface TemplatesState {
   sortBy: string | null
   sortOrder: 'asc' | 'desc' | null
   filters: Record<string, string[]>
-  previewValues: Record<string, string>
   isLoading: boolean
   hasLoaded: boolean
   /** The last fetch was unsearched and unfiltered and found nothing: the tenant has none yet. */
@@ -35,7 +34,6 @@ const initialState: TemplatesState = {
   sortBy: null,
   sortOrder: null,
   filters: {},
-  previewValues: {},
   isLoading: false,
   hasLoaded: false,
   hasNoData: false,
@@ -75,9 +73,6 @@ export const templatesSlice = createSlice({
       }
       state.page = 1
     },
-    setPreviewValues(state, action: PayloadAction<Record<string, string>>) {
-      state.previewValues = { ...state.previewValues, ...action.payload }
-    },
   },
   extraReducers: (builder) => {
     builder
@@ -115,7 +110,6 @@ export const templatesSlice = createSlice({
   },
 })
 
-export const { setPage, setLimit, setSearch, setSort, setFilter, setPreviewValues } =
-  templatesSlice.actions
+export const { setPage, setLimit, setSearch, setSort, setFilter } = templatesSlice.actions
 
 export default templatesSlice.reducer

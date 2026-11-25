@@ -65,6 +65,8 @@ interface NotificationPreviewModalProps {
   /** Rendered SMS body with counts, shown only after a successful preview. */
   smsPreview?: ReactNode
   isLoading?: boolean
+  /** Announced independently of the selected output tab. */
+  statusMessage?: string
   error?: string | null
 
   /** Primary action in the modal footer, such as "Send notification (63)". */
@@ -92,7 +94,13 @@ const RenderedOutput: FC<{
   bodyText?: string
 }> = ({ bodyOverride, error, isLoading, smsPreview, bodyHtml, bodyText }) => {
   if (bodyOverride) return <>{bodyOverride}</>
-  if (error) return <p className="notification-preview__error">{error}</p>
+  if (error) {
+    return (
+      <p className="notification-preview__error" role="alert">
+        {error}
+      </p>
+    )
+  }
   if (isLoading) {
     // Indeterminate: a render is a single request with no measurable progress, so a
     // percentage would be invented.
@@ -134,6 +142,7 @@ const VariableField: FC<{
       <div className="notification-preview__field-toggle">
         <ToggleButtonGroup
           label={variable.name}
+          aria-label={variable.name}
           size="small"
           selectionMode="single"
           disallowEmptySelection
@@ -196,6 +205,7 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
   outputHeader,
   smsPreview,
   isLoading = false,
+  statusMessage,
   error = null,
   footer,
   notice,
@@ -221,6 +231,10 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
           </div>
 
           {notice && <div className="notification-preview__notice">{notice}</div>}
+
+          <div role="status" aria-live="polite" aria-atomic="true">
+            {statusMessage ?? (isLoading ? 'Rendering preview...' : '')}
+          </div>
 
           <div className="notification-preview__body">
             <div className="notification-preview__data">
@@ -273,7 +287,7 @@ const NotificationPreviewModal: FC<NotificationPreviewModalProps> = ({
               )}
             </div>
 
-            <div className="notification-preview__output-pane">
+            <div className="notification-preview__output-pane" aria-busy={isLoading}>
               {(from || to || cc || bcc || subject) && (
                 <dl className="notification-preview__envelope">
                   {from && (
