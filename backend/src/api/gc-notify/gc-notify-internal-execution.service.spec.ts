@@ -20,6 +20,7 @@ import { TenantsService } from '../admin/tenants/tenants.service'
 import { EventNotificationResolver } from '../events/event-notification.resolver'
 import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import { QueueName } from '../../enum/queue-name.enum'
+import { FeatureFlagService } from '../feature-flag/feature-flag.service'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
 
@@ -134,6 +135,7 @@ describe('GcNotifyInternalExecutionService', () => {
         { provide: NotificationDedupService, useValue: mockNotificationDedupService },
         { provide: EventNotificationResolver, useValue: {} },
         { provide: TenantsService, useValue: { assertCanSend: vi.fn() } },
+        { provide: FeatureFlagService, useValue: {} },
         NotifySubmissionService,
       ],
     }).compile()

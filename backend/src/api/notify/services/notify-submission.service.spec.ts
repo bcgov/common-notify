@@ -13,6 +13,7 @@ import { LimitAlertNotificationService } from './limit-alert-notification.servic
 import { SmsSegmentService } from './sms-segment.service'
 import { NotificationDedupService } from './notification-dedup.service'
 import { TenantsService } from '../../admin/tenants/tenants.service'
+import { FeatureFlagService } from '../../feature-flag/feature-flag.service'
 import { QueueName } from '../../../enum/queue-name.enum'
 import { NotificationChannel } from '../../../enum/notification-channel.enum'
 import { UsagePeriodType } from '../../../enum/usage-period-type.enum'
@@ -73,6 +74,7 @@ describe('NotifySubmissionService', () => {
         { provide: SmsSegmentService, useValue: {} },
         { provide: EventNotificationResolver, useValue: {} },
         { provide: TenantsService, useValue: tenants },
+        { provide: FeatureFlagService, useValue: {} },
       ],
     }).compile()
 

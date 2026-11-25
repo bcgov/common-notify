@@ -105,6 +105,7 @@ const mockFeatureFlagService = {
   getFlagsForTenant: vi.fn().mockResolvedValue({
     sms_notifications: true,
   }),
+  isEnabled: vi.fn(),
 }
 
 const mockTenantsService = {
@@ -176,6 +177,7 @@ describe('Notify Controllers', () => {
     )
     mockNotificationService.create.mockResolvedValue({ id: 'mock-notification-id' })
     mockNotificationService.update.mockResolvedValue(undefined)
+    mockFeatureFlagService.isEnabled.mockResolvedValue(true)
     mockTenantUsageService.recordUsage.mockResolvedValue([])
     mockTenantUsageService.assertWithinLimits.mockResolvedValue(undefined)
     mockLimitAlertNotificationService.processAcceptedUsage.mockResolvedValue(undefined)
@@ -923,6 +925,23 @@ describe('Notify Controllers', () => {
           })
         })
 
+        it('queues a test send asking for high at normal priority when the flag is off', async () => {
+          mockFeatureFlagService.isEnabled.mockResolvedValue(false)
+
+          await request(app.getHttpServer())
+            .post('/api/v1/frontend/notifysimple/event/test')
+            .send({ eventId, to: ['test@example.com'], priority: 'high' })
+            .expect(202)
+
+          await vi.waitFor(() => {
+            expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+              'notification-ingestion',
+              expect.any(Object),
+              expect.objectContaining({ priority: 5 }),
+            )
+          })
+        })
+
         it('rejects an unknown priority on an event send', async () => {
           await request(app.getHttpServer())
             .post('/api/v1/frontend/notifysimple/event')
@@ -1092,6 +1111,85 @@ describe('Notify Controllers', () => {
             .expect(400)
 
           expect(mockIngestionQueue.add).not.toHaveBeenCalled()
+        })
+
+        describe('with the notification_priority flag off', () => {
+          beforeEach(() => {
+            mockFeatureFlagService.isEnabled.mockResolvedValue(false)
+          })
+
+          const expectQueuedAt = async (priority: number) => {
+            await vi.waitFor(() => {
+              expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+                'notification-ingestion',
+                expect.any(Object),
+                expect.objectContaining({ priority }),
+              )
+            })
+          }
+
+          it('checks the flag for the sending tenant', async () => {
+            await request(app.getHttpServer())
+              .post('/api/v1/notifysimple')
+              .send({ ...emailSend, priority: 'high' })
+              .expect(202)
+
+            expect(mockFeatureFlagService.isEnabled).toHaveBeenCalledWith(
+              'notification_priority',
+              'test-tenant-id',
+            )
+          })
+
+          it('queues a send asking for high at normal priority', async () => {
+            await request(app.getHttpServer())
+              .post('/api/v1/notifysimple')
+              .send({ ...emailSend, priority: 'high' })
+              .expect(202)
+
+            await expectQueuedAt(5)
+          })
+
+          it('stores the request without its priority, so the reconciler cannot restore it', async () => {
+            await request(app.getHttpServer())
+              .post('/api/v1/notifysimple/email')
+              .send({ ...emailSend.email, priority: 'high' })
+              .expect(202)
+
+            const { payload } = mockNotificationService.create.mock.calls[0][0]
+            expect(payload).not.toHaveProperty('priority')
+            expect(payload.email).not.toHaveProperty('priority')
+          })
+
+          it('queues an email-only send asking for high at normal priority', async () => {
+            await request(app.getHttpServer())
+              .post('/api/v1/notifysimple/email')
+              .send({ ...emailSend.email, priority: 'high' })
+              .expect(202)
+
+            await expectQueuedAt(5)
+          })
+
+          it('queues a merge asking for high at low priority', async () => {
+            await request(app.getHttpServer())
+              .post('/api/v1/frontend/notifysimple')
+              .send({
+                content: { templateId: '12345678-1234-4234-8234-123456789012' },
+                recipients: { mergeArray: [['to'], ['alice@example.com']] },
+                priority: 'high',
+              })
+              .expect(202)
+
+            await expectQueuedAt(10)
+          })
+
+          it('still rejects an unknown priority', async () => {
+            await request(app.getHttpServer())
+              .post('/api/v1/notifysimple')
+              .send({ ...emailSend, priority: 'urgent' })
+              .expect(400)
+
+            expect(mockIngestionQueue.add).not.toHaveBeenCalled()
+          })
         })
       })
 

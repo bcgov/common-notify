@@ -1,6 +1,9 @@
 import type { ConfigService } from '@nestjs/config'
 
-/** How urgently a send goes out. Accepted on NotifySimpleRequest, hidden in Swagger for now. */
+/**
+ * How urgently a send goes out. Accepted on NotifySimpleRequest, hidden in Swagger for now, and
+ * ignored unless the notification_priority feature flag is on.
+ */
 export const NOTIFICATION_PRIORITIES = ['high', 'normal', 'low'] as const
 export type NotificationPriority = (typeof NOTIFICATION_PRIORITIES)[number]
 

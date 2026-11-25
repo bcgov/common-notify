@@ -33,6 +33,8 @@ import { mergeRequestChannel } from '../../../queue/merge-batch-builder'
 import { INGESTION_JOB_OPTIONS } from '../../../queue/job-options'
 import { jobPriority, requestPriority } from '../../../queue/job-priority'
 import { TenantsService } from '../../admin/tenants/tenants.service'
+import { FeatureFlagService } from '../../feature-flag/feature-flag.service'
+import { FeatureFlagCode } from '../../../enum/feature-flag-code.enum'
 
 interface AcceptedUsageResult extends RecordedUsageResult {
   channelCode: string
@@ -97,6 +99,7 @@ export class NotifySubmissionService {
     private readonly notificationDedupService: NotificationDedupService,
     private readonly eventNotificationResolver: EventNotificationResolver,
     private readonly tenantsService: TenantsService,
+    private readonly featureFlagService: FeatureFlagService,
     @Inject(QueueName.INGESTION) private readonly ingestionQueue: Queue,
     @Optional() private readonly limitAlertNotificationService?: LimitAlertNotificationService,
     @Optional() private readonly configService?: ConfigService,
@@ -129,6 +132,13 @@ export class NotifySubmissionService {
           ...(priority && { priority }),
         }
       }
+
+      // Strip out the priority value and fall back to default priority if the feature flag is disabled.
+      const priorityAllowed = await this.featureFlagService.isEnabled(
+        FeatureFlagCode.NOTIFICATION_PRIORITY,
+        caller.tenantId,
+      )
+      if (!priorityAllowed) payload = withoutPriority(payload)
 
       const mergeChannel = mergeRequestChannel(payload)
       if (mergeChannel) {
@@ -769,6 +779,22 @@ function duplicateResponse(
       'An identical notification was already accepted; returning the original request instead ' +
       'of sending again',
   }
+}
+
+/**
+ * A copy of the request without a priority, in either place `requestPriority` reads one: the
+ * top level, or `email` on the email-only routes.
+ */
+function withoutPriority(payload: unknown): unknown {
+  if (!payload || typeof payload !== 'object') return payload
+  const request = { ...payload } as { priority?: unknown; email?: unknown }
+  delete request.priority
+  if (request.email && typeof request.email === 'object') {
+    const email = { ...request.email } as { priority?: unknown }
+    delete email.priority
+    request.email = email
+  }
+  return request
 }
 
 /**
