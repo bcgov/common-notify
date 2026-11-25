@@ -42,8 +42,11 @@ export function notificationErrorSummary(error: string | null | undefined): stri
   if (/\bsafelist(?:ed)?\b/i.test(text)) {
     return 'This recipient is not on the list of permitted recipients.'
   }
+  if (/\bmissing personalisation\b/i.test(text)) {
+    return 'Required template values are missing. Check the template and provide all required values.'
+  }
   if (
-    /\b(ECONNREFUSED|ENOTFOUND|EAI_AGAIN|EHOSTUNREACH|ETIMEDOUT|ECONNRESET)\b|service unavailable|upstream (?:408|429|5\d\d)\b|\b(?:timed? out|timeout|circuit.*open)\b/i.test(
+    /\b(ECONNREFUSED|ENOTFOUND|EAI_AGAIN|EHOSTUNREACH|ETIMEDOUT|ECONNRESET)\b|service unavailable|\b(?:upstream|returned HTTP) (?:408|429|5\d\d)\b|\b(?:timed? out|timeout|circuit.*open)\b/i.test(
       text,
     )
   ) {

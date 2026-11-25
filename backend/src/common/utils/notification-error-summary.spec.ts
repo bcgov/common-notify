@@ -8,6 +8,11 @@ describe('notificationErrorSummary', () => {
 
   it.each([
     'CHES email: upstream 503 - maintenance',
+    'ACS returned HTTP 408',
+    'ACS returned HTTP 429',
+    'ACS returned HTTP 500',
+    'ACS returned HTTP 503',
+    'ACS returned HTTP 599',
     'connect ECONNREFUSED internal-host:443',
     'request timed out',
     JSON.stringify({ response: { status: 502, data: { message: 'private diagnostics' } } }),
@@ -31,7 +36,19 @@ describe('notificationErrorSummary', () => {
   })
 
   it.each([
+    'Missing personalisation for template ID template-uuid: firstName, email',
+    JSON.stringify({ message: 'Missing personalisation for template ID template-sms-uuid: code' }),
+  ])('keeps missing template values actionable without exposing diagnostics (%s)', (error) => {
+    expect(notificationErrorSummary(error)).toBe(
+      'Required template values are missing. Check the template and provide all required values.',
+    )
+  })
+
+  it.each([
     '{broken JSON',
+    'ACS returned HTTP 400',
+    'ACS returned HTTP 401',
+    'ACS returned HTTP 404',
     JSON.stringify({ message: 'Authentication failed', token: 'secret', status: 401 }),
     JSON.stringify({ recipient: 'person@example.com', status: 400 }),
     'Unknown provider response containing person@example.com',
