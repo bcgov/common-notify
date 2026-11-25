@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import type { Job } from 'bullmq'
 import { DeliveryJobPayload } from '../queue.types'
 import { EMAIL_CHANNEL } from './delivery-channel'
@@ -97,6 +98,8 @@ export class EmailDeliveryWorker extends DeliveryWorker {
   readonly concurrency = { configKey: 'emailDeliveryWorkerConcurrency', default: 2 }
   protected readonly channel = EMAIL_CHANNEL
   protected readonly logger = new Logger(EmailDeliveryWorker.name)
+  /** Environment prefix on the subject, added just before sending (not stored); empty in PROD. */
+  private readonly subjectPrefix: string
 
   constructor(
     private readonly notificationService: NotificationService,
@@ -111,8 +114,10 @@ export class EmailDeliveryWorker extends DeliveryWorker {
     @Optional() structuredLogger?: StructuredLoggerService,
     @Optional() private readonly tenantSettingsService?: TenantSettingsService,
     @Optional() private readonly eventNotificationResolver?: EventNotificationResolver,
+    @Optional() configService?: ConfigService,
   ) {
     super(mergeBatches, failures, structuredLogger)
+    this.subjectPrefix = (configService?.get<string>('delivery.environmentPrefix') ?? '').trim()
   }
 
   /**
@@ -443,8 +448,9 @@ export class EmailDeliveryWorker extends DeliveryWorker {
 
     // Only set `from` when one is configured: the adapters read their own default when the field
     // is absent, and an explicit undefined would not be the same thing.
+    const prefixed = this.withSubjectPrefix(payload)
     const result = await this.emailAdapter.send(
-      (fromAddress ? { ...payload, from: fromAddress } : payload) as any,
+      (fromAddress ? { ...prefixed, from: fromAddress } : prefixed) as any,
     )
 
     return {
@@ -452,5 +458,15 @@ export class EmailDeliveryWorker extends DeliveryWorker {
         result.messageId || result.providerResponse || `${this.emailAdapter.name}-${Date.now()}`,
       provider: this.emailAdapter.name,
     }
+  }
+
+  /** The payload with the DEV/TEST marker on its subject; unchanged in PROD. */
+  private withSubjectPrefix(payload: EmailPayload): EmailPayload {
+    const subject = payload.content?.subject
+    if (!this.subjectPrefix || typeof subject !== 'string') return payload
+    return {
+      ...payload,
+      content: { ...payload.content, subject: `${this.subjectPrefix} ${subject}` },
+    } as EmailPayload
   }
 }
