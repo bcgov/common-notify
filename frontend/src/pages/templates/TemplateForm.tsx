@@ -109,9 +109,11 @@ export interface TemplateFormData {
   engineCode: string
   subject: string
   body: string
+  previewParams?: Record<string, string>
 }
 
 interface TemplateFormCommonProps {
+  templateId?: string
   isReadOnly?: boolean
   onSave: (values: TemplateFormData) => Promise<void>
   onCancel: () => void
@@ -137,9 +139,11 @@ const TemplateForm: FC<TemplateFormProps> = ({
   onSave,
   onCancel,
   children,
+  templateId,
 }) => {
   const [saving, setSaving] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewParams, setPreviewParams] = useState<Record<string, string>>({})
   const [formData, setFormData] = useState<TemplateFormData>(
     initialValues ?? { name: '', channelCode: '', engineCode: '', subject: '', body: '' },
   )
@@ -200,7 +204,7 @@ const TemplateForm: FC<TemplateFormProps> = ({
     if (isReadOnly || saving || !validate()) return
     setSaving(true)
     try {
-      await onSave(formData)
+      await onSave(mode === 'create' ? { ...formData, previewParams } : formData)
     } catch (error) {
       if ((error as { status?: number } | null)?.status === 409) {
         setFormErrors((prev) => ({
@@ -355,6 +359,10 @@ const TemplateForm: FC<TemplateFormProps> = ({
         subject={formData.subject}
         channelCode={formData.channelCode as NotificationChannel}
         engineCode={formData.engineCode as TemplateEngine}
+        templateId={mode === 'edit' ? templateId : undefined}
+        canSave={!isReadOnly}
+        draftValues={mode === 'create' ? previewParams : undefined}
+        onDraftValuesChange={mode === 'create' ? setPreviewParams : undefined}
       />
     </>
   )
