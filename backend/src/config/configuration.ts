@@ -146,6 +146,14 @@ export default function configuration() {
         process.env.CSTAR_USER_TENANTS_CACHE_TTL_MS || '15000',
         10,
       ),
+      // Service account (client credentials) for the CSTAR routes that run with no user
+      // present - resolving a saved CSTAR group's members at send time. CSTAR accepts it
+      // only on GET tenants/{id}/groups and GET tenants/{id}/groups/{groupId}/users, and
+      // only once the Notify shared service has allowServiceAccounts enabled with this
+      // client as its serviceAccountClientIdentifier.
+      tokenUrl: process.env.CSTAR_TOKEN_URL,
+      clientId: process.env.CSTAR_CLIENT_ID,
+      clientSecret: process.env.CSTAR_CLIENT_SECRET,
     },
 
     // Twilio SMS Service

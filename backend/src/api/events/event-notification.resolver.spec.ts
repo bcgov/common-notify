@@ -17,7 +17,9 @@ describe('EventNotificationResolver', () => {
   const configurationRepository = {
     findOne: vi.fn(),
   } as unknown as Repository<NotifyConfiguration>
-  const cstarApiClient = { getGroupMemberEmails: vi.fn() } as unknown as CstarApiClient
+  const cstarApiClient = {
+    getGroupMemberEmailsAsServiceAccount: vi.fn(),
+  } as unknown as CstarApiClient
 
   const resolver = new EventNotificationResolver(
     eventRepository,
@@ -26,7 +28,7 @@ describe('EventNotificationResolver', () => {
     cstarApiClient,
   )
 
-  const cstar = { tenantId: 'external-tenant-id', authHeader: 'Bearer token' }
+  const cstarTenantId = 'external-tenant-id'
 
   /** An event with one live, active, complete EMAIL channel. */
   const eventWith = (setting: Partial<EventChannelSetting>) =>
@@ -61,7 +63,7 @@ describe('EventNotificationResolver', () => {
     vi.mocked(configurationRepository.findOne).mockResolvedValue({
       config: { value: 100 },
     } as any)
-    vi.mocked(cstarApiClient.getGroupMemberEmails).mockResolvedValue([])
+    vi.mocked(cstarApiClient.getGroupMemberEmailsAsServiceAccount).mockResolvedValue([])
   })
 
   describe('resolveSend', () => {
@@ -75,7 +77,12 @@ describe('EventNotificationResolver', () => {
         }),
       )
 
-      const result = await resolver.resolveSend('tenant-id', 'event-id', { name: 'Ada' }, cstar)
+      const result = await resolver.resolveSend(
+        'tenant-id',
+        'event-id',
+        { name: 'Ada' },
+        cstarTenantId,
+      )
 
       expect(result).toEqual({
         params: { name: 'Ada' },
@@ -93,18 +100,17 @@ describe('EventNotificationResolver', () => {
           cstarGroups: [group(EventRecipientKind.TO, 'group-a')] as any,
         }),
       )
-      vi.mocked(cstarApiClient.getGroupMemberEmails).mockResolvedValue([
+      vi.mocked(cstarApiClient.getGroupMemberEmailsAsServiceAccount).mockResolvedValue([
         'member1@gov.bc.ca',
         'member2@gov.bc.ca',
       ])
 
-      const result = await resolver.resolveSend('tenant-id', 'event-id', undefined, cstar)
+      const result = await resolver.resolveSend('tenant-id', 'event-id', undefined, cstarTenantId)
 
       // CSTAR identifies tenants by the external ID, not notify's own primary key.
-      expect(cstarApiClient.getGroupMemberEmails).toHaveBeenCalledWith(
+      expect(cstarApiClient.getGroupMemberEmailsAsServiceAccount).toHaveBeenCalledWith(
         'external-tenant-id',
         ['group-a'],
-        'Bearer token',
       )
       expect(result.email?.recipients.to).toEqual([
         'named@gov.bc.ca',
@@ -125,11 +131,43 @@ describe('EventNotificationResolver', () => {
         }),
       )
 
-      const result = await resolver.resolveSend('tenant-id', 'event-id', undefined, cstar)
+      const result = await resolver.resolveSend('tenant-id', 'event-id', undefined, cstarTenantId)
 
       expect(result.email?.recipients.to).toEqual(['both@gov.bc.ca'])
       expect(result.email?.recipients.cc).toEqual(['cconly@gov.bc.ca'])
       expect(result.email?.recipients.bcc).toBeUndefined()
+    })
+
+    it('looks up a group on both To and Cc once, for To', async () => {
+      vi.mocked(eventRepository.findOne).mockResolvedValue(
+        eventWith({
+          cstarGroups: [
+            group(EventRecipientKind.TO, 'group-a'),
+            group(EventRecipientKind.CC, 'group-a'),
+            group(EventRecipientKind.CC, 'group-b'),
+          ] as any,
+        }),
+      )
+      vi.mocked(cstarApiClient.getGroupMemberEmailsAsServiceAccount).mockImplementation(
+        async (_tenantId, groupIds) =>
+          groupIds.includes('group-a') ? ['member@gov.bc.ca'] : ['other@gov.bc.ca'],
+      )
+
+      const result = await resolver.resolveSend('tenant-id', 'event-id', undefined, cstarTenantId)
+
+      expect(cstarApiClient.getGroupMemberEmailsAsServiceAccount).toHaveBeenCalledTimes(2)
+      expect(cstarApiClient.getGroupMemberEmailsAsServiceAccount).toHaveBeenNthCalledWith(
+        1,
+        cstarTenantId,
+        ['group-a'],
+      )
+      expect(cstarApiClient.getGroupMemberEmailsAsServiceAccount).toHaveBeenNthCalledWith(
+        2,
+        cstarTenantId,
+        ['group-b'],
+      )
+      expect(result.email?.recipients.to).toEqual(['member@gov.bc.ca'])
+      expect(result.email?.recipients.cc).toEqual(['other@gov.bc.ca'])
     })
 
     it('enforces the recipient cap on the expanded total', async () => {
@@ -137,14 +175,14 @@ describe('EventNotificationResolver', () => {
       vi.mocked(eventRepository.findOne).mockResolvedValue(
         eventWith({ cstarGroups: [group(EventRecipientKind.TO, 'group-a')] as any }),
       )
-      vi.mocked(cstarApiClient.getGroupMemberEmails).mockResolvedValue([
+      vi.mocked(cstarApiClient.getGroupMemberEmailsAsServiceAccount).mockResolvedValue([
         'a@gov.bc.ca',
         'b@gov.bc.ca',
         'c@gov.bc.ca',
       ])
 
       await expect(
-        resolver.resolveSend('tenant-id', 'event-id', undefined, cstar),
+        resolver.resolveSend('tenant-id', 'event-id', undefined, cstarTenantId),
       ).rejects.toBeInstanceOf(UnprocessableEntityException)
     })
 
@@ -154,28 +192,43 @@ describe('EventNotificationResolver', () => {
       )
 
       await expect(
-        resolver.resolveSend('tenant-id', 'event-id', undefined, cstar),
+        resolver.resolveSend('tenant-id', 'event-id', undefined, cstarTenantId),
       ).rejects.toBeInstanceOf(UnprocessableEntityException)
+    })
+
+    it('explains a CSTAR group that can no longer be read', async () => {
+      vi.mocked(eventRepository.findOne).mockResolvedValue(
+        eventWith({ cstarGroups: [group(EventRecipientKind.TO, 'group-a')] as any }),
+      )
+      vi.mocked(cstarApiClient.getGroupMemberEmailsAsServiceAccount).mockRejectedValue(
+        new ForbiddenException('Not authorized to read members of group group-a'),
+      )
+
+      const result = resolver.resolveSend('tenant-id', 'event-id', undefined, cstarTenantId)
+      await expect(result).rejects.toBeInstanceOf(UnprocessableEntityException)
+      await expect(result).rejects.toThrow('members of group group-a')
     })
 
     it('lets a CSTAR failure fail the request', async () => {
       vi.mocked(eventRepository.findOne).mockResolvedValue(
         eventWith({ cstarGroups: [group(EventRecipientKind.TO, 'group-a')] as any }),
       )
-      vi.mocked(cstarApiClient.getGroupMemberEmails).mockRejectedValue(new Error('CSTAR is down'))
+      vi.mocked(cstarApiClient.getGroupMemberEmailsAsServiceAccount).mockRejectedValue(
+        new Error('CSTAR is down'),
+      )
 
       // Sending to fewer people than the event was configured for would be worse than not
       // sending at all, so this must not be swallowed.
-      await expect(resolver.resolveSend('tenant-id', 'event-id', undefined, cstar)).rejects.toThrow(
-        'CSTAR is down',
-      )
+      await expect(
+        resolver.resolveSend('tenant-id', 'event-id', undefined, cstarTenantId),
+      ).rejects.toThrow('CSTAR is down')
     })
 
     it('rejects an unknown event', async () => {
       vi.mocked(eventRepository.findOne).mockResolvedValue(null)
 
       await expect(
-        resolver.resolveSend('tenant-id', 'missing', undefined, cstar),
+        resolver.resolveSend('tenant-id', 'missing', undefined, cstarTenantId),
       ).rejects.toBeInstanceOf(NotFoundException)
     })
 
@@ -191,7 +244,7 @@ describe('EventNotificationResolver', () => {
       )
 
       await expect(
-        resolver.resolveSend('tenant-id', 'event-id', undefined, cstar),
+        resolver.resolveSend('tenant-id', 'event-id', undefined, cstarTenantId),
       ).rejects.toBeInstanceOf(UnprocessableEntityException)
     })
 
@@ -202,7 +255,7 @@ describe('EventNotificationResolver', () => {
       } as unknown as NotifyEvent)
 
       await expect(
-        resolver.resolveSend('tenant-id', 'event-id', undefined, cstar),
+        resolver.resolveSend('tenant-id', 'event-id', undefined, cstarTenantId),
       ).rejects.toBeInstanceOf(UnprocessableEntityException)
     })
   })
@@ -240,7 +293,7 @@ describe('EventNotificationResolver', () => {
         to: ['me@gov.bc.ca'],
       })
 
-      expect(cstarApiClient.getGroupMemberEmails).not.toHaveBeenCalled()
+      expect(cstarApiClient.getGroupMemberEmailsAsServiceAccount).not.toHaveBeenCalled()
     })
 
     // Verification is a pass-through until there is a team member list to check against.

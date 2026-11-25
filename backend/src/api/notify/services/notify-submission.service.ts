@@ -61,7 +61,6 @@ interface Caller {
   tenantExternalId?: string
   requestRoute?: string
   uploadedBy: string
-  authHeader?: string
   email?: unknown
 }
 
@@ -396,7 +395,6 @@ export class NotifySubmissionService {
       tenantExternalId: tenant.externalId,
       requestRoute: extractRequestRoute(req),
       uploadedBy,
-      authHeader: req?.headers?.authorization,
       email: user?.email,
     }
   }
@@ -415,10 +413,12 @@ export class NotifySubmissionService {
     const { tenantId } = caller
 
     if (mode === 'full') {
-      return resolver.resolveSend(tenantId, request.eventId, request.params, {
-        tenantId: caller.tenantExternalId,
-        authHeader: caller.authHeader,
-      })
+      return resolver.resolveSend(
+        tenantId,
+        request.eventId,
+        request.params,
+        caller.tenantExternalId,
+      )
     }
 
     // Recipients chosen on the test send screen. The resolver decides which of them are allowed.

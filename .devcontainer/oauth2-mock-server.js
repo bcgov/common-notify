@@ -12,6 +12,7 @@ const testClients = {
   'LOCAL002-DEF456': 'LOCAL002-SECRET-DEF456XYZ789',
   'LOCAL003-GHI789': 'LOCAL003-SECRET-GHI789XYZ789',
   'sa-notify-service': 'notify-service-secret-12345678901234', // Service account for API key management
+  'sa-notify-cstar': 'notify-cstar-secret', // CSTAR service account (CSTAR_CLIENT_ID)
 }
 
 // JWT signing secrets (must match Kong JWT credentials created with 'secret' field)
@@ -20,6 +21,7 @@ const jwtSecrets = {
   'LOCAL002-DEF456': 'jwt-secret-local002',
   'LOCAL003-GHI789': 'jwt-secret-local003',
   'sa-notify-service': 'notify-service-secret-12345678901234', // Same as client secret for service account
+  'sa-notify-cstar': 'notify-cstar-secret',
 }
 
 // Issuer (should match API_GATEWAY_KEYCLOAK_ISSUER in backend)
@@ -237,6 +239,380 @@ app.get('/api/v1/tenants/:tenantId/ssousers/:ssoUserId/shared-service-roles', (r
     },
   })
 })
+
+// CSTAR tenant users, user search and group reads, for the NOTIFY_ADMIN CSTAR pages and the
+// service-account group lookups. In-memory, so additions and removals last until restart.
+const cstarTenantUsers = {
+  [TENANT_1_ID]: [
+    {
+      id: 'a1b2c3d4-0000-4000-8000-000000000001',
+      createdDateTime: '2026-01-01T00:00:00Z',
+      updatedDateTime: '2026-01-01T00:00:00Z',
+      ssoUser: {
+        ssoUserId: 'user-001',
+        firstName: 'Local',
+        lastName: 'Admin',
+        displayName: 'Admin, Local CITZ:EX',
+        userName: 'LADMIN',
+        email: 'local.admin@gov.bc.ca',
+        idpType: 'idir',
+      },
+      roles: [{ id: 'tenant-role-owner', name: 'TENANT_OWNER', description: 'Tenant owner' }],
+    },
+  ],
+}
+const DEV_TEAM_GROUP_ID = '3a3fafee-d41b-4fbe-92df-62dbebf0f73a'
+const cstarGroups = {
+  [TENANT_1_ID]: [{ id: DEV_TEAM_GROUP_ID, name: 'Development Team', description: null }],
+}
+// Members of each group, by groupId: { id: groupUserId, tenantUserId }.
+const cstarGroupUsers = {
+  [DEV_TEAM_GROUP_ID]: [
+    {
+      id: 'b1b2c3d4-0000-4000-8000-000000000001',
+      tenantUserId: 'a1b2c3d4-0000-4000-8000-000000000001',
+    },
+  ],
+}
+// The Notify role IDs each group grants, by groupId.
+const cstarGroupRoles = {
+  [DEV_TEAM_GROUP_ID]: new Set(['c1b2c3d4-0000-4000-8000-000000000003']),
+}
+const notifySharedService = {
+  id: 'c1b2c3d4-0000-4000-8000-000000000000',
+  name: 'notify',
+  displayName: 'Notify',
+  clientIdentifier: 'notify-local',
+  description: 'BC Gov Notify',
+  isActive: true,
+  allowHeadlessOps: true,
+  allowServiceAccounts: true,
+  roles: [
+    {
+      id: 'c1b2c3d4-0000-4000-8000-000000000001',
+      name: 'NOTIFY_OPERATIONS_ADMIN',
+      description: 'Full admin access',
+      allowedIdentityProviders: null,
+    },
+    {
+      id: 'c1b2c3d4-0000-4000-8000-000000000002',
+      name: 'NOTIFY_TEMPLATE_EDITOR',
+      description: 'Can create and edit templates',
+      allowedIdentityProviders: null,
+    },
+    {
+      id: 'c1b2c3d4-0000-4000-8000-000000000003',
+      name: 'NOTIFY_VIEWER',
+      description: 'Read-only access',
+      allowedIdentityProviders: null,
+    },
+  ],
+}
+const cstarTenantNames = {
+  [TENANT_1_ID]: 'Notify Test Tenant 1',
+  [TENANT_2_ID]: 'Notify Test Tenant 2',
+  [TENANT_3_ID]: 'Notify Test Tenant 3',
+}
+
+const findTenantUser = (tenantId, tenantUserId) =>
+  (cstarTenantUsers[tenantId] || []).find((user) => user.id === tenantUserId)
+
+app.get('/api/v1/tenants/:tenantId/users', (req, res) => {
+  res.json({ data: { users: cstarTenantUsers[req.params.tenantId] || [] } })
+})
+
+app.get('/api/v1/tenants/:tenantId/users/:tenantUserId', (req, res) => {
+  const user = findTenantUser(req.params.tenantId, req.params.tenantUserId)
+  if (!user) return res.status(404).json({ message: 'Tenant user not found' })
+  res.json({ data: { tenantUser: user } })
+})
+
+app.get('/api/v1/tenants/:tenantId/users/:tenantUserId/roles', (req, res) => {
+  const user = findTenantUser(req.params.tenantId, req.params.tenantUserId)
+  res.json({ data: { roles: user ? user.roles : [] } })
+})
+
+app.post('/api/v1/tenants/:tenantId/users', (req, res) => {
+  const { user } = req.body || {}
+  if (!user?.ssoUserId) return res.status(400).json({ message: 'user is required' })
+  if (req.body.roles || req.body.groups) {
+    return res
+      .status(400)
+      .json({ message: 'roles and groups are not allowed with a shared service token' })
+  }
+  const users = (cstarTenantUsers[req.params.tenantId] ||= [])
+  if (users.some((existing) => existing.ssoUser.ssoUserId === user.ssoUserId)) {
+    return res.status(409).json({ message: 'User is already a member of this tenant' })
+  }
+  const now = new Date().toISOString()
+  const tenantUser = {
+    id: crypto.randomUUID(),
+    createdDateTime: now,
+    updatedDateTime: now,
+    ssoUser: user,
+    roles: [{ id: 'tenant-role-service-user', name: 'SERVICE_USER', description: 'Service user' }],
+  }
+  users.push(tenantUser)
+  res.status(201).json({ data: { user: tenantUser } })
+})
+
+app.delete('/api/v1/tenants/:tenantId/users/:tenantUserId', (req, res) => {
+  const user = findTenantUser(req.params.tenantId, req.params.tenantUserId)
+  if (!user) return res.status(404).json({ message: 'Tenant user not found' })
+  if (user.roles.some((role) => role.name !== 'SERVICE_USER')) {
+    return res.status(403).json({ message: 'Only SERVICE_USER-only users can be removed' })
+  }
+  cstarTenantUsers[req.params.tenantId] = cstarTenantUsers[req.params.tenantId].filter(
+    (existing) => existing !== user,
+  )
+  res.status(204).end()
+})
+
+app.get('/api/v1/users/bcgovssousers/idir/search', (req, res) => {
+  if (!req.query.tenantId) return res.status(400).json({ message: 'tenantId is required' })
+  res.json({
+    data: [
+      {
+        firstName: 'Jordan',
+        lastName: 'Smith',
+        email: 'jordan.smith@gov.bc.ca',
+        username: 'a1b2c3d4e5f6478899aabbccddeeff00@idir',
+        attributes: {
+          idir_user_guid: ['A1B2C3D4E5F6478899AABBCCDDEEFF00'],
+          idir_username: ['JSMITH'],
+          display_name: ['Smith, Jordan CITZ:EX'],
+        },
+      },
+    ],
+  })
+})
+
+app.get('/api/v1/users/bcgovssousers/bceid/search', (req, res) => {
+  if (!req.query.tenantId) return res.status(400).json({ message: 'tenantId is required' })
+  res.json({
+    data: [
+      {
+        firstName: 'Casey',
+        lastName: 'Lee',
+        email: 'casey.lee@example.com',
+        username: 'b1c2d3e4f5a6478899aabbccddeeff00@bceidbusiness',
+        attributes: {
+          bceid_user_guid: ['B1C2D3E4F5A6478899AABBCCDDEEFF00'],
+          bceid_business_guid: ['C1D2E3F4A5B6478899AABBCCDDEEFF00'],
+          display_name: ['Casey Lee'],
+        },
+      },
+    ],
+  })
+})
+
+const findGroup = (tenantId, groupId) =>
+  (cstarGroups[tenantId] || []).find((group) => group.id === groupId)
+
+// The group's Notify roles in CSTAR's shared-services shape, each marked enabled or not.
+const groupSharedServices = (groupId) => {
+  const { roles, ...service } = notifySharedService
+  const enabled = cstarGroupRoles[groupId] || new Set()
+  return [
+    {
+      id: service.id,
+      name: service.name,
+      displayName: service.displayName,
+      clientIdentifier: service.clientIdentifier,
+      sharedServiceRoles: roles.map(({ id, name, description }) => ({
+        id,
+        name,
+        description,
+        enabled: enabled.has(id),
+      })),
+    },
+  ]
+}
+
+app.get('/api/v1/health', (req, res) => {
+  res.json({ apiStatus: 'Healthy', time: new Date().toISOString() })
+})
+
+app.get('/api/v1/tenants/:tenantId/shared-services', (req, res) => {
+  res.json({ data: { sharedServices: [notifySharedService] } })
+})
+
+app.get('/api/v1/tenants/:tenantId/ssousers/:ssoUserId/roles', (req, res) => {
+  const user = (cstarTenantUsers[req.params.tenantId] || []).find(
+    ({ ssoUser }) => ssoUser.ssoUserId === req.params.ssoUserId,
+  )
+  res.json({ data: { roles: user ? user.roles : [] } })
+})
+
+// The groups an SSO user is in that grant at least one Notify role, with the roles they grant.
+// Registered before /users/:tenantUserId[/roles], which it would not match anyway.
+app.get('/api/v1/tenants/:tenantId/users/:ssoUserId/groups/shared-service-roles', (req, res) => {
+  const { tenantId, ssoUserId } = req.params
+  const user = (cstarTenantUsers[tenantId] || []).find(
+    ({ ssoUser }) => ssoUser.ssoUserId === ssoUserId,
+  )
+  const groups = (cstarGroups[tenantId] || [])
+    .filter((group) =>
+      (cstarGroupUsers[group.id] || []).some((member) => member.tenantUserId === user?.id),
+    )
+    .map((group) => ({
+      ...group,
+      sharedServiceRoles: notifySharedService.roles.filter((role) =>
+        cstarGroupRoles[group.id]?.has(role.id),
+      ),
+    }))
+    .filter((group) => group.sharedServiceRoles.length > 0)
+  res.json({ data: { groups } })
+})
+
+app.get('/api/v1/tenants/:tenantId', (req, res) => {
+  const { tenantId } = req.params
+  const name = cstarTenantNames[tenantId]
+  if (!name) return res.status(404).json({ message: 'Tenant not found' })
+  const tenant = {
+    id: tenantId,
+    name,
+    ministryName: 'Test Ministry',
+    description: 'Local test tenant',
+    createdDateTime: '2026-01-01T00:00:00Z',
+    updatedDateTime: '2026-01-01T00:00:00Z',
+  }
+  if (req.query.expand === 'tenantUserRoles') tenant.users = cstarTenantUsers[tenantId] || []
+  res.json({ data: { tenant } })
+})
+
+app.get('/api/v1/tenants/:tenantId/groups', (req, res) => {
+  res.json({ data: { groups: cstarGroups[req.params.tenantId] || [] } })
+})
+
+app.post('/api/v1/tenants/:tenantId/groups', (req, res) => {
+  const { name, description } = req.body || {}
+  if (!name) return res.status(400).json({ message: 'name is required' })
+  const groups = (cstarGroups[req.params.tenantId] ||= [])
+  if (groups.some((group) => group.name === name)) {
+    return res.status(409).json({ message: 'A group with this name already exists' })
+  }
+  const group = { id: crypto.randomUUID(), name, description: description ?? null }
+  groups.push(group)
+  cstarGroupUsers[group.id] = []
+  cstarGroupRoles[group.id] = new Set()
+  res.status(201).json({ data: { group } })
+})
+
+app.get('/api/v1/tenants/:tenantId/groups/:groupId', (req, res) => {
+  const { tenantId, groupId } = req.params
+  const group = findGroup(tenantId, groupId)
+  if (!group) return res.status(404).json({ message: 'Group not found' })
+  const detail = { ...group }
+  if (req.query.expand === 'groupUsers') {
+    detail.users = (cstarGroupUsers[groupId] || []).map(({ id, tenantUserId }) => ({
+      id,
+      user: findTenantUser(tenantId, tenantUserId),
+    }))
+  }
+  res.json({ data: { group: detail } })
+})
+
+app.put('/api/v1/tenants/:tenantId/groups/:groupId', (req, res) => {
+  const group = findGroup(req.params.tenantId, req.params.groupId)
+  if (!group) return res.status(404).json({ message: 'Group not found' })
+  const { name, description } = req.body || {}
+  if (
+    name &&
+    name !== group.name &&
+    cstarGroups[req.params.tenantId].some((other) => other.name === name)
+  ) {
+    return res.status(409).json({ message: 'A group with this name already exists' })
+  }
+  if (name !== undefined) group.name = name
+  if (description !== undefined) group.description = description
+  res.json({ data: { group } })
+})
+
+// CSTAR accepts only service account tokens here.
+app.get('/api/v1/tenants/:tenantId/groups/:groupId/users', (req, res) => {
+  const { tenantId, groupId } = req.params
+  if (!findGroup(tenantId, groupId)) return res.status(404).json({ message: 'Group not found' })
+  res.json({
+    data: {
+      users: (cstarGroupUsers[groupId] || [])
+        .map(({ tenantUserId }) => findTenantUser(tenantId, tenantUserId))
+        .filter(Boolean)
+        .map(({ ssoUser }) => ({
+          firstName: ssoUser.firstName,
+          lastName: ssoUser.lastName,
+          displayName: ssoUser.displayName,
+          email: ssoUser.email ?? null,
+          idpType: ssoUser.idpType,
+        })),
+    },
+  })
+})
+
+app.post('/api/v1/tenants/:tenantId/groups/:groupId/users', (req, res) => {
+  const { tenantId, groupId } = req.params
+  if (!findGroup(tenantId, groupId)) return res.status(404).json({ message: 'Group not found' })
+  const ssoUserId = req.body?.user?.ssoUserId
+  if (!ssoUserId) return res.status(400).json({ message: 'user is required' })
+  const tenantUser = (cstarTenantUsers[tenantId] || []).find(
+    ({ ssoUser }) => ssoUser.ssoUserId === ssoUserId,
+  )
+  if (!tenantUser) return res.status(404).json({ message: 'User is not a member of this tenant' })
+  const members = (cstarGroupUsers[groupId] ||= [])
+  if (members.some((member) => member.tenantUserId === tenantUser.id)) {
+    return res.status(409).json({ message: 'User is already a member of this group' })
+  }
+  const groupUser = { id: crypto.randomUUID(), tenantUserId: tenantUser.id }
+  members.push(groupUser)
+  res.status(201).json({ data: { groupUser: { id: groupUser.id, user: tenantUser } } })
+})
+
+app.delete('/api/v1/tenants/:tenantId/groups/:groupId/users/:groupUserId', (req, res) => {
+  const { tenantId, groupId, groupUserId } = req.params
+  if (!findGroup(tenantId, groupId)) return res.status(404).json({ message: 'Group not found' })
+  const members = cstarGroupUsers[groupId] || []
+  if (!members.some((member) => member.id === groupUserId)) {
+    return res.status(404).json({ message: 'Group user not found' })
+  }
+  cstarGroupUsers[groupId] = members.filter((member) => member.id !== groupUserId)
+  res.status(204).end()
+})
+
+app.get(
+  '/api/v1/tenants/:tenantId/groups/:groupId/shared-services/shared-service-roles',
+  (req, res) => {
+    const { tenantId, groupId } = req.params
+    if (!findGroup(tenantId, groupId)) return res.status(404).json({ message: 'Group not found' })
+    res.json({ data: { sharedServices: groupSharedServices(groupId) } })
+  },
+)
+
+app.put(
+  '/api/v1/tenants/:tenantId/groups/:groupId/shared-services/shared-service-roles',
+  (req, res) => {
+    const { tenantId, groupId } = req.params
+    if (!findGroup(tenantId, groupId)) return res.status(404).json({ message: 'Group not found' })
+    const enabled = (cstarGroupRoles[groupId] ||= new Set())
+    for (const service of req.body?.sharedServices || []) {
+      // A shared service token may only change its own service's roles.
+      if (service.id !== notifySharedService.id) {
+        return res.status(403).json({ message: 'Only Notify roles can be changed' })
+      }
+      for (const role of service.sharedServiceRoles || []) {
+        if (!notifySharedService.roles.some((known) => known.id === role.id)) {
+          return res.status(400).json({ message: `Unknown role ${role.id}` })
+        }
+      }
+    }
+    for (const service of req.body?.sharedServices || []) {
+      for (const role of service.sharedServiceRoles || []) {
+        if (role.enabled) enabled.add(role.id)
+        else enabled.delete(role.id)
+      }
+    }
+    res.json({ data: { sharedServices: groupSharedServices(groupId) } })
+  },
+)
 
 // ---------------------------------------------------------------------------
 // APS Directory API Mock — Credential Issuer
@@ -510,6 +886,26 @@ app.listen(PORT, () => {
   console.log(`   GET  http://localhost:${PORT}/api/v1/users/:ssoUserId/tenants`)
   console.log(
     `   GET  http://localhost:${PORT}/api/v1/tenants/:tenantId/ssousers/:ssoUserId/shared-service-roles`,
+  )
+  console.log(`   GET|POST http://localhost:${PORT}/api/v1/tenants/:tenantId/users`)
+  console.log(`   GET|DELETE http://localhost:${PORT}/api/v1/tenants/:tenantId/users/:tenantUserId`)
+  console.log(`   GET  http://localhost:${PORT}/api/v1/tenants/:tenantId/users/:tenantUserId/roles`)
+  console.log(`   GET  http://localhost:${PORT}/api/v1/users/bcgovssousers/{idir,bceid}/search`)
+  console.log(`   GET  http://localhost:${PORT}/api/v1/health`)
+  console.log(`   GET  http://localhost:${PORT}/api/v1/tenants/:tenantId[?expand=tenantUserRoles]`)
+  console.log(`   GET  http://localhost:${PORT}/api/v1/tenants/:tenantId/shared-services`)
+  console.log(`   GET  http://localhost:${PORT}/api/v1/tenants/:tenantId/ssousers/:ssoUserId/roles`)
+  console.log(
+    `   GET  http://localhost:${PORT}/api/v1/tenants/:tenantId/users/:ssoUserId/groups/shared-service-roles`,
+  )
+  console.log(`   GET|POST http://localhost:${PORT}/api/v1/tenants/:tenantId/groups`)
+  console.log(`   GET|PUT http://localhost:${PORT}/api/v1/tenants/:tenantId/groups/:groupId`)
+  console.log(`   GET|POST http://localhost:${PORT}/api/v1/tenants/:tenantId/groups/:groupId/users`)
+  console.log(
+    `   DELETE http://localhost:${PORT}/api/v1/tenants/:tenantId/groups/:groupId/users/:groupUserId`,
+  )
+  console.log(
+    `   GET|PUT http://localhost:${PORT}/api/v1/tenants/:tenantId/groups/:groupId/shared-services/shared-service-roles`,
   )
   console.log('')
   console.log('APS Directory API Mock (Credential Issuer) — backed by Kong at ' + KONG_ADMIN_URL)
