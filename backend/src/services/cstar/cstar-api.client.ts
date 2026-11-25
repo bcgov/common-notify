@@ -614,14 +614,6 @@ export class CstarApiClient {
   }
 
   /**
-   * getTenantGroups, authenticated as Notify's CSTAR service account rather than a user, for
-   * work that runs with no user present.
-   */
-  getTenantGroupsAsServiceAccount(tenantId: string): Promise<CstarGroupDto[]> {
-    return this.withServiceAccount((authHeader) => this.getTenantGroups(tenantId, authHeader))
-  }
-
-  /**
    * The members of one CSTAR group, authenticated as Notify's CSTAR service account. CSTAR
    * accepts only service account tokens on this route; user tokens get a 403.
    */

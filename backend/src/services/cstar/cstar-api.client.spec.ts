@@ -540,11 +540,11 @@ describe('CstarApiClient service account', () => {
     vi.useRealTimers()
   })
 
-  it("lists a tenant's groups with a client-credentials token", async () => {
-    route({ data: { groups: [{ id: GROUP, name: 'Dev' }] } })
+  it("resolves a group's members with a client-credentials token", async () => {
+    route({ data: { users: [{ displayName: 'Lovelace, Ada', email: 'ada@gov.bc.ca' }] } })
 
-    await expect(buildClient().getTenantGroupsAsServiceAccount(TENANT)).resolves.toEqual([
-      { id: GROUP, name: 'Dev' },
+    await expect(buildClient().getGroupMembersAsServiceAccount(TENANT, GROUP)).resolves.toEqual([
+      { displayName: 'Lovelace, Ada', email: 'ada@gov.bc.ca' },
     ])
 
     const [tokenUrl, tokenInit] = fetchMock.mock.calls[0]
@@ -555,15 +555,6 @@ describe('CstarApiClient service account', () => {
       client_id: 'sa-notify-cstar',
       client_secret: 'secret',
     })
-    expect(cstarCalls()[0][1].headers.Authorization).toBe('Bearer sa-token-1')
-  })
-
-  it("resolves a group's members with the service account", async () => {
-    route({ data: { users: [{ displayName: 'Lovelace, Ada', email: 'ada@gov.bc.ca' }] } })
-
-    await expect(buildClient().getGroupMembersAsServiceAccount(TENANT, GROUP)).resolves.toEqual([
-      { displayName: 'Lovelace, Ada', email: 'ada@gov.bc.ca' },
-    ])
     expect(cstarCalls()[0][0]).toBe(
       `https://cstar.example/api/v1/tenants/${TENANT}/groups/${GROUP}/users`,
     )
@@ -572,22 +563,25 @@ describe('CstarApiClient service account', () => {
 
   it('reuses the token until 80% of its lifetime has passed', async () => {
     vi.useFakeTimers()
-    route({ data: { groups: [] } })
+    route({ data: { users: [] } })
     const client = buildClient()
 
-    await client.getTenantGroupsAsServiceAccount(TENANT)
+    await client.getGroupMembersAsServiceAccount(TENANT, GROUP)
     vi.advanceTimersByTime(239_000) // just under 80% of 300s
-    await client.getTenantGroupsAsServiceAccount(TENANT)
+    await client.getGroupMembersAsServiceAccount(TENANT, GROUP)
     expect(cstarCalls()[1][1].headers.Authorization).toBe('Bearer sa-token-1')
 
     vi.advanceTimersByTime(2_000)
-    await client.getTenantGroupsAsServiceAccount(TENANT)
+    await client.getGroupMembersAsServiceAccount(TENANT, GROUP)
     expect(cstarCalls()[2][1].headers.Authorization).toBe('Bearer sa-token-2')
   })
 
   it('is unavailable when the service account is not configured', async () => {
     await expect(
-      buildClient({ 'cstar.clientSecret': undefined }).getTenantGroupsAsServiceAccount(TENANT),
+      buildClient({ 'cstar.clientSecret': undefined }).getGroupMembersAsServiceAccount(
+        TENANT,
+        GROUP,
+      ),
     ).rejects.toThrow(ServiceUnavailableException)
     expect(fetchMock).not.toHaveBeenCalled()
   })
