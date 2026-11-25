@@ -48,8 +48,13 @@ backend:
   #-- hosts every PR environment under one quota; TEST and PROD raise it in merge.yml.
   memoryRequest: 200Mi
   #-- seconds a stopping pod gets to finish in-flight queue jobs before it is killed. With
-  #-- Recreate, a deploy waits this long only while a pod is mid-batch; idle pods exit at once.
+  #-- Recreate, a deploy waits this long only while a pod is mid-batch; idle pods exit once
+  #-- preStopSleepSeconds is up.
   terminationGracePeriodSeconds: 120
+  #-- seconds a stopping pod keeps serving before it is sent SIGTERM, so the gateway drops it
+  #-- from its endpoints before the process starts closing connections. Comes out of
+  #-- terminationGracePeriodSeconds, so QUEUE_SHUTDOWN_DRAIN_MS subtracts it. 0 omits the hook.
+  preStopSleepSeconds: 10
   #-- the number of replicas when autoscaling is disabled
   replicaCount: 1
   #-- autoscaling for the component. it is optional and is an object.
@@ -108,6 +113,12 @@ backend:
     #-- `name: <plate>` and carries the environment in a separate label, so this one
     #-- value matches the dev, test and prod data planes.
     apiGatewayLicensePlate: 264e6f
+    #-- namespace labels of the Prometheus that scrapes /api/metrics. It runs in this license
+    #-- plate's tools namespace, which the `monitoring` policy-group does NOT cover — that group
+    #-- is OpenShift's own cluster monitoring. Empty disables the rule.
+    metricsScrapeNamespaceSelector:
+      name: f6bc3f
+      environment: tools
   #-- which transport each channel sends through. The credentials for the selected adapter must
   #-- exist (app-api-secrets, or backend.awsSms.credentialsSecret for aws), or it does not send.
   delivery:

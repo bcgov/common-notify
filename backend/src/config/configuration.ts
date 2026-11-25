@@ -16,6 +16,9 @@ function parseSentinels(value?: string): { host: string; port: number }[] | unde
   return sentinels.length > 0 ? sentinels : undefined
 }
 
+/** The prefix on every SMS body and email subject, by ENVIRONMENT. */
+const ENVIRONMENT_PREFIXES: Record<string, string> = { dev: '[DEV]', test: '[TEST]' }
+
 export default function configuration() {
   const defaultEmailFrom = process.env.DEFAULT_EMAIL_FROM || 'notify_noreply@gov.bc.ca'
   const defaultSmsFrom = process.env.DEFAULT_SMS_FROM_NUMBER || '+15551234567'
@@ -169,6 +172,9 @@ export default function configuration() {
     delivery: {
       email: process.env.DELIVERY_EMAIL_ADAPTER || 'ches',
       sms: process.env.DELIVERY_SMS_ADAPTER || 'aws',
+      // Marks DEV/TEST sends on SMS bodies and email subjects; empty in PROD
+      environmentPrefix:
+        ENVIRONMENT_PREFIXES[(process.env.ENVIRONMENT || '').trim().toLowerCase()] ?? '',
     },
 
     // Load-test-only switches. MUST stay false outside DEV / ephemeral PR dev envs.

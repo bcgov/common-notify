@@ -19,6 +19,7 @@ import type { InlineRenderingService } from '../../services/rendering/inline-ren
 import type { StructuredLoggerService } from '../../common/logger'
 import type { SmsNumbersService } from '../../api/sms-numbers/sms-numbers.service'
 import type { TenantSettingsService } from '../../api/tenant-settings/tenant-settings.service'
+import type { ConfigService } from '@nestjs/config'
 
 describe('SmsDeliveryWorker', () => {
   let mockNotificationService: any
@@ -42,6 +43,7 @@ describe('SmsDeliveryWorker', () => {
     structuredLogger?: StructuredLoggerService
     smsNumbersService?: SmsNumbersService
     tenantSettingsService?: TenantSettingsService
+    smsMessagePrefix?: string
   }) {
     const mergeBatches = new MergeBatchRunner(
       deps.notificationService,
@@ -67,6 +69,9 @@ describe('SmsDeliveryWorker', () => {
       deps.structuredLogger,
       deps.smsNumbersService,
       deps.tenantSettingsService,
+      deps.smsMessagePrefix === undefined
+        ? undefined
+        : ({ get: () => deps.smsMessagePrefix } as unknown as ConfigService),
     )
     processHandler = (job) => worker.process(job)
     failedCallback = (job, err) => worker.onFailed(job, err)
@@ -1252,6 +1257,67 @@ describe('SmsDeliveryWorker', () => {
 
       expect(mockSmsAdapter.send).toHaveBeenCalledWith(
         expect.not.objectContaining({ from: expect.anything() }),
+      )
+    })
+  })
+
+  describe('environment prefix', () => {
+    const init = (smsMessagePrefix: string, senderName: string | null = null) => {
+      const tenantSettingsService = { getSmsSenderName: vi.fn().mockResolvedValue(senderName) }
+      mockInlineRenderingService.renderSms = vi.fn().mockResolvedValue({ body: 'Hi A' })
+      mockSmsAdapter.send = vi.fn().mockResolvedValue({ messageId: 'SM1' })
+      initialize({
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+        tenantSettingsService: tenantSettingsService as unknown as TenantSettingsService,
+        smsMessagePrefix,
+      })
+    }
+
+    it('starts a plain send with the prefix', async () => {
+      init('[DEV]')
+
+      await processHandler(plainJob())
+
+      expect(mockSmsAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({ content: expect.objectContaining({ body: '[DEV] Test SMS' }) }),
+      )
+    })
+
+    it('puts the prefix before the tenant name', async () => {
+      init('[TEST]', 'Parks Booking')
+
+      await processHandler(plainJob())
+
+      expect(mockSmsAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.objectContaining({ body: '[TEST] Parks Booking: Test SMS' }),
+        }),
+      )
+    })
+
+    it('starts every merge recipient with the prefix', async () => {
+      init('[DEV]')
+
+      await processHandler(mergeJob())
+
+      expect(mockSmsAdapter.send).toHaveBeenCalledTimes(3)
+      for (const [options] of vi.mocked(mockSmsAdapter.send).mock.calls) {
+        expect(options).toMatchObject({ content: { body: '[DEV] Hi A' } })
+      }
+    })
+
+    it('sends the body unchanged when the prefix is empty, as in prod', async () => {
+      init('')
+
+      await processHandler(plainJob())
+
+      expect(mockSmsAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({ content: expect.objectContaining({ body: 'Test SMS' }) }),
       )
     })
   })
