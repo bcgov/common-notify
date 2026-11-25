@@ -1,4 +1,10 @@
 {{- if .Values.backend.enabled }}
+{{- /* `default` treats 0 as empty, so read these explicitly to let 0 disable the hook. */}}
+{{- $grace := int (.Values.backend.terminationGracePeriodSeconds | default 120) }}
+{{- $preStop := 10 }}
+{{- if hasKey .Values.backend "preStopSleepSeconds" }}
+{{- $preStop = int .Values.backend.preStopSleepSeconds }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -35,9 +41,10 @@ spec:
     spec:
       # Nothing here calls the API server, so do not mount a token.
       automountServiceAccountToken: false
-      # Time for queue workers to finish in-flight jobs on shutdown (QueueModule
-      # beforeApplicationShutdown). QUEUE_SHUTDOWN_DRAIN_MS below stops waiting 15s short of it.
-      terminationGracePeriodSeconds: {{ .Values.backend.terminationGracePeriodSeconds | default 120 }}
+      # Budget for a stopping pod, in this order: preStopSleepSeconds still serving, then
+      # queue workers finishing in-flight jobs (QueueModule beforeApplicationShutdown), then
+      # 15s spare. QUEUE_SHUTDOWN_DRAIN_MS below is what is left after the other two.
+      terminationGracePeriodSeconds: {{ $grace }}
       securityContext:
         runAsNonRoot: true
       initContainers:
@@ -154,7 +161,7 @@ spec:
             - name: NODE_OPTIONS
               value: {{ printf "--max-old-space-size=%v" (.Values.backend.heapMb | default 512) | quote }}
             - name: QUEUE_SHUTDOWN_DRAIN_MS
-              value: {{ mul (sub (.Values.backend.terminationGracePeriodSeconds | default 120) 15) 1000 | quote }}
+              value: {{ mul (sub (sub $grace 15) $preStop) 1000 | quote }}
             - name: NOTIFICATION_DEDUP_WINDOW_SECONDS
               value: {{ .Values.backend.dedupWindowSeconds | quote }}
             - name: CLAMAV_HOST
@@ -266,6 +273,14 @@ spec:
             - name: http
               containerPort: {{ .Values.backend.service.targetPort }}
               protocol: TCP
+          {{- if gt $preStop 0 }}
+          lifecycle:
+            preStop:
+              # Native sleep handler, not an exec: the image is distroless, so there is no
+              # shell or sleep binary to call.
+              sleep:
+                seconds: {{ $preStop }}
+          {{- end }}
           startupProbe:
             httpGet:
               path: /api/health
