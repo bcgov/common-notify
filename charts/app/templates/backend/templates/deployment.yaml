@@ -272,6 +272,7 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.cstarMcp.secretName }}
                   key: MCP_API_KEY
+                  optional: true
             {{- end }}
             - name: CSTAR_API_URL
               valueFrom:

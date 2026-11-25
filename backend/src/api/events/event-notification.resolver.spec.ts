@@ -1,4 +1,9 @@
-import { ForbiddenException, NotFoundException, UnprocessableEntityException } from '@nestjs/common'
+import {
+  ForbiddenException,
+  NotFoundException,
+  ServiceUnavailableException,
+  UnprocessableEntityException,
+} from '@nestjs/common'
 import type { MockInstance } from 'vitest'
 import { Repository } from 'typeorm'
 import { McpGroupsService } from '../../services/mcp/mcp-groups.service'
@@ -154,16 +159,19 @@ describe('EventNotificationResolver', () => {
       ).rejects.toBeInstanceOf(UnprocessableEntityException)
     })
 
-    it('lets a CSTAR failure fail the request', async () => {
+    it.each([
+      new Error('CSTAR is down'),
+      new ServiceUnavailableException('MCP tool cstar/get_recipients is not enabled'),
+    ])('propagates CSTAR failures without changing their status: %s', async (failure) => {
       vi.mocked(eventRepository.findOne).mockResolvedValue(
         eventWith({ cstarGroups: [group(EventRecipientKind.TO, 'group-a')] as any }),
       )
-      vi.mocked(mcpGroups.getGroupMemberEmails).mockRejectedValue(new Error('CSTAR is down'))
+      vi.mocked(mcpGroups.getGroupMemberEmails).mockRejectedValue(failure)
 
       // Sending to fewer people than the event was configured for would be worse than not
       // sending at all, so this must not be swallowed.
-      await expect(resolver.resolveSend('tenant-id', 'event-id', undefined, cstar)).rejects.toThrow(
-        'CSTAR is down',
+      await expect(resolver.resolveSend('tenant-id', 'event-id', undefined, cstar)).rejects.toBe(
+        failure,
       )
     })
 

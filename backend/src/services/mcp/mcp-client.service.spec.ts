@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { ForbiddenException } from '@nestjs/common'
+import { ForbiddenException, ServiceUnavailableException } from '@nestjs/common'
 import { DataSource } from 'typeorm'
 import { McpClientService } from './mcp-client.service'
 import { McpGroupsService } from './mcp-groups.service'
@@ -182,7 +182,14 @@ describe('stored MCP server policy', () => {
   it('blocks disabled or unregistered tools', async () => {
     query.mockResolvedValue([])
     await expect(service.call('cstar', 'unregistered', 'tenant-a', {})).rejects.toThrow(
-      'not enabled',
+      'is not enabled',
+    )
+    await expect(service.call('cstar', 'get_recipients', 'tenant-a', {})).rejects.toMatchObject({
+      status: 503,
+      message: 'MCP tool cstar/get_recipients is not enabled',
+    })
+    await expect(service.call('cstar', 'get_recipients', 'tenant-a', {})).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
     )
     expect(mocks.connect).not.toHaveBeenCalled()
   })
@@ -211,7 +218,7 @@ describe('stored MCP server policy', () => {
   it('rejects an unsupported transport', async () => {
     registryRow({ protocol: 'stdio' })
     await expect(service.call('cstar', 'get_recipients', 'tenant-a', {})).rejects.toThrow(
-      'not enabled',
+      'is not enabled',
     )
   })
   it('rejects malformed argument policies', async () => {

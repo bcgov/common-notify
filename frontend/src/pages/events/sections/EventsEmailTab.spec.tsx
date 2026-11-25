@@ -434,7 +434,8 @@ describe('EventsEmailTab', () => {
         isConfigured: true,
         cstarGroupsStatus: 'disabled',
       })
-      expect(screen.queryByRole('checkbox', { name: 'CSTAR Group(s)' })).not.toBeInTheDocument()
+      expect(screen.getByRole('checkbox', { name: 'CSTAR Group(s)' })).toBeEnabled()
+      expect(screen.getByRole('alert')).toHaveTextContent('CSTAR lookups are disabled')
       expect(
         screen.queryByRole('button', { name: 'Remove saved CSTAR groups' }),
       ).not.toBeInTheDocument()
@@ -451,6 +452,27 @@ describe('EventsEmailTab', () => {
         ),
       )
     })
+
+    it.each(['disabled', 'error', 'loading'] as const)(
+      'can remove saved groups while lookup is %s',
+      async (cstarGroupsStatus) => {
+        const { onSave } = renderTab({
+          values: { ...savedAndActive, cstarGroupIdsTo: ['group-1'] },
+          isConfigured: true,
+          cstarGroupsStatus,
+        })
+        await userEvent.click(screen.getByRole('checkbox', { name: 'CSTAR Group(s)' }))
+        if (cstarGroupsStatus === 'disabled') {
+          expect(screen.queryByRole('checkbox', { name: 'CSTAR Group(s)' })).not.toBeInTheDocument()
+        } else {
+          expect(screen.getByRole('checkbox', { name: 'CSTAR Group(s)' })).not.toBeChecked()
+        }
+        await userEvent.click(saveButton())
+        await waitFor(() =>
+          expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ cstarGroupIdsTo: [] })),
+        )
+      },
+    )
 
     it('opens the group fields when CSTAR groups are chosen', async () => {
       renderTab({ values: { ...unconfigured, active: true }, cstarGroups: groups })

@@ -390,9 +390,17 @@ export class EventsService {
     // Groups are deliberately absent from the cap: how many people a group stands for is only
     // known once CSTAR resolves it, which is the send path's job, not this save's.
     await this.assertWithinRecipientCap('email', recipients.length)
-    await this.assertCstarGroupsBelongToTenant(cstarGroups, cstar)
-
     const setting = this.findOrCreateEmailSetting(event, userId)
+    const savedGroupIds = new Set(
+      (setting.isDeleted ? [] : (setting.cstarGroups ?? []))
+        .filter((group) => !group.isDeleted)
+        .map((group) => group.cstarGroupId),
+    )
+    // Previously validated IDs remain valid for edits, removals and moves between To/Cc/Bcc.
+    await this.assertCstarGroupsBelongToTenant(
+      cstarGroups.filter((group) => !savedGroupIds.has(group.cstarGroupId)),
+      cstar,
+    )
 
     // Mirrors chk_event_channel_setting_active_complete, checked against the incoming `active`
     // rather than the stored one: switching the channel on requires the settings being saved
@@ -939,8 +947,7 @@ export class EventsService {
    * group. Checked against the same listing the picker is populated from (listCstarGroups), so
    * an ID the UI could offer is an ID that passes here.
    *
-   * One CSTAR call per save, and only when groups were actually submitted: an event saved with
-   * typed-in addresses alone never reaches CSTAR.
+   * One CSTAR call only when this save adds group IDs that are not already saved.
    */
   private async assertCstarGroupsBelongToTenant(
     cstarGroups: DesiredCstarGroup[],

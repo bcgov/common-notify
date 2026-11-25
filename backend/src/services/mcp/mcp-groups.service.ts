@@ -1,8 +1,10 @@
-import { BadGatewayException, Injectable } from '@nestjs/common'
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { McpClientService } from './mcp-client.service'
 
 @Injectable()
 export class McpGroupsService {
+  private readonly logger = new Logger(McpGroupsService.name)
+
   constructor(private readonly client: McpClientService) {}
 
   isEnabled() {
@@ -28,9 +30,17 @@ export class McpGroupsService {
     const result = await this.client.call('cstar', 'get_recipients', tenantId, { groupIds })
     if (
       !Array.isArray(result.emails) ||
-      result.emails.some((email) => typeof email !== 'string' || !email.trim())
+      result.emails.some((email) => typeof email !== 'string' || !email.trim()) ||
+      (result.missingGroupIds !== undefined &&
+        (!Array.isArray(result.missingGroupIds) ||
+          result.missingGroupIds.some((id) => typeof id !== 'string' || !id.trim())))
     ) {
       throw new BadGatewayException('Invalid MCP recipients response')
+    }
+    if (Array.isArray(result.missingGroupIds) && result.missingGroupIds.length) {
+      this.logger.warn(
+        `CSTAR groups missing for tenant ${tenantId}: ${result.missingGroupIds.join(', ')}`,
+      )
     }
     return [...new Set((result.emails as string[]).map((email) => email.trim().toLowerCase()))]
   }

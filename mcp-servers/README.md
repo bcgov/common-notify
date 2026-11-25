@@ -45,8 +45,10 @@ group visibility and pagination with Chris/Shankar before deployment. Group disc
 `GET /api/v1/tenants/{tenantId}/groups/{groupId}/users` endpoint. Its response is `data.users[]`
 with a direct nullable `email` field (not `ssoUser.email`). One lookup is made per distinct group,
 with at most four member requests in flight. Any failed/malformed group response fails the complete
-recipient lookup. Only normalized, deduplicated emails are returned. The current upstream
-implementation returns complete arrays; no pagination is implemented here.
+recipient lookup. IDs absent from the tenant group list are skipped without member lookups;
+`get_recipients` returns them as `missingGroupIds` alongside normalized, deduplicated `emails`.
+Notify logs a warning for missing IDs so deleted groups do not block valid recipients. The current
+upstream implementation returns complete arrays; no pagination is implemented here.
 
 ## Live CSTAR DEV verification
 
@@ -178,13 +180,15 @@ selected by `app-api-secrets.CSTAR_API_URL`. The previous CSTAR client forwarded
 not establish a stored service-account credential mapping. Confirm the existing service-account
 Secret/key before copying or remapping credentials. Do not commit secret values.
 
-Event group workflows require the adapter; `cstarMcp.enabled` controls its deployment.
-DEV/PR, TEST and PROD charts enable it together with the application integration. Provision each
-environment's existing secret mappings before promotion.
-Each To/CC/BCC selection accepts up to 100 CSTAR groups. A lookup has a shared 30-second budget
-across authentication and group expansion, with a 10-second limit on each upstream request.
-Notify allows 35 seconds for the adapter call, including protocol overhead. Any failed or timed-out
-lookup fails the send rather than returning partial recipients.
+Event group workflows require the adapter; `cstarMcp.enabled` controls its deployment. DEV/PR, TEST
+and PROD charts enable it together with the application integration. Provision each environment's
+existing secret mappings before promotion. Each To/CC/BCC selection accepts up to 100 CSTAR groups.
+A lookup has a shared 30-second budget across authentication and group expansion, with a 10-second
+limit on each upstream request. Notify allows 35 seconds for the adapter call, including protocol
+overhead. Any failed or timed-out lookup fails the send rather than returning partial recipients.
+Disabled servers/tools return HTTP 503. Event saves validate only newly added group IDs; retaining,
+moving or removing saved IDs needs no lookup. The backend can start without the adapter key; group
+lookups fail until credentials are configured.
 
 The image defaults to the release registry/repository/tag supplied by the existing deployer;
 `cstarMcp.image` is an optional full-image override. Secrets must exist in each target namespace

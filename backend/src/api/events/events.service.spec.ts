@@ -1264,6 +1264,58 @@ describe('EventsService', () => {
       ])
     })
 
+    it.each([
+      [[GROUP_ONE], [], []],
+      [[], [GROUP_ONE], []],
+      [[], [], [GROUP_ONE]],
+      [[], [], []],
+    ])('saves retained, moved or removed groups without CSTAR (%j)', async (to, cc, bcc) => {
+      mockEventRepository.findOne.mockResolvedValue(
+        buildEvent([
+          {
+            ...emailSetting(),
+            cstarGroups: [
+              { kind: EventRecipientKind.TO, cstarGroupId: GROUP_ONE, isDeleted: false },
+            ],
+          } as unknown as EventChannelSetting,
+        ]),
+      )
+      mockMcpGroupsService.getTenantGroups.mockRejectedValue(new Error('CSTAR unavailable'))
+      await saveGroups(to, cc, bcc)
+      expect(mockMcpGroupsService.getTenantGroups).not.toHaveBeenCalled()
+    })
+
+    it('still validates newly added groups when another group is already saved', async () => {
+      mockEventRepository.findOne.mockResolvedValue(
+        buildEvent([
+          {
+            ...emailSetting(),
+            cstarGroups: [
+              { kind: EventRecipientKind.TO, cstarGroupId: GROUP_ONE, isDeleted: false },
+            ],
+          } as unknown as EventChannelSetting,
+        ]),
+      )
+      mockMcpGroupsService.getTenantGroups.mockResolvedValue([{ id: GROUP_TWO, name: 'New group' }])
+      await saveGroups([GROUP_ONE, GROUP_TWO])
+      expect(mockMcpGroupsService.getTenantGroups).toHaveBeenCalledWith(cstar.tenantId)
+    })
+
+    it('revalidates a previously removed group', async () => {
+      mockEventRepository.findOne.mockResolvedValue(
+        buildEvent([
+          {
+            ...emailSetting(),
+            cstarGroups: [
+              { kind: EventRecipientKind.TO, cstarGroupId: GROUP_ONE, isDeleted: true },
+            ],
+          } as unknown as EventChannelSetting,
+        ]),
+      )
+      mockMcpGroupsService.getTenantGroups.mockResolvedValue([])
+      await expect(saveGroups([GROUP_ONE])).rejects.toThrow('do not belong to this tenant')
+    })
+
     it('stores every group a list addresses, not just the first', async () => {
       await saveGroups([GROUP_ONE, GROUP_TWO])
 

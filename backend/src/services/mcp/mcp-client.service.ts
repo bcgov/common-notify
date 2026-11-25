@@ -1,4 +1,9 @@
-import { BadGatewayException, ForbiddenException, Injectable } from '@nestjs/common'
+import {
+  BadGatewayException,
+  ForbiddenException,
+  Injectable,
+  ServiceUnavailableException,
+} from '@nestjs/common'
 import { DataSource } from 'typeorm'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
@@ -65,7 +70,7 @@ export class McpClientService {
       [serverName, tool],
     )
     if (server?.protocol !== 'streamable-http')
-      throw new ForbiddenException('MCP tool is not enabled')
+      throw new ServiceUnavailableException(`MCP tool ${serverName}/${tool} is not enabled`)
     if (!tenantId || !/^[A-Za-z0-9_-]{1,128}$/.test(tenantId))
       throw new ForbiddenException('Invalid tenant context')
     if (

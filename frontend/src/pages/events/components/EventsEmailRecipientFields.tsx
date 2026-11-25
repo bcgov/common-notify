@@ -33,21 +33,23 @@ const EventsEmailRecipientFields: FC<EventsEmailRecipientFieldsProps> = ({
 }) => (
   <>
     <EventsRecipientSourcesGroup
-      showCstar={cstarGroupsStatus !== 'disabled'}
-      isCstarEnabled={cstarGroupsStatus === 'ready'}
+      showCstar={cstarGroupsStatus !== 'disabled' || recipients.sources.includes(CSTAR_GROUPS_ID)}
+      isCstarEnabled={cstarGroupsStatus === 'ready' || recipients.sources.includes(CSTAR_GROUPS_ID)}
       value={recipients.sources}
       onChange={(value) => {
-        recipients.setSources(
-          cstarGroupsStatus !== 'ready' && recipients.sources.includes(CSTAR_GROUPS_ID)
-            ? [...new Set([...value, CSTAR_GROUPS_ID])]
-            : value,
-        )
+        recipients.setSources(value)
         onChange()
       }}
       isDisabled={isDisabled}
       errorMessage={errorMessage}
     />
 
+    {cstarGroupsStatus === 'disabled' && recipients.sources.includes(CSTAR_GROUPS_ID) && (
+      <p className="events__help" role="alert">
+        CSTAR lookups are disabled. This event has saved CSTAR groups and cannot send until lookups
+        are enabled or the groups are removed. Uncheck CSTAR Group(s) to remove them.
+      </p>
+    )}
     {cstarGroupsStatus === 'error' && (
       <p className="events__help" role="alert">
         Unable to retrieve the recipients using CSTAR. You can still enter recipients manually.

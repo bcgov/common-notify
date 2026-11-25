@@ -86,8 +86,12 @@ test('service account resolves only tenant-owned groups and normalizes emails', 
   )
   assert.deepEqual(await client.getRecipients('tenant-a', ['group-a']), {
     emails: ['a@example.com'],
+    missingGroupIds: [],
   })
-  await assert.rejects(client.getRecipients('tenant-a', ['foreign-group']), /does not belong/)
+  assert.deepEqual(await client.getRecipients('tenant-a', ['foreign-group', 'foreign-group']), {
+    emails: [],
+    missingGroupIds: ['foreign-group'],
+  })
   assert.deepEqual(
     calls.filter(([url]) => url.endsWith('/users')).map(([url]) => url),
     ['https://cstar.example/api/v1/tenants/tenant-a/groups/group-a/users'],
@@ -115,6 +119,7 @@ test('groups without Notify roles remain eligible for recipient lookup', async (
   )
   client.token = { value: 'notify-service-token', expiresAt: Date.now() + 300000 }
   assert.deepEqual(await client.getRecipients('tenant-a', ['workflow-team']), {
+    missingGroupIds: [],
     emails: ['approver@example.com'],
   })
   assert.deepEqual(calls, [
@@ -163,10 +168,15 @@ test('service-account endpoint deduplicates groups and emails and fails without 
     })
   })
   client.token = { value: 'service-token', expiresAt: Date.now() + 300000 }
-  assert.deepEqual(await client.getRecipients('tenant-a', ['a', 'b', 'a']), {
+  assert.deepEqual(await client.getRecipients('tenant-a', ['a', 'deleted', 'b', 'a', 'deleted']), {
+    missingGroupIds: ['deleted'],
     emails: ['first@example.com', 'same@example.com', 'second@example.com'],
   })
   assert.equal(calls.filter((path) => path.endsWith('/a/users')).length, 1)
+  assert.equal(
+    calls.some((path) => path.endsWith('/deleted/users')),
+    false,
+  )
   failedGroup = 'b'
   await assert.rejects(client.getRecipients('tenant-a', ['a', 'b']), /CSTAR lookup failed/)
   failedGroup = ''

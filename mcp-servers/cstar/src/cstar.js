@@ -83,12 +83,13 @@ export class CstarClient {
   async getRecipients(tenantId, groupIds, signal = AbortSignal.timeout(30000)) {
     validateIdentifier(tenantId)
     groupIds.forEach(validateIdentifier)
-    if (!groupIds.length) return { emails: [] }
+    if (!groupIds.length) return { emails: [], missingGroupIds: [] }
     // Validate tenant ownership before expanding groups with a privileged service account.
     const { groups } = await this.listGroups(tenantId, signal)
     const allowed = new Set(groups.map((group) => group.id))
-    if (groupIds.some((id) => !allowed.has(id))) throw new Error('Group does not belong to tenant')
-    const uniqueGroupIds = [...new Set(groupIds)]
+    const requested = [...new Set(groupIds)]
+    const missingGroupIds = requested.filter((id) => !allowed.has(id))
+    const uniqueGroupIds = requested.filter((id) => allowed.has(id))
     const emails = []
     // The service-account endpoint is scoped to a single tenant/group. Bound fan-out
     // to four requests at a time and fail the whole lookup if any group fails.
@@ -105,6 +106,6 @@ export class CstarClient {
       )
       emails.push(...results.flat())
     }
-    return { emails: [...new Set(emails)] }
+    return { emails: [...new Set(emails)], missingGroupIds }
   }
 }
