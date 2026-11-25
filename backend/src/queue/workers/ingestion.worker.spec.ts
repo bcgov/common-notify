@@ -993,7 +993,7 @@ describe('IngestionWorker', () => {
           expect.objectContaining({
             jobId: 'notify-bulk-EMAIL-0',
             // A job queued without a priority gets the default; priority lanes are off.
-            priority: 5,
+            priority: 10,
             removeOnComplete: true,
             removeOnFail: FAILED_JOB_RETENTION,
             attempts: 3,
@@ -1040,7 +1040,7 @@ describe('IngestionWorker', () => {
         expect(mockEmailQueue.add).toHaveBeenCalledWith(
           QueueName.EMAIL_DELIVERY,
           expect.anything(),
-          expect.objectContaining({ priority: 10 }),
+          expect.objectContaining({ priority: 15 }),
         )
       })
 

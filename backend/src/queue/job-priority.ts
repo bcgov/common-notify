@@ -10,9 +10,9 @@ export type NotificationPriority = (typeof NOTIFICATION_PRIORITIES)[number]
 
 /** BullMQ priorities, lower first. QUEUE_PRIORITY_HIGH/NORMAL/LOW override them. */
 export const DEFAULT_JOB_PRIORITIES: Record<NotificationPriority, number> = {
-  high: 1,
-  normal: 5,
-  low: 10,
+  high: 5,
+  normal: 10,
+  low: 15,
 }
 
 /** BullMQ's highest accepted priority. 0 means "no priority", which runs ahead of every level. */

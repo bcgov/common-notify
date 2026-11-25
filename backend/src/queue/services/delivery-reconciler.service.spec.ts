@@ -216,9 +216,9 @@ describe('DeliveryReconcilerService', () => {
   })
 
   it.each([
-    [undefined, 5],
-    [false, 5],
-    [true, 10],
+    [undefined, 10],
+    [false, 10],
+    [true, 15],
   ])('rebuilds a merge batch with priority lanes %s at priority %i', async (lanes, priority) => {
     const { service, queue } = setup({ job: null, priorityLanes: lanes })
 

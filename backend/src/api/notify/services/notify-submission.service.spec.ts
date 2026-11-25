@@ -103,8 +103,8 @@ describe('NotifySubmissionService', () => {
 
   // The GC Notify route calls acceptMerge directly, so it reads the flag itself.
   it.each([
-    [false, 5],
-    [true, 10],
+    [false, 10],
+    [true, 15],
   ])('queues a merge with priority lanes %s at priority %i', async (lanes, priority) => {
     featureFlags.isEnabled.mockResolvedValue(lanes)
 

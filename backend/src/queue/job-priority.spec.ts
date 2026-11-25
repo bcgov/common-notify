@@ -6,22 +6,22 @@ const configWith = (values: Record<string, unknown>) =>
   ({ get: (key: string) => values[key] }) as unknown as ConfigService
 
 describe('jobPriority', () => {
-  it('falls back to 1, 5 and 10 without config', () => {
-    expect(jobPriority('high')).toBe(1)
-    expect(jobPriority('normal')).toBe(5)
-    expect(jobPriority('low')).toBe(10)
+  it('falls back to 5, 10 and 15 without config', () => {
+    expect(jobPriority('high')).toBe(5)
+    expect(jobPriority('normal')).toBe(10)
+    expect(jobPriority('low')).toBe(15)
   })
 
   it('reads each level from queue.priority', () => {
     const config = configWith({ 'queue.priority.low': 50 })
     expect(jobPriority('low', config)).toBe(50)
-    expect(jobPriority('high', config)).toBe(1)
+    expect(jobPriority('high', config)).toBe(5)
   })
 
   it.each([0, -1, 2_097_153, 2.5, Number.NaN])(
     'ignores %s, which BullMQ would reject or treat as no priority',
     (value) => {
-      expect(jobPriority('low', configWith({ 'queue.priority.low': value }))).toBe(10)
+      expect(jobPriority('low', configWith({ 'queue.priority.low': value }))).toBe(15)
     },
   )
 

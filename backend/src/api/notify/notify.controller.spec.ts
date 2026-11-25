@@ -401,7 +401,7 @@ describe('Notify Controllers', () => {
 
         // Priority lanes are on in this suite, so a merge is low priority.
         const [, , options] = mockIngestionQueue.add.mock.calls[0]
-        expect(options).toMatchObject({ priority: 10 })
+        expect(options).toMatchObject({ priority: 15 })
         expect(mockFeatureFlagService.isEnabled).toHaveBeenCalledWith(
           'notification_priority',
           'tenant-1',
@@ -907,8 +907,8 @@ describe('Notify Controllers', () => {
         })
 
         it.each([
-          [undefined, 5],
-          ['high', 1],
+          [undefined, 10],
+          ['high', 5],
         ])('queues a full event send asking for priority %s at %d', async (priority, expected) => {
           mockNotificationDedupService.findDuplicate.mockResolvedValue(null)
 
@@ -936,7 +936,7 @@ describe('Notify Controllers', () => {
             expect(mockIngestionQueue.add).toHaveBeenCalledWith(
               'notification-ingestion',
               expect.any(Object),
-              expect.objectContaining({ priority: 1 }),
+              expect.objectContaining({ priority: 5 }),
             )
           })
         })
@@ -953,7 +953,7 @@ describe('Notify Controllers', () => {
             expect(mockIngestionQueue.add).toHaveBeenCalledWith(
               'notification-ingestion',
               expect.any(Object),
-              expect.objectContaining({ priority: 5 }),
+              expect.objectContaining({ priority: 10 }),
             )
           })
         })
@@ -1039,7 +1039,7 @@ describe('Notify Controllers', () => {
             expect(mockIngestionQueue.add).toHaveBeenCalledWith(
               'notification-ingestion',
               expect.any(Object),
-              expect.objectContaining({ priority: 5 }),
+              expect.objectContaining({ priority: 10 }),
             )
           })
         })
@@ -1054,7 +1054,7 @@ describe('Notify Controllers', () => {
             expect(mockIngestionQueue.add).toHaveBeenCalledWith(
               'notification-ingestion',
               expect.any(Object),
-              expect.objectContaining({ priority: 1 }),
+              expect.objectContaining({ priority: 5 }),
             )
           })
         })
@@ -1072,7 +1072,7 @@ describe('Notify Controllers', () => {
             expect(mockIngestionQueue.add).toHaveBeenCalledWith(
               'notification-ingestion',
               expect.objectContaining({ mailMerge: true }),
-              expect.objectContaining({ priority: 10 }),
+              expect.objectContaining({ priority: 15 }),
             )
           })
         })
@@ -1087,7 +1087,7 @@ describe('Notify Controllers', () => {
             expect(mockIngestionQueue.add).toHaveBeenCalledWith(
               'notification-ingestion',
               expect.any(Object),
-              expect.objectContaining({ priority: 1 }),
+              expect.objectContaining({ priority: 5 }),
             )
           })
         })
@@ -1106,7 +1106,7 @@ describe('Notify Controllers', () => {
             expect(mockIngestionQueue.add).toHaveBeenCalledWith(
               'notification-ingestion',
               expect.objectContaining({ mailMerge: true }),
-              expect.objectContaining({ priority: 1 }),
+              expect.objectContaining({ priority: 5 }),
             )
           })
         })
@@ -1162,7 +1162,7 @@ describe('Notify Controllers', () => {
               .send({ ...emailSend, priority: 'high' })
               .expect(202)
 
-            await expectQueuedAt(5)
+            await expectQueuedAt(10)
           })
 
           it('stores the request without its priority, so the reconciler cannot restore it', async () => {
@@ -1182,7 +1182,7 @@ describe('Notify Controllers', () => {
               .send({ ...emailSend.email, priority: 'high' })
               .expect(202)
 
-            await expectQueuedAt(5)
+            await expectQueuedAt(10)
           })
 
           it('queues a merge at normal priority, not behind single sends', async () => {
@@ -1195,7 +1195,7 @@ describe('Notify Controllers', () => {
               })
               .expect(202)
 
-            await expectQueuedAt(5)
+            await expectQueuedAt(10)
           })
 
           it('still rejects an unknown priority', async () => {
