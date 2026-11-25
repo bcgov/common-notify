@@ -17,6 +17,7 @@ const TemplateCreate: FC = () => {
       engineCode: values.engineCode as TemplateEngine,
       subject: values.channelCode === NotificationChannel.EMAIL ? values.subject : undefined,
       body: values.body,
+      previewParams: values.previewParams,
     })
     showSuccessToast('Template created successfully')
     navigate({ to: '/template-edit/$templateId', params: { templateId: template.id } })

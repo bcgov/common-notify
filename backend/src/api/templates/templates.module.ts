@@ -8,6 +8,7 @@ import { TemplatesService } from './templates.service'
 import { TemplatesRepository } from './templates.repository'
 import { Template } from './entities/template.entity'
 import { TemplateVersion } from './entities/template-version.entity'
+import { TemplatePreviewData } from './entities/template-preview-data.entity'
 import { TemplateEngineCode } from './entities/template-engine-code.entity'
 import { EventChannelSetting } from '../events/entities/event-channel-setting.entity'
 import { RenderingModule } from '../../services/rendering/rendering.module'
@@ -35,6 +36,7 @@ import { EmailTemplateLayoutService } from './email-template-layout.service'
     TypeOrmModule.forFeature([
       Template,
       TemplateVersion,
+      TemplatePreviewData,
       TemplateEngineCode,
       Tenant,
       EventChannelSetting,

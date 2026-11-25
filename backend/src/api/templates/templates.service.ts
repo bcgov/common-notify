@@ -19,6 +19,7 @@ import type { NotifyContent } from '../notify/schemas/notify-content'
 import { TemplateResponseDto } from './schemas/template-response.dto'
 import { PaginatedTemplateResponse } from './schemas/paginated-template-response'
 import { TemplateUsageResponseDto } from './schemas/template-usage-response.dto'
+import { TemplatePreviewDataDto } from './schemas/template-preview-data.dto'
 import { TemplateVersionResponseDto } from './schemas/template-version-response.dto'
 import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from '../../services/rendering/tokens'
 import { ITemplateRendererRegistry } from '../../adapters/interfaces'
@@ -103,6 +104,31 @@ export class TemplatesService {
     // Only the single-template read carries the placeholder report: it is what the bulk-send screen
     // builds its spreadsheet columns from, and parsing every template in a list would be wasted work.
     return { ...this.toResponseDto(template), placeholders: describeTemplatePlaceholders(template) }
+  }
+
+  async getPreviewData(tenantId: string, templateId: string): Promise<TemplatePreviewDataDto> {
+    const template = await this.templatesRepository.findById(tenantId, templateId)
+    if (!template) {
+      throw new NotFoundException(`Template ${templateId} not found`)
+    }
+
+    const data = await this.templatesRepository.findPreviewData(templateId)
+    return { params: data?.params ?? {} }
+  }
+
+  async savePreviewData(
+    tenantId: string,
+    templateId: string,
+    dto: TemplatePreviewDataDto,
+    userId: string,
+  ): Promise<TemplatePreviewDataDto> {
+    const template = await this.templatesRepository.findById(tenantId, templateId)
+    if (!template) {
+      throw new NotFoundException(`Template ${templateId} not found`)
+    }
+
+    const params = await this.templatesRepository.savePreviewData(templateId, dto.params, userId)
+    return { params }
   }
 
   /**

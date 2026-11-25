@@ -3,6 +3,8 @@ import {
   NotificationChannel,
   TemplateEngine,
   createTemplate,
+  getTemplatePreviewData,
+  saveTemplatePreviewData,
   deleteTemplate,
   getPreviousTemplateVersion,
   getTemplateById,
@@ -12,11 +14,12 @@ import {
   previewTemplateBody,
   updateTemplate,
 } from './templates.api'
-import { deleteMethod, generateApiParameters, get, post } from '@/common/api'
+import { deleteMethod, generateApiParameters, get, post, put } from '@/common/api'
 
 vi.mock('@/common/api', () => ({
   get: vi.fn(),
   post: vi.fn(),
+  put: vi.fn(),
   deleteMethod: vi.fn(),
   generateApiParameters: vi.fn((url: string, params?: unknown) => ({
     url,
@@ -43,6 +46,35 @@ const httpError = (status: number, data?: unknown) =>
 describe('templates.api', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  it('reads the selected template preview data', async () => {
+    const data = { params: { name: 'Jane' } }
+    vi.mocked(get).mockResolvedValue(data)
+    await expect(getTemplatePreviewData('template-a')).resolves.toEqual(data)
+    expect(get).toHaveBeenCalledWith(
+      expect.objectContaining({ url: `${BASE_URL}/template-a/preview-data` }),
+    )
+  })
+
+  it('sends preview values in the PUT request body', async () => {
+    const data = { params: { approved: 'false', name: '' } }
+    vi.mocked(put).mockResolvedValue(data)
+    await expect(saveTemplatePreviewData('template-a', data.params)).resolves.toEqual(data)
+    expect(put).toHaveBeenCalledWith(
+      expect.objectContaining({ url: `${BASE_URL}/template-a/preview-data`, params: data }),
+    )
+  })
+
+  it('surfaces preview data load and save failures', async () => {
+    vi.mocked(get).mockRejectedValue(httpError(404))
+    vi.mocked(put).mockRejectedValue(httpError(403))
+    await expect(getTemplatePreviewData('other-template')).rejects.toThrow(
+      'Failed to load preview values',
+    )
+    await expect(saveTemplatePreviewData('template-a', {})).rejects.toThrow(
+      'Failed to save preview values',
+    )
   })
 
   describe('getTemplates', () => {

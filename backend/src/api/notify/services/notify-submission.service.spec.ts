@@ -13,6 +13,7 @@ import { LimitAlertNotificationService } from './limit-alert-notification.servic
 import { SmsSegmentService } from './sms-segment.service'
 import { NotificationDedupService } from './notification-dedup.service'
 import { TenantsService } from '../../admin/tenants/tenants.service'
+import { FeatureFlagService } from '../../feature-flag/feature-flag.service'
 import { QueueName } from '../../../enum/queue-name.enum'
 import { NotificationChannel } from '../../../enum/notification-channel.enum'
 import { UsagePeriodType } from '../../../enum/usage-period-type.enum'
@@ -32,6 +33,8 @@ describe('NotifySubmissionService', () => {
   } as unknown as NotifySimpleRequest
 
   const tenants = { assertCanSend: vi.fn().mockResolvedValue(undefined) }
+  const featureFlags = { isEnabled: vi.fn() }
+  const ingestionQueue = { name: 'ingestion', add: vi.fn() }
   const usage = {
     assertWithinLimits: vi.fn(),
     recordUsage: vi.fn(),
@@ -39,6 +42,8 @@ describe('NotifySubmissionService', () => {
 
   beforeEach(async () => {
     limitAlerts.processAcceptedUsage.mockReset()
+    featureFlags.isEnabled.mockReset().mockResolvedValue(false)
+    ingestionQueue.add.mockReset()
     usage.assertWithinLimits.mockReset().mockResolvedValue(undefined)
     usage.recordUsage.mockReset().mockResolvedValue([
       {
@@ -66,13 +71,14 @@ describe('NotifySubmissionService', () => {
         { provide: SafelistService, useValue: { findBlocked: vi.fn().mockResolvedValue([]) } },
         { provide: NotificationDedupService, useValue: { enabled: false } },
         { provide: LimitAlertNotificationService, useValue: limitAlerts },
-        { provide: QueueName.INGESTION, useValue: { name: 'ingestion', add: vi.fn() } },
+        { provide: QueueName.INGESTION, useValue: ingestionQueue },
         { provide: NotificationRequestDetailService, useValue: {} },
         { provide: AttachmentValidationService, useValue: {} },
         { provide: AttachmentProcessingService, useValue: {} },
         { provide: SmsSegmentService, useValue: {} },
         { provide: EventNotificationResolver, useValue: {} },
         { provide: TenantsService, useValue: tenants },
+        { provide: FeatureFlagService, useValue: featureFlags },
       ],
     }).compile()
 
@@ -92,6 +98,25 @@ describe('NotifySubmissionService', () => {
     expect(limitAlerts.processAcceptedUsage).toHaveBeenCalledWith({
       tenantId: 'tenant-1',
       usageResults: [expect.objectContaining({ channelCode: NotificationChannel.EMAIL })],
+    })
+  })
+
+  // The GC Notify route calls acceptMerge directly, so it reads the flag itself.
+  it.each([
+    [false, 10],
+    [true, 15],
+  ])('queues a merge with priority lanes %s at priority %i', async (lanes, priority) => {
+    featureFlags.isEnabled.mockResolvedValue(lanes)
+
+    await merge()
+
+    expect(featureFlags.isEnabled).toHaveBeenCalledWith('notification_priority', 'tenant-1')
+    await vi.waitFor(() => {
+      expect(ingestionQueue.add).toHaveBeenCalledWith(
+        'ingestion',
+        expect.any(Object),
+        expect.objectContaining({ priority }),
+      )
     })
   })
 

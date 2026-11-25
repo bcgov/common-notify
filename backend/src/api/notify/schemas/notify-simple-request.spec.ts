@@ -442,7 +442,9 @@ describe('NotifySimpleRequest', () => {
 
       const instance = plainToInstance(NotifySimpleRequest, data)
 
-      expect(Object.keys(instance).sort()).toEqual(['email', 'msgApp', 'params', 'sms'].sort())
+      expect(Object.keys(instance).sort()).toEqual(
+        ['email', 'msgApp', 'params', 'priority', 'sms'].sort(),
+      )
     })
 
     it('should handle deeply nested params', async () => {

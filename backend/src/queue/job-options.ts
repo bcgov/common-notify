@@ -1,5 +1,6 @@
 import type { BackoffOptions, JobsOptions } from 'bullmq'
 import { COMPLETED_JOB_RETENTION, FAILED_JOB_RETENTION } from './job-retention'
+import { DEFAULT_JOB_PRIORITIES } from './job-priority'
 
 /**
  * Backoff for every job here: retry n waits (2^n - 1) x delay, so 2s then 6s at a 2s base. The
@@ -49,9 +50,16 @@ export const RETRY_POLICY = {
   backoff: { type: BACKOFF_STRATEGY, delay: 2000 },
 } satisfies JobsOptions
 
+/**
+ * A fallback priority for the ingestion and delivery queues, where every job must have one: a job
+ * without one runs ahead of all prioritised jobs. Each add overrides it with the send's priority.
+ */
+const DEFAULT_PRIORITY = { priority: DEFAULT_JOB_PRIORITIES.normal } satisfies JobsOptions
+
 /** An ingestion job: kept an hour once done, so a re-add of the same id is deduplicated. */
 export const INGESTION_JOB_OPTIONS = {
   ...RETRY_POLICY,
+  ...DEFAULT_PRIORITY,
   removeOnComplete: COMPLETED_JOB_RETENTION,
   removeOnFail: FAILED_JOB_RETENTION,
 } satisfies JobsOptions
@@ -59,6 +67,7 @@ export const INGESTION_JOB_OPTIONS = {
 /** A delivery job: removed once done. Postgres records what it sent. */
 export const DELIVERY_JOB_OPTIONS = {
   ...RETRY_POLICY,
+  ...DEFAULT_PRIORITY,
   removeOnComplete: true,
   removeOnFail: FAILED_JOB_RETENTION,
 } satisfies JobsOptions

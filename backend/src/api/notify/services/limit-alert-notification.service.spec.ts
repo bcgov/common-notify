@@ -245,6 +245,7 @@ describe('LimitAlertNotificationService', () => {
         backoff: { type: BACKOFF_STRATEGY, delay: 2000 },
         removeOnComplete: COMPLETED_JOB_RETENTION,
         removeOnFail: FAILED_JOB_RETENTION,
+        priority: 10,
       },
     )
     expect(notificationService.update).toHaveBeenCalledWith('notification-1', 'tenant-1', {

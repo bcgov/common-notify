@@ -1,4 +1,13 @@
-import { IsString, IsEnum, IsOptional, MinLength, MaxLength, ValidateIf } from 'class-validator'
+import {
+  IsString,
+  IsEnum,
+  IsOptional,
+  MinLength,
+  MaxLength,
+  ValidateIf,
+  Validate,
+} from 'class-validator'
+import { PreviewParamsValidator } from './template-preview-data.dto'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { NotificationChannel } from '../../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../../enum/template-engine.enum'
@@ -7,6 +16,11 @@ import { TemplateEngine } from '../../../enum/template-engine.enum'
  * DTO for creating a new template
  */
 export class CreateTemplateDto {
+  @ApiPropertyOptional({ type: 'object', additionalProperties: { type: 'string' } })
+  @ValidateIf((_object, value) => value !== undefined)
+  @Validate(PreviewParamsValidator)
+  previewParams?: Record<string, string>
+
   /**
    * Template name (must be unique within the tenant)
    * @example "Funding Approved Email"

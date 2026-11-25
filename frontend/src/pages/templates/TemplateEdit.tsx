@@ -100,6 +100,7 @@ const TemplateEdit: FC<TemplateEditProps> = ({ templateId }) => {
       <TemplateForm
         key={template.id}
         mode="edit"
+        templateId={templateId}
         initialValues={{
           name: template.name,
           channelCode: template.channelCode,

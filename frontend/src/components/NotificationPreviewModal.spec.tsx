@@ -26,6 +26,21 @@ function renderModal(overrides: Partial<Parameters<typeof NotificationPreviewMod
 }
 
 describe('NotificationPreviewModal', () => {
+  it('announces loading independently of an overridden output', () => {
+    renderModal({
+      isLoading: true,
+      statusMessage: 'Saving preview values...',
+      bodyOverride: <p>Raw template</p>,
+    })
+    expect(screen.getByRole('status')).toHaveTextContent('Saving preview values...')
+    expect(screen.getByRole('textbox', { name: 'firstName' })).toBeInTheDocument()
+    expect(screen.getByRole('radiogroup', { name: 'isApproved' })).toBeInTheDocument()
+  })
+
+  it('announces rendering errors', () => {
+    renderModal({ error: 'Rendering failed' })
+    expect(screen.getByRole('alert')).toHaveTextContent('Rendering failed')
+  })
   it('renders nothing while closed', () => {
     renderModal({ isOpen: false })
 

@@ -6,6 +6,8 @@ import { ApiOneOf, ApiOneOfOptional } from './api-one-of.decorator'
 import { ValidateTemplateOrRenderer } from './validators/template-or-renderer.validator'
 import { ValidateRecipientsOrMerge } from './validators/recipients-or-merge.validator'
 import { NotifyAttachment } from './notify-attachment'
+import { PriorityProperty } from './priority-property.decorator'
+import type { NotificationPriority } from '../../../queue/job-priority'
 import {
   NotifyEmailAddressRecipients,
   NotifyEmailMergeRecipients,
@@ -92,4 +94,11 @@ export class NotifyEmailChannel {
   @IsOptional()
   @IsUUID()
   identityId?: string
+
+  /**
+   * Queue priority for the email-only routes. A request-level
+   * priority takes precedence. See requestPriority.
+   */
+  @PriorityProperty()
+  priority?: NotificationPriority
 }

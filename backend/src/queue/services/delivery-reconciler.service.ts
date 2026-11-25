@@ -7,6 +7,7 @@ import {
   Optional,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import { ConfigService } from '@nestjs/config'
 import { FindOptionsWhere, In, IsNull, Repository } from 'typeorm'
 import { randomUUID } from 'node:crypto'
 import type { Queue } from 'bullmq'
@@ -21,6 +22,7 @@ import { ProviderToken } from '../../enum/provider-token.enum'
 import { QueueName } from '../../enum/queue-name.enum'
 import { redisKey } from '../../common/redis/redis-namespace'
 import { DELIVERY_JOB_OPTIONS, INGESTION_JOB_OPTIONS } from '../job-options'
+import { jobPriority, priorityLanesEnabled, requestPriority } from '../job-priority'
 import { StructuredLoggerService } from '../../common/logger'
 import {
   delayUntilScheduled,
@@ -28,6 +30,8 @@ import {
   mergeContentFromRequest,
 } from '../merge-batch-builder'
 import type { DeliveryJobPayload } from '../queue.types'
+import type { NotifySimpleRequest } from '../../api/notify/schemas/notify-simple-request'
+import { FeatureFlagService } from '../../api/feature-flag/feature-flag.service'
 import { recordReconcilePass } from '../reconcile-activity'
 import type { ReconcileActionRecord, ReconcileKind } from '../reconcile-activity'
 
@@ -126,6 +130,8 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
     @Optional() @Inject(QueueName.SMS_DELIVERY) private readonly smsQueue?: Queue | null,
     @Optional() @Inject(QueueName.INGESTION) private readonly ingestionQueue?: Queue | null,
     @Optional() private readonly structuredLogger?: StructuredLoggerService,
+    @Optional() private readonly configService?: ConfigService,
+    @Optional() private readonly featureFlagService?: FeatureFlagService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -350,9 +356,11 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
     // Finished or gone while work is still owed: replace it.
     if (job) await job.remove().catch(() => undefined)
     if (item.kind === 'batch') {
-      await queue.add(queue.name, await this.rebuildBatchJob(item), {
+      const { data, priority } = await this.rebuildBatchJob(item)
+      await queue.add(queue.name, data, {
         jobId: item.jobId,
         ...DELIVERY_JOB_OPTIONS,
+        priority,
       })
     } else {
       await this.reingest(item)
@@ -389,6 +397,7 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
     await this.ingestionQueue.add(this.ingestionQueue.name, job, {
       jobId: item.notifyId,
       ...INGESTION_JOB_OPTIONS,
+      priority: await this.priorityFor(request.tenantId, request.payload, !!job.mailMerge),
       ...(delay > 0 && { delay }),
     })
 
@@ -400,8 +409,13 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
     }
   }
 
-  /** The batch's job as ingestion queued it: shared content and params, recipients left in Postgres. */
-  private async rebuildBatchJob(item: StuckWork): Promise<DeliveryJobPayload> {
+  /**
+   * The batch's job as ingestion queued it: shared content and params, recipients left in
+   * Postgres. Its priority is the merge's, from the stored request.
+   */
+  private async rebuildBatchJob(
+    item: StuckWork,
+  ): Promise<{ data: DeliveryJobPayload; priority: number }> {
     const request = await this.requestRepository.findOne({
       where: { id: item.notifyId },
       select: { id: true, payload: true },
@@ -410,7 +424,7 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
 
     const channel = item.channel as NotificationChannel
     const mailMergeData = mergeContentFromRequest(request.payload, channel)
-    return {
+    const data: DeliveryJobPayload = {
       notifyId: item.notifyId,
       tenantId: item.tenantId,
       channel,
@@ -421,6 +435,21 @@ export class DeliveryReconcilerService implements OnApplicationBootstrap, OnModu
       batchId: item.batchId,
       mailMergeData,
     }
+    const priority = await this.priorityFor(item.tenantId, request.payload, true)
+    return { data, priority }
+  }
+
+  /** The priority acceptance gives this stored request. */
+  private async priorityFor(
+    tenantId: string,
+    payload: unknown,
+    mailMerge: boolean,
+  ): Promise<number> {
+    const lanes = await priorityLanesEnabled(this.featureFlagService, tenantId)
+    return jobPriority(
+      requestPriority(payload as NotifySimpleRequest, mailMerge, lanes),
+      this.configService,
+    )
   }
 
   /**
