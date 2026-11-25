@@ -488,14 +488,15 @@ export class NotifySimpleController {
   }
 
   /**
-   * The request's ingestion job while it has not started - waiting, or delayed until its send
-   * time - and only if it belongs to this tenant. Null once it is running or done.
+   * The request's ingestion job while it has not started - waiting (prioritized, as every job
+   * now has a priority), or delayed until its send time - and only if it belongs to this tenant.
+   * Null once it is running or done.
    */
   private async pendingIngestionJob(notificationId: string, tenantId: string) {
     const job = await this.ingestionQueue.getJob(notificationId)
     if (!job || job.data?.tenantId !== tenantId) return null
     const state = await job.getState()
-    return state === 'delayed' || state === 'waiting' ? job : null
+    return state === 'delayed' || state === 'waiting' || state === 'prioritized' ? job : null
   }
 
   private async doCancelOrReschedule(
@@ -567,6 +568,14 @@ export class NotifySimpleController {
               {
                 jobId: notificationId,
                 ...INGESTION_JOB_OPTIONS,
+                // A job queued before priorities has none, and would otherwise jump the queue.
+                priority:
+                  jobToUpdate.opts.priority ||
+                  (await this.submissionService.ingestionPriority(
+                    tenantId,
+                    jobToUpdate.data.request,
+                    !!jobToUpdate.data.mailMerge,
+                  )),
                 delay: Math.max(0, newDelay),
               },
             )

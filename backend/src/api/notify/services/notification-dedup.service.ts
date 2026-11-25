@@ -150,7 +150,8 @@ export class NotificationDedupService implements OnModuleInit, OnModuleDestroy {
    * Stable hash of a send. Recipients are normalised and sorted - so address order, case and
    * phone formatting don't make a request look new - and object keys are sorted. Everything
    * else (content, params, attachments, delayedSend, mergeArray) is hashed as given, so any
-   * difference in what would be delivered makes it a different request.
+   * difference in what would be delivered makes it a different request. Priority is left out:
+   * it only orders the queue, so a send resubmitted at another priority is still a duplicate.
    */
   fingerprint(payload: unknown): string {
     return createHash('sha256')
@@ -306,6 +307,8 @@ export class NotificationDedupService implements OnModuleInit, OnModuleDestroy {
     if (!isObject(payload)) return payload
     return {
       ...payload,
+      // Undefined keys are dropped from the JSON that is hashed.
+      priority: undefined,
       email: this.normalizeChannel(payload.email, ['to', 'cc', 'bcc'], (a) =>
         this.normalizeEmail(a),
       ),
@@ -318,7 +321,8 @@ export class NotificationDedupService implements OnModuleInit, OnModuleDestroy {
     fields: string[],
     normalize: (value: string) => string,
   ): unknown {
-    if (!isObject(channel) || !isObject(channel.recipients)) return channel
+    if (!isObject(channel)) return channel
+    if (!isObject(channel.recipients)) return { ...channel, priority: undefined }
     const recipients: Record<string, unknown> = { ...channel.recipients }
     for (const field of fields) {
       const values = recipients[field]
@@ -328,7 +332,7 @@ export class NotificationDedupService implements OnModuleInit, OnModuleDestroy {
           .sort(byCodeUnit)
       }
     }
-    return { ...channel, recipients }
+    return { ...channel, priority: undefined, recipients }
   }
 }
 

@@ -20,6 +20,7 @@ import { TenantsService } from '../admin/tenants/tenants.service'
 import { EventNotificationResolver } from '../events/event-notification.resolver'
 import { TenantSettingsService } from '../tenant-settings/tenant-settings.service'
 import { QueueName } from '../../enum/queue-name.enum'
+import { FeatureFlagService } from '../feature-flag/feature-flag.service'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import { TemplateEngine } from '../../enum/template-engine.enum'
 
@@ -134,6 +135,7 @@ describe('GcNotifyInternalExecutionService', () => {
         { provide: NotificationDedupService, useValue: mockNotificationDedupService },
         { provide: EventNotificationResolver, useValue: {} },
         { provide: TenantsService, useValue: { assertCanSend: vi.fn() } },
+        { provide: FeatureFlagService, useValue: {} },
         NotifySubmissionService,
       ],
     }).compile()
@@ -215,7 +217,8 @@ describe('GcNotifyInternalExecutionService', () => {
       expect(mockIngestionQueue.add).toHaveBeenCalledWith(
         'notification-ingestion',
         expect.objectContaining({ notifyId: 'notif-1', tenantId: TENANT_ID }),
-        expect.objectContaining({ jobId: 'notif-1' }),
+        // Always normal: without a priority it would be processed ahead of every prioritised job.
+        expect.objectContaining({ jobId: 'notif-1', priority: 10 }),
       )
       expect(mockNotificationService.update).toHaveBeenCalledWith(
         'notif-1',
@@ -1201,6 +1204,13 @@ describe('GcNotifyInternalExecutionService', () => {
       expect(mockTemplatesService.renderTemplateContent).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'tpl-2', engineCode: TemplateEngine.GC_NOTIFY_NATIVE }),
         body.personalisation,
+      )
+
+      await flushMicrotasks()
+      expect(mockIngestionQueue.add).toHaveBeenCalledWith(
+        'notification-ingestion',
+        expect.objectContaining({ notifyId: 'notif-2' }),
+        expect.objectContaining({ jobId: 'notif-2', priority: 10 }),
       )
     })
 

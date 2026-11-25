@@ -14,7 +14,9 @@ import { AttachmentService } from '../../api/attachment/attachment.service'
 import { PhoneNumberService } from '../../api/notify/services/phone-number.service'
 import { mergeJobDataFromRequest } from '../merge-batch-builder'
 import { DELIVERY_JOB_OPTIONS } from '../job-options'
+import { jobPriority, priorityLanesEnabled, requestPriority } from '../job-priority'
 import { TenantsService } from '../../api/admin/tenants/tenants.service'
+import { FeatureFlagService } from '../../api/feature-flag/feature-flag.service'
 import { describeError } from '../../common/utils/describe-error'
 
 type IngestionRequest = IngestionJobPayload['request']
@@ -74,6 +76,7 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
     private readonly tenantsService: TenantsService,
     @Optional() private readonly clamavService?: ClamavService,
     @Optional() private readonly attachmentService?: AttachmentService,
+    @Optional() private readonly featureFlagService?: FeatureFlagService,
   ) {}
 
   /**
@@ -118,8 +121,12 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
         return { success: false, reason: 'Sending is disabled for this tenant' }
       }
 
+      // Delivery jobs inherit the ingestion job's priority. A job queued before priorities has
+      // none, and gets the default for its kind of send.
+      const priority = job.opts.priority || (await this.defaultPriority(job.data))
+
       if (job.data.mailMerge && job.data.mailMergeData) {
-        return await this.fanOutMerge(job.data)
+        return await this.fanOutMerge(job.data, priority)
       }
 
       const request = this.normalizeSmsRecipients(job.data.request)
@@ -134,7 +141,7 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
         return { success: false, reason: 'Quarantined due to malware detection' }
       }
 
-      const queued = await this.fanOut(job.data, request, resumed)
+      const queued = await this.fanOut(job.data, request, resumed, priority)
 
       await this.notificationService.update(notifyId, tenantId, {
         status: NotificationStatus.PROCESSING,
@@ -200,11 +207,17 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
     ).recipients!
   }
 
+  /** The priority for a job queued without one, as acceptance would give it today. */
+  private async defaultPriority(data: IngestionJobPayload): Promise<number> {
+    const lanes = await priorityLanesEnabled(this.featureFlagService, data.tenantId)
+    return jobPriority(requestPriority(data.request, !!data.mailMerge, lanes), this.configService)
+  }
+
   /**
    * Split a merge's recipients into fixed-size batches and queue one delivery job per batch on
    * the merge's channel. Each batch's detail rows are written here, tagged with its batchId.
    */
-  private async fanOutMerge(data: IngestionJobPayload): Promise<unknown> {
+  private async fanOutMerge(data: IngestionJobPayload, priority: number): Promise<unknown> {
     const { notifyId, tenantId, request } = data
     const { content, params } = data.mailMergeData!
     const batchSize = this.configService?.get<number>('queue.batchSize') || 25
@@ -220,7 +233,8 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
     )
 
     let batchIndex = 0
-    // In order, one batch at a time: each batch's rows are written before its job is queued.
+    // In order, one batch at a time: each batch's rows are written before its job is queued, and
+    // a large merge would otherwise hit the database with every batch at once (hence NOSONAR).
     for (let start = 0; start < recipients.length; start += batchSize, batchIndex++) {
       const chunk = recipients.slice(start, start + batchSize)
       // {notification_request id}-{channel}-{index}, reused as the delivery jobId so a failed
@@ -229,8 +243,8 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
 
       // A retried ingestion job re-runs this loop. Rows already written for a batch mean an
       // earlier run created it; writing them again would send those recipients twice.
-      if ((await this.requestDetailService.countBatch(notifyId, batchId)) === 0) {
-        await this.requestDetailService.createMergePending(
+      if ((await /* NOSONAR */ this.requestDetailService.countBatch(notifyId, batchId)) === 0) {
+        await /* NOSONAR */ this.requestDetailService.createMergePending(
           notifyId,
           batchId,
           chunk,
@@ -251,7 +265,11 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
         // Recipients stay in Postgres; the worker reads this batch's detail rows.
         mailMergeData: { content, params },
       }
-      await queue.add(queue.name, deliveryPayload, { jobId: batchId, ...DELIVERY_JOB_OPTIONS })
+      await /* NOSONAR */ queue.add(queue.name, deliveryPayload, {
+        jobId: batchId,
+        ...DELIVERY_JOB_OPTIONS,
+        priority,
+      })
 
       this.logger.log(
         `[${notifyId}] Queued mail merge batch ${batchIndex} (batchId=${batchId}, recipients=${chunk.length})`,
@@ -395,6 +413,7 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
     { notifyId, tenantId, scheduledFor }: IngestionJobPayload,
     request: IngestionRequest,
     resumed: boolean,
+    priority: number,
   ): Promise<number> {
     const deliveries: Array<{
       queue: Queue<DeliveryJobPayload>
@@ -452,6 +471,7 @@ export class IngestionWorker implements QueueProcessor<IngestionJobPayload> {
         jobId: jobKey,
         delay,
         ...DELIVERY_JOB_OPTIONS,
+        priority,
       })
 
       this.logger.log(

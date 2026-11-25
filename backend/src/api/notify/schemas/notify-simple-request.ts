@@ -5,6 +5,8 @@ import { NotifyEmailChannel } from './notify-email-channel'
 import { NotifySmsChannel } from './notify-sms-channel'
 import { NotifyMsgAppChannel } from './notify-msg-app-channel'
 import { ValidateTemplateOrContent } from './validators/template-or-content.validator'
+import { PriorityProperty } from './priority-property.decorator'
+import type { NotificationPriority } from '../../../queue/job-priority'
 
 @ValidateTemplateOrContent()
 export class NotifySimpleRequest {
@@ -43,4 +45,8 @@ export class NotifySimpleRequest {
   @ValidateNested()
   @Type(() => NotifyMsgAppChannel)
   msgApp?: NotifyMsgAppChannel
+
+  /** Queue priority. Defaults to normal, or low for a merge. */
+  @PriorityProperty()
+  priority?: NotificationPriority
 }
