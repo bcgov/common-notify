@@ -223,9 +223,10 @@ grafana.ini:
     login_attribute_path: preferred_username
     name_attribute_path: name
 
-    # Role mapping - default all users to Viewer
-    # To grant admin access, manually promote users in Grafana after first login
-    role_attribute_path: contains(groups[*], 'grafana-admin') && 'Admin' || 'Viewer'
+    # CSS exposes the roles assigned on an integration in `client_roles`. The
+    # `groups` claim this read is never present, so every IDIR user fell through to
+    # Viewer, and Grafana's per-login role sync undid manual promotions (CCP-6580).
+    role_attribute_path: contains(client_roles[*], 'grafana-admin') && 'Admin' || 'Viewer'
     role_attribute_strict: false
 
     # Allow users to see Grafana org users list
