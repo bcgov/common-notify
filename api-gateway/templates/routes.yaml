@@ -755,6 +755,79 @@ routes:
     request_buffering: true
     response_buffering: true
 
+  # ============================================================================
+  # CSTAR ADMIN ROUTES (NOTIFY_ADMIN, or NOTIFY_OPERATIONS_ADMIN for their own tenant)
+  # ============================================================================
+  # /api/v1/frontend/admin/cstar (every CSTAR admin read)
+  # Kong prefix-matches, so this covers:
+  #   health
+  #   tenants/:tenantId
+  #   tenants/:tenantId/shared-services
+  #   tenants/:tenantId/ssousers/:ssoUserId/{roles,groups}
+  #   tenants/:tenantId/users[/:tenantUserId[/roles]]
+  #   tenants/:tenantId/groups[/:groupId[/roles]]
+  #   users/search/{idir,bceid}
+  - name: ${ROUTE_PREFIX}admin-cstar-read-frontend
+    tags: [${CONFIG_TAG}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/admin/cstar
+    methods:
+      - GET
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/admin/cstar/tenants/:tenantId/users (add a tenant user)
+  # Also covers .../groups (create a group) and .../groups/:groupId/users (add a group user).
+  - name: ${ROUTE_PREFIX}admin-cstar-tenant-users-create-frontend
+    tags: [${CONFIG_TAG}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/admin/cstar/tenants/
+    methods:
+      - POST
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/admin/cstar/tenants/:tenantId/groups/:groupId[/roles] (update a group or its roles)
+  - name: ${ROUTE_PREFIX}admin-cstar-groups-update-frontend
+    tags: [${CONFIG_TAG}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/admin/cstar/tenants/
+    methods:
+      - PUT
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
+  # /api/v1/frontend/admin/cstar/tenants/:tenantId/users/:tenantUserId (remove a tenant user)
+  # Also covers .../groups/:groupId/users/:groupUserId (remove a group user).
+  - name: ${ROUTE_PREFIX}admin-cstar-tenant-users-delete-frontend
+    tags: [${CONFIG_TAG}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/admin/cstar/tenants/
+    methods:
+      - DELETE
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
   # /api/v1/frontend/templates (frontend variant - list and create)
   - name: ${ROUTE_PREFIX}templates-frontend-list
     tags: [${CONFIG_TAG}]

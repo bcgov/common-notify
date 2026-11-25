@@ -413,9 +413,12 @@ export class NotifySubmissionService {
     const { tenantId } = caller
 
     if (mode === 'full') {
-      return resolver.resolveSend(tenantId, request.eventId, request.params, {
-        tenantId: caller.tenantExternalId,
-      })
+      return resolver.resolveSend(
+        tenantId,
+        request.eventId,
+        request.params,
+        caller.tenantExternalId,
+      )
     }
 
     // Recipients chosen on the test send screen. The resolver decides which of them are allowed.
