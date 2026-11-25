@@ -13,7 +13,6 @@ import { NotifyConfiguration } from '../notification/entities/configuration.enti
 import { CstarApiClient } from '../../services/cstar/cstar-api.client'
 import { EventRecipientKind } from '../../enum/event-recipient-kind.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
-import type { CstarRequestContext } from './events.service'
 import type { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
 
 /** Global cap on recipients per channel, seeded by V62. Mirrors EventsService. */
@@ -69,13 +68,31 @@ export class EventNotificationResolver {
     tenantId: string,
     eventId: string,
     params: Record<string, unknown> | undefined,
-    cstar: CstarRequestContext,
+    cstarTenantId: string,
   ): Promise<NotifySimpleRequest> {
     const setting = await this.findSendableEmailSetting(tenantId, eventId)
 
-    const to = await this.recipientsOfKind(setting, EventRecipientKind.TO, cstar)
-    const cc = await this.recipientsOfKind(setting, EventRecipientKind.CC, cstar)
-    const bcc = await this.recipientsOfKind(setting, EventRecipientKind.BCC, cstar)
+    // A group on more than one list is looked up only for the first, since the dedupe below
+    // would drop its members from the later lists anyway.
+    const resolvedGroupIds = new Set<string>()
+    const to = await this.recipientsOfKind(
+      setting,
+      EventRecipientKind.TO,
+      cstarTenantId,
+      resolvedGroupIds,
+    )
+    const cc = await this.recipientsOfKind(
+      setting,
+      EventRecipientKind.CC,
+      cstarTenantId,
+      resolvedGroupIds,
+    )
+    const bcc = await this.recipientsOfKind(
+      setting,
+      EventRecipientKind.BCC,
+      cstarTenantId,
+      resolvedGroupIds,
+    )
 
     // Someone can sit in a typed-in address and in a group, or in two groups addressed by
     // different lists. They should be written to once, on the most prominent list that names
@@ -214,29 +231,49 @@ export class EventNotificationResolver {
     return setting
   }
 
-  /** One list's typed-in addresses, plus the members of every CSTAR group it addresses. */
+  /**
+   * One list's typed-in addresses, plus the members of every CSTAR group it addresses that is
+   * not already in `resolvedGroupIds`. The groups it looks up are added to that set.
+   */
   private async recipientsOfKind(
     setting: EventChannelSetting,
     kind: EventRecipientKind,
-    cstar: CstarRequestContext,
+    cstarTenantId: string,
+    resolvedGroupIds: Set<string>,
   ): Promise<string[]> {
     const addresses = (setting.recipients ?? [])
       .filter((recipient) => !recipient.isDeleted && recipient.kind === kind)
       .map((recipient) => recipient.address)
 
-    const groupIds = (setting.cstarGroups ?? [])
-      .filter((group) => !group.isDeleted && group.kind === kind)
-      .map((group) => group.cstarGroupId)
+    const groupIds = [
+      ...new Set(
+        (setting.cstarGroups ?? [])
+          .filter((group) => !group.isDeleted && group.kind === kind)
+          .map((group) => group.cstarGroupId)
+          .filter((groupId) => !resolvedGroupIds.has(groupId)),
+      ),
+    ]
+    groupIds.forEach((groupId) => resolvedGroupIds.add(groupId))
 
     if (groupIds.length === 0) return addresses
 
-    // Deliberately not caught: sending to fewer people than the event was configured for is
-    // worse than not sending, so a CSTAR failure fails the request.
-    const members = await this.cstarApiClient.getGroupMemberEmails(
-      cstar.tenantId,
-      groupIds,
-      cstar.authHeader,
-    )
+    // A CSTAR failure fails the request: sending to fewer people than the event was configured
+    // for is worse than not sending. A refused read is reworded so the sender knows to check
+    // the event's groups; every other failure passes through as it is.
+    let members: string[]
+    try {
+      members = await this.cstarApiClient.getGroupMemberEmailsAsServiceAccount(
+        cstarTenantId,
+        groupIds,
+      )
+    } catch (error) {
+      if (!(error instanceof ForbiddenException)) throw error
+      throw new UnprocessableEntityException(
+        `This event's CSTAR groups could not be read: ${error.message}. A group may have been ` +
+          "deleted in CSTAR, or Notify's service account may not have access to it. Check the " +
+          "event's recipients.",
+      )
+    }
 
     this.logger.debug(
       `Resolved ${groupIds.length} CSTAR group(s) for ${kind} to ${members.length} address(es)`,

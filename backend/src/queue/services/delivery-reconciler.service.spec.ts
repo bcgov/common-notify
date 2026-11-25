@@ -9,6 +9,7 @@ import type { NotificationRequestDetail } from '../../api/notification/entities/
 import type { NotificationRequest } from '../../api/notification/entities/notification-request.entity'
 import type { NotificationService } from '../../api/notification/notification.service'
 import type { StructuredLoggerService } from '../../common/logger'
+import type { FeatureFlagService } from '../../api/feature-flag/feature-flag.service'
 
 const BATCH = {
   batchId: 'req-1-EMAIL-0',
@@ -46,6 +47,7 @@ function setup({
   pending = [],
   scheduled = [],
   ingestionJob = null,
+  priorityLanes,
 }: {
   job?: Partial<Job> | null
   locked?: string | null
@@ -60,6 +62,8 @@ function setup({
   /** Scheduled sends past their send time; queried after the QUEUED ones. */
   scheduled?: object[]
   ingestionJob?: Partial<Job> | null
+  /** The notification_priority flag; no flag service when left out. */
+  priorityLanes?: boolean
 }) {
   const results = [stale, deliveries]
   const builder: Record<string, unknown> = {}
@@ -136,6 +140,12 @@ function setup({
     null,
     ingestionQueue as unknown as Queue,
     structuredLogger as unknown as StructuredLoggerService,
+    undefined,
+    priorityLanes === undefined
+      ? undefined
+      : ({
+          isEnabled: vi.fn().mockResolvedValue(priorityLanes),
+        } as unknown as FeatureFlagService),
   )
   return {
     service,
@@ -203,6 +213,19 @@ describe('DeliveryReconcilerService', () => {
     })
     expect(payload.mailMergeData).not.toHaveProperty('recipients')
     expect(options).toMatchObject({ jobId: 'req-1-EMAIL-0', attempts: 3 })
+  })
+
+  it.each([
+    [undefined, 10],
+    [false, 10],
+    [true, 15],
+  ])('rebuilds a merge batch with priority lanes %s at priority %i', async (lanes, priority) => {
+    const { service, queue } = setup({ job: null, priorityLanes: lanes })
+
+    await service.reconcile()
+
+    const [, , options] = queue.add.mock.calls[0]
+    expect(options).toMatchObject({ priority })
   })
 
   it('replaces a job that finished while recipients are still owed', async () => {

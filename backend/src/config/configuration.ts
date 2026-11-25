@@ -146,6 +146,14 @@ export default function configuration() {
         process.env.CSTAR_USER_TENANTS_CACHE_TTL_MS || '15000',
         10,
       ),
+      // Service account (client credentials) for the CSTAR routes that run with no user
+      // present - resolving a saved CSTAR group's members at send time. CSTAR accepts it
+      // only on GET tenants/{id}/groups and GET tenants/{id}/groups/{groupId}/users, and
+      // only once the Notify shared service has allowServiceAccounts enabled with this
+      // client as its serviceAccountClientIdentifier.
+      tokenUrl: process.env.CSTAR_TOKEN_URL,
+      clientId: process.env.CSTAR_CLIENT_ID,
+      clientSecret: process.env.CSTAR_CLIENT_SECRET,
     },
 
     // Twilio SMS Service
@@ -245,6 +253,12 @@ export default function configuration() {
       ),
       jobRetries: Number.parseInt(process.env.JOB_RETRIES || '3', 10),
       jobBackoffDelay: Number.parseInt(process.env.JOB_BACKOFF_DELAY || '2000', 10),
+      // BullMQ job priority per send priority; lower is processed first. See job-priority.ts.
+      priority: {
+        high: Number.parseInt(process.env.QUEUE_PRIORITY_HIGH || '5', 10),
+        normal: Number.parseInt(process.env.QUEUE_PRIORITY_NORMAL || '10', 10),
+        low: Number.parseInt(process.env.QUEUE_PRIORITY_LOW || '15', 10),
+      },
     },
 
     // Identical sends (same tenant, recipients and content) within this window are answered with
