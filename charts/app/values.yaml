@@ -162,6 +162,10 @@ backend:
     port: 3310
     #-- connection timeout in milliseconds
     timeout: 30000
+    #-- how many times a day freshclam looks for new definitions. The pod used to
+    #-- download them once at startup and never again (CCP-6249). 4 is ClamAV's
+    #-- documented courtesy ceiling for database.clamav.net; 1-50 is the valid range.
+    freshclamChecksPerDay: 4
     #-- fail closed when ClamAV is disabled or unavailable. false here covers
     #-- DEV and PR environments, which share one single-replica instance:
     #-- fail-closed there would block PR sends whenever it restarts. TEST and

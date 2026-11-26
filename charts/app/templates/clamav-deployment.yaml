@@ -73,6 +73,7 @@ spec:
               cat > /tmp/freshclam.conf <<EOF
               DatabaseMirror database.clamav.net
               DatabaseDirectory /var/lib/clamav
+              PidFile /tmp/freshclam.pid
               LogVerbose yes
               LogTime yes
               Foreground yes
@@ -80,6 +81,7 @@ spec:
 
               # Download virus databases in background
               /usr/bin/freshclam --config-file=/tmp/freshclam.conf &
+              FRESHCLAM_INITIAL_PID=$!
 
               # Wait for databases to download (check for daily.cvd/cld)
               while [ ! -f /var/lib/clamav/daily.cvd ] && [ ! -f /var/lib/clamav/daily.cld ]; do
@@ -110,6 +112,19 @@ spec:
 
               # Tail logs to stdout
               tail -f /tmp/clamd.log &
+
+              # Let the initial download finish first, so two freshclam processes never
+              # write the database directory at once.
+              wait $FRESHCLAM_INITIAL_PID
+
+              # Keep definitions current for the life of the pod. Without this freshclam
+              # only ever ran the one-shot above, so a pod up for weeks scanned with
+              # signatures weeks old (CCP-6249). --daemon-notify makes clamd reload as
+              # soon as an update lands instead of waiting out its 600s SelfCheck.
+              /usr/bin/freshclam --config-file=/tmp/freshclam.conf \
+                --daemon --foreground \
+                --checks={{ .Values.backend.clamav.freshclamChecksPerDay | default 4 }} \
+                --daemon-notify=/tmp/clamd.conf &
 
               # Wait for clamd process
               wait $CLAMD_PID
