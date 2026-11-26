@@ -1,5 +1,4 @@
 import { Injectable, BadRequestException } from '@nestjs/common'
-import Handlebars from 'handlebars'
 import mjml2html from 'mjml'
 import {
   ITemplateRenderer,
@@ -9,6 +8,7 @@ import {
   RenderOptions,
 } from '../../../adapters/interfaces'
 import { splitPersonalisation } from '../utils/split-personalisation'
+import { renderHandlebars } from '../utils/template-syntax'
 
 const validateTemplate = (template: string): void => {
   const dangerousPatterns = [
@@ -41,14 +41,14 @@ export class MjmlTemplateRenderer implements ITemplateRenderer {
     validateTemplate(context.template.body)
 
     const subject = context.template.subject
-      ? Handlebars.compile(context.template.subject)(strings)
+      ? renderHandlebars(context.template.subject, strings, 'subject')
       : (context.defaultSubject ?? 'Notification')
 
     // Stored SMS templates still flow through renderEmail in TemplatesService.
     if (context.template.type === 'sms') {
       return {
         subject,
-        body: Handlebars.compile(context.template.body)(strings),
+        body: renderHandlebars(context.template.body, strings, 'body'),
         attachments:
           attachments.length > 0
             ? attachments.map((a) => ({
@@ -60,7 +60,7 @@ export class MjmlTemplateRenderer implements ITemplateRenderer {
       }
     }
 
-    const interpolatedBody = Handlebars.compile(context.template.body)(strings)
+    const interpolatedBody = renderHandlebars(context.template.body, strings, 'body')
 
     try {
       const result = await mjml2html(interpolatedBody, {
@@ -100,7 +100,9 @@ export class MjmlTemplateRenderer implements ITemplateRenderer {
 
     // SMS is plain text: no MJML compilation and no HTML escaping of personalisation.
     return {
-      body: Handlebars.compile(context.template.body, { noEscape: true })(context.personalisation),
+      body: renderHandlebars(context.template.body, context.personalisation, 'body', {
+        noEscape: true,
+      }),
     }
   }
 }

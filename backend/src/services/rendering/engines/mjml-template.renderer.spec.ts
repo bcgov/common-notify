@@ -1,4 +1,5 @@
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { TemplateRenderError } from '../utils/template-syntax'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { BadRequestException } from '@nestjs/common'
@@ -209,6 +210,26 @@ describe('MjmlTemplateRenderer', () => {
   describe('name property', () => {
     it('should have name "mjml"', () => {
       expect(renderer.name).toBe('mjml')
+    })
+  })
+
+  describe('template errors', () => {
+    it('names a placeholder with a space', async () => {
+      const failure = renderer.renderEmail({
+        template: {
+          id: 't',
+          name: 't',
+          type: 'email',
+          subject: 'Hello',
+          body: '<mjml><mj-body><mj-section><mj-column><mj-text>Hi {{first name}}</mj-text></mj-column></mj-section></mj-body></mjml>',
+          active: true,
+        },
+        personalisation: { first: 'Bob' },
+      })
+      await expect(failure).rejects.toBeInstanceOf(TemplateRenderError)
+      await expect(failure).rejects.toThrow(
+        'Placeholder {{first name}} in body contains a space — use {{first_name}}',
+      )
     })
   })
 })

@@ -25,6 +25,10 @@ import { TEMPLATE_RENDERER_REGISTRY_TOKEN } from '../../services/rendering/token
 import { ITemplateRendererRegistry } from '../../adapters/interfaces'
 import type { TemplateDefinition } from '../../adapters/interfaces'
 import { TenantsService } from '../admin/tenants/tenants.service'
+import {
+  findTemplateSyntaxProblem,
+  TemplateRenderError,
+} from '../../services/rendering/utils/template-syntax'
 import type { ParsedListQuery } from '../../common/query/list-query.types'
 import {
   EmailHeaderOverride,
@@ -188,6 +192,7 @@ export class TemplatesService {
     }
 
     const engineCode = createDto.engineCode || TemplateEngine.HANDLEBARS
+    this.assertValidSyntax(engineCode, createDto.channelCode, createDto.subject, createDto.body)
     // SMS carries no formatting, so its body is stored and sent as plain text.
     const bodyType = this.defaultBodyType(engineCode, createDto.channelCode)
 
@@ -271,6 +276,12 @@ export class TemplatesService {
     template.subject = updateDto.subject ?? template.subject
     template.body = updateDto.body || template.body
     template.engineCode = nextEngineCode
+    this.assertValidSyntax(
+      template.engineCode,
+      template.channelCode,
+      template.subject,
+      template.body,
+    )
     if (template.channelCode === NotificationChannel.SMS) {
       // SMS carries no formatting; the body is always sent verbatim.
       template.bodyType = 'text'
@@ -439,6 +450,12 @@ export class TemplatesService {
   ): Promise<RenderedEmailContent> {
     const normalizedPersonalisation = personalisation ?? {}
 
+    this.assertValidSyntax(
+      template.engineCode,
+      template.channelCode,
+      template.subject,
+      template.body,
+    )
     this.validateTemplatePersonalisation(
       template,
       normalizedPersonalisation,
@@ -556,6 +573,20 @@ export class TemplatesService {
       default:
         return 'email' // default fallback
     }
+  }
+
+  /** A template whose syntax its engine cannot render fails every send, so it is rejected. */
+  private assertValidSyntax(
+    engineCode: TemplateEngine | string,
+    channelCode: string,
+    subject: string | null | undefined,
+    body: string,
+  ): void {
+    const problem =
+      (channelCode === NotificationChannel.EMAIL
+        ? findTemplateSyntaxProblem(engineCode, subject ?? undefined, 'subject')
+        : undefined) ?? findTemplateSyntaxProblem(engineCode, body, 'body')
+    if (problem) throw new TemplateRenderError(problem)
   }
 
   private validateTemplatePersonalisation(
