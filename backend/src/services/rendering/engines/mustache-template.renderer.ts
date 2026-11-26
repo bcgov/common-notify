@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import Mustache from 'mustache'
 import {
   ITemplateRenderer,
   RenderContext,
@@ -8,6 +7,7 @@ import {
   RenderOptions,
 } from '../../../adapters/interfaces'
 import { splitPersonalisation } from '../utils/split-personalisation'
+import { renderMustache } from '../utils/template-syntax'
 
 /**
  * Mustache template renderer. Logic-less syntax: {{ variable }}, {{# section }}, etc.
@@ -20,9 +20,9 @@ export class MustacheTemplateRenderer implements ITemplateRenderer {
   renderEmail(context: RenderContext, _options?: RenderOptions): Promise<RenderedEmail> {
     const { strings, attachments } = splitPersonalisation(context.personalisation)
     const subject = context.template.subject
-      ? Mustache.render(context.template.subject, strings)
+      ? renderMustache(context.template.subject, strings, 'subject')
       : (context.defaultSubject ?? 'Notification')
-    const body = Mustache.render(context.template.body, strings)
+    const body = renderMustache(context.template.body, strings, 'body')
 
     return Promise.resolve({
       subject,
@@ -41,14 +41,9 @@ export class MustacheTemplateRenderer implements ITemplateRenderer {
   renderSms(context: RenderContext, _options?: RenderOptions): Promise<RenderedSms> {
     // SMS is plain text, never HTML: the pass-through escape keeps personalisation literal.
     // With Mustache's default escape a value like "O'Brien" is sent as "O&#39;Brien".
-    const body = Mustache.render(
-      context.template.body,
-      context.personalisation,
-      {},
-      {
-        escape: String,
-      },
-    )
+    const body = renderMustache(context.template.body, context.personalisation, 'body', {
+      escape: String,
+    })
     return Promise.resolve({ body })
   }
 }

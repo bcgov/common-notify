@@ -11,6 +11,7 @@ import { IEmailTransport } from '../../adapters'
 import { AttachmentResolverService } from '../../api/notify/services/attachment-resolver.service'
 import { MergeBatchRunner } from './merge-batch-runner'
 import { DeliveryFailureHandler } from './delivery-failure-handler'
+import { HandlebarsTemplateRenderer } from '../../services/rendering/engines/handlebars-template.renderer'
 import type { NotificationService } from '../../api/notification/notification.service'
 import type { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
 import type { TemplatesRepository } from '../../api/templates/templates.repository'
@@ -828,6 +829,56 @@ describe('EmailDeliveryWorker', () => {
         'EmailDeliveryWorker',
       )
     })
+
+    it('should fail a template syntax error on the first attempt with a readable reason', async () => {
+      // The real renderer, so the error is the one a bad template produces in production.
+      const renderer = new HandlebarsTemplateRenderer()
+      mockInlineRenderingService.renderEmail.mockImplementation((content, params) =>
+        renderer.renderEmail({
+          template: { id: 'inline', name: 'inline', type: 'email', active: true, ...content },
+          personalisation: params,
+        }),
+      )
+
+      initialize({
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        attachmentResolverService: mockAttachmentResolverService as AttachmentResolverService,
+        emailAdapter: mockEmailAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
+
+      const job: Partial<Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-bad-syntax',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.EMAIL,
+          request: { params: {} },
+          payload: {
+            recipients: { to: ['test@example.com'] },
+            content: { renderer: 'handlebars', subject: 'Hello', body: 'Hi {{first name}}' },
+            params: { first: 'Bob' },
+          },
+          attempt: 0,
+        } as DeliveryJobPayload,
+        opts: { attempts: 3 } as any,
+        attemptsMade: 0,
+      }
+
+      const reason = 'Placeholder {{first name}} in body contains a space — use {{first_name}}'
+      const failure = processHandler(job as Job<DeliveryJobPayload>)
+      await expect(failure).rejects.toBeInstanceOf(UnrecoverableError)
+      await expect(failure).rejects.toThrow(reason)
+      expect(mockEmailAdapter.send).not.toHaveBeenCalled()
+      expect(mockNotificationService.update).toHaveBeenCalledWith(
+        'notify-bad-syntax',
+        'tenant-123',
+        expect.objectContaining({ status: NotificationStatus.FAILED, errorReason: reason }),
+      )
+    })
+
     it('should throw error when notifyId is missing', async () => {
       initialize({
         notificationService: mockNotificationService,

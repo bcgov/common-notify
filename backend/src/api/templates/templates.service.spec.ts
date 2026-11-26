@@ -472,14 +472,22 @@ describe('TemplatesService', () => {
       const template: Template = {
         ...mockTemplate,
         subject: 'Static subject',
-        body: 'Due {{formatDate dueDate}}',
+        body: 'Due {{lookup dates dueDate}}',
       }
 
       await expect(
-        service.renderTemplateContent(template, { dueDate: '' }, undefined, {
+        service.renderTemplateContent(template, { dates: { soon: 'x' }, dueDate: '' }, undefined, {
           allowEmptyValues: false,
         }),
       ).rejects.toThrow('Missing personalisation for template ID template-123: dueDate')
+    })
+
+    it('should report a syntax error before checking personalisation', async () => {
+      const template: Template = { ...mockTemplate, subject: 'Hello', body: 'Hi {{first name}}' }
+
+      await expect(service.renderTemplateContent(template, { first: 'Bob' })).rejects.toThrow(
+        'Placeholder {{first name}} in body contains a space — use {{first_name}}',
+      )
     })
 
     it('should still require a value that is only tested to be supplied', async () => {
@@ -899,6 +907,25 @@ describe('TemplatesService', () => {
   })
 
   describe('createTemplate', () => {
+    it.each([
+      ['body', { subject: 'Hello', body: 'Hi {{first name}}' }],
+      ['subject', { subject: 'Hi {{first name}}', body: 'Hello' }],
+    ])('should reject a placeholder with a space in the %s', async (field, content) => {
+      mockRepository.findByName.mockResolvedValue(null)
+
+      await expect(
+        service.createTemplate('tenant-123', {
+          name: 'Bad Template',
+          channelCode: NotificationChannel.EMAIL,
+          engineCode: TemplateEngine.HANDLEBARS,
+          ...content,
+        }),
+      ).rejects.toThrow(
+        `Placeholder {{first name}} in ${field} contains a space — use {{first_name}}`,
+      )
+      expect(mockRepository.create).not.toHaveBeenCalled()
+    })
+
     it('should create template with bodyType field', async () => {
       const createDto = {
         name: 'Test Template',
@@ -1018,6 +1045,15 @@ describe('TemplatesService', () => {
   })
 
   describe('updateTemplate', () => {
+    it('should reject a body Handlebars cannot render, and save nothing', async () => {
+      mockRepository.findById.mockResolvedValue({ ...mockTemplate })
+
+      await expect(
+        service.updateTemplate('tenant-123', 'template-123', { body: 'Hi {{#if x}}open' }),
+      ).rejects.toBeInstanceOf(BadRequestException)
+      expect(mockRepository.update).not.toHaveBeenCalled()
+    })
+
     it('should save the display name for the version trigger to copy', async () => {
       mockRepository.findById.mockResolvedValue({ ...mockTemplate })
       mockRepository.update.mockResolvedValue({ ...mockTemplate })

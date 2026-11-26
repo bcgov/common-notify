@@ -1,5 +1,4 @@
 import { Injectable, BadRequestException } from '@nestjs/common'
-import Handlebars from 'handlebars'
 import {
   ITemplateRenderer,
   RenderContext,
@@ -8,6 +7,7 @@ import {
   RenderOptions,
 } from '../../../adapters/interfaces'
 import { splitPersonalisation } from '../utils/split-personalisation'
+import { renderHandlebars } from '../utils/template-syntax'
 
 /**
  * Validates template content for dangerous patterns.
@@ -46,9 +46,9 @@ export class HandlebarsTemplateRenderer implements ITemplateRenderer {
     validateTemplate(context.template.body)
 
     const subject = context.template.subject
-      ? Handlebars.compile(context.template.subject)(strings)
+      ? renderHandlebars(context.template.subject, strings, 'subject')
       : (context.defaultSubject ?? 'Notification')
-    const body = Handlebars.compile(context.template.body)(strings)
+    const body = renderHandlebars(context.template.body, strings, 'body')
 
     return Promise.resolve({
       subject,
@@ -70,9 +70,9 @@ export class HandlebarsTemplateRenderer implements ITemplateRenderer {
 
     // SMS is plain text, never HTML: noEscape keeps personalisation literal. Without it
     // Handlebars escapes for HTML and a value like "O'Brien" is sent as "O&#x27;Brien".
-    const body = Handlebars.compile(context.template.body, { noEscape: true })(
-      context.personalisation,
-    )
+    const body = renderHandlebars(context.template.body, context.personalisation, 'body', {
+      noEscape: true,
+    })
     return Promise.resolve({ body })
   }
 }

@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
+import { TemplateRenderError } from '../utils/template-syntax'
 import { HandlebarsTemplateRenderer } from './handlebars-template.renderer'
 import type { RenderContext } from '../../../adapters/interfaces'
 
@@ -562,6 +563,48 @@ describe('HandlebarsTemplateRenderer', () => {
       } catch (error: unknown) {
         expect((error as Error).message).toContain('potentially unsafe pattern')
       }
+    })
+  })
+
+  describe('template errors', () => {
+    const email = (subject: string, body: string, personalisation: Record<string, unknown>) =>
+      // The renderer throws synchronously; an async wrapper turns that into a rejection.
+      (async () =>
+        renderer.renderEmail({
+          template: { id: 't', name: 't', type: 'email', subject, body, active: true },
+          personalisation,
+        }))()
+
+    it.each([
+      ['a key named after the first word', { first: 'Bob' }],
+      ['a key with the space in it', { 'first name': 'Bob' }],
+    ])('names a placeholder with a space, given %s', async (_case, personalisation) => {
+      const failure = email('Hello', 'Hi {{first name}}', personalisation)
+      await expect(failure).rejects.toBeInstanceOf(TemplateRenderError)
+      await expect(failure).rejects.toThrow(
+        'Placeholder {{first name}} in body contains a space — use {{first_name}}',
+      )
+    })
+
+    it('names the subject when the subject is the problem', async () => {
+      await expect(
+        email("{{ isResubmission ? 'Resubmitted' : 'Submitted' }}", 'Hello', {
+          isResubmission: true,
+        }),
+      ).rejects.toThrow(
+        `Placeholder {{ isResubmission ? 'Resubmitted' : 'Submitted' }} in subject is not valid ` +
+          'Handlebars: "isResubmission" is not a helper.',
+      )
+    })
+
+    it('names a placeholder with a space in an SMS body', async () => {
+      await expect(
+        (async () =>
+          renderer.renderSms({
+            template: { id: 't', name: 't', type: 'sms', body: 'Hi {{first name}}', active: true },
+            personalisation: { first: 'Bob' },
+          }))(),
+      ).rejects.toThrow('Placeholder {{first name}} in body contains a space — use {{first_name}}')
     })
   })
 })

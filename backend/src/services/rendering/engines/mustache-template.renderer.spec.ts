@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
+import { TemplateRenderError } from '../utils/template-syntax'
 
 import { MustacheTemplateRenderer } from './mustache-template.renderer'
 import type { RenderContext } from '../../../adapters/interfaces'
@@ -376,6 +377,27 @@ describe('MustacheTemplateRenderer', () => {
   describe('name property', () => {
     it('should have name "mustache"', () => {
       expect(renderer.name).toBe('mustache')
+    })
+  })
+
+  describe('template errors', () => {
+    it('reports an unclosed section as a template error', async () => {
+      const failure = (async () =>
+        renderer.renderEmail({
+          template: {
+            id: 't',
+            name: 't',
+            type: 'email',
+            subject: 'Hello',
+            body: 'Hi {{#name}}x',
+            active: true,
+          },
+          personalisation: { name: 'Bob' },
+        }))()
+      await expect(failure).rejects.toBeInstanceOf(TemplateRenderError)
+      await expect(failure).rejects.toThrow(
+        'Invalid template syntax in body: Unclosed section "name"',
+      )
     })
   })
 })

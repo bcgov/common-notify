@@ -10,6 +10,7 @@ import { ISmsTransport } from '../../adapters'
 import { TransientDeliveryError } from '../../adapters/delivery-errors'
 import { MergeBatchRunner } from './merge-batch-runner'
 import { DeliveryFailureHandler } from './delivery-failure-handler'
+import { HandlebarsTemplateRenderer } from '../../services/rendering/engines/handlebars-template.renderer'
 import { PhoneNumberService } from '../../api/notify/services/phone-number.service'
 import type { NotificationService } from '../../api/notification/notification.service'
 import type { NotificationRequestDetailService } from '../../api/notification/notification-request-detail.service'
@@ -740,6 +741,53 @@ describe('SmsDeliveryWorker', () => {
       expect(mockRequestDetailService.markFailed).toHaveBeenCalledWith(
         'notify-sms-template-missing',
         'Missing personalisation for template ID template-sms-uuid: code',
+      )
+    })
+
+    it('should fail a template syntax error on the first attempt with a readable reason', async () => {
+      // The real renderer, so the error is the one a bad template produces in production.
+      const renderer = new HandlebarsTemplateRenderer()
+      mockInlineRenderingService.renderSms = vi.fn((content, params) =>
+        renderer.renderSms({
+          template: { id: 'inline', name: 'inline', type: 'sms', active: true, ...content },
+          personalisation: params,
+        }),
+      )
+
+      initialize({
+        notificationService: mockNotificationService,
+        templatesRepository: mockTemplatesRepository,
+        templatesService: mockTemplatesService,
+        inlineRenderingService: mockInlineRenderingService,
+        smsAdapter: mockSmsAdapter,
+        requestDetailService: mockRequestDetailService,
+      })
+
+      const job: Partial<Job<DeliveryJobPayload>> = {
+        data: {
+          notifyId: 'notify-sms-bad-syntax',
+          tenantId: 'tenant-123',
+          channel: NotificationChannel.SMS,
+          payload: {
+            recipients: { to: ['+16135551234'] },
+            content: { renderer: 'handlebars', body: 'Hi {{first name}}' },
+            params: { first: 'Bob' },
+          },
+          attempt: 0,
+        } as any,
+        opts: { attempts: 3 } as any,
+        attemptsMade: 0,
+      }
+
+      const reason = 'Placeholder {{first name}} in body contains a space — use {{first_name}}'
+      const failure = processHandler(job as Job<DeliveryJobPayload>)
+      await expect(failure).rejects.toBeInstanceOf(UnrecoverableError)
+      await expect(failure).rejects.toThrow(reason)
+      expect(mockSmsAdapter.send).not.toHaveBeenCalled()
+      expect(mockNotificationService.update).toHaveBeenCalledWith(
+        'notify-sms-bad-syntax',
+        'tenant-123',
+        expect.objectContaining({ status: NotificationStatus.FAILED, errorReason: reason }),
       )
     })
 
