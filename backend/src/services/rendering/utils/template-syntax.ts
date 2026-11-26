@@ -107,7 +107,8 @@ function describeUnknownHelperCall(node: any, text: string, field: TemplateField
   const tag = sourceOf(node, text)
   const words = [node.path, ...node.params]
   if (!node.hash && words.every((word) => word.type === 'PathExpression')) {
-    return `Placeholder ${tag} in ${field} contains a space.`
+    const suggestion = words.map((word) => word.original).join('_')
+    return `Placeholder ${tag} in ${field} contains a space — use {{${suggestion}}}`
   }
   return (
     `Placeholder ${tag} in ${field} is not valid Handlebars: "${node.path.original}" is not a ` +
