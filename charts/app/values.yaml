@@ -26,8 +26,10 @@ global:
     databaseUser: ~
     redisHost: ~ # Redis host, should be set to common-notify-redis-master. Defaults to <release-name>-redis-master if not set
     redisSecret: ~ # Redis secret name, should be set to common-notify-redis. Defaults to <release-name>-redis if not set
-    redisSentinels: ~ # Comma-separated host:port list. When set, the backend discovers the master through Sentinel and follows a promotion; redisHost is then unused. Leave null for a direct connection to redisHost.
-    redisMasterName: ~ # Sentinel master group name. Must match the redis chart's sentinel.masterSet. Defaults to mymaster.
+    #-- DEV and every PR env share the one Redis release, which runs Sentinel (CCP-6557).
+    #-- TEST and PROD null this in their own values files until their cutover window.
+    redisSentinels: common-notify-redis:26379 # Comma-separated host:port list. When set, the backend discovers the master through Sentinel and follows a promotion; redisHost is then unused.
+    redisMasterName: mymaster # Sentinel master group name. Must match the redis chart's sentinel.masterSet.
   #-- domain of the application, it is required, apps.silver.devops.gov.bc.ca for silver cluster and apps.devops.gov.bc.ca for gold cluster
   domain: 'apps.silver.devops.gov.bc.ca' # it is apps.gold.devops.gov.bc.ca for gold cluster
   databaseAlias: ~ # set using github action workflow during helm deploy.
