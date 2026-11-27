@@ -1,13 +1,15 @@
 # Dev environment overrides for Redis
 # - Reduced replicas due to storage constraints (40Gi quota)
-# - Disabled PodDisruptionBudget (not needed in dev)
+# - No PodDisruptionBudget: dev nodes are drained routinely and a blocked drain
+#   there costs more than the restart. The keys below were `podDisruptionBudget.
+#   enabled`, which upstream renamed to `pdb.create`, so dev had PDBs regardless.
 # - Disabled Sentinel (not needed with only 1 replica)
 replica:
   replicaCount: 1
-  podDisruptionBudget:
-    enabled: false
+  pdb:
+    create: false
 sentinel:
   enabled: false
 master:
-  podDisruptionBudget:
-    enabled: false
+  pdb:
+    create: false

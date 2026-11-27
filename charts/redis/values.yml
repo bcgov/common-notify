@@ -55,6 +55,13 @@ master:
     limits:
       cpu: 500m
       memory: 1Gi
+  # The chart's default PDB is maxUnavailable: 1, which on a single-pod master
+  # permits the eviction it should prevent (CCP-5828). minAvailable: 1 blocks a
+  # drain instead of silently taking Redis down; see the PR for the trade-off.
+  pdb:
+    create: true
+    minAvailable: 1
+    maxUnavailable: ""
 replica:
   shareProcessNamespace: true
   replicaCount: 2
