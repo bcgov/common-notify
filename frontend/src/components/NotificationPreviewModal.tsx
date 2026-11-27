@@ -17,6 +17,8 @@ export interface PreviewVariable {
   name: string
   value: string
   type: PreviewVariableType
+  /** A text field that may be left blank. */
+  isOptional?: boolean
   /** Marks the field invalid; only meaningful when the list is editable. */
   isInvalid?: boolean
   errorMessage?: string
@@ -175,7 +177,7 @@ const VariableField: FC<{
         value={variable.value}
         onChange={(value) => onVariableChange?.(variable.name, value)}
         isReadOnly={!isEditable}
-        isRequired={isEditable}
+        isRequired={isEditable && !variable.isOptional}
         isInvalid={variable.isInvalid}
         errorMessage={variable.errorMessage}
       />

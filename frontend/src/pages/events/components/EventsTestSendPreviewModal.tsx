@@ -9,7 +9,11 @@ import type { TemplateResponse } from '@/api/templates.api'
 import type { EventEmailSettings } from '@/api/events.api'
 import { detectVariables } from '@/utils/templateVariables'
 import type { DetectedVariable } from '@/utils/templateVariables'
-import { initializePreviewValues, previewRenderParams } from '@/utils/templatePreviewValues'
+import {
+  initializePreviewValues,
+  isMissingPreviewValue,
+  previewRenderParams,
+} from '@/utils/templatePreviewValues'
 import type { RenderedNotification } from './EventsEmailPreview'
 
 export interface AppliedNotification {
@@ -59,9 +63,7 @@ const EventsTestSendPreviewModal: FC<EventsTestSendPreviewModalProps> = ({
   // re-renders. Identity is enough: every edit makes a new object.
   const renderedDraft = useRef<Record<string, string> | null>(null)
 
-  // A condition always holds true or false, so only text can be empty.
-  const isEmptyField = (variable: DetectedVariable) =>
-    variable.type !== 'boolean' && !(draft[variable.name] ?? '').trim()
+  const isEmptyField = (variable: DetectedVariable) => isMissingPreviewValue(variable, draft)
 
   // Dismissed per message, so closing the note about values doesn't hide a later warning.
   const notice = variables.some(isEmptyField)
@@ -151,6 +153,7 @@ const EventsTestSendPreviewModal: FC<EventsTestSendPreviewModalProps> = ({
         name: variable.name,
         value: draft[variable.name] ?? '',
         type: variable.type,
+        isOptional: variable.isOptional,
         isInvalid: isEmptyField(variable),
         errorMessage: 'This field is empty.',
       }))}

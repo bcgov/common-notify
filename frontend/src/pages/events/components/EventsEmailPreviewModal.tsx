@@ -184,6 +184,7 @@ const EventsEmailPreviewModal: FC<EventsEmailPreviewModalProps> = ({
         name: variable.name,
         value: values[variable.name] ?? '',
         type: variable.type,
+        isOptional: variable.isOptional,
       }))}
       variablesIntro="Provide values for all variables in your template."
       isEditable={!loadingValues && !loading && !loadError}

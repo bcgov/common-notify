@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { initializePreviewValues, previewRenderParams } from './templatePreviewValues'
+import {
+  initializePreviewValues,
+  isMissingPreviewValue,
+  previewRenderParams,
+} from './templatePreviewValues'
 import type { DetectedVariable } from './templateVariables'
 
 const variables: DetectedVariable[] = [
@@ -30,6 +34,17 @@ describe('template preview values', () => {
       newFlag: 'true',
     })
     expect(values.approved).toBe('false')
+  })
+
+  it('treats only a blank required text field as missing', () => {
+    const values = { name: ' ', phone: '', approved: '', filled: 'x' }
+    expect(isMissingPreviewValue({ name: 'name', type: 'text' }, values)).toBe(true)
+    expect(isMissingPreviewValue({ name: 'absent', type: 'text' }, values)).toBe(true)
+    expect(isMissingPreviewValue({ name: 'filled', type: 'text' }, values)).toBe(false)
+    expect(isMissingPreviewValue({ name: 'phone', type: 'text', isOptional: true }, values)).toBe(
+      false,
+    )
+    expect(isMissingPreviewValue({ name: 'approved', type: 'boolean' }, values)).toBe(false)
   })
 
   it('treats prototype property names as ordinary placeholders', () => {

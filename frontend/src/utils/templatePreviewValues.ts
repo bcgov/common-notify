@@ -13,6 +13,18 @@ export function initializePreviewValues(
   )
 }
 
+/**
+ * Whether a field still needs a value. A toggle always holds one, and an optional field's blank
+ * value is meaningful - it hides the section that tests it - so only a required text field can be
+ * missing.
+ */
+export function isMissingPreviewValue(
+  variable: DetectedVariable,
+  values: Record<string, string>,
+): boolean {
+  return variable.type === 'text' && !variable.isOptional && !(values[variable.name] ?? '').trim()
+}
+
 export function previewRenderParams(
   variables: DetectedVariable[],
   values: Record<string, string>,

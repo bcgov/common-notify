@@ -4,7 +4,12 @@ import NotificationPreviewModal from '@/components/NotificationPreviewModal'
 import { previewTemplate } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
 import { detectVariables } from '@/utils/templateVariables'
-import { initializePreviewValues, previewRenderParams } from '@/utils/templatePreviewValues'
+import type { DetectedVariable } from '@/utils/templateVariables'
+import {
+  initializePreviewValues,
+  isMissingPreviewValue,
+  previewRenderParams,
+} from '@/utils/templatePreviewValues'
 import EventsSmsEstimate from './EventsSmsEstimate'
 
 interface Props {
@@ -62,7 +67,7 @@ export default function EventsSmsPreviewModal({
     }
   }, [template.id, variables, values])
 
-  const missing = (name: string) => !values[name]?.trim()
+  const missing = (variable: DetectedVariable) => isMissingPreviewValue(variable, values)
   return (
     <NotificationPreviewModal
       isOpen
@@ -98,8 +103,9 @@ export default function EventsSmsPreviewModal({
       variables={variables.map((variable) => ({
         name: variable.name,
         type: variable.type,
+        isOptional: variable.isOptional,
         value: values[variable.name] ?? '',
-        isInvalid: attempted && missing(variable.name),
+        isInvalid: attempted && missing(variable),
         errorMessage: 'Enter a value.',
       }))}
       isEditable
@@ -123,7 +129,7 @@ export default function EventsSmsPreviewModal({
             variant="primary"
             onPress={() => {
               setAttempted(true)
-              if (variables.some((variable) => missing(variable.name))) return
+              if (variables.some(missing)) return
               onSaveValues(values)
             }}
           >

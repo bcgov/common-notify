@@ -13,7 +13,11 @@ import {
 } from '@/api/templates.api'
 import { useAppSelector } from '@/redux/hooks'
 import { detectVariables } from '@/utils/templateVariables'
-import { initializePreviewValues, previewRenderParams } from '@/utils/templatePreviewValues'
+import {
+  initializePreviewValues,
+  isMissingPreviewValue,
+  previewRenderParams,
+} from '@/utils/templatePreviewValues'
 import '@/scss/components/templates.scss'
 
 interface TemplatePreviewModalProps {
@@ -65,8 +69,6 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
   const [hasApplied, setHasApplied] = useState(false)
   // Whether to surface per-field errors on empty inputs, once a preview has been applied.
   const [showErrors, setShowErrors] = useState(false)
-
-  const isMissing = (name: string) => !(values[name] ?? '').trim()
 
   const runPreview = async (vals: Record<string, string>, persist = false) => {
     if (applying.current) return
@@ -132,9 +134,7 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
         const initial = initializePreviewValues(variables, saved)
         setValues(initial)
         onDraftValuesChange?.(initial)
-        const missing = variables.some(
-          (v) => v.type !== 'boolean' && !(initial[v.name] ?? '').trim(),
-        )
+        const missing = variables.some((v) => isMissingPreviewValue(v, initial))
         if (!missing) {
           setHasApplied(true)
           void runPreview(initial)
@@ -213,7 +213,8 @@ const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({
         name: variable.name,
         value: values[variable.name] ?? '',
         type: variable.type,
-        isInvalid: showErrors && variable.type !== 'boolean' && isMissing(variable.name),
+        isOptional: variable.isOptional,
+        isInvalid: showErrors && isMissingPreviewValue(variable, values),
         errorMessage: 'This field is empty.',
       }))}
       variablesIntro="Enter values for all variables to view the rendered template."

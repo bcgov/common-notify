@@ -5,7 +5,12 @@ export type VariableType = 'text' | 'boolean'
 export interface DetectedVariable {
   name: string
   type: VariableType
+  /** Printed and also tested, so a blank value is meaningful: it hides the tested section. */
+  isOptional?: boolean
 }
+
+/** How a template uses a variable: printed into the output, or tested by a condition. */
+type VariableUse = 'printed' | 'tested'
 
 // Matches a single identifier (e.g. firstName).
 const IDENTIFIER = /^[a-zA-Z_$][\w$]*$/
@@ -42,23 +47,29 @@ function* mustacheTagContents(body: string): Generator<string> {
   }
 }
 
-/** Collects detected variables, letting a conditional use win over a plain interpolation. */
+/**
+ * Collects detected variables and how each is used. A variable that is only tested is a True/False
+ * toggle; one that is printed anywhere needs a real value, so it is free text - and when it is also
+ * tested, a blank value is how the preview shows the section hidden.
+ */
 class VariableCollector {
-  private readonly found = new Map<string, VariableType>()
+  private readonly found = new Map<string, Set<VariableUse>>()
 
-  add(name: string, type: VariableType): void {
+  add(name: string, use: VariableUse): void {
     if (!IDENTIFIER.test(name)) return
-    const existing = this.found.get(name)
-    if (existing === undefined) {
-      this.found.set(name, type)
-    } else if (type === 'boolean' && existing !== 'boolean') {
-      // A variable used in a condition wins the boolean treatment
-      this.found.set(name, 'boolean')
+    const uses = this.found.get(name)
+    if (uses) {
+      uses.add(use)
+    } else {
+      this.found.set(name, new Set([use]))
     }
   }
 
   toList(): DetectedVariable[] {
-    return [...this.found].map(([name, type]) => ({ name, type }))
+    return [...this.found].map(([name, uses]): DetectedVariable => {
+      if (!uses.has('printed')) return { name, type: 'boolean' }
+      return uses.has('tested') ? { name, type: 'text', isOptional: true } : { name, type: 'text' }
+    })
   }
 }
 
@@ -73,9 +84,9 @@ function collectLegacy(body: string, into: VariableCollector): void {
   for (const inner of legacyTagContents(body)) {
     const condIndex = inner.indexOf('??')
     if (condIndex === -1) {
-      into.add(inner.trim(), 'text')
+      into.add(inner.trim(), 'printed')
     } else {
-      into.add(inner.slice(0, condIndex).trim(), 'boolean')
+      into.add(inner.slice(0, condIndex).trim(), 'tested')
     }
   }
 }
@@ -88,26 +99,27 @@ function collectBlockOpen(inner: string, into: VariableCollector): void {
   const helper = tokens[0]
 
   if (BLOCK_HELPERS.has(helper) && tokens.length > 1) {
-    const type: VariableType = helper === 'if' || helper === 'unless' ? 'boolean' : 'text'
-    into.add(tokens.at(-1) as string, type)
+    // #each / #with take a value rather than a condition, so they count as printed.
+    const use: VariableUse = helper === 'if' || helper === 'unless' ? 'tested' : 'printed'
+    into.add(tokens.at(-1) as string, use)
     return
   }
 
   // Mustache section / inverted section: the token itself is the variable
-  into.add(helper.replace(/^&/, ''), 'boolean')
+  into.add(helper.replace(/^&/, ''), 'tested')
 }
 
 /** Plain interpolation, possibly a helper call: {{x}}, {{& x}}, {{formatDate x}}. */
 function collectInterpolation(inner: string, into: VariableCollector): void {
   const tokens = inner.replace(/^&\s*/, '').split(/\s+/)
   if (tokens.length === 1) {
-    into.add(tokens[0], 'text')
+    into.add(tokens[0], 'printed')
     return
   }
 
   // Helper invocation - treat the arguments as variables
   for (const token of tokens.slice(1)) {
-    into.add(token.replace(/^&/, ''), 'text')
+    into.add(token.replace(/^&/, ''), 'printed')
   }
 }
 
@@ -131,9 +143,9 @@ function collectMustache(body: string, into: VariableCollector): void {
 
 /**
  * Parse a template body and detect the variables it references, so the user can
- * supply sample values. Variables used in a conditional (e.g. handlebars
+ * supply sample values. Variables only used in a conditional (e.g. handlebars
  * {{#if x}} or a mustache section {{#x}}) are surfaced as boolean toggles;
- * everything else is a free-text value.
+ * everything else is a free-text value, optional when it is also tested.
  */
 export function detectVariables(body: string, engine: TemplateEngine): DetectedVariable[] {
   const collector = new VariableCollector()

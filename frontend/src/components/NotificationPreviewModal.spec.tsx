@@ -94,6 +94,19 @@ describe('NotificationPreviewModal', () => {
     expect(onVariableChange).toHaveBeenCalledWith('firstName', 'Molly!')
   })
 
+  it('does not require an optional text field', () => {
+    renderModal({
+      isEditable: true,
+      variables: [
+        { name: 'firstName', value: '', type: 'text' },
+        { name: 'phone', value: '', type: 'text', isOptional: true },
+      ],
+    })
+
+    expect(screen.getByRole('textbox', { name: /^firstName/ })).toBeRequired()
+    expect(screen.getByRole('textbox', { name: 'phone' })).not.toBeRequired()
+  })
+
   it('shows the envelope when the caller supplies one', () => {
     renderModal({ from: 'noreply@gov.bc.ca', to: 'alee@gov.bc.ca', subject: 'Pizza Pizza' })
 
