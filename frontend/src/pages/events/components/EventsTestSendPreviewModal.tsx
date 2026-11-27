@@ -9,6 +9,7 @@ import type { TemplateResponse } from '@/api/templates.api'
 import type { EventEmailSettings } from '@/api/events.api'
 import { detectVariables } from '@/utils/templateVariables'
 import type { DetectedVariable } from '@/utils/templateVariables'
+import { initializePreviewValues, previewRenderParams } from '@/utils/templatePreviewValues'
 import type { RenderedNotification } from './EventsEmailPreview'
 
 export interface AppliedNotification {
@@ -17,22 +18,6 @@ export interface AppliedNotification {
   /** What the template is rendered with. Send these, not `values`, so the email matches. */
   params: Record<string, string>
   rendered: RenderedNotification
-}
-
-/**
- * The template values a set of fields stands for. A condition is either 'true' or empty, since
- * a template treats any non-empty string as true - including 'false'.
- */
-export function toTemplateParams(
-  variables: readonly DetectedVariable[],
-  values: Record<string, string>,
-): Record<string, string> {
-  const params: Record<string, string> = {}
-  variables.forEach((variable) => {
-    const raw = values[variable.name] ?? ''
-    params[variable.name] = variable.type === 'boolean' && raw !== 'true' ? '' : raw
-  })
-  return params
 }
 
 interface EventsTestSendPreviewModalProps {
@@ -118,14 +103,11 @@ const EventsTestSendPreviewModal: FC<EventsTestSendPreviewModalProps> = ({
   useEffect(() => {
     if (!isOpen) return
 
-    const initial: Record<string, string> = {}
-    variables.forEach((variable) => {
-      initial[variable.name] = values[variable.name] ?? (variable.type === 'boolean' ? 'true' : '')
-    })
+    const initial = initializePreviewValues(variables, values)
     setDraft(initial)
     setDismissedNotice(null)
     renderedDraft.current = initial
-    void runPreview(toTemplateParams(variables, initial))
+    void runPreview(previewRenderParams(variables, initial))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, variables, runPreview])
 
@@ -135,7 +117,7 @@ const EventsTestSendPreviewModal: FC<EventsTestSendPreviewModalProps> = ({
 
     const timer = setTimeout(() => {
       renderedDraft.current = draft
-      void runPreview(toTemplateParams(variables, draft))
+      void runPreview(previewRenderParams(variables, draft))
     }, 500)
     return () => clearTimeout(timer)
   }, [isOpen, draft, variables, runPreview])
@@ -143,7 +125,7 @@ const EventsTestSendPreviewModal: FC<EventsTestSendPreviewModalProps> = ({
   const handleApply = async () => {
     // A debounced render may still be pending, so this renders the draft as it stands rather
     // than handing the page whatever the last render happened to produce.
-    const params = toTemplateParams(variables, draft)
+    const params = previewRenderParams(variables, draft)
     const result = await runPreview(params)
     if (result) onApply({ values: draft, params, rendered: result })
   }

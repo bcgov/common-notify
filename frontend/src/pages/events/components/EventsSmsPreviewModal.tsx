@@ -4,6 +4,7 @@ import NotificationPreviewModal from '@/components/NotificationPreviewModal'
 import { previewTemplate } from '@/api/templates.api'
 import type { TemplateResponse } from '@/api/templates.api'
 import { detectVariables } from '@/utils/templateVariables'
+import { initializePreviewValues, previewRenderParams } from '@/utils/templatePreviewValues'
 import EventsSmsEstimate from './EventsSmsEstimate'
 
 interface Props {
@@ -28,12 +29,7 @@ export default function EventsSmsPreviewModal({
     [template.body, template.engineCode],
   )
   const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(
-      variables.map((variable) => [
-        variable.name,
-        initialValues[variable.name] ?? (variable.type === 'boolean' ? 'true' : ''),
-      ]),
-    ),
+    initializePreviewValues(variables, initialValues),
   )
   const [result, setResult] = useState<{ body: string; error: string | null; loading: boolean }>({
     body: '',
@@ -46,14 +42,7 @@ export default function EventsSmsPreviewModal({
   useEffect(() => {
     let current = true
     const timer = window.setTimeout(() => {
-      const params = Object.fromEntries(
-        variables.map((variable) => {
-          const value = values[variable.name] ?? ''
-          const booleanValue = value === 'true' ? 'true' : ''
-          return [variable.name, variable.type === 'boolean' ? booleanValue : value]
-        }),
-      )
-      previewTemplate(template.id, params)
+      previewTemplate(template.id, previewRenderParams(variables, values))
         .then((response) => {
           if (current) setResult({ body: response.body, error: null, loading: false })
         })
