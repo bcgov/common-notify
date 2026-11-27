@@ -40,6 +40,7 @@ import { NotifyFrontendRoleGuard } from '../../common/guards/notify-frontend-rol
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
 import { ListQueryDto } from '../../common/query/list-query.dto'
+import { notificationErrorSummary } from '../../common/utils/notification-error-summary'
 
 /**
  * Frontend Notification API Controller
@@ -110,9 +111,16 @@ export class NotificationFrontendController implements OnModuleDestroy {
     description: 'Filters using field:operator:value. Repeat query param for multiple filters.',
   })
   @ApiOkResponse({ type: PaginatedNotificationResponse })
-  findAll(@Req() req: Request, @Query() query: ListQueryDto) {
+  async findAll(@Req() req: Request, @Query() query: ListQueryDto) {
     const tenant = (req as any).tenant as Tenant
-    return this.notificationService.findAll(tenant.externalId, query)
+    const result = await this.notificationService.findAll(tenant.externalId, query)
+    return {
+      ...result,
+      data: result.data.map((row) => ({
+        ...row,
+        errorReason: notificationErrorSummary(row.errorReason),
+      })),
+    }
   }
 
   @Version('1')
@@ -190,19 +198,26 @@ export class NotificationFrontendController implements OnModuleDestroy {
     description: 'Case-insensitive search across recipient address.',
   })
   @ApiOkResponse({ type: PaginatedNotificationRequestDetailResponse })
-  findRequestDetails(
+  async findRequestDetails(
     @Req() req: Request,
     @Param('id') id: string,
     @Query() query: NotificationRequestDetailListQueryDto,
   ) {
     const frontendUser = (req as any).tenant as Tenant
     const parsedQuery = parseListQuery(query, notificationRequestDetailListQueryConfig)
-    return this.notificationRequestDetailService.findByRequestIdFrontend(
+    const result = await this.notificationRequestDetailService.findByRequestIdFrontend(
       id,
       frontendUser.externalId,
       parsedQuery,
       query.search,
     )
+    return {
+      ...result,
+      data: result.data.map((row) => ({
+        ...row,
+        errorMessage: notificationErrorSummary(row.errorMessage),
+      })),
+    }
   }
 
   @Version('1')
@@ -214,9 +229,10 @@ export class NotificationFrontendController implements OnModuleDestroy {
   )
   @ApiOperation({ summary: 'Get a single notification request by id for the authenticated tenant' })
   @ApiOkResponse({ type: NotificationRequestDto })
-  findOne(@Req() req: Request, @Param('id') id: string) {
+  async findOne(@Req() req: Request, @Param('id') id: string) {
     const tenant = (req as any).tenant as Tenant
-    return this.notificationService.findOneFrontend(id, tenant.externalId)
+    const result = await this.notificationService.findOneFrontend(id, tenant.externalId)
+    return { ...result, errorReason: notificationErrorSummary(result.errorReason) }
   }
 
   onModuleDestroy(): void {
