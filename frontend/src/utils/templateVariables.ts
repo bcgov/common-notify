@@ -12,8 +12,12 @@ export interface DetectedVariable {
 /** How a template uses a variable: printed into the output, or tested by a condition. */
 type VariableUse = 'printed' | 'tested'
 
-// Matches a single identifier (e.g. firstName).
+// Matches a single identifier (e.g. firstName). Legacy GC Notify has no dotted syntax.
 const IDENTIFIER = /^[a-zA-Z_$][\w$]*$/
+
+// Matches an identifier or a dotted path of them (e.g. user.firstName), which Handlebars and
+// Mustache resolve against nested data. `this.x` is the current context, not template data.
+const PATH = /^(?!this\.)[a-zA-Z_$][\w$]*(?:\.[a-zA-Z_$][\w$]*)*$/
 
 // Tags are found with indexOf rather than a regex: a lazy group between optional-whitespace
 // quantifiers rescans the body from every position when a tag is left unclosed, and the body is
@@ -55,8 +59,11 @@ function* mustacheTagContents(body: string): Generator<string> {
 class VariableCollector {
   private readonly found = new Map<string, Set<VariableUse>>()
 
+  /** @param namePattern Which names are variables; anything else is skipped. */
+  constructor(private readonly namePattern: RegExp) {}
+
   add(name: string, use: VariableUse): void {
-    if (!IDENTIFIER.test(name)) return
+    if (!this.namePattern.test(name)) return
     const uses = this.found.get(name)
     if (uses) {
       uses.add(use)
@@ -148,13 +155,14 @@ function collectMustache(body: string, into: VariableCollector): void {
  * everything else is a free-text value, optional when it is also tested.
  */
 export function detectVariables(body: string, engine: TemplateEngine): DetectedVariable[] {
-  const collector = new VariableCollector()
-
   if (engine === TemplateEngine.LEGACY_GC_NOTIFY) {
+    const collector = new VariableCollector(IDENTIFIER)
     collectLegacy(body, collector)
-  } else {
-    collectMustache(body, collector)
+    return collector.toList()
   }
+
+  const collector = new VariableCollector(PATH)
+  collectMustache(body, collector)
 
   return collector.toList()
 }

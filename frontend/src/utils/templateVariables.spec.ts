@@ -37,9 +37,7 @@ describe('detectVariables', () => {
     ).toEqual([{ name: 'phone', type: 'text', isOptional: true }])
   })
 
-  it('detects Handlebars blocks and helpers, ignoring dotted paths', () => {
-    // Dotted paths (user.createdAt) are excluded: the renderer receives a flat
-    // params object, so a nested lookup can never bind and would render empty.
+  it('detects Handlebars blocks and helpers, including dotted paths', () => {
     expect(
       detectVariables(
         'Hi {{firstName}} {{#if hasUpdates}}updates{{/if}} {{formatDate user.createdAt}}',
@@ -48,6 +46,30 @@ describe('detectVariables', () => {
     ).toEqual([
       { name: 'firstName', type: 'text' },
       { name: 'hasUpdates', type: 'boolean' },
+      { name: 'user.createdAt', type: 'text' },
+    ])
+  })
+
+  it.each([TemplateEngine.HANDLEBARS, TemplateEngine.MJML, TemplateEngine.MUSTACHE])(
+    'detects dotted paths in %s, skipping this.x and parent or data references',
+    (engine) => {
+      expect(
+        detectVariables(
+          '{{user.firstName}} {{#if order.isRush}}rush{{/if}} {{order.address.city}} ' +
+            '{{this.name}} {{../title}} {{@root.title}} {{user.}} {{.hidden}}',
+          engine,
+        ),
+      ).toEqual([
+        { name: 'user.firstName', type: 'text' },
+        { name: 'order.isRush', type: 'boolean' },
+        { name: 'order.address.city', type: 'text' },
+      ])
+    },
+  )
+
+  it('does not detect dotted names in legacy GC Notify, which has no path syntax', () => {
+    expect(detectVariables('((user.name)) ((name))', TemplateEngine.LEGACY_GC_NOTIFY)).toEqual([
+      { name: 'name', type: 'text' },
     ])
   })
 

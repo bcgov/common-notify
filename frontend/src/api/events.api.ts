@@ -342,7 +342,7 @@ export interface EventSendResponse {
  */
 export async function sendEventTestEmail(
   eventId: string,
-  params: Record<string, string>,
+  params: Record<string, unknown>,
   recipients?: { to: string[] } | { mergeArray: string[][] },
 ): Promise<EventSendResponse> {
   try {

@@ -36,6 +36,43 @@ describe('template preview values', () => {
     expect(values.approved).toBe('false')
   })
 
+  it('sends dotted names as nested objects, keeping booleans as true or empty', () => {
+    const nested: DetectedVariable[] = [
+      { name: 'user.firstName', type: 'text' },
+      { name: 'user.phone', type: 'text', isOptional: true },
+      { name: 'order.isRush', type: 'boolean' },
+      { name: 'order.address.city', type: 'text' },
+      { name: 'title', type: 'text' },
+    ]
+    expect(
+      previewRenderParams(nested, {
+        'user.firstName': 'Molly',
+        'user.phone': '',
+        'order.isRush': 'false',
+        'order.address.city': 'Victoria',
+        title: 'Order',
+      }),
+    ).toEqual({
+      user: { firstName: 'Molly', phone: '' },
+      order: { isRush: '', address: { city: 'Victoria' } },
+      title: 'Order',
+    })
+  })
+
+  it('skips names that would reach the object prototype', () => {
+    const params = previewRenderParams(
+      [
+        { name: '__proto__.polluted', type: 'text' },
+        { name: 'user.constructor', type: 'text' },
+        { name: 'toString', type: 'text' },
+      ],
+      { '__proto__.polluted': 'x', 'user.constructor': 'x', toString: 'shown' },
+    )
+
+    expect(params).toEqual({ toString: 'shown' })
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+  })
+
   it('treats only a blank required text field as missing', () => {
     const values = { name: ' ', phone: '', approved: '', filled: 'x' }
     expect(isMissingPreviewValue({ name: 'name', type: 'text' }, values)).toBe(true)

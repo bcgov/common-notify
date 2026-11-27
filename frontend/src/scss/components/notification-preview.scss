@@ -136,6 +136,12 @@ $preview-gutter: $spacing-xl * 1.5;
   display: flex;
   flex-direction: column;
   gap: $spacing-xs;
+
+  // The DS group stretches to fill its container; size it to its buttons, as events.scss and
+  // settings.scss do for their toggle groups.
+  .bcds-react-aria-ToggleButtonGroup {
+    width: fit-content;
+  }
 }
 
 .notification-preview__data-footer {

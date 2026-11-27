@@ -20,7 +20,7 @@ export interface AppliedNotification {
   /** What the fields hold, so reopening the modal shows them as they were left. */
   values: Record<string, string>
   /** What the template is rendered with. Send these, not `values`, so the email matches. */
-  params: Record<string, string>
+  params: Record<string, unknown>
   rendered: RenderedNotification
 }
 
@@ -75,7 +75,7 @@ const EventsTestSendPreviewModal: FC<EventsTestSendPreviewModalProps> = ({
       } as const)
 
   const runPreview = useCallback(
-    async (params: Record<string, string>): Promise<RenderedNotification | null> => {
+    async (params: Record<string, unknown>): Promise<RenderedNotification | null> => {
       setLoading(true)
       setError(null)
       try {

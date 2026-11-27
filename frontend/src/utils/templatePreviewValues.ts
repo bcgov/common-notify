@@ -1,3 +1,4 @@
+import { setParam } from './nestedParams'
 import type { DetectedVariable } from './templateVariables'
 
 export function initializePreviewValues(
@@ -25,15 +26,19 @@ export function isMissingPreviewValue(
   return variable.type === 'text' && !variable.isOptional && !(values[variable.name] ?? '').trim()
 }
 
+/**
+ * The params a template is rendered with. A dotted name (`user.name`) becomes a nested object, the
+ * shape an API caller sends, while the form values stay keyed by the flat name.
+ */
 export function previewRenderParams(
   variables: DetectedVariable[],
   values: Record<string, string>,
-): Record<string, string> {
-  return Object.fromEntries(
-    variables.map((variable) => {
-      const raw = values[variable.name] ?? ''
-      // Render a false toggle as falsy while preserving "false" in saved form values.
-      return [variable.name, variable.type === 'boolean' && raw !== 'true' ? '' : raw]
-    }),
-  )
+): Record<string, unknown> {
+  const params: Record<string, unknown> = {}
+  for (const variable of variables) {
+    const raw = values[variable.name] ?? ''
+    // Render a false toggle as falsy while preserving "false" in saved form values.
+    setParam(params, variable.name, variable.type === 'boolean' && raw !== 'true' ? '' : raw)
+  }
+  return params
 }

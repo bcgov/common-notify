@@ -257,7 +257,7 @@ export interface PreviewTemplateBodyData {
   subject?: string
   channelCode: NotificationChannel
   engineCode: TemplateEngine
-  params?: Record<string, string>
+  params?: Record<string, unknown>
 }
 
 /**

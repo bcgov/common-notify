@@ -1,6 +1,7 @@
 import Papa from 'papaparse'
 import { parsePhoneNumberFromString } from 'libphonenumber-js'
 import { isValidEmail } from './email'
+import { setParam } from './nestedParams'
 
 /**
  * Header the recipient's address goes under, as the design specifies and as the spreadsheet the
@@ -441,9 +442,6 @@ export function toMergeArray(parsed: ParsedCsv, channel: BulkChannel): string[][
   ]
 }
 
-/** Keys that would reach Object.prototype if written blindly into a nested object. */
-const UNSAFE_PARAM_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype'])
-
 /**
  * The params for one row, keyed by placeholder name - used to render the preview.
  *
@@ -466,34 +464,6 @@ export function rowParams(
   })
 
   return params
-}
-
-/** Write one cell into the params object, expanding a dotted column name into nested objects. */
-function setParam(params: Record<string, unknown>, key: string, value: string): void {
-  const segments = key.split('.')
-
-  if (segments.some((segment) => !segment || UNSAFE_PARAM_SEGMENTS.has(segment))) {
-    return
-  }
-
-  let target = params
-  for (let i = 0; i < segments.length - 1; i++) {
-    const segment = segments[i]
-    const existing = target[segment]
-
-    if (existing === undefined) {
-      target[segment] = {}
-    } else if (typeof existing !== 'object' || existing === null || Array.isArray(existing)) {
-      return
-    }
-
-    target = target[segment] as Record<string, unknown>
-  }
-
-  const leaf = segments.at(-1)!
-  if (!(leaf in target)) {
-    target[leaf] = value
-  }
 }
 
 /** One row's values, as the preview modals list them beside the rendered message. */
