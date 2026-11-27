@@ -148,6 +148,7 @@ describe('Sidebar', () => {
     renderSidebar(null, ['NOTIFY_OPERATIONS_ADMIN'])
 
     expect(screen.getByRole('link', { name: /settings/i })).toHaveAttribute('href', '/settings')
+    expect(screen.queryByRole('link', { name: /usage & limits/i })).not.toBeInTheDocument()
   })
 
   it('hides the Settings link for users with no CSTAR role', () => {

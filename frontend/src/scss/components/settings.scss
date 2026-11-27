@@ -13,7 +13,7 @@
 
 .settings__title {
   margin: 0;
-  font-size: $font-size-xl;
+  font-size: 32px;
   font-weight: 700;
   color: $dark-text;
 }
@@ -44,6 +44,30 @@
   > .settings__form--email > :not(.sticky-bar) {
     max-width: 500px;
   }
+
+  > .settings__usage {
+    width: 100%;
+    max-width: 850px;
+  }
+}
+
+.settings__usage {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-lg;
+  min-width: 0;
+
+  .data-table {
+    margin: 0;
+  }
+}
+
+.settings__usage-heading {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: $dark-text;
 }
 
 .settings__form--email .settings__field {

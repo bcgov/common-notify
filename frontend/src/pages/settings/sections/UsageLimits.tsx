@@ -1,13 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { FC } from 'react'
 import type { ChannelUsage } from '@/api/usage.api'
 import { useAppSelector, useAppDispatch } from '@/redux/hooks'
-import {
-  fetchTenantUsage,
-  fetchTenantUsageHistory,
-  updateThreshold,
-} from '@/redux/thunks/usage.thunks'
-import PageHeading from '@/components/PageHeading'
+import { updateThreshold } from '@/redux/thunks/usage.thunks'
 import DataTable from '@/components/DataTable/DataTable'
 import type { TableColumn } from '@/components/DataTable/DataTable'
 import UsageCell from '@/components/UsageCell'
@@ -18,23 +13,15 @@ import { formatChannel } from '@/utils/channels'
 
 const OPERATIONS_ADMIN_ROLE = 'NOTIFY_OPERATIONS_ADMIN'
 
-const Usage: FC = () => {
+const UsageLimits: FC = () => {
   const dispatch = useAppDispatch()
   const { usage, isLoading, updatingChannel, error } = useAppSelector((state) => state.usage)
-  const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const cstarRoles = useAppSelector((state) => state.user.current?.cstarRoles)
 
   const canEditThreshold = Array.isArray(cstarRoles) && cstarRoles.includes(OPERATIONS_ADMIN_ROLE)
 
   const [editingChannel, setEditingChannel] = useState<ChannelUsage | null>(null)
   const [thresholdValue, setThresholdValue] = useState(80)
-
-  useEffect(() => {
-    if (selectedTenant) {
-      dispatch(fetchTenantUsage())
-      dispatch(fetchTenantUsageHistory())
-    }
-  }, [selectedTenant, dispatch])
 
   const isSaving = editingChannel ? updatingChannel === editingChannel.channel : false
 
@@ -70,11 +57,11 @@ const Usage: FC = () => {
     {
       key: 'channel',
       label: 'Channel',
-      render: (_, row) => <span className="fw-semibold">{formatChannel(row.channel)}</span>,
+      render: (_, row) => formatChannel(row.channel),
     },
     {
       key: 'dailyLimit',
-      label: 'Daily',
+      label: 'Daily usage',
       render: (_, row) => (
         <UsageCell
           used={row.usedToday}
@@ -85,7 +72,7 @@ const Usage: FC = () => {
     },
     {
       key: 'annualLimit',
-      label: 'Annual (fiscal year)',
+      label: 'Annual usage (fiscal year)',
       render: (_, row) => (
         <UsageCell
           used={row.usedThisYear}
@@ -113,8 +100,8 @@ const Usage: FC = () => {
   const channels = usage?.channels ?? []
 
   return (
-    <div className="page">
-      <PageHeading title="Notification Usage & Limits" />
+    <div className="settings__usage">
+      <h2 className="settings__usage-heading">Notification Usage &amp; Limits</h2>
       {error && <div role="alert">{error}</div>}
 
       <DataTable
@@ -166,4 +153,4 @@ const Usage: FC = () => {
   )
 }
 
-export default Usage
+export default UsageLimits

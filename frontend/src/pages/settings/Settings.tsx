@@ -5,13 +5,14 @@ import Breadcrumb from '@/components/Breadcrumb'
 import EmailSettings from './sections/EmailSettings'
 import SmsSettings from './sections/SmsSettings'
 import TenantSettings from './sections/TenantSettings'
+import UsageLimits from './sections/UsageLimits'
 import SafelistSection from './SafelistSection'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { fetchSettings } from '@/redux/thunks/settings.thunks'
 import { useFeatureFlag } from '@/config/featureFlags/useFeatureFlag'
 import '@/scss/components/settings.scss'
 
-type SettingsTab = 'tenant' | 'email' | 'sms' | 'safelist'
+type SettingsTab = 'tenant' | 'email' | 'sms' | 'usage' | 'safelist'
 
 const Settings: FC = () => {
   const dispatch = useAppDispatch()
@@ -65,7 +66,7 @@ const Settings: FC = () => {
     <div className="settings">
       <Breadcrumb items={[{ label: 'Home', to: '/' }, { label: 'Settings' }]} />
 
-      <h1 className="settings__title">{selectedTenant?.name}</h1>
+      <h1 className="settings__title">Settings</h1>
 
       <div className="settings__tabs">
         <ToggleButtonGroup
@@ -82,6 +83,7 @@ const Settings: FC = () => {
           <ToggleButton id="tenant">Tenant Settings</ToggleButton>
           <ToggleButton id="email">Email Settings</ToggleButton>
           <ToggleButton id="sms">SMS Settings</ToggleButton>
+          <ToggleButton id="usage">Usage &amp; Limits</ToggleButton>
           {safelistEnabled && <ToggleButton id="safelist">Recipient Safelist</ToggleButton>}
         </ToggleButtonGroup>
       </div>
@@ -100,6 +102,7 @@ const Settings: FC = () => {
             {activeTab === 'tenant' && <TenantSettings key={tenantId} />}
             {activeTab === 'email' && <EmailSettings key={tenantId} />}
             {activeTab === 'sms' && <SmsSettings key={tenantId} />}
+            {activeTab === 'usage' && <UsageLimits key={tenantId} />}
           </>
         )}
       </section>

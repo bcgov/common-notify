@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, userEvent, waitFor, fireEvent } from '@/test-utils'
 import reducer from '@/redux/slices/usage.slice'
 import { showErrorToast, showSuccessToast } from '@/redux/utils/toastUtils'
-import Usage from './Usage'
+import UsageLimits from './UsageLimits'
 import { updateThreshold } from '@/redux/thunks/usage.thunks'
 import type * as UsageThunks from '@/redux/thunks/usage.thunks'
 
@@ -22,7 +22,6 @@ vi.mock('@/redux/hooks', () => ({
   useAppDispatch: () => mocks.dispatch,
 }))
 vi.mock('@/service/user-service', () => ({ default: { hasRole: () => mocks.admin } }))
-vi.mock('@/components/PageHeading', () => ({ default: () => <h1>Usage</h1> }))
 vi.mock('@/components/NotAuthorized', () => ({ default: () => <div>Not authorized</div> }))
 vi.mock('@/redux/utils/toastUtils', () => ({ showErrorToast: vi.fn(), showSuccessToast: vi.fn() }))
 
@@ -46,10 +45,10 @@ function setup(overrides = {}, roles = ['NOTIFY_OPERATIONS_ADMIN']) {
     tenant: { selectedTenant: { id: 'tenant' } },
     user: { current: { cstarRoles: roles } },
   }
-  return render(<Usage />)
+  return render(<UsageLimits />)
 }
 
-describe('Usage', () => {
+describe('UsageLimits', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.admin = true
@@ -61,6 +60,19 @@ describe('Usage', () => {
     expect(
       screen.getAllByText('No notification limits are configured for this tenant.')[0],
     ).toBeInTheDocument()
+  })
+  it('renders the existing usage data without fetching again', () => {
+    setup({ usage: { tenantId: 'tenant', fiscalYearStart: '2026', channels: [row] } })
+    expect(
+      screen.getByRole('heading', { name: 'Notification Usage & Limits', level: 2 }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Daily usage' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('columnheader', { name: 'Annual usage (fiscal year)' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: '20 / 100 (20%)' })).toBeInTheDocument()
+    expect(screen.getByText(/SMS usage is counted in message segments/)).toBeInTheDocument()
+    expect(mocks.dispatch).not.toHaveBeenCalled()
   })
   it('shows loading instead of empty content', () => {
     setup({ isLoading: true })
@@ -84,11 +96,11 @@ describe('Usage', () => {
     expect(updateThreshold).toHaveBeenCalledWith({ channel: 'SMS', warnThresholdPercent: 60 })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
-  it('validates numeric input without saving', async () => {
+  it.each(['0', '101', '50.5'])('rejects invalid threshold %s without saving', async (value) => {
     setup({ usage: { tenantId: 'tenant', fiscalYearStart: '2026', channels: [row] } })
     await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Warning threshold (%)' }), {
-      target: { value: '0' },
+      target: { value },
     })
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(showErrorToast).toHaveBeenCalled()

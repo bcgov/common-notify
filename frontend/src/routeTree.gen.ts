@@ -16,7 +16,6 @@ import { Route as NotAuthorizedRouteImport } from './routes/not-authorized'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TemplateCreateRouteImport } from './routes/template-create'
 import { Route as TemplatesRouteImport } from './routes/templates'
-import { Route as UsageRouteImport } from './routes/usage'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminFeatureFlagsRouteImport } from './routes/admin/feature-flags'
 import { Route as AdminHealthRouteImport } from './routes/admin/health'
@@ -69,11 +68,6 @@ const TemplateCreateRoute = TemplateCreateRouteImport.update({
 const TemplatesRoute = TemplatesRouteImport.update({
   id: '/templates',
   path: '/templates',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UsageRoute = UsageRouteImport.update({
-  id: '/usage',
-  path: '/usage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -178,7 +172,6 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRoute
-  '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/monitoring': typeof AdminMonitoringRoute
@@ -205,7 +198,6 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRoute
-  '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/monitoring': typeof AdminMonitoringRoute
@@ -234,7 +226,6 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/template-create': typeof TemplateCreateRoute
   '/templates': typeof TemplatesRoute
-  '/usage': typeof UsageRoute
   '/admin/feature-flags': typeof AdminFeatureFlagsRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/monitoring': typeof AdminMonitoringRoute
@@ -264,7 +255,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/template-create'
     | '/templates'
-    | '/usage'
     | '/admin/feature-flags'
     | '/admin/health'
     | '/admin/monitoring'
@@ -291,7 +281,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/template-create'
     | '/templates'
-    | '/usage'
     | '/admin/feature-flags'
     | '/admin/health'
     | '/admin/monitoring'
@@ -319,7 +308,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/template-create'
     | '/templates'
-    | '/usage'
     | '/admin/feature-flags'
     | '/admin/health'
     | '/admin/monitoring'
@@ -348,7 +336,6 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   TemplateCreateRoute: typeof TemplateCreateRoute
   TemplatesRoute: typeof TemplatesRoute
-  UsageRoute: typeof UsageRoute
   EventsCreateRoute: typeof EventsCreateRoute
   RequestStatusNotificationRequestIdRoute: typeof RequestStatusNotificationRequestIdRoute
   TemplateEditTemplateIdRoute: typeof TemplateEditTemplateIdRoute
@@ -408,13 +395,6 @@ declare module '@tanstack/react-router' {
       path: '/templates'
       fullPath: '/templates'
       preLoaderRoute: typeof TemplatesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/usage': {
-      id: '/usage'
-      path: '/usage'
-      fullPath: '/usage'
-      preLoaderRoute: typeof UsageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -585,7 +565,6 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   TemplateCreateRoute: TemplateCreateRoute,
   TemplatesRoute: TemplatesRoute,
-  UsageRoute: UsageRoute,
   EventsCreateRoute: EventsCreateRoute,
   RequestStatusNotificationRequestIdRoute:
     RequestStatusNotificationRequestIdRoute,
