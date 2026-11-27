@@ -3,37 +3,34 @@ import { cstarApi } from '@/api/cstar.api'
 import type { CstarGroup } from '@/api/cstar.api'
 import { useAppSelector } from '@/redux/hooks'
 
-/**
- * The selected tenant's CSTAR groups, for the group picker on an event's Email Notification tab.
- *
- * The list is tenant-scoped and the backend takes the tenant from the request header, so this
- * waits for a selected tenant and re-fetches when it changes.
- *
- * Failures are deliberately not surfaced: the form around the picker is still usable without the
- * list, and the page reports its own save errors.
- */
-export function useCstarGroups(): CstarGroup[] {
-  const selectedTenantId = useAppSelector((state) => state.tenant.selectedTenant?.id)
-  const [groups, setGroups] = useState<CstarGroup[]>([])
+export type CstarGroupsStatus = 'loading' | 'ready' | 'disabled' | 'error'
+
+/** Load tenant-scoped options and distinguish operator disablement from lookup failure. */
+export function useCstarGroups() {
+  const tenantId = useAppSelector((state) => state.tenant.selectedTenant?.id)
+  const [state, setState] = useState<{
+    tenantId: string | undefined
+    groups: CstarGroup[]
+    status: CstarGroupsStatus
+  }>({ tenantId: undefined, groups: [], status: 'loading' })
 
   useEffect(() => {
-    if (!selectedTenantId) return
-
+    if (!tenantId) return
     let active = true
-
-    cstarApi
-      .fetchTenantGroups()
-      .then((fetched) => {
-        if (active) {
-          setGroups(fetched)
-        }
-      })
-      .catch(() => {})
-
+    cstarApi.fetchTenantGroupAvailability().then(
+      ({ groups, enabled }) => {
+        if (active) setState({ tenantId, groups, status: enabled ? 'ready' : 'disabled' })
+      },
+      () => {
+        if (active) setState({ tenantId, groups: [], status: 'error' })
+      },
+    )
     return () => {
       active = false
     }
-  }, [selectedTenantId])
+  }, [tenantId])
 
-  return groups
+  return state.tenantId === tenantId && tenantId
+    ? state
+    : { groups: [], status: 'loading' as const }
 }

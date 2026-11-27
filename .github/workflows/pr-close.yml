@@ -23,7 +23,7 @@ jobs:
       oc_server: https://api.silver.devops.gov.bc.ca:6443
     with:
       cleanup: helm
-      packages: backend frontend migrations
+      packages: backend frontend migrations notify-cstar-mcp
 
   cleanup_db: # TODO move it off to another action later.
     name: Remove DB User from Crunchy

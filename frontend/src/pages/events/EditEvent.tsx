@@ -45,7 +45,7 @@ const EditEvent: FC<EditEventProps> = ({
   const { canEdit } = useCstarRoles()
   // Fetched here rather than in the email tab, the same way the tenant's logos and default sender
   // are: the tab takes everything outside its own form as a prop.
-  const cstarGroups = useCstarGroups()
+  const { groups: cstarGroups, status: cstarGroupsStatus } = useCstarGroups()
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
   const defaultSenderEmail = useAppSelector((state) => state.tenantSettings.defaultSenderEmail)
@@ -261,6 +261,7 @@ const EditEvent: FC<EditEventProps> = ({
           tenantName={tenantName}
           onUnsavedChangesChange={setEmailHasUnsavedChanges}
           cstarGroups={cstarGroups}
+          cstarGroupsStatus={cstarGroupsStatus}
         />
       )
 

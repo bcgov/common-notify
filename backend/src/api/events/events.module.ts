@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
+import { McpClientModule } from '../../services/mcp/mcp-client.module'
 import { CstarModule } from '../../services/cstar/cstar.module'
 import { TenantsModule } from '../admin/tenants/tenants.module'
 import { EmailLogoModule } from '../email-logo/email-logo.module'
@@ -30,6 +31,7 @@ import { EventNotificationResolver } from './event-notification.resolver'
     ]),
     TenantsModule,
     CstarModule,
+    McpClientModule,
     FeatureFlagModule,
     EmailLogoModule,
     TemplatesModule,

@@ -26,6 +26,9 @@ export class CstarGroupResponseDto {
  * DTO for the tenant's CSTAR groups
  */
 export class CstarGroupListResponseDto {
+  /** Whether the MCP server and both required group tools are enabled. */
+  enabled: boolean
+
   /**
    * The groups defined in the authenticated tenant. Empty when the tenant has none.
    */

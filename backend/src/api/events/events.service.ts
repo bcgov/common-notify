@@ -31,7 +31,7 @@ import { TemplatesRepository } from '../templates/templates.repository'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
 import { applyParsedListQueryToQueryBuilder } from '../../common/query/typeorm-list-query.util'
 import type { ParsedListQuery, QueryableFieldsConfig } from '../../common/query/list-query.types'
-import { CstarApiClient } from '../../services/cstar/cstar-api.client'
+import { McpGroupsService } from '../../services/mcp/mcp-groups.service'
 import { CstarGroupListResponseDto } from './schemas/cstar-group-response.dto'
 import { FeatureFlagService } from '../feature-flag/feature-flag.service'
 import { FeatureFlagCode } from '../../enum/feature-flag-code.enum'
@@ -61,15 +61,13 @@ interface DesiredCstarGroup {
 }
 
 /**
- * The CSTAR tenant the caller is acting in, and the token to reach CSTAR with. Needed to check
+ * The authenticated CSTAR tenant the caller is acting in. Needed to check
  * that the CSTAR group IDs an event is being pointed at actually belong to that tenant, since
  * groups live in CSTAR and cannot be constrained by a foreign key here.
  */
 export interface CstarRequestContext {
   /** The CSTAR tenant ID, i.e. notify's tenant.externalId. */
   tenantId: string
-  /** The caller's Authorization header, passed through to CSTAR. */
-  authHeader?: string
 }
 
 export const eventListQueryConfig: QueryableFieldsConfig = {
@@ -123,7 +121,7 @@ export class EventsService {
     private readonly emailLogoService: EmailLogoService,
     private readonly templatesRepository: TemplatesRepository,
     private readonly configService: ConfigService,
-    private readonly cstarApiClient: CstarApiClient,
+    private readonly mcpGroups: McpGroupsService,
     private readonly smsNumbersService: SmsNumbersService,
     private readonly featureFlagService: FeatureFlagService,
     private readonly tenantSettingsService: TenantSettingsService,
@@ -314,12 +312,14 @@ export class EventsService {
    *
    * The same list is what updateEmailChannelSetting below validates saved group IDs against.
    *
-   * @param cstar CSTAR tenant and token to look the groups up with
+   * @param cstar Authenticated tenant context; credentials are owned by the MCP adapter
    */
   async listCstarGroups(cstar: CstarRequestContext): Promise<CstarGroupListResponseDto> {
-    const groups = await this.cstarApiClient.getTenantGroups(cstar.tenantId, cstar.authHeader)
+    if (!(await this.mcpGroups.isEnabled())) return { groups: [], enabled: false }
+    const groups = await this.mcpGroups.getTenantGroups(cstar.tenantId)
 
     return {
+      enabled: true,
       groups: groups.map((group) => ({
         id: group.id,
         name: group.name,
@@ -390,9 +390,17 @@ export class EventsService {
     // Groups are deliberately absent from the cap: how many people a group stands for is only
     // known once CSTAR resolves it, which is the send path's job, not this save's.
     await this.assertWithinRecipientCap('email', recipients.length)
-    await this.assertCstarGroupsBelongToTenant(cstarGroups, cstar)
-
     const setting = this.findOrCreateEmailSetting(event, userId)
+    const savedGroupIds = new Set(
+      (setting.isDeleted ? [] : (setting.cstarGroups ?? []))
+        .filter((group) => !group.isDeleted)
+        .map((group) => group.cstarGroupId),
+    )
+    // Previously validated IDs remain valid for edits, removals and moves between To/Cc/Bcc.
+    await this.assertCstarGroupsBelongToTenant(
+      cstarGroups.filter((group) => !savedGroupIds.has(group.cstarGroupId)),
+      cstar,
+    )
 
     // Mirrors chk_event_channel_setting_active_complete, checked against the incoming `active`
     // rather than the stored one: switching the channel on requires the settings being saved
@@ -939,8 +947,7 @@ export class EventsService {
    * group. Checked against the same listing the picker is populated from (listCstarGroups), so
    * an ID the UI could offer is an ID that passes here.
    *
-   * One CSTAR call per save, and only when groups were actually submitted: an event saved with
-   * typed-in addresses alone never reaches CSTAR.
+   * One CSTAR call only when this save adds group IDs that are not already saved.
    */
   private async assertCstarGroupsBelongToTenant(
     cstarGroups: DesiredCstarGroup[],
@@ -954,7 +961,7 @@ export class EventsService {
       )
     }
 
-    const tenantGroups = await this.cstarApiClient.getTenantGroups(cstar.tenantId, cstar.authHeader)
+    const tenantGroups = await this.mcpGroups.getTenantGroups(cstar.tenantId)
     const permitted = new Set(tenantGroups.map((group) => group.id))
     const unknown = [
       ...new Set(

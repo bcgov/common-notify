@@ -681,6 +681,20 @@ routes:
   # ============================================================================
   # FEATURE FLAG ADMIN ROUTES (admin only)
   # ============================================================================
+  # MCP registry administration (SSO NOTIFY_ADMIN; no tenant authorization bypass).
+  - name: ${ROUTE_PREFIX}admin-mcp-servers-frontend
+    tags: [${CONFIG_TAG}]
+    hosts:
+      - ${GATEWAY_HOSTNAME}
+    paths:
+      - ${PATH_PREFIX}/api/v1/frontend/admin/mcp-servers
+    methods: [GET, POST]
+    strip_path: true
+    https_redirect_status_code: 426
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+
   # /api/v1/frontend/admin/feature-flags (list all)
   - name: ${ROUTE_PREFIX}admin-feature-flags-list-frontend
     tags: [${CONFIG_TAG}]
@@ -1880,6 +1894,13 @@ plugins:
   # ============================================================================
   # FEATURE FLAG ADMIN ROUTES PLUGINS
   # ============================================================================
+  # MCP registry uses the existing frontend JWT policy.
+  - name: jwt-keycloak
+    tags: [${CONFIG_TAG}]
+    enabled: true
+    route: ${ROUTE_PREFIX}admin-mcp-servers-frontend
+    config: *jwtConfig
+
   # Admin Feature Flags List - Frontend Admin Token
   - name: jwt-keycloak
     tags: [${CONFIG_TAG}]

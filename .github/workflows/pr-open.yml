@@ -27,17 +27,31 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        package: [backend, frontend, migrations]
+        package: [backend, frontend, migrations, notify-cstar-mcp]
     timeout-minutes: 10
     steps:
+      - uses: actions/checkout@v7
+        if: matrix.package == 'notify-cstar-mcp'
+      - uses: actions/setup-node@v7
+        if: matrix.package == 'notify-cstar-mcp'
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: mcp-servers/cstar/package-lock.json
+      - name: Test CSTAR MCP adapter
+        if: matrix.package == 'notify-cstar-mcp'
+        run: npm ci --ignore-scripts && npm test
+        working-directory: mcp-servers/cstar
       - uses: bcgov/action-builder-ghcr@cb2629351c87dd1c2130073e4ebb7233a9653a63 # v4.4.1
         with:
           package: ${{ matrix.package }}
+          build_context: ${{ matrix.package == 'notify-cstar-mcp' && 'mcp-servers/cstar' || matrix.package }}
+          build_file: ${{ matrix.package == 'notify-cstar-mcp' && 'mcp-servers/cstar/Dockerfile' || format('{0}/Dockerfile', matrix.package) }}
           tags: ${{ github.event.number }}
-          # Unchanged packages reuse :dev, except migrations: it always builds (it is only a COPY
-          # of the SQL) so a PR's schema never trails a stale :dev.
-          tag_fallback: ${{ matrix.package != 'migrations' && 'dev' || '' }}
-          triggers: ('${{ matrix.package }}/')
+          # Backend/frontend may reuse :dev. Migrations and MCP always build from the PR
+          # so the schema and adapter being tested match this branch.
+          tag_fallback: ${{ matrix.package != 'migrations' && matrix.package != 'notify-cstar-mcp' && 'dev' || '' }}
+          triggers: ('${{ matrix.package == 'notify-cstar-mcp' && 'mcp-servers/cstar' || matrix.package }}/')
 
   import:
     name: Import to ImageStream
@@ -45,7 +59,7 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        package: [backend, frontend, migrations]
+        package: [backend, frontend, migrations, notify-cstar-mcp]
     steps:
       - name: Import image to OpenShift ImageStream
         uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
@@ -131,7 +145,7 @@ jobs:
         --set backend.clamav.enabled=false
         --set backend.awsSms.credentialsSync.enabled=false
         --set backend.clamav.host=common-notify-dev-clamav
-      triggers: ('backend/' 'frontend/' 'migrations/' 'charts/' 'api-gateway/' '.github/workflows/.deployer.yml')
+      triggers: ('backend/' 'frontend/' 'migrations/' 'charts/' 'api-gateway/' 'mcp-servers/' '.github/workflows/pr-open.yml' '.github/workflows/.deployer.yml')
       db_triggers: ('charts/crunchy/')
       redis_triggers: ('charts/redis/')
 

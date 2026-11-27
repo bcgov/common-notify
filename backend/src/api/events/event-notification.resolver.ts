@@ -10,7 +10,7 @@ import { Repository } from 'typeorm'
 import { NotifyEvent } from './entities/event.entity'
 import { EventChannelSetting } from './entities/event-channel-setting.entity'
 import { NotifyConfiguration } from '../notification/entities/configuration.entity'
-import { CstarApiClient } from '../../services/cstar/cstar-api.client'
+import { McpGroupsService } from '../../services/mcp/mcp-groups.service'
 import { EventRecipientKind } from '../../enum/event-recipient-kind.enum'
 import { NotificationChannel } from '../../enum/notification-channel.enum'
 import type { NotifySimpleRequest } from '../notify/schemas/notify-simple-request'
@@ -58,7 +58,7 @@ export class EventNotificationResolver {
     private readonly channelSettingRepository: Repository<EventChannelSetting>,
     @InjectRepository(NotifyConfiguration)
     private readonly configurationRepository: Repository<NotifyConfiguration>,
-    private readonly cstarApiClient: CstarApiClient,
+    private readonly mcpGroups: McpGroupsService,
   ) {}
 
   /**
@@ -262,10 +262,7 @@ export class EventNotificationResolver {
     // the event's groups; every other failure passes through as it is.
     let members: string[]
     try {
-      members = await this.cstarApiClient.getGroupMemberEmailsAsServiceAccount(
-        cstarTenantId,
-        groupIds,
-      )
+      members = await this.mcpGroups.getGroupMemberEmails(cstarTenantId, groupIds)
     } catch (error) {
       if (!(error instanceof ForbiddenException)) throw error
       throw new UnprocessableEntityException(
