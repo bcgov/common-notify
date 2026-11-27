@@ -67,6 +67,69 @@ describe('detectVariables', () => {
     },
   )
 
+  describe.each([TemplateEngine.HANDLEBARS, TemplateEngine.MJML])('%s scopes', (engine) => {
+    it('skips this and names scoped to an #each or #with item', () => {
+      expect(
+        detectVariables(
+          '{{this}} {{#each people}}{{name}} {{this}} {{#if this}}x{{/if}} {{@index}}{{/each}} ' +
+            '{{#with owner}}{{email}}{{#each tags}}{{label}}{{/each}}{{/with}} {{title}}',
+          engine,
+        ),
+      ).toEqual([
+        { name: 'people', type: 'text' },
+        { name: 'owner', type: 'text' },
+        { name: 'title', type: 'text' },
+      ])
+    })
+
+    it('detects the list of an #each with block parameters, skipping the parameter', () => {
+      expect(
+        detectVariables('{{#each staff as |member|}}{{member.name}}{{/each}}', engine),
+      ).toEqual([{ name: 'staff', type: 'text' }])
+    })
+
+    it('collects names in an else branch, which renders against the outer data', () => {
+      expect(
+        detectVariables(
+          '{{#each items}}{{name}}{{else}}{{emptyMessage}}{{/each}} ' +
+            '{{#with owner}}{{email}}{{^}}{{noOwner}}{{/with}}',
+          engine,
+        ),
+      ).toEqual([
+        { name: 'items', type: 'text' },
+        { name: 'emptyMessage', type: 'text' },
+        { name: 'owner', type: 'text' },
+        { name: 'noOwner', type: 'text' },
+      ])
+    })
+
+    it('tests the variable of an {{else if}} rather than adding a variable named if', () => {
+      expect(
+        detectVariables('{{#if a}}A{{else if b}}B{{else unless c}}C{{else}}D{{/if}}', engine),
+      ).toEqual([
+        { name: 'a', type: 'boolean' },
+        { name: 'b', type: 'boolean' },
+        { name: 'c', type: 'boolean' },
+      ])
+    })
+
+    it('picks the outer scope back up after a block closes', () => {
+      expect(detectVariables('{{#each items}}{{name}}{{/each}}{{name}}', engine)).toEqual([
+        { name: 'items', type: 'text' },
+        { name: 'name', type: 'text' },
+      ])
+    })
+  })
+
+  it('keeps names inside a Mustache section, which looks them up through enclosing data', () => {
+    expect(
+      detectVariables('{{#people}}{{name}} {{.}}{{/people}}', TemplateEngine.MUSTACHE),
+    ).toEqual([
+      { name: 'people', type: 'boolean' },
+      { name: 'name', type: 'text' },
+    ])
+  })
+
   it('does not detect dotted names in legacy GC Notify, which has no path syntax', () => {
     expect(detectVariables('((user.name)) ((name))', TemplateEngine.LEGACY_GC_NOTIFY)).toEqual([
       { name: 'name', type: 'text' },

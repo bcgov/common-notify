@@ -16,8 +16,9 @@ type VariableUse = 'printed' | 'tested'
 const IDENTIFIER = /^[a-zA-Z_$][\w$]*$/
 
 // Matches an identifier or a dotted path of them (e.g. user.firstName), which Handlebars and
-// Mustache resolve against nested data. `this.x` is the current context, not template data.
-const PATH = /^(?!this\.)[a-zA-Z_$][\w$]*(?:\.[a-zA-Z_$][\w$]*)*$/
+// Mustache resolve against nested data. `this` and `this.x` are the current context, not template
+// data.
+const PATH = /^(?!this(?:\.|$))[a-zA-Z_$][\w$]*(?:\.[a-zA-Z_$][\w$]*)*$/
 
 // Tags are found with indexOf rather than a regex: a lazy group between optional-whitespace
 // quantifiers rescans the body from every position when a tag is left unclosed, and the body is
@@ -100,50 +101,92 @@ function collectLegacy(body: string, into: VariableCollector): void {
 
 const BLOCK_HELPERS = new Set(['if', 'unless', 'each', 'with'])
 
-/** A block open: {{#if x}}, {{#unless x}}, {{#each x}}, {{#with x}} or a section {{#x}}. */
-function collectBlockOpen(inner: string, into: VariableCollector): void {
+/**
+ * A block open: {{#if x}}, {{#unless x}}, {{#each x}}, {{#with x}} or a section {{#x}}.
+ * Returns whether the block renders against the value it is given (#each, #with) rather than the
+ * data around it. `into` is null when the block's own name belongs to an enclosing item.
+ */
+function collectBlockOpen(inner: string, into: VariableCollector | null): boolean {
   const tokens = inner.slice(1).trim().split(/\s+/)
   const helper = tokens[0]
 
   if (BLOCK_HELPERS.has(helper) && tokens.length > 1) {
-    // #each / #with take a value rather than a condition, so they count as printed.
-    const use: VariableUse = helper === 'if' || helper === 'unless' ? 'tested' : 'printed'
-    into.add(tokens.at(-1) as string, use)
-    return
+    if (helper === 'if' || helper === 'unless') {
+      into?.add(tokens.at(-1) as string, 'tested')
+      return false
+    }
+    // #each / #with take a value rather than a condition, so it counts as printed. The value
+    // comes first; `as |item|` block parameters may follow it.
+    into?.add(tokens[1], 'printed')
+    return true
   }
 
   // Mustache section / inverted section: the token itself is the variable
-  into.add(helper.replace(/^&/, ''), 'tested')
+  into?.add(helper.replace(/^&/, ''), 'tested')
+  return false
 }
 
 /** Plain interpolation, possibly a helper call: {{x}}, {{& x}}, {{formatDate x}}. */
-function collectInterpolation(inner: string, into: VariableCollector): void {
+function collectInterpolation(inner: string, into: VariableCollector | null): void {
   const tokens = inner.replace(/^&\s*/, '').split(/\s+/)
   if (tokens.length === 1) {
-    into.add(tokens[0], 'printed')
+    into?.add(tokens[0], 'printed')
     return
   }
 
   // Helper invocation - treat the arguments as variables
   for (const token of tokens.slice(1)) {
-    into.add(token.replace(/^&/, ''), 'printed')
+    into?.add(token.replace(/^&/, ''), 'printed')
   }
 }
 
-/** Handlebars / Mustache / MJML syntax: {{ var }} and {{{ var }}}. */
-function collectMustache(body: string, into: VariableCollector): void {
+/** Where a tag's names go: nowhere when an enclosing block renders against its own item. */
+function targetFor(blocks: boolean[], into: VariableCollector): VariableCollector | null {
+  return blocks.includes(true) ? null : into
+}
+
+/**
+ * A close tag or an else - {{/x}}, {{else}}, {{^}} or {{else if x}} - which changes the data the
+ * tags after it read. Returns whether `inner` was one.
+ */
+function applyBlockBoundary(inner: string, blocks: boolean[], into: VariableCollector): boolean {
+  if (inner.startsWith('/')) {
+    blocks.pop()
+    return true
+  }
+  if (inner !== 'else' && inner !== '^' && !inner.startsWith('else ')) return false
+
+  // An else branch renders against the outer data, as when an #each list is empty.
+  if (blocks.length > 0) blocks[blocks.length - 1] = false
+  // {{else if x}} continues the chain, so `x` is tested just as in the block it follows.
+  const chained = inner.startsWith('else ') ? inner.slice('else '.length).trim() : ''
+  if (chained) collectBlockOpen(`#${chained}`, targetFor(blocks, into))
+  return true
+}
+
+/**
+ * Handlebars / Mustache / MJML syntax: {{ var }} and {{{ var }}}.
+ *
+ * Handlebars renders an #each or #with block against the item it is given, so names inside one
+ * are the item's, not template data, and get no input. Mustache looks a name up through every
+ * enclosing section, so it has no such scope and its names are always collected.
+ */
+function collectMustache(body: string, into: VariableCollector, isHandlebars: boolean): void {
+  // One entry per open block, innermost last: whether it renders against its own item.
+  const blocks: boolean[] = []
+
   for (const tag of mustacheTagContents(body)) {
     const inner = tag.trim()
-    if (!inner) continue
+    // Empty, a comment or a partial: no variable of its own.
+    if (!inner || inner.startsWith('!') || inner.startsWith('>')) continue
+    if (applyBlockBoundary(inner, blocks, into)) continue
 
-    const lead = inner[0]
-    // Close tag, comment or partial, and {{else}}, reference no variable of their own.
-    if (lead === '/' || lead === '!' || lead === '>' || inner === 'else') continue
-
-    if (lead === '#' || lead === '^') {
-      collectBlockOpen(inner, into)
+    // A tag inside an item scope is still read, for the blocks it opens.
+    const target = targetFor(blocks, into)
+    if (inner.startsWith('#') || inner.startsWith('^')) {
+      blocks.push(collectBlockOpen(inner, target) && isHandlebars)
     } else {
-      collectInterpolation(inner, into)
+      collectInterpolation(inner, target)
     }
   }
 }
@@ -162,7 +205,7 @@ export function detectVariables(body: string, engine: TemplateEngine): DetectedV
   }
 
   const collector = new VariableCollector(PATH)
-  collectMustache(body, collector)
+  collectMustache(body, collector, engine !== TemplateEngine.MUSTACHE)
 
   return collector.toList()
 }
