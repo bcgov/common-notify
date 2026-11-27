@@ -22,7 +22,6 @@ import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettin
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
 import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined'
-import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
 // import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined'
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined'
 import { CSTAR_ROLE_DISPLAY } from '@/enum/cstar-role.enum'
@@ -56,11 +55,6 @@ const navItems = [
     label: 'Send Batch Notifications',
     to: '/bulk-notifications',
     icon: <SendOutlinedIcon />,
-  },
-  {
-    label: 'Usage & Limits',
-    to: '/usage',
-    icon: <SpeedOutlinedIcon />,
   },
   {
     label: 'Settings',
@@ -115,7 +109,6 @@ const Sidebar: FC = () => {
   }
   // Get user from Redux store (populated from JWT token)
   const user = useAppSelector((state) => state.auth.user)
-  const cstarTenants = useAppSelector((state) => state.cstar.tenants)
   const selectedTenant = useAppSelector((state) => state.tenant.selectedTenant)
   const { primaryRole, hasTenantRole } = useCstarRoles()
   const isAdmin = UserService.hasRole(SsoRole.NOTIFY_ADMIN)
@@ -124,10 +117,6 @@ const Sidebar: FC = () => {
   const { canAccess: canDashboard } = useDashboardAccess()
   // Events are behind a feature flag; hide the nav item until it is enabled for the tenant
   const eventsEnabled = useFeatureFlag('events', selectedTenant?.id)
-
-  // Determine which menu items to show based on roles
-  // Dashboard and Templates require CSTAR roles (assume NOTIFY_VIEWER or similar)
-  const showUsage = cstarTenants.length > 0
 
   const handleLogout = () => {
     UserService.doLogout()
@@ -172,7 +161,6 @@ const Sidebar: FC = () => {
             (item.to === '/events' && hasTenantRole && eventsEnabled) ||
             (item.to === '/templates' && hasTenantRole) ||
             (item.to === '/bulk-notifications' && canBulkNotify) ||
-            (item.to === '/usage' && showUsage) ||
             (item.to === '/settings' && hasTenantRole)
 
           return shouldShow ? (

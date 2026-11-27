@@ -5,6 +5,7 @@ import { fetchSettings } from '@/redux/thunks/settings.thunks'
 
 const dispatchMock = vi.fn()
 const tenantMounts = vi.fn()
+const usageMounts = vi.fn()
 
 let state: any
 
@@ -27,6 +28,12 @@ vi.mock('./sections/TenantSettings', () => ({
 }))
 vi.mock('./sections/EmailSettings', () => ({ default: () => <div>email section</div> }))
 vi.mock('./sections/SmsSettings', () => ({ default: () => <div>sms section</div> }))
+vi.mock('./sections/UsageLimits', () => ({
+  default: () => {
+    usageMounts()
+    return <div>usage section</div>
+  },
+}))
 
 vi.mock('@/components/Breadcrumb', () => ({ default: () => null }))
 
@@ -82,6 +89,7 @@ describe('Settings page', () => {
 
     await screen.findByText('tenant section')
     expect(fetchSettings).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('heading', { name: 'Settings', level: 1 })).toBeInTheDocument()
   })
 
   it('shows the loading placeholder and no section while the fetch is in flight', async () => {
@@ -144,6 +152,51 @@ describe('Settings page', () => {
     await waitFor(() => expect(fetchSettings).toHaveBeenCalledTimes(2))
     // Remounted rather than reused, so it reseeds from the newly loaded slice values.
     expect(tenantMounts).toHaveBeenCalledTimes(2)
-    expect(screen.getByText('Tenant Two')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Settings', level: 1 })).toBeInTheDocument()
+  })
+
+  it('opens usage without re-fetching and switches back to tenant settings', async () => {
+    render(<Settings />)
+    await screen.findByText('tenant section')
+
+    fireEvent.click(screen.getByText('Usage & Limits'))
+    expect(screen.getByText('usage section')).toBeInTheDocument()
+    expect(screen.queryByText('tenant section')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Tenant Settings'))
+    expect(screen.getByText('tenant section')).toBeInTheDocument()
+    expect(screen.queryByText('usage section')).not.toBeInTheDocument()
+    expect(fetchSettings).toHaveBeenCalledTimes(1)
+  })
+
+  it('waits for settings before mounting usage', async () => {
+    const { promise, resolve } = deferred()
+    dispatchMock.mockImplementation(() => ({ unwrap: () => promise }))
+    render(<Settings />)
+    fireEvent.click(screen.getByText('Usage & Limits'))
+
+    expect(screen.getByText('Loading settings...')).toBeInTheDocument()
+    expect(usageMounts).not.toHaveBeenCalled()
+    resolve()
+    expect(await screen.findByText('usage section')).toBeInTheDocument()
+  })
+
+  it('unmounts usage while switching tenants and remounts after loading', async () => {
+    const { rerender } = render(<Settings />)
+    await screen.findByText('tenant section')
+    fireEvent.click(screen.getByText('Usage & Limits'))
+    expect(usageMounts).toHaveBeenCalledTimes(1)
+
+    const { promise, resolve } = deferred()
+    dispatchMock.mockImplementation(() => ({ unwrap: () => promise }))
+    state = { tenant: { selectedTenant: tenant('tenant-2', 'Tenant Two') } }
+    rerender(<Settings />)
+    expect(screen.queryByText('usage section')).not.toBeInTheDocument()
+    expect(screen.getByText('Loading settings...')).toBeInTheDocument()
+
+    resolve()
+    expect(await screen.findByText('usage section')).toBeInTheDocument()
+    expect(usageMounts).toHaveBeenCalledTimes(2)
+    expect(fetchSettings).toHaveBeenCalledTimes(2)
   })
 })
