@@ -5,11 +5,14 @@
 #   enabled`, which upstream renamed to `pdb.create`, so dev had PDBs regardless.
 # - Disabled Sentinel (not needed with only 1 replica)
 replica:
-  replicaCount: 1
+  # Sentinel needs a majority to agree, so 3 nodes for quorum 2. In Sentinel mode
+  # this is the redis-node count, not a replica count alongside a master.
+  replicaCount: 3
   pdb:
     create: false
 sentinel:
-  enabled: false
+  # DEV and the PR envs pilot Sentinel before TEST and PROD are cut over (CCP-6557).
+  enabled: true
 master:
   pdb:
     create: false

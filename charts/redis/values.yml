@@ -1,6 +1,6 @@
 # Redis configuration for job queues and caching
-# Based on BC Gov OpenShift best practices - using Sentinel architecture
-# Storage quota freed - ready for automated deployment
+# DEV/PR run Sentinel (values-dev.yml); TEST and PROD still run the plain
+# master/replicas topology below until their cutover window (CCP-6557).
 architecture: replication
 global:
   storageClass: netapp-block-standard
@@ -98,7 +98,9 @@ sentinel:
   # Enabling it now would switch to the `redis-node` topology, remove the
   # `-redis-master` service the backend targets, and break the app. Keep it off.
   enabled: false
-  quorum: 1
+  # Must be a majority of the nodes, or one Sentinel can call a failover alone.
+  # 3 nodes -> 2. The chart's own default is 2; this file had overridden it to 1.
+  quorum: 2
   podSecurityContext:
     enabled: true
     fsGroup: null
