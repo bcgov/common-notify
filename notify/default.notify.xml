@@ -1042,6 +1042,7 @@
       <table name="template" remarks="Templates for notifications. Each template is scoped to a tenant and can be used to render notifications across different channels." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Template ID (UUID). Primary key." size="2147483647" type="uuid" typeCode="1111">
             <child column="template_id" foreignKey="fk_event_channel_setting_template" implied="false" onDeleteCascade="false" schema="notify" table="event_channel_setting"/>
+            <child column="template_id" foreignKey="fk_template_preview_data_template" implied="false" onDeleteCascade="true" schema="notify" table="template_preview_data"/>
             <child column="template_id" foreignKey="fk_template_version_template" implied="false" onDeleteCascade="true" schema="notify" table="template_version"/>
          </column>
          <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="tenant_id" nullable="false" remarks="Tenant ID (UUID). Identifies which tenant owns this template." size="2147483647" type="uuid" typeCode="1111"/>
@@ -1112,6 +1113,21 @@
          <index name="template_engine_code_pkey" unique="true">
             <column ascending="true" name="engine_code"/>
          </index>
+      </table>
+      <table name="template_preview_data" remarks="Sample placeholder values used to preview a template, one row per template. Shared by the template editor and the events page preview. Sample data only - never used for a real send." schema="notify" type="TABLE">
+         <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="template_id" nullable="false" remarks="Template the values belong to. Also the primary key: a template has one set of preview values. Cascade deleted with the template." size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="fk_template_preview_data_template" implied="false" onDeleteCascade="true" schema="notify" table="template"/>
+         </column>
+         <column autoUpdated="false" defaultValue="'{}'::jsonb" digits="0" id="1" name="params" nullable="false" remarks="Preview values keyed by placeholder name, e.g. {&quot;firstName&quot;: &quot;Jane&quot;}. Booleans are stored as the strings &quot;true&quot;/&quot;false&quot;, as the preview form holds them." size="2147483647" type="jsonb" typeCode="1111"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="2" name="created_at" nullable="false" remarks="Timestamp with timezone when preview values were first saved for the template." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="created_by" nullable="false" remarks="Identifier of the user who first saved preview values for the template." size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="updated_at" nullable="false" remarks="Timestamp with timezone when the preview values were last saved. Maintained by trg_template_preview_data_updated_at." size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="updated_by" nullable="false" remarks="Identifier of the user who last saved the preview values." size="200" type="varchar" typeCode="12"/>
+         <primaryKey column="template_id" sequenceNumberInPK="1"/>
+         <index name="pk_template_preview_data" unique="true">
+            <column ascending="true" name="template_id"/>
+         </index>
+         <checkConstraint constraint="(jsonb_typeof(params) = 'object'::text)" name="chk_template_preview_data_params_object"/>
       </table>
       <table name="template_version" remarks="The current and previous version of each template. Older versions are removed by the version trigger." schema="notify" type="TABLE">
          <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="Version record ID (UUID). Primary key." size="2147483647" type="uuid" typeCode="1111"/>

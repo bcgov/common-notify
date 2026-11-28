@@ -29,6 +29,7 @@ recipient_safelist
 feature_flag
 api_key_limit_alert
 api_key_limit
+template_preview_data
 client_tenant_mapping
 attachment
 webhook_config

@@ -28,6 +28,7 @@ tenant_request
 webhook_config
 attachment
 client_tenant_mapping
+template_preview_data
 api_key_limit
 api_key_limit_alert
 feature_flag
